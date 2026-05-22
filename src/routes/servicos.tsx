@@ -64,13 +64,15 @@ function ServicosPage() {
                   <div key={i} className="h-56 bg-offwhite/10 animate-pulse rounded-xl" />
                 ))
               : services.map((s) => (
-                  <ServiceCard key={s.id} service={s as PublicService} onBuy={onBuy} variant="dark" />
+                  <ServiceCard key={s.id} service={s as PublicService} onBuy={onBuy} onDetails={onDetails} variant="dark" />
                 ))}
           </div>
         </div>
       </section>
       <SiteFooter />
       <CheckoutModal service={selected} open={open} onOpenChange={setOpen} />
+      <ServiceDetailsModal service={details} open={detailsOpen} onOpenChange={setDetailsOpen} onBuy={onBuy} />
+
     </div>
   );
 }
