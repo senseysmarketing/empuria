@@ -23,6 +23,7 @@ import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authe
 import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
 import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_authenticated/portal.ingressos'
 import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenticated/portal.clube'
+import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
 import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
 import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
 import { Route as AuthenticatedAdminPdvRouteImport } from './routes/_authenticated/admin.pdv'
@@ -105,6 +106,12 @@ const AuthenticatedPortalClubeRoute =
     path: '/clube',
     getParentRoute: () => AuthenticatedPortalRoute,
   } as any)
+const AuthenticatedAdminUsuariosRoute =
+  AuthenticatedAdminUsuariosRouteImport.update({
+    id: '/usuarios',
+    path: '/usuarios',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminTriagemRoute =
   AuthenticatedAdminTriagemRouteImport.update({
     id: '/triagem',
@@ -167,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRoute
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
@@ -188,6 +196,7 @@ export interface FileRoutesByTo {
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRoute
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
@@ -213,6 +222,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/_authenticated/portal/clube': typeof AuthenticatedPortalClubeRoute
   '/_authenticated/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/_authenticated/portal/loja': typeof AuthenticatedPortalLojaRoute
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/admin/pdv'
     | '/admin/slots'
     | '/admin/triagem'
+    | '/admin/usuarios'
     | '/portal/clube'
     | '/portal/ingressos'
     | '/portal/loja'
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/admin/pdv'
     | '/admin/slots'
     | '/admin/triagem'
+    | '/admin/usuarios'
     | '/portal/clube'
     | '/portal/ingressos'
     | '/portal/loja'
@@ -283,6 +295,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/pdv'
     | '/_authenticated/admin/slots'
     | '/_authenticated/admin/triagem'
+    | '/_authenticated/admin/usuarios'
     | '/_authenticated/portal/clube'
     | '/_authenticated/portal/ingressos'
     | '/_authenticated/portal/loja'
@@ -399,6 +412,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPortalClubeRouteImport
       parentRoute: typeof AuthenticatedPortalRoute
     }
+    '/_authenticated/admin/usuarios': {
+      id: '/_authenticated/admin/usuarios'
+      path: '/usuarios'
+      fullPath: '/admin/usuarios'
+      preLoaderRoute: typeof AuthenticatedAdminUsuariosRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/triagem': {
       id: '/_authenticated/admin/triagem'
       path: '/triagem'
@@ -467,6 +487,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminPdvRoute: typeof AuthenticatedAdminPdvRoute
   AuthenticatedAdminSlotsRoute: typeof AuthenticatedAdminSlotsRoute
   AuthenticatedAdminTriagemRoute: typeof AuthenticatedAdminTriagemRoute
+  AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
@@ -479,6 +500,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminPdvRoute: AuthenticatedAdminPdvRoute,
   AuthenticatedAdminSlotsRoute: AuthenticatedAdminSlotsRoute,
   AuthenticatedAdminTriagemRoute: AuthenticatedAdminTriagemRoute,
+  AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
