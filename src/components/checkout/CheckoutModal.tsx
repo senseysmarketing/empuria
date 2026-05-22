@@ -196,7 +196,7 @@ export function CheckoutModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg bg-offwhite text-brown-deep border-border">
+      <DialogContent className="max-w-lg bg-offwhite text-brown-deep border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display uppercase tracking-tight text-2xl">
             {service.title}
