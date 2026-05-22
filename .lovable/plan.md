@@ -1,55 +1,57 @@
-## Seção "A Agenda Empuria" na Landing Page
+# Módulo Passaportes Empuria — Gestão de Usuários
 
-Nova seção dinâmica na home (`src/routes/index.tsx`), posicionada logo após o bloco de Serviços (após a Esteira 2 high-ticket) e antes da seção CLUBE. Fundo off-white para contraste com o bloco marrom anterior.
+## 1. Migração de banco
+- `profiles`: adicionar `is_blocked boolean NOT NULL DEFAULT false` e `admin_notes text`.
+- Nova tabela `impersonation_logs`: `id`, `admin_id`, `target_user_id`, `reason text NOT NULL`, `created_at`. RLS: somente staff lê/insere.
+- Sem nova coluna para "Passaporte ID" — derivado do `profile.id` como `EMP-AAAA-XXXXXX` (ano + 6 primeiros hex maiúsculos). Busca por código reverte para `id LIKE`.
 
-### 1. Backend — nova server function
+## 2. Server functions (`src/lib/admin/usuarios.functions.ts`, todas com `requireStaff`)
+- `listUsers({ search, status, clube, period, page, pageSize })` — junta `profiles` com `supabaseAdmin.auth.admin.listUsers()` (paginado) para retornar `email` e `last_sign_in_at`. Filtros aplicados em memória após o merge da página.
+- `updateUserProfile({ id, full_name, phone, is_club_member, admin_notes })`.
+- `setUserBlocked({ id, blocked })` — atualiza `profiles.is_blocked` e chama `auth.admin.updateUserById(id, { ban_duration: blocked ? "876000h" : "none" })`.
+- `forcePasswordReset({ id })` — `auth.admin.generateLink({ type: "recovery" })`, devolve URL para o admin copiar (toast).
+- `changeUserEmail({ id, new_email })` — `auth.admin.updateUserById`.
+- `impersonateUser({ id, reason })` — valida `reason.length >= 10`, grava em `impersonation_logs`, gera magiclink (`auth.admin.generateLink({ type: "magiclink" })`) e retorna a URL. O front faz `window.open(url, "_blank")` — admin permanece logado na aba original.
 
-Adicionar em `src/lib/events/tickets.functions.ts`:
+## 3. Rota e UI (`src/routes/_authenticated/admin.usuarios.tsx`)
 
-- `listHomeEvents`: retorna `{ upcoming, past }`
-  - `upcoming`: eventos com `starts_at >= hoje`, `is_published = true`, ordenados ASC, limit 3.
-  - `past`: eventos com `starts_at < hoje`, `is_published = true`, ordenados DESC, limit 12.
-  - Campos: `id, slug, title, starts_at, cover_url, location_address`.
-  - Usa `supabaseAdmin` (rota pública), igual ao `listPublishedEvents` existente.
+**Bento de controle (topo, `bg-offwhite` em card claro sobre o `bg-admin-bg`):**
+- Busca global com debounce 300 ms (nome, email, código `EMP-…`, UUID).
+- 3 dropdowns: Status (Todos/Ativos/Bloqueados), Clube (Todos/Sim/Não), Cadastro (Todos/7d/Mês).
+- 3 mini-tiles (`MetricTile`): Total ativos, Membros do Clube, Novos no mês.
 
-### 2. Componente da seção
+**Lista (cards em List View, não tabela densa):**
+Cada linha = card `bg-admin-surface` com:
+- Avatar redondo + Nome (Philosopher bold) + email
+- Passaporte ID (monospace, clique copia)
+- Pílula status: verde "Ativo" / vermelha "Bloqueado"
+- Pílula clube: amarela "VIP" / cinza "Standard"
+- Último acesso (relativo: "há 2h")
+- `DropdownMenu` (`MoreVertical`) à direita
 
-Novo arquivo `src/components/events/HomeEventsSection.tsx`:
+**Menu de ações:**
+1. **Editar perfil** → `Sheet` lateral com form (nome, telefone, clube, notas).
+2. **Trocar senha** → confirma → toast com link copiável.
+3. **Alterar e-mail** → modal pequeno.
+4. **Bloquear/Desbloquear** → `AlertDialog` destrutivo.
+5. **Acessar como usuário** → `AlertDialog` com `Textarea` de motivo obrigatório. Ao confirmar: abre magiclink em nova aba (`window.open(url, "_blank", "noopener")`). Aviso amarelo: "Sua sessão de admin permanece nesta aba."
 
-- Header:
-  - Eyebrow laranja: "Agenda & Comunidade"
-  - H2 Unbounded (`font-display`): "A AGENDA EMPURIA: NOSSA COMUNIDADE EM MOVIMENTO."
-  - Subtítulo Philosopher (`font-body italic`): "Mais do que serviços, criamos conexões..."
+Paginação simples (Anterior/Próxima) com `pageSize=25`.
 
-- **Cenário A — `upcoming.length > 0`**: grid `md:grid-cols-3` de até 3 cards:
-  - Imagem capa (60% altura, `aspect-[4/5]` topo).
-  - Tag flutuante amarela (`bg-yellow-brand text-brown`) absolute top-left: dia + mês curto (Ex.: "15 JUN").
-  - Título evento + endereço (`location_address`).
-  - Botão laranja "Ver Detalhes e Ingressos" → `Link to="/evento/$slug"`.
+## 4. Navegação
+- `AdminDock`: adicionar item "Usuários" (ícone `Users`) entre **Clube** e **Auto**.
 
-- **Cenário B — `upcoming.length === 0`**: um único "Card Convite" centralizado, ocupando full width do grid:
-  - Fundo `bg-brown text-offwhite` + classe `bg-topo` (textura topográfica SVG já usada na home).
-  - Headline curto + copy: "Nossa equipe está preparando a próxima grande experiência..."
-  - CTA transparente com borda branca: "Como chegar ao Instituto" → abre Google Maps em nova aba (endereço da Gran Vía, mesmo já presente no footer/site).
+## 5. Segurança
+- Toda ação grava também em `activity_feed` (tipo reaproveita `member_joined` ou novo `user_managed` — escolheremos `user_managed`).
+- Impersonação registrada em `impersonation_logs` com motivo obrigatório; magic link expira em 1h (padrão Supabase).
+- Nenhum segredo no cliente — todo `supabaseAdmin` fica em server functions.
 
-- **Vitrine de Eventos Passados** (sempre visível se `past.length > 0`):
-  - Subtítulo pequeno: "Como foi por aqui"
-  - Carrossel horizontal scroll (`flex overflow-x-auto snap-x`) ou grid compacto `grid-cols-2 md:grid-cols-4 lg:grid-cols-6` sem gaps grandes.
-  - Cada item: imagem `aspect-square`, `grayscale` + transition; em `group-hover`: `grayscale-0` e overlay escuro com título "Como foi o [Nome do Evento]".
-  - Link para `/evento/$slug` (mesma landing page).
-
-### 3. Integração na home
-
-Em `src/routes/index.tsx`:
-
-- Importar `HomeEventsSection` e `listHomeEvents`.
-- Adicionar `queryOptions` + `ensureQueryData` no loader (junto com o atual `fetchServices`).
-- Renderizar `<HomeEventsSection />` entre `</section>` da seção SERVIÇOS (linha ~325) e a seção CLUBE.
-
-### Notas técnicas
-
-- Usar `useSuspenseQuery` no componente para consumir o cache.
-- Datas formatadas em PT-BR (`Intl.DateTimeFormat("pt-BR", { day:"2-digit", month:"short" })`).
-- Sem alterações de schema — tabela `events` já tem todos os campos necessários.
-- Sem alterações de RLS — política "Anyone view published events" já permite leitura anônima.
-- Imagens com `loading="lazy"`.
+## Arquivos
+```text
+supabase/migrations/<timestamp>_passaportes_empuria.sql   (novo)
+src/lib/admin/usuarios.functions.ts                       (novo)
+src/routes/_authenticated/admin.usuarios.tsx              (novo)
+src/components/admin/UsuarioEditSheet.tsx                 (novo)
+src/components/admin/ImpersonateDialog.tsx                (novo)
+src/components/admin/AdminDock.tsx                        (editar — novo item)
+```
