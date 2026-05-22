@@ -1,133 +1,55 @@
+## Seção "A Agenda Empuria" na Landing Page
 
-# Módulo de Eventos & Smart Tickets
+Nova seção dinâmica na home (`src/routes/index.tsx`), posicionada logo após o bloco de Serviços (após a Esteira 2 high-ticket) e antes da seção CLUBE. Fundo off-white para contraste com o bloco marrom anterior.
 
-Sistema nativo de eventos com landing pages dinâmicas, ingressos simples ou multi-categoria, checkout frictionless (pagamento mockado por enquanto) e validação na portaria via QR do Passaporte Empuria.
+### 1. Backend — nova server function
 
----
+Adicionar em `src/lib/events/tickets.functions.ts`:
 
-## Decisões confirmadas
+- `listHomeEvents`: retorna `{ upcoming, past }`
+  - `upcoming`: eventos com `starts_at >= hoje`, `is_published = true`, ordenados ASC, limit 3.
+  - `past`: eventos com `starts_at < hoje`, `is_published = true`, ordenados DESC, limit 12.
+  - Campos: `id, slug, title, starts_at, cover_url, location_address`.
+  - Usa `supabaseAdmin` (rota pública), igual ao `listPublishedEvents` existente.
 
-- **Múltiplos ingressos por usuário**: permitido. Na portaria, mostra `INGRESSO VIP × 3` com 3 botões de check-in individual (ou "Check-in de todos").
-- **Eventos gratuitos**: mesmo fluxo de checkout (nome/WhatsApp/email/senha), sem etapa de pagamento — tela final "Reserva confirmada".
-- **Pagamento**: UI mockada (tela de "PIX gerado" fake + botão "Simular pagamento aprovado"). Sem gateway real.
+### 2. Componente da seção
 
----
+Novo arquivo `src/components/events/HomeEventsSection.tsx`:
 
-## 1. Banco de dados (migration)
+- Header:
+  - Eyebrow laranja: "Agenda & Comunidade"
+  - H2 Unbounded (`font-display`): "A AGENDA EMPURIA: NOSSA COMUNIDADE EM MOVIMENTO."
+  - Subtítulo Philosopher (`font-body italic`): "Mais do que serviços, criamos conexões..."
 
-- **`events`**: slug (unique), title, description, starts_at, ends_at, location_address, location_lat/lng (nullable), cover_url, cover_kind ('image'|'video'), sales_mode ('simples'|'categorias'), is_published, created_by.
-- **`event_ticket_tiers`** (sempre existe; simples = 1 tier "Padrão"): event_id, name, price_cents, capacity (nullable), sold, benefits (jsonb tags), position, is_active.
-- **`event_tickets`**: event_id, tier_id, user_id, order_id (nullable p/ gratuitos), code (8 chars), status ('valido'|'usado'|'cancelado'), checked_in_at, checked_in_by, notes. **Sem unique por user+event** (múltiplas compras permitidas).
-- **Trigger**: inserir ticket válido → `sold++`; deletar/cancelar → `sold--`. Bloqueia insert se `sold >= capacity`.
-- **RLS**: events/tiers públicos quando `is_published`; tickets visíveis ao dono e staff; insert via server fn.
-- **Bucket Storage** `event-covers` (público).
-- **Seed**: 1 evento demo "Sunset de Imigração na Gran Vía" com 3 tiers (Standard €15 / Premium €30 / VIP €45).
+- **Cenário A — `upcoming.length > 0`**: grid `md:grid-cols-3` de até 3 cards:
+  - Imagem capa (60% altura, `aspect-[4/5]` topo).
+  - Tag flutuante amarela (`bg-yellow-brand text-brown`) absolute top-left: dia + mês curto (Ex.: "15 JUN").
+  - Título evento + endereço (`location_address`).
+  - Botão laranja "Ver Detalhes e Ingressos" → `Link to="/evento/$slug"`.
 
----
+- **Cenário B — `upcoming.length === 0`**: um único "Card Convite" centralizado, ocupando full width do grid:
+  - Fundo `bg-brown text-offwhite` + classe `bg-topo` (textura topográfica SVG já usada na home).
+  - Headline curto + copy: "Nossa equipe está preparando a próxima grande experiência..."
+  - CTA transparente com borda branca: "Como chegar ao Instituto" → abre Google Maps em nova aba (endereço da Gran Vía, mesmo já presente no footer/site).
 
-## 2. Admin — Gestão de Eventos
+- **Vitrine de Eventos Passados** (sempre visível se `past.length > 0`):
+  - Subtítulo pequeno: "Como foi por aqui"
+  - Carrossel horizontal scroll (`flex overflow-x-auto snap-x`) ou grid compacto `grid-cols-2 md:grid-cols-4 lg:grid-cols-6` sem gaps grandes.
+  - Cada item: imagem `aspect-square`, `grayscale` + transition; em `group-hover`: `grayscale-0` e overlay escuro com título "Como foi o [Nome do Evento]".
+  - Link para `/evento/$slug` (mesma landing page).
 
-Nova rota `/admin/eventos` + item no `AdminDock`.
+### 3. Integração na home
 
-- **Lista**: próximos / passados / rascunhos, com vendidos / capacidade / receita.
-- **Criar/Editar** (`/admin/eventos/novo`, `/admin/eventos/$id`):
-  - Form: título, slug auto-gerado, datas, endereço, upload de capa, rich-text simples.
-  - Toggle **Simples vs Categorias**:
-    - Simples: preço + toggle "Capacidade limitada" → input numérico.
-    - Categorias: repeater (Nome, Preço, Capacidade, Benefícios em chips).
-  - "Publicar" → `is_published=true`.
-- **Detalhe de vendas**: lista de tickets, busca, contagem de check-ins ao vivo (realtime), exportar CSV.
+Em `src/routes/index.tsx`:
 
-Server fns: `createEvent`, `updateEvent`, `publishEvent`, `listEventsAdmin`, `getEventAdmin`, `listEventTickets`.
+- Importar `HomeEventsSection` e `listHomeEvents`.
+- Adicionar `queryOptions` + `ensureQueryData` no loader (junto com o atual `fetchServices`).
+- Renderizar `<HomeEventsSection />` entre `</section>` da seção SERVIÇOS (linha ~325) e a seção CLUBE.
 
----
+### Notas técnicas
 
-## 3. Landing Page Pública — `evento.$slug.tsx`
-
-Loader chama server fn pública (admin-elevada, filtro `is_published=true`).
-
-- **Hero**: imagem/vídeo com overlay, título Unbounded branco, data em `#e5a657`, countdown.
-- **Bento Grid**: Sobre (Philosopher / offwhite), Local (Google Maps via connector com `loading=async&callback=initMap`; fallback "Local a definir / Online"), Quando (+ `.ics`).
-- **Vitrine de Ingressos**:
-  - Simples: gatilho de escassez ("Restam X") se houver capacidade.
-  - Categorias: cards Bento com radio, nome, preço, benefícios; esgotado = cinza + tag.
-  - **Seletor de quantidade** (1–10) por categoria, já que múltiplos ingressos são permitidos.
-- **Sticky CTA**: label dinâmico — `Garantir meu ingresso · € X`, `Reservar (Gratuito)`, ou `Comprar 2× VIP (€ 90)`.
-- SEO: head() com title/description/og:image = cover_url.
-
----
-
-## 4. Checkout Inteligente (estende `CheckoutModal`)
-
-Aceita novo input `{ ticketTierId, qty }`. Fluxo:
-
-1. Captura Nome / WhatsApp / Email.
-2. `email_exists` → novo pede senha (cria conta) / existente pede senha (login).
-3. **Tela de resumo**: evento + categoria + qty + total. Botão obrigatório **"Comprar Agora"** (Regra de Ouro). Em gratuitos, label = "Confirmar Reserva".
-4. **Pagamento mockado**:
-   - Pago: tela com QR PIX fictício (SVG placeholder) + botão **"Simular pagamento aprovado"** (dev-only, visível por enquanto).
-   - Gratuito: pula direto pra confirmação.
-5. Server fn `confirmTicketPurchase({ tierId, qty })` cria N linhas em `event_tickets` (status `valido`, code único cada), opcionalmente cria `orders` row mockada.
-6. Redireciona para `/portal/ingressos` com toast "🎟️ Ingresso(s) garantido(s)".
-
----
-
-## 5. Portal do Membro
-
-- **Banner no `/portal`** (quando há ingresso para hoje): "🎟️ Você tem N ingresso(s) para *Evento X* hoje — apresente seu Passaporte na entrada".
-- Nova rota `/portal/ingressos` listando futuros e passados (evento, categoria, qty, status, código). Sem QR próprio — o Passaporte vitalício é a chave.
-- Item no `PortalDock`.
-
----
-
-## 6. Scanner Admin de Ingressos
-
-Reusa o `PassportScannerDialog` em **modo evento**. Novo item no `AdminDock` "Validar Ingresso" e botão dentro do detalhe do evento.
-
-Fluxo:
-1. Staff seleciona evento ativo (auto se houver só um hoje) → abre scanner.
-2. Lê `empuria:<uuid>` → server fn `validateEventTicket({ eventId, userId })`.
-3. Retorno:
-   - ✅ **Verde tela cheia**: foto + nome + lista de tickets do usuário p/ esse evento (`INGRESSO VIP × 3`, `STANDARD × 1`), notas. Para cada ticket, botão **"Check-in"** (marca `status=usado`, `checked_in_at`, `checked_in_by`); botão extra **"Check-in de todos"**. Tickets já usados aparecem em cinza com hora do check-in. Check-in é opcional.
-   - ❌ **Vermelho tela cheia**: "Ingresso não encontrado para este evento" ou "Todos os ingressos já foram utilizados".
-4. Botão "Próximo" volta ao scanner.
-
----
-
-## Arquivos
-
-**Criar:**
-- `supabase/migrations/...events.sql` (tabelas, RLS, trigger de inventário, bucket, seed)
-- `src/lib/admin/events.functions.ts`
-- `src/lib/events/public.functions.ts`
-- `src/lib/events/checkout.functions.ts` (confirmTicketPurchase)
-- `src/lib/admin/ticket-validation.functions.ts`
-- `src/routes/_authenticated/admin.eventos.tsx` (lista)
-- `src/routes/_authenticated/admin.eventos.novo.tsx`
-- `src/routes/_authenticated/admin.eventos.$id.tsx`
-- `src/routes/evento.$slug.tsx`
-- `src/routes/_authenticated/portal.ingressos.tsx`
-- `src/components/events/EventHero.tsx`
-- `src/components/events/TicketTierCard.tsx`
-- `src/components/events/StickyTicketCTA.tsx`
-- `src/components/events/EventMap.tsx`
-- `src/components/admin/EventForm.tsx` (com repeater de tiers)
-- `src/components/admin/TicketScannerDialog.tsx`
-- `src/components/admin/TicketValidationResult.tsx`
-- `src/components/portal/EventTicketBanner.tsx`
-- `src/components/checkout/MockPaymentStep.tsx` (PIX fake + "Simular pagamento")
-
-**Editar:**
-- `AdminDock.tsx`, `PortalDock.tsx`
-- `CheckoutModal.tsx` (suporte a `ticketTierId` + `qty` + modo gratuito)
-- `portal.index.tsx` (banner do dia)
-
----
-
-## Stack notes
-
-- Server fns em `*.functions.ts`, com `requireStaff` para admin e `requireSupabaseAuth` para checkout.
-- Loader da landing pública usa server fn admin-elevada (filtro `is_published=true`) — público sem auth.
-- Realtime em `event_tickets` p/ contagem de check-ins no admin.
-- Google Maps via connector (browser key + `loading=async&callback=initMap`).
-- Mock pagamento isolado em `MockPaymentStep` para troca futura por gateway real.
+- Usar `useSuspenseQuery` no componente para consumir o cache.
+- Datas formatadas em PT-BR (`Intl.DateTimeFormat("pt-BR", { day:"2-digit", month:"short" })`).
+- Sem alterações de schema — tabela `events` já tem todos os campos necessários.
+- Sem alterações de RLS — política "Anyone view published events" já permite leitura anônima.
+- Imagens com `loading="lazy"`.
