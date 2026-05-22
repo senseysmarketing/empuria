@@ -1,100 +1,37 @@
-## Objetivo
+## Problema
 
-Reconstruir o Portal do Membro (`/portal`) aplicando o mesmo sistema visual do `/admin` (BentoCard, dock fixo inferior, tipografia Unbounded/display, tokens `admin-*`), com 4 telas modulares, empty states ativos e skeletons.
+A tela `/login` já possui o formulário de "Criar conta" chamando `supabase.auth.signUp`, mas o cadastro não conclui o fluxo porque:
 
-## Arquitetura de Rotas
+1. **Não existe trigger `handle_new_user`** em `auth.users` — ou seja, ao criar uma conta, nenhuma linha é inserida em `public.profiles` nem em `public.user_roles`.
+2. Sem `user_roles`, a função `is_staff()` / `getCurrentUserRole()` falha ou retorna vazio, e o redirecionamento pós-login para `/portal` quebra (era a causa raiz do erro `permission denied for function is_staff` reportado antes).
+3. O `full_name` enviado em `options.data` nunca é persistido em `profiles`.
 
-Converter `portal.tsx` em **layout** com Outlet + PortalDock, e criar rotas filhas:
+## Plano
 
-```
-src/routes/_authenticated/
-  portal.tsx              → layout (guard member + dock)
-  portal.index.tsx        → Dashboard (A Chegada)
-  portal.clube.tsx        → Clube do Imigrante (streaming)
-  portal.servicos.tsx     → Meus Serviços (vouchers + progresso)
-  portal.loja.tsx         → Nova Compra / Up-sell
-```
+### 1. Migration — auto-provisionar perfil e role no signup
 
-## Telas
+Criar função `public.handle_new_user()` (SECURITY DEFINER, search_path fixo) e trigger `on_auth_user_created` em `auth.users AFTER INSERT`:
 
-### 1. Dashboard (`portal.index.tsx`) — "A Chegada"
-Layout grid 12-col bento (igual cockpit):
-- **Header**: saudação dinâmica ("Bem-vindo a Madrid, {nome}" se tem agendamento futuro próximo, senão "Preparando sua jornada, {nome}").
-- **BentoCard Passaporte Empuria** (col-span-8): cartão de embarque premium — gradient brown→orange, dados do membro, QR Code (lib `qrcode` já instalada) com o `user.id`, número de "passageiro", desde quando é membro.
-- **BentoCard Próximo Passo** (col-span-4): widget dinâmico — se há tour/reunião agendada → data, hora, CTA "Ver detalhes"; senão → convite "O café está quente na Gran Vía. Venha nos visitar hoje!" com CTA para `/portal/loja`.
-- **MetricTiles** (4 tiles): Serviços ativos, Próximo agendamento (em X dias), Status Clube, Vouchers disponíveis.
-- **BentoCard Atividade recente** (col-span-8): últimas compras/atualizações de status.
-- **BentoCard Recomendados** (col-span-4): 2 serviços sugeridos da loja.
+- Insere em `public.profiles (id, full_name)` usando `NEW.id` e `NEW.raw_user_meta_data->>'full_name'` (fallback para parte antes do `@` do email).
+- Insere em `public.user_roles (user_id, role)` com role `'member'` por padrão.
+- `ON CONFLICT DO NOTHING` em ambos para idempotência (cobre casos de retry / usuários já existentes).
 
-### 2. Clube do Imigrante (`portal.clube.tsx`) — Estilo Streaming
-- Header com status de associação. Se não-associado → CTA "Associar-se" + preview bloqueado.
-- Carrosséis horizontais por categoria (Passos Iniciais, Mentalidade do Imigrante, Cultura Espanhola): capas grandes 16:9, snap-scroll.
-- Player de vídeo integrado em modal/Dialog (HTML5 `<video>` ou iframe Vimeo/YouTube embed) — sem sair da plataforma.
-- Dados via novo `getClubContent` server fn lendo de uma nova tabela `club_content` (categoria, título, descrição, capa, video_url, ordem). **Migration necessária**.
+Também rodar um **backfill único**: para todo `auth.users` que ainda não tem `profile`/`user_role`, criar as linhas correspondentes — assim contas já cadastradas (incluindo a sua que está dando erro) passam a funcionar.
 
-### 3. Meus Serviços (`portal.servicos.tsx`) — Carteira
-- Reusa/expande `MyServicesPanel` já existente (orders + delivery status + QR de tour + checklist banking).
-- Adiciona: **barra de progresso visual** para serviços high-ticket (Relocation/Visto) — passos definidos por `service.kind`. Os estados já existem em `delivery_status`.
-- Seção "Pendentes de pagamento" e "Concluídos".
-- Empty state: banners clicáveis para `/portal/loja`.
+### 2. Front-end (`src/routes/login.tsx`)
 
-### 4. Loja / Up-sell (`portal.loja.tsx`)
-- Grid de cards de serviços da Esteira 1 (reusa `getPublicServices`).
-- Clique no card → Drawer/Sheet lateral com resumo + botão **"Comprar agora"** (explícito).
-- Apenas após clique → gera ordem (`createOrderForCheckout` existente) e exibe QR PIX / link Stripe. Sem geração antecipada.
+O código atual já está quase correto. Pequenos ajustes:
 
-## Componentes novos (em `src/components/portal/`)
+- Após `signUp`, verificar `data.session`: se o Supabase retornou sessão (confirmação de e-mail desativada no projeto), invalidar o cache do React Query e redirecionar direto para `/portal` em vez de só mostrar mensagem "verifique seu e-mail". Se não houver sessão, manter a mensagem de confirmação.
+- Garantir `emailRedirectTo: ${window.location.origin}/portal` (já está) para o caso de confirmação por e-mail.
 
-- `PortalDock.tsx` — análogo ao `AdminDock`, itens: Início, Clube, Serviços, Loja, Sair. Mesma estética (fixed bottom, rounded, brown-deep).
-- `PassportCard.tsx` — cartão de embarque com QR.
-- `NextStepWidget.tsx` — widget dinâmico de próximo passo.
-- `ClubCarousel.tsx` + `VideoPlayerModal.tsx`.
-- `ServiceProgressBar.tsx` — barra de etapas para high-ticket.
-- `UpsellSheet.tsx` — drawer de compra com botão explícito.
-- `PortalSkeleton.tsx` — skeleton screens (pulse cinza) para loading.
+### 3. Validação
 
-## Reuso
+- Criar conta nova pela tela `/login` → confirmar que `profiles` e `user_roles` ganham linha automaticamente e o usuário entra em `/portal` sem o erro `permission denied`.
+- Logar com conta existente → mesmo fluxo funciona.
 
-- `BentoCard`, `MetricTile` do admin (mesmos arquivos).
-- Tokens `bg-admin-bg`, `text-admin-ink`, `border-admin-border` — funcionam no portal também (mesma paleta brown/offwhite/orange).
-- `MyServicesPanel` (já existe) → mover lógica para `portal.servicos.tsx`.
+### Fora de escopo
 
-## Server Functions
-
-Novas em `src/lib/portal/`:
-- `dashboard.functions.ts` → `getPortalDashboard` (perfil + próximos appts + métricas + sugestões).
-- `clube.functions.ts` → `getClubContent` (lista por categoria, gated por `is_club_member`).
-
-Reuso: `getMyServices`, `getPublicServices`, `createOrderForCheckout` (já existem).
-
-## Migration (Supabase)
-
-Tabela `club_content`:
-- `id`, `category` (text), `title`, `description`, `cover_url`, `video_url`, `duration_seconds`, `order_index`, `published` (bool), timestamps.
-- RLS: SELECT permitido a `authenticated` se `is_club_member = true` (via função `is_club_member(uid)`) OU se `published` and preview-only flag. Admin/staff INSERT/UPDATE/DELETE via `has_role`.
-- Seed inicial: 2-3 vídeos por categoria (placeholder cover + video).
-
-## UX / Detalhes
-
-- **Skeletons** em todas as telas durante `isLoading` (substituem o "Carregando..." atual).
-- **Transições**: `framer-motion` slide-x suave entre rotas filhas do portal.
-- **Empty states ativos**: nunca texto vazio — sempre CTA/banner clicável.
-- **Responsivo**: dock vira bottom bar em mobile; bento vira stack.
-
-## Fora de escopo
-
-- Pagamento real (mantém fluxo atual `createOrderForCheckout`).
-- Upload de conteúdo do Clube via admin (apenas migration + seed; UI de gestão fica para iteração futura).
-- Notificações push.
-
-## Arquivos a criar
-
-- 4 rotas em `src/routes/_authenticated/portal.*.tsx`
-- 7 componentes em `src/components/portal/`
-- 2 server fn files em `src/lib/portal/`
-- 1 migration SQL
-
-## Arquivos a editar
-
-- `src/routes/_authenticated/portal.tsx` (vira layout)
-- `src/components/admin/AdminDock.tsx` — atualizar link "Portal" para `/portal` (já está)
+- Não vou mexer em OAuth (Google/Apple) — não foi pedido.
+- Não vou criar tela separada de "esqueci minha senha" agora (pode ser pedido depois).
+- Não vou alterar a estética da tela (já aprovada).
