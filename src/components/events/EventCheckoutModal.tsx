@@ -117,7 +117,7 @@ export function EventCheckoutModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg bg-offwhite text-brown-deep">
+      <DialogContent className="max-w-lg bg-offwhite text-brown-deep max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display uppercase tracking-tight text-2xl">{event.title}</DialogTitle>
           <p className="text-sm text-brown-deep/60">{tier.name} × {qty} · {isFree ? "Gratuito" : `€ ${totalEUR}`}</p>
@@ -151,12 +151,14 @@ export function EventCheckoutModal({
 
         {step === "payment" && !isFree && (
           <div className="space-y-4 text-center">
-            {qrUrl ? <img src={qrUrl} alt="QR PIX" className="mx-auto rounded-lg border" /> : <QrCode className="h-10 w-10 mx-auto opacity-30" />}
-            <div className="bg-muted/50 rounded-md p-3 text-left">
+            <div className="flex justify-center">
+              {qrUrl ? <img src={qrUrl} alt="QR PIX" className="w-full max-w-[220px] h-auto rounded-lg border border-brown/15 bg-white p-2" /> : <QrCode className="h-10 w-10 opacity-30" />}
+            </div>
+            <div className="bg-muted/50 rounded-md p-3 text-left overflow-hidden">
               <Label className="text-[10px] uppercase tracking-wider font-display">PIX Copia e Cola</Label>
-              <div className="flex gap-2 items-center mt-1">
-                <code className="flex-1 text-[10px] font-mono truncate">{pixPayload}</code>
-                <button onClick={() => { navigator.clipboard.writeText(pixPayload); toast.success("Copiado"); }} className="text-orange-brand">
+              <div className="flex gap-2 items-start mt-1">
+                <code className="flex-1 min-w-0 text-[10px] font-mono break-all line-clamp-2">{pixPayload}</code>
+                <button onClick={() => { navigator.clipboard.writeText(pixPayload); toast.success("Copiado"); }} className="text-orange-brand shrink-0">
                   <Copy className="h-4 w-4" />
                 </button>
               </div>

@@ -196,7 +196,7 @@ export function CheckoutModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg bg-offwhite text-brown-deep border-border">
+      <DialogContent className="max-w-lg bg-offwhite text-brown-deep border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display uppercase tracking-tight text-2xl">
             {service.title}
@@ -338,16 +338,18 @@ export function CheckoutModal({
 
             {tab === "pix" ? (
               <div className="space-y-3 text-center">
-                {qrUrl ? (
-                  <img src={qrUrl} alt="QR PIX" className="mx-auto rounded-lg border border-border" />
-                ) : (
-                  <div className="h-[240px] flex items-center justify-center"><QrCode className="h-10 w-10 text-brown-deep/30" /></div>
-                )}
-                <div className="bg-muted/50 rounded-md p-3 text-left">
+                <div className="flex justify-center">
+                  {qrUrl ? (
+                    <img src={qrUrl} alt="QR PIX" className="w-full max-w-[220px] h-auto rounded-lg border border-border bg-white p-2" />
+                  ) : (
+                    <div className="h-[220px] w-[220px] flex items-center justify-center"><QrCode className="h-10 w-10 text-brown-deep/30" /></div>
+                  )}
+                </div>
+                <div className="bg-muted/50 rounded-md p-3 text-left overflow-hidden">
                   <Label className="text-[10px] uppercase tracking-wider font-display">PIX Copia e Cola</Label>
-                  <div className="flex gap-2 items-center mt-1">
-                    <code className="flex-1 text-[10px] font-mono text-brown-deep/70 truncate">{intent.mockPix.copyPaste}</code>
-                    <button onClick={() => { navigator.clipboard.writeText(intent.mockPix.copyPaste); toast.success("Copiado"); }} className="text-orange-brand">
+                  <div className="flex gap-2 items-start mt-1">
+                    <code className="flex-1 min-w-0 text-[10px] font-mono text-brown-deep/70 break-all line-clamp-2">{intent.mockPix.copyPaste}</code>
+                    <button onClick={() => { navigator.clipboard.writeText(intent.mockPix.copyPaste); toast.success("Copiado"); }} className="text-orange-brand shrink-0">
                       <Copy className="h-4 w-4" />
                     </button>
                   </div>

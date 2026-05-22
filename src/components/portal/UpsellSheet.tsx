@@ -142,20 +142,20 @@ export function UpsellSheet({
           </div>
         ) : (
           <div className="mt-6 space-y-4">
-            <div className="text-center">
+            <div className="flex justify-center">
               {qr ? (
-                <img src={qr} alt="QR PIX" className="mx-auto rounded-lg border border-admin-border" />
+                <img src={qr} alt="QR PIX" className="w-full max-w-[220px] h-auto rounded-lg border border-admin-border bg-white p-2" />
               ) : (
-                <div className="h-[240px] flex items-center justify-center"><QrCode className="h-10 w-10 text-admin-ink-muted" /></div>
+                <div className="h-[220px] w-[220px] flex items-center justify-center"><QrCode className="h-10 w-10 text-admin-ink-muted" /></div>
               )}
             </div>
-            <div className="bg-admin-surface-2 border border-admin-border rounded-xl p-3">
+            <div className="bg-admin-surface-2 border border-admin-border rounded-xl p-3 overflow-hidden">
               <div className="text-[10px] uppercase tracking-widest font-display text-admin-ink-muted mb-1">PIX Copia e Cola</div>
-              <div className="flex gap-2 items-center">
-                <code className="flex-1 text-[10px] font-mono text-admin-ink-soft truncate">{intent.mockPix.copyPaste}</code>
+              <div className="flex gap-2 items-start">
+                <code className="flex-1 min-w-0 text-[10px] font-mono text-admin-ink-soft break-all line-clamp-2">{intent.mockPix.copyPaste}</code>
                 <button
                   onClick={() => { navigator.clipboard.writeText(intent.mockPix.copyPaste); toast.success("Copiado"); }}
-                  className="text-admin-accent"
+                  className="text-admin-accent shrink-0"
                 >
                   <Copy className="h-4 w-4" />
                 </button>
