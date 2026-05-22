@@ -397,6 +397,7 @@ function HomePage() {
       </section>
 
       <SiteFooter />
+      <ConsultoriaWizardModal open={wizardOpen} onOpenChange={setWizardOpen} />
     </div>
   );
 }
