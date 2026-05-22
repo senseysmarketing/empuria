@@ -23,6 +23,7 @@ import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authentic
 import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenticated/portal.clube'
 import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
 import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
+import { Route as AuthenticatedAdminPdvRouteImport } from './routes/_authenticated/admin.pdv'
 import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authenticated/admin.esteira'
 import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authenticated/admin.clube'
 import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
@@ -101,6 +102,11 @@ const AuthenticatedAdminSlotsRoute = AuthenticatedAdminSlotsRouteImport.update({
   path: '/slots',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminPdvRoute = AuthenticatedAdminPdvRouteImport.update({
+  id: '/pdv',
+  path: '/pdv',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminEsteiraRoute =
   AuthenticatedAdminEsteiraRouteImport.update({
     id: '/esteira',
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/_authenticated/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/_authenticated/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/_authenticated/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/_authenticated/portal/clube': typeof AuthenticatedPortalClubeRoute
@@ -195,6 +204,7 @@ export interface FileRouteTypes {
     | '/admin/automacoes'
     | '/admin/clube'
     | '/admin/esteira'
+    | '/admin/pdv'
     | '/admin/slots'
     | '/admin/triagem'
     | '/portal/clube'
@@ -212,6 +222,7 @@ export interface FileRouteTypes {
     | '/admin/automacoes'
     | '/admin/clube'
     | '/admin/esteira'
+    | '/admin/pdv'
     | '/admin/slots'
     | '/admin/triagem'
     | '/portal/clube'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/automacoes'
     | '/_authenticated/admin/clube'
     | '/_authenticated/admin/esteira'
+    | '/_authenticated/admin/pdv'
     | '/_authenticated/admin/slots'
     | '/_authenticated/admin/triagem'
     | '/_authenticated/portal/clube'
@@ -348,6 +360,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSlotsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/pdv': {
+      id: '/_authenticated/admin/pdv'
+      path: '/pdv'
+      fullPath: '/admin/pdv'
+      preLoaderRoute: typeof AuthenticatedAdminPdvRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/esteira': {
       id: '/_authenticated/admin/esteira'
       path: '/esteira'
@@ -384,6 +403,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAutomacoesRoute: typeof AuthenticatedAdminAutomacoesRoute
   AuthenticatedAdminClubeRoute: typeof AuthenticatedAdminClubeRoute
   AuthenticatedAdminEsteiraRoute: typeof AuthenticatedAdminEsteiraRoute
+  AuthenticatedAdminPdvRoute: typeof AuthenticatedAdminPdvRoute
   AuthenticatedAdminSlotsRoute: typeof AuthenticatedAdminSlotsRoute
   AuthenticatedAdminTriagemRoute: typeof AuthenticatedAdminTriagemRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -394,6 +414,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAutomacoesRoute: AuthenticatedAdminAutomacoesRoute,
   AuthenticatedAdminClubeRoute: AuthenticatedAdminClubeRoute,
   AuthenticatedAdminEsteiraRoute: AuthenticatedAdminEsteiraRoute,
+  AuthenticatedAdminPdvRoute: AuthenticatedAdminPdvRoute,
   AuthenticatedAdminSlotsRoute: AuthenticatedAdminSlotsRoute,
   AuthenticatedAdminTriagemRoute: AuthenticatedAdminTriagemRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,

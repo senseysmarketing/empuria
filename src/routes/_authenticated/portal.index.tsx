@@ -6,6 +6,7 @@ import { BentoCard } from "@/components/admin/BentoCard";
 import { MetricTile } from "@/components/admin/MetricTile";
 import { PassportCard } from "@/components/portal/PassportCard";
 import { NextStepWidget } from "@/components/portal/NextStepWidget";
+import { TabWidget } from "@/components/portal/TabWidget";
 import { DashboardSkeleton } from "@/components/portal/PortalSkeleton";
 import { Wallet, CalendarClock, Crown, Receipt, ArrowRight, ShoppingBag } from "lucide-react";
 
@@ -37,6 +38,7 @@ function PortalDashboard() {
       </header>
 
       <div className="grid grid-cols-12 gap-4">
+        {data.profile?.id && <TabWidget userId={data.profile.id} />}
         <div className="col-span-12 lg:col-span-8">
           <PassportCard
             userId={data.profile?.id ?? ""}

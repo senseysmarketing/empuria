@@ -221,6 +221,53 @@ export type Database = {
           },
         ]
       }
+      club_benefits: {
+        Row: {
+          category: Database["public"]["Enums"]["product_category"] | null
+          created_at: string
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["benefit_kind"]
+          max_per_visit: number | null
+          name: string
+          product_id: string | null
+          scope: Database["public"]["Enums"]["benefit_scope"]
+          value: number
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["product_category"] | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind: Database["public"]["Enums"]["benefit_kind"]
+          max_per_visit?: number | null
+          name: string
+          product_id?: string | null
+          scope: Database["public"]["Enums"]["benefit_scope"]
+          value?: number
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["product_category"] | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["benefit_kind"]
+          max_per_visit?: number | null
+          name?: string
+          product_id?: string | null
+          scope?: Database["public"]["Enums"]["benefit_scope"]
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_benefits_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_content: {
         Row: {
           created_at: string
@@ -465,6 +512,45 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          category: Database["public"]["Enums"]["product_category"]
+          created_at: string
+          emoji: string | null
+          id: string
+          is_active: boolean
+          name: string
+          position: number
+          price_cents: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["product_category"]
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          position?: number
+          price_cents?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["product_category"]
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          position?: number
+          price_cents?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -596,6 +682,108 @@ export type Database = {
           },
         ]
       }
+      tab_items: {
+        Row: {
+          added_by: string | null
+          benefit_label: string | null
+          created_at: string
+          discount_cents: number
+          id: string
+          product_emoji: string | null
+          product_id: string | null
+          product_name_snapshot: string
+          qty: number
+          tab_id: string
+          unit_price_cents: number
+        }
+        Insert: {
+          added_by?: string | null
+          benefit_label?: string | null
+          created_at?: string
+          discount_cents?: number
+          id?: string
+          product_emoji?: string | null
+          product_id?: string | null
+          product_name_snapshot: string
+          qty?: number
+          tab_id: string
+          unit_price_cents?: number
+        }
+        Update: {
+          added_by?: string | null
+          benefit_label?: string | null
+          created_at?: string
+          discount_cents?: number
+          id?: string
+          product_emoji?: string | null
+          product_id?: string | null
+          product_name_snapshot?: string
+          qty?: number
+          tab_id?: string
+          unit_price_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tab_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tab_items_tab_id_fkey"
+            columns: ["tab_id"]
+            isOneToOne: false
+            referencedRelation: "tabs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tabs: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          id: string
+          opened_at: string
+          opened_by: string | null
+          order_id: string | null
+          paid_cents: number
+          payment_method: string | null
+          status: Database["public"]["Enums"]["tab_status"]
+          total_cents: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          opened_by?: string | null
+          order_id?: string | null
+          paid_cents?: number
+          payment_method?: string | null
+          status?: Database["public"]["Enums"]["tab_status"]
+          total_cents?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          opened_at?: string
+          opened_by?: string | null
+          order_id?: string | null
+          paid_cents?: number
+          payment_method?: string | null
+          status?: Database["public"]["Enums"]["tab_status"]
+          total_cents?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -647,6 +835,8 @@ export type Database = {
       app_role: "admin" | "staff" | "member"
       appointment_status: "pendente" | "confirmado" | "cancelado" | "concluido"
       automation_channel: "whatsapp" | "email" | "painel"
+      benefit_kind: "desconto_pct" | "desconto_fixo" | "cortesia"
+      benefit_scope: "produto" | "categoria"
       lead_pipeline_stage: "novo" | "analise" | "qualificado" | "descartado"
       lead_status: "novo" | "contatado" | "qualificado" | "fechado" | "perdido"
       order_delivery_status:
@@ -656,8 +846,10 @@ export type Database = {
         | "agendado"
         | "concluido"
       order_payment_status: "pendente" | "aprovado" | "recusado" | "estornado"
+      product_category: "bebida" | "comida" | "barbearia" | "outro"
       service_category: "esteira1" | "esteira2" | "clube"
       service_kind: "airport" | "tour" | "consulting" | "banking" | "meeting"
+      tab_status: "aberta" | "paga" | "cancelada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -800,6 +992,8 @@ export const Constants = {
       app_role: ["admin", "staff", "member"],
       appointment_status: ["pendente", "confirmado", "cancelado", "concluido"],
       automation_channel: ["whatsapp", "email", "painel"],
+      benefit_kind: ["desconto_pct", "desconto_fixo", "cortesia"],
+      benefit_scope: ["produto", "categoria"],
       lead_pipeline_stage: ["novo", "analise", "qualificado", "descartado"],
       lead_status: ["novo", "contatado", "qualificado", "fechado", "perdido"],
       order_delivery_status: [
@@ -810,8 +1004,10 @@ export const Constants = {
         "concluido",
       ],
       order_payment_status: ["pendente", "aprovado", "recusado", "estornado"],
+      product_category: ["bebida", "comida", "barbearia", "outro"],
       service_category: ["esteira1", "esteira2", "clube"],
       service_kind: ["airport", "tour", "consulting", "banking", "meeting"],
+      tab_status: ["aberta", "paga", "cancelada"],
     },
   },
 } as const

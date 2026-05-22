@@ -7,6 +7,7 @@ import { MetricTile } from "@/components/admin/MetricTile";
 import { ActivityFeed } from "@/components/admin/ActivityFeed";
 import { ArrivalDialog } from "@/components/admin/ArrivalDialog";
 import { RevenueChart } from "@/components/admin/RevenueChart";
+import { PassportScannerDialog } from "@/components/admin/PassportScannerDialog";
 import { Euro, Crown, CalendarClock, Users } from "lucide-react";
 import logoIcone from "@/assets/logo-empuria-icone.png";
 
@@ -46,7 +47,10 @@ function CockpitPage() {
             </p>
           </div>
         </div>
-        <ArrivalDialog />
+        <div className="flex items-center gap-2">
+          <PassportScannerDialog />
+          <ArrivalDialog />
+        </div>
       </header>
 
       <div className="grid grid-cols-12 gap-4">
