@@ -88,6 +88,55 @@
   --gradient-sunset: linear-gradient(120deg, var(--red-brand) 0%, var(--orange-brand) 60%, var(--yellow-brand) 100%);
   --shadow-warm: 0 20px 60px -20px color-mix(in oklab, var(--brown) 50%, transparent);
   --shadow-card: 0 4px 24px -8px color-mix(in oklab, var(--brown) 20%, transparent);
+
+
+  /* Admin Portal — Light Mode (Apple-like) */
+  --admin-bg: oklch(0.985 0.003 80);          /* near-white grey */
+  --admin-surface: oklch(1 0 0);              /* pure white cards */
+  --admin-surface-2: oklch(0.97 0.004 80);    /* secondary fill */
+  --admin-border: oklch(0.91 0.008 70);
+  --admin-border-strong: oklch(0.85 0.012 65);
+  --admin-ink: oklch(0.22 0.04 40);
+  --admin-ink-soft: oklch(0.48 0.03 45);
+  --admin-ink-muted: oklch(0.62 0.025 50);
+  --admin-accent: var(--orange-brand);
+  --admin-accent-soft: oklch(0.93 0.05 60);
+  --admin-success: oklch(0.62 0.14 150);
+  --admin-warning: oklch(0.72 0.16 75);
+  --admin-danger: oklch(0.58 0.21 25);
+  --shadow-admin: 0 1px 2px rgba(20,12,8,0.04), 0 8px 24px -12px rgba(20,12,8,0.10);
+  --shadow-admin-hover: 0 1px 2px rgba(20,12,8,0.05), 0 16px 40px -16px rgba(20,12,8,0.18);
+}
+
+@theme inline {
+  --color-admin-bg: var(--admin-bg);
+  --color-admin-surface: var(--admin-surface);
+  --color-admin-surface-2: var(--admin-surface-2);
+  --color-admin-border: var(--admin-border);
+  --color-admin-border-strong: var(--admin-border-strong);
+  --color-admin-ink: var(--admin-ink);
+  --color-admin-ink-soft: var(--admin-ink-soft);
+  --color-admin-ink-muted: var(--admin-ink-muted);
+  --color-admin-accent: var(--admin-accent);
+  --color-admin-accent-soft: var(--admin-accent-soft);
+  --color-admin-success: var(--admin-success);
+  --color-admin-warning: var(--admin-warning);
+  --color-admin-danger: var(--admin-danger);
+}
+
+/* Admin dock hover expand */
+.admin-dock-item .dock-label {
+  max-width: 0;
+  opacity: 0;
+  transition: max-width 280ms cubic-bezier(.2,.8,.2,1), opacity 200ms ease, margin-left 280ms cubic-bezier(.2,.8,.2,1);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.admin-dock-item:hover .dock-label,
+.admin-dock-item[data-active="true"] .dock-label {
+  max-width: 12rem;
+  opacity: 1;
+  margin-left: 0.5rem;
 }
 
 @layer base {
