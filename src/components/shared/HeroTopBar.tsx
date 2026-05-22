@@ -52,12 +52,12 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
   const isAdmin = variant === "admin";
   const bg = isAdmin
     ? "bg-gradient-to-br from-brown-deep via-brown-deep to-[#3a1f15]"
-    : "bg-gradient-to-br from-[#c2956b] via-orange-brand to-yellow-brand";
-  const textMain = isAdmin ? "text-offwhite" : "text-brown-deep";
-  const textMuted = isAdmin ? "text-offwhite/60" : "text-brown-deep/70";
-  const accent = isAdmin ? "text-orange-brand" : "text-brown-deep";
-  const watermark = isAdmin ? "text-orange-brand/15" : "text-brown-deep/15";
-  const logoRing = isAdmin ? "bg-brown-deep/60 ring-orange-brand/20" : "bg-white/30 ring-brown-deep/20";
+    : "bg-gradient-to-br from-brown via-[#6b2e1f] to-brown-deep";
+  const textMain = "text-offwhite";
+  const textMuted = "text-offwhite/65";
+  const accent = isAdmin ? "text-orange-brand" : "text-yellow-brand";
+  const watermark = isAdmin ? "text-orange-brand/15" : "text-yellow-brand/12";
+  const logoRing = isAdmin ? "bg-brown-deep/60 ring-orange-brand/20" : "bg-brown-deep/60 ring-yellow-brand/25";
   const greeting = isAdmin
     ? `${greetingFor(now)}, ${name || "equipe"}`
     : `Bem-vindo de volta, ${impersonation?.targetName?.split(" ")[0] || name || "imigrante"}`;
