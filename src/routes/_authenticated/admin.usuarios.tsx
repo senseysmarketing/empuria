@@ -303,15 +303,9 @@ function UserRowCard({ user }: { user: UserRow }) {
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
-  useMemoEffect(() => {
+  useEffect(() => {
     const t = setTimeout(() => setV(value), ms);
     return () => clearTimeout(t);
   }, [value, ms]);
   return v;
-}
-
-// avoid extra import: small useEffect wrapper
-function useMemoEffect(fn: () => void | (() => void), deps: unknown[]) {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  return (require("react") as typeof import("react")).useEffect(fn, deps);
 }
