@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { buildPassportQrPayload } from "@/lib/passport-qr";
 import logoIcone from "@/assets/logo-empuria-icone.png";
 
 export function PassportCard({
@@ -15,9 +16,16 @@ export function PassportCard({
 }) {
   const [qr, setQr] = useState<string | null>(null);
   useEffect(() => {
-    QRCode.toDataURL(`empuria:${userId}`, { width: 220, margin: 1, color: { dark: "#1a0c05", light: "#f5e9d4" } }).then(
-      setQr,
-    );
+    if (!userId) {
+      setQr(null);
+      return;
+    }
+    QRCode.toDataURL(buildPassportQrPayload(userId), {
+      width: 220,
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: { dark: "#1a0c05", light: "#f5e9d4" },
+    }).then(setQr, () => setQr(null));
   }, [userId]);
 
   const passNum = userId.replace(/-/g, "").slice(0, 12).toUpperCase();

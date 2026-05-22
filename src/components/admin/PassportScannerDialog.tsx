@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useServerFn } from "@tanstack/react-start";
 import { lookupPassport } from "@/lib/admin/pdv.functions";
+import { parsePassportQrPayload } from "@/lib/passport-qr";
 import { PassportContextModal, type PassportContext } from "./PassportContextModal";
 import { Camera, Search, ScanLine } from "lucide-react";
 import { toast } from "sonner";
@@ -13,19 +14,30 @@ export function PassportScannerDialog() {
   const [open, setOpen] = useState(false);
   const [manualId, setManualId] = useState("");
   const [context, setContext] = useState<PassportContext | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const scanLockRef = useRef(false);
   const lookup = useServerFn(lookupPassport);
 
   const handle = async (raw: string) => {
-    let userId = raw.trim();
-    if (userId.startsWith("empuria:")) userId = userId.slice("empuria:".length);
-    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuid.test(userId)) { toast.error("Código inválido"); return; }
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
+    const userId = parsePassportQrPayload(raw);
+    if (!userId) {
+      toast.error("Codigo de passaporte invalido");
+      window.setTimeout(() => { scanLockRef.current = false; }, 1000);
+      return;
+    }
+
     try {
+      setScanning(true);
       const ctx = await lookup({ data: { userId } });
       setContext(ctx as PassportContext);
       setOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao buscar passaporte");
+    } finally {
+      scanLockRef.current = false;
+      setScanning(false);
     }
   };
 
@@ -52,7 +64,7 @@ export function PassportScannerDialog() {
                 onScan={(results) => {
                   if (results.length > 0) handle(results[0].rawValue);
                 }}
-                onError={() => {}}
+                onError={() => toast.error("Nao foi possivel acessar a camera")}
                 constraints={{ facingMode: "environment" }}
                 styles={{ container: { width: "100%", height: "100%" }, video: { objectFit: "cover" } }}
               />
@@ -64,10 +76,10 @@ export function PassportScannerDialog() {
               <Input
                 value={manualId}
                 onChange={(e) => setManualId(e.target.value)}
-                placeholder="empuria:uuid ou uuid"
+                placeholder="empuria:passport:v1:uuid ou uuid"
                 className="bg-admin-surface-2 border-admin-border"
               />
-              <Button onClick={() => handle(manualId)} variant="secondary">
+              <Button onClick={() => handle(manualId)} variant="secondary" disabled={scanning}>
                 <Search className="h-4 w-4" />
               </Button>
             </div>
