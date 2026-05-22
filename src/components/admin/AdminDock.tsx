@@ -10,6 +10,7 @@ import {
   LogOut,
   Home,
   Wine,
+  Ticket,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import logoIcone from "@/assets/logo-empuria-icone.png";
@@ -17,12 +18,13 @@ import logoIcone from "@/assets/logo-empuria-icone.png";
 const items = [
   { to: "/admin", label: "Cockpit", icon: LayoutDashboard, exact: true },
   { to: "/admin/pdv", label: "PDV", icon: Wine },
-  { to: "/admin/esteira", label: "Esteira 1", icon: PackageCheck },
+  { to: "/admin/eventos", label: "Eventos", icon: Ticket },
+  { to: "/admin/esteira", label: "Esteira", icon: PackageCheck },
   { to: "/admin/slots", label: "Vagas", icon: CalendarClock },
   { to: "/admin/triagem", label: "Triagem", icon: Filter },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/admin/clube", label: "Clube", icon: Crown },
-  { to: "/admin/automacoes", label: "Automações", icon: Zap },
+  { to: "/admin/automacoes", label: "Auto", icon: Zap },
 ] as const;
 
 export function AdminDock() {
