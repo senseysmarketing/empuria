@@ -11,6 +11,7 @@ import {
   Home,
   Wine,
   Ticket,
+  Users,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import logoIcone from "@/assets/logo-empuria-icone.png";
