@@ -8,6 +8,7 @@ import { Reveal } from "@/components/Reveal";
 import { ServiceCard, type PublicService } from "@/components/services/ServiceCard";
 import { CheckoutModal } from "@/components/checkout/CheckoutModal";
 import { HomeEventsSection } from "@/components/events/HomeEventsSection";
+import { ConsultoriaWizardModal } from "@/components/leads/ConsultoriaWizardModal";
 import { listPublicServices } from "@/lib/services-public.functions";
 import lounge from "@/assets/instituto-lounge.jpg";
 import barbearia from "@/assets/instituto-barbearia.jpg";
