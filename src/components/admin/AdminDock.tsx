@@ -37,7 +37,9 @@ export function AdminDock() {
       <div className="mx-auto max-w-3xl bg-brown-deep/95 backdrop-blur-xl border border-brown/40 rounded-2xl shadow-2xl">
         <ul className="flex items-center justify-between gap-0 px-2 py-2">
           <li className="flex items-center px-1.5">
-            <img src={logoIcone} alt="Empuria" className="h-6 w-6 object-contain opacity-90" />
+            <Link to="/admin" aria-label="Cockpit" className="flex items-center transition-opacity hover:opacity-100 opacity-90">
+              <img src={logoIcone} alt="Empuria" className="h-6 w-6 object-contain" />
+            </Link>
           </li>
           <li className="w-px h-5 bg-brown/60 mx-0.5" />
           {items.map((it) => {
