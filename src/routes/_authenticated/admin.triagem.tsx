@@ -14,7 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, Globe, Calendar as CalIcon, Wallet, MessageCircle, FileText, Clock, ArrowRight, NotebookPen, Sparkles } from "lucide-react";
+import { Mail, Phone, Globe, Calendar as CalIcon, Wallet, MessageCircle, Clock, ArrowRight, NotebookPen, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { temperatureChip, temperatureOf, scoreLead } from "@/lib/leads/scoring";
 
