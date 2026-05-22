@@ -9,18 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ServicosRouteImport } from './routes/servicos'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ServicosSlugRouteImport } from './routes/servicos.$slug'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
+import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
 import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authenticated/admin.esteira'
 import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authenticated/admin.clube'
 import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
 import { Route as AuthenticatedAdminAgendaRouteImport } from './routes/_authenticated/admin.agenda'
 
+const ServicosRoute = ServicosRouteImport.update({
+  id: '/servicos',
+  path: '/servicos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -34,6 +42,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ServicosSlugRoute = ServicosSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => ServicosRoute,
 } as any)
 const AuthenticatedPortalRoute = AuthenticatedPortalRouteImport.update({
   id: '/portal',
@@ -56,6 +69,11 @@ const AuthenticatedAdminTriagemRoute =
     path: '/triagem',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminSlotsRoute = AuthenticatedAdminSlotsRouteImport.update({
+  id: '/slots',
+  path: '/slots',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminEsteiraRoute =
   AuthenticatedAdminEsteiraRouteImport.update({
     id: '/esteira',
@@ -83,23 +101,29 @@ const AuthenticatedAdminAgendaRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/servicos': typeof ServicosRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/portal': typeof AuthenticatedPortalRoute
+  '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/servicos': typeof ServicosRouteWithChildren
   '/portal': typeof AuthenticatedPortalRoute
+  '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
@@ -108,12 +132,15 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/servicos': typeof ServicosRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/portal': typeof AuthenticatedPortalRoute
+  '/servicos/$slug': typeof ServicosSlugRoute
   '/_authenticated/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/_authenticated/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/_authenticated/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/_authenticated/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -122,23 +149,29 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/servicos'
     | '/admin'
     | '/portal'
+    | '/servicos/$slug'
     | '/admin/agenda'
     | '/admin/automacoes'
     | '/admin/clube'
     | '/admin/esteira'
+    | '/admin/slots'
     | '/admin/triagem'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/servicos'
     | '/portal'
+    | '/servicos/$slug'
     | '/admin/agenda'
     | '/admin/automacoes'
     | '/admin/clube'
     | '/admin/esteira'
+    | '/admin/slots'
     | '/admin/triagem'
     | '/admin'
   id:
@@ -146,12 +179,15 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/servicos'
     | '/_authenticated/admin'
     | '/_authenticated/portal'
+    | '/servicos/$slug'
     | '/_authenticated/admin/agenda'
     | '/_authenticated/admin/automacoes'
     | '/_authenticated/admin/clube'
     | '/_authenticated/admin/esteira'
+    | '/_authenticated/admin/slots'
     | '/_authenticated/admin/triagem'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
@@ -160,10 +196,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ServicosRoute: typeof ServicosRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/servicos': {
+      id: '/servicos'
+      path: '/servicos'
+      fullPath: '/servicos'
+      preLoaderRoute: typeof ServicosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -184,6 +228,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/servicos/$slug': {
+      id: '/servicos/$slug'
+      path: '/$slug'
+      fullPath: '/servicos/$slug'
+      preLoaderRoute: typeof ServicosSlugRouteImport
+      parentRoute: typeof ServicosRoute
     }
     '/_authenticated/portal': {
       id: '/_authenticated/portal'
@@ -211,6 +262,13 @@ declare module '@tanstack/react-router' {
       path: '/triagem'
       fullPath: '/admin/triagem'
       preLoaderRoute: typeof AuthenticatedAdminTriagemRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/slots': {
+      id: '/_authenticated/admin/slots'
+      path: '/slots'
+      fullPath: '/admin/slots'
+      preLoaderRoute: typeof AuthenticatedAdminSlotsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/esteira': {
@@ -249,6 +307,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAutomacoesRoute: typeof AuthenticatedAdminAutomacoesRoute
   AuthenticatedAdminClubeRoute: typeof AuthenticatedAdminClubeRoute
   AuthenticatedAdminEsteiraRoute: typeof AuthenticatedAdminEsteiraRoute
+  AuthenticatedAdminSlotsRoute: typeof AuthenticatedAdminSlotsRoute
   AuthenticatedAdminTriagemRoute: typeof AuthenticatedAdminTriagemRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
@@ -258,6 +317,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAutomacoesRoute: AuthenticatedAdminAutomacoesRoute,
   AuthenticatedAdminClubeRoute: AuthenticatedAdminClubeRoute,
   AuthenticatedAdminEsteiraRoute: AuthenticatedAdminEsteiraRoute,
+  AuthenticatedAdminSlotsRoute: AuthenticatedAdminSlotsRoute,
   AuthenticatedAdminTriagemRoute: AuthenticatedAdminTriagemRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
@@ -279,10 +339,23 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface ServicosRouteChildren {
+  ServicosSlugRoute: typeof ServicosSlugRoute
+}
+
+const ServicosRouteChildren: ServicosRouteChildren = {
+  ServicosSlugRoute: ServicosSlugRoute,
+}
+
+const ServicosRouteWithChildren = ServicosRoute._addFileChildren(
+  ServicosRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ServicosRoute: ServicosRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

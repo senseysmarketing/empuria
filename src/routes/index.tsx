@@ -1,14 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Reveal } from "@/components/Reveal";
+import { ServiceCard, type PublicService } from "@/components/services/ServiceCard";
+import { CheckoutModal } from "@/components/checkout/CheckoutModal";
+import { listPublicServices } from "@/lib/services-public.functions";
 import lounge from "@/assets/instituto-lounge.jpg";
 import barbearia from "@/assets/instituto-barbearia.jpg";
 import bar from "@/assets/instituto-bar.jpg";
 import granvia from "@/assets/gran-via.jpg";
 import {
-  Compass, ShieldCheck, Handshake, Plane, MapPin, CreditCard,
-  Landmark, Users, Scissors, Beer, Gamepad2, Sparkles,
+  Compass, ShieldCheck, Handshake, Scissors, Beer, Gamepad2, Sparkles,
   ArrowRight, Check,
 } from "lucide-react";
 
@@ -28,14 +33,16 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
-const fastServices = [
-  { icon: Plane, title: "Recepção no Aeroporto", desc: "O fim da insegurança ao desembarcar. Te buscamos com placa e sorriso brasileiro." },
-  { icon: MapPin, title: "Tour Turístico Raiz", desc: "Conheça Madrid como um local — econômico, autêntico e sem armadilhas de turista." },
-  { icon: CreditCard, title: "Apoio: Vale Transporte", desc: "Passo a passo presencial ou online para o seu Abono." },
-  { icon: Landmark, title: "Abertura de Conta Bancária", desc: "Resolvemos a burocracia financeira com você, em português." },
-  { icon: Users, title: "Reunião Presencial", desc: "Consultoria dos passos iniciais, cara a cara, no nosso espaço." },
-  { icon: Sparkles, title: "Clube da Imigração", desc: "Assinatura com cursos, vídeos e comunidade exclusiva online." },
+const fastServices: never[] = [];
+
+const espacoChecklist = [
+  { icon: Scissors, text: "Barbearia com estilo e corte brasileiro — só chegar e esperar." },
+  { icon: Beer, text: "Bar com cerveja gelada, Ruffles e petiscos com gosto de casa." },
+  { icon: Gamepad2, text: "Sofá, videogame e aquele bate-papo sem pressa." },
+  { icon: Sparkles, text: "Ambiente premium, 100% instagramável para registrar sua chegada." },
 ];
+
+void fastServices;
 
 const espacoChecklist = [
   { icon: Scissors, text: "Barbearia com estilo e corte brasileiro — só chegar e esperar." },
@@ -45,9 +52,20 @@ const espacoChecklist = [
 ];
 
 function HomePage() {
+  const fetchServices = useServerFn(listPublicServices);
+  const { data: services = [] } = useQuery({
+    queryKey: ["public-services"],
+    queryFn: () => fetchServices(),
+  });
+  const [selected, setSelected] = useState<PublicService | null>(null);
+  const [open, setOpen] = useState(false);
+  const onBuy = (s: PublicService) => { setSelected(s); setOpen(true); };
+
   return (
     <div className="min-h-screen bg-offwhite text-brown-deep overflow-x-hidden">
       <SiteHeader />
+      <CheckoutModal service={selected} open={open} onOpenChange={setOpen} />
+
 
       {/* HERO */}
       <section className="relative min-h-screen flex items-center pt-24 pb-16 bg-topo">
@@ -271,26 +289,14 @@ function HomePage() {
               </span>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {fastServices.map((s, i) => (
-                <Reveal key={s.title} delay={i * 70}>
-                  <div className="group bg-offwhite text-brown-deep rounded-xl p-6 border border-transparent hover:border-orange-brand transition-all hover:-translate-y-1 hover:shadow-warm h-full flex flex-col">
-                    <div className="w-11 h-11 rounded-lg bg-orange-brand/10 text-orange-brand flex items-center justify-center mb-4">
-                      <s.icon className="w-5 h-5" strokeWidth={1.7} />
-                    </div>
-                    <h4 className="font-display font-bold text-lg uppercase tracking-tight leading-tight text-brown">
-                      {s.title}
-                    </h4>
-                    <p className="font-body text-sm mt-2 text-brown-deep/70 leading-snug flex-1">
-                      {s.desc}
-                    </p>
-                    <button className="mt-5 inline-flex items-center gap-2 bg-orange-brand text-offwhite px-4 py-2.5 rounded-md font-display font-semibold text-xs uppercase tracking-widest hover:bg-red-brand transition-all w-fit">
-                      Ver Oferta <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+              {services.slice(0, 6).map((s, i) => (
+                <Reveal key={s.id} delay={i * 70}>
+                  <ServiceCard service={s as PublicService} onBuy={onBuy} variant="dark" />
                 </Reveal>
               ))}
             </div>
           </div>
+
 
           {/* Esteira 2 — High ticket */}
           <Reveal>

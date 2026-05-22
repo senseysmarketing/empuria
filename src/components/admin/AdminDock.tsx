@@ -4,6 +4,7 @@ import {
   PackageCheck,
   Filter,
   CalendarDays,
+  CalendarClock,
   Crown,
   Zap,
   LogOut,
@@ -15,6 +16,7 @@ import logoIcone from "@/assets/logo-empuria-icone.png";
 const items = [
   { to: "/admin", label: "Cockpit", icon: LayoutDashboard, exact: true },
   { to: "/admin/esteira", label: "Esteira 1", icon: PackageCheck },
+  { to: "/admin/slots", label: "Vagas", icon: CalendarClock },
   { to: "/admin/triagem", label: "Triagem", icon: Filter },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/admin/clube", label: "Clube", icon: Crown },
