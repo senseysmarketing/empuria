@@ -58,7 +58,7 @@ function LojaPage() {
               >
                 <div className="aspect-[16/10] bg-admin-surface-2 relative overflow-hidden">
                   <img
-                    src={s.image_url ?? KIND_IMAGE[s.kind ?? ""] ?? FALLBACK_IMAGE}
+                    src={getServiceImage(s)}
                     alt={s.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
