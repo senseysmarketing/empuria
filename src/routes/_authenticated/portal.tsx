@@ -2,6 +2,8 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { AccessDeniedCard } from "@/components/auth/AccessDeniedCard";
 import { PortalDock } from "@/components/portal/PortalDock";
+import { HeroTopBar } from "@/components/shared/HeroTopBar";
+import { TopBarActionsProvider } from "@/components/shared/TopBarActionsContext";
 
 export const Route = createFileRoute("/_authenticated/portal")({
   component: PortalLayout,
@@ -25,11 +27,14 @@ function PortalLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-admin-bg text-admin-ink">
-      <main className="max-w-7xl mx-auto px-6 pt-8 pb-32">
-        <Outlet />
-      </main>
-      <PortalDock />
-    </div>
+    <TopBarActionsProvider>
+      <div className="min-h-screen bg-admin-bg text-admin-ink">
+        <HeroTopBar variant="portal" />
+        <main className="max-w-7xl mx-auto px-6 pt-6 pb-32">
+          <Outlet />
+        </main>
+        <PortalDock />
+      </div>
+    </TopBarActionsProvider>
   );
 }

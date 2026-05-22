@@ -9,7 +9,7 @@ import { ArrivalDialog } from "@/components/admin/ArrivalDialog";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { PassportScannerDialog } from "@/components/admin/PassportScannerDialog";
 import { Euro, Crown, CalendarClock, Users } from "lucide-react";
-import logoIcone from "@/assets/logo-empuria-icone.png";
+import { useTopBarActions, useTopBarQuickStat } from "@/components/shared/TopBarActionsContext";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: CockpitPage,
@@ -22,6 +22,18 @@ function CockpitPage() {
   const metricsQ = useQuery({ queryKey: ["cockpit"], queryFn: () => fetchMetrics(), retry: false });
   const feedQ = useQuery({ queryKey: ["activity"], queryFn: () => fetchFeed(), retry: false });
 
+  useTopBarActions(
+    <>
+      <PassportScannerDialog />
+      <ArrivalDialog />
+    </>,
+  );
+
+  const m = metricsQ.data;
+  useTopBarQuickStat(
+    m ? { label: "Vendas hoje", value: `€ ${(m.salesToday / 100).toFixed(2)}` } : null,
+  );
+
   if (metricsQ.error) {
     return (
       <div className="text-center py-24">
@@ -31,27 +43,9 @@ function CockpitPage() {
     );
   }
 
-  const m = metricsQ.data;
-
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-brown-deep flex items-center justify-center shrink-0">
-            <img src={logoIcone} alt="Instituto Empuria" className="h-8 w-8 object-contain" />
-          </div>
-          <div>
-            <h1 className="font-display text-4xl font-bold tracking-tight">Cockpit</h1>
-            <p className="text-admin-ink-muted text-sm mt-1">
-              Visão em tempo real da operação Empuria — vendas, leads, agenda e chegadas.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <PassportScannerDialog />
-          <ArrivalDialog />
-        </div>
-      </header>
+
 
       <div className="grid grid-cols-12 gap-4">
         {/* Metric tiles */}
