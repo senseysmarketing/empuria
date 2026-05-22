@@ -37,8 +37,8 @@ export function PortalDock() {
                       : "px-2.5 hover:text-offwhite hover:bg-brown/50"
                   }`}
                 >
-                  <it.icon className="h-[18px] w-[18px] shrink-1" />
-                  <span className={`dock-label text-[10px] font-unbounded uppercase tracking-wide ${active ? "" : ""}`}>
+                  <it.icon className="h-[18px] w-[18px]" />
+                  <span className="dock-label text-[10px] font-display uppercase tracking-wide">
                     {it.label}
                   </span>
                 </Link>
