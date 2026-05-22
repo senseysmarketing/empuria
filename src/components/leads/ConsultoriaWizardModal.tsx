@@ -94,10 +94,7 @@ export function ConsultoriaWizardModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent
-        className="max-w-xl p-0 overflow-hidden bg-offwhite border-brown/10 [&>button]:text-brown/60"
-        showCloseButton
-      >
+      <DialogContent className="max-w-xl p-0 overflow-hidden bg-offwhite border-brown/10 [&>button]:text-brown/60">
         {/* Progress bar */}
         <div className="h-1 bg-brown/10 w-full overflow-hidden">
           <motion.div
