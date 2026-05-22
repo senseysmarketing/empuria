@@ -54,6 +54,7 @@ function HomePage() {
   });
   const [selected, setSelected] = useState<PublicService | null>(null);
   const [open, setOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const onBuy = (s: PublicService) => { setSelected(s); setOpen(true); };
 
   return (
