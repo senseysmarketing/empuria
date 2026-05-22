@@ -25,10 +25,12 @@ export type PublicService = {
 export function ServiceCard({
   service,
   onBuy,
+  onDetails,
   variant = "dark",
 }: {
   service: PublicService;
   onBuy: (s: PublicService) => void;
+  onDetails?: (s: PublicService) => void;
   variant?: "dark" | "light";
 }) {
   const Icon = ICONS[service.kind] ?? MapPin;
