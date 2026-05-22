@@ -291,10 +291,11 @@ function LeadDetailBody({ lead }: { lead: Lead }) {
 
         {/* Bloco 2 — WhatsApp */}
         <Button
+          size="sm"
           onClick={onWhatsapp}
-          className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-display uppercase tracking-widest text-xs gap-2"
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
         >
-          <MessageCircle className="h-5 w-5" /> Iniciar conversa no WhatsApp
+          <MessageCircle className="h-4 w-4" /> Iniciar conversa no WhatsApp
           <ArrowRight className="h-4 w-4 ml-auto" />
         </Button>
 
