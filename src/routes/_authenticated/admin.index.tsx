@@ -31,7 +31,7 @@ function CockpitPage() {
 
   const m = metricsQ.data;
   useTopBarQuickStat(
-    m ? { label: "Vendas hoje", value: `€ ${(m.salesTodayCents / 100).toFixed(2)}` } : null,
+    m ? { label: "Vendas hoje", value: `€ ${(m.salesToday / 100).toFixed(2)}` } : null,
   );
 
   if (metricsQ.error) {
