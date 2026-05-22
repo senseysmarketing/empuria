@@ -109,10 +109,10 @@ function AdminPage() {
                 {data?.appointments.map((a) => (
                   <li key={a.id} className="flex justify-between border-b border-yellow-brand/10 py-2 text-sm">
                     <span className="text-offwhite">
-                      {/* @ts-expect-error joined */}
-                      {a.services?.title ?? "Serviço"} ·{" "}
-                      {/* @ts-expect-error joined */}
-                      <span className="text-offwhite/60">{a.profiles?.full_name ?? "—"}</span>
+                      {(a as { services?: { title?: string } }).services?.title ?? "Serviço"} ·{" "}
+                      <span className="text-offwhite/60">
+                        {(a as { profiles?: { full_name?: string } }).profiles?.full_name ?? "—"}
+                      </span>
                     </span>
                     <span className="text-offwhite/60 text-xs">
                       {new Date(a.starts_at).toLocaleString("pt-BR")} · {a.status}

@@ -72,8 +72,7 @@ function PortalPage() {
                   {data?.appointments.map((a) => (
                     <li key={a.id} className="border-b border-yellow-brand/10 pb-3">
                       <div className="text-offwhite font-display">
-                        {/* @ts-expect-error joined */}
-                        {a.services?.title ?? "Serviço"}
+                        {(a as { services?: { title?: string } }).services?.title ?? "Serviço"}
                       </div>
                       <div className="text-xs text-offwhite/60 font-body">
                         {new Date(a.starts_at).toLocaleString("pt-BR")} ·{" "}
