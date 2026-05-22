@@ -57,10 +57,11 @@ function PdvPage() {
   const rmFn = useServerFn(removeTabItem);
   const closeFn = useServerFn(closeTabAsStaff);
 
-  const grouped = (productsQ.data ?? []).reduce<Record<string, typeof productsQ.data extends infer T ? (T extends Array<infer I> ? I[] : never) : never>>((acc, p) => {
-    (acc[p.category] ??= []).push(p);
-    return acc;
-  }, {} as never);
+  type Product = NonNullable<typeof productsQ.data>[number];
+  const grouped: Record<string, Product[]> = {};
+  for (const p of (productsQ.data ?? []) as Product[]) {
+    (grouped[p.category] ??= []).push(p);
+  }
 
   const tab = tabQ.data?.tab;
   const items = tabQ.data?.items ?? [];
