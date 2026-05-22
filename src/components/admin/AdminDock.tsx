@@ -11,6 +11,7 @@ import {
   Home,
   Wine,
   Ticket,
+  Users,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import logoIcone from "@/assets/logo-empuria-icone.png";
@@ -24,6 +25,7 @@ const items = [
   { to: "/admin/triagem", label: "Triagem", icon: Filter },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/admin/clube", label: "Clube", icon: Crown },
+  { to: "/admin/usuarios", label: "Usuários", icon: Users },
   { to: "/admin/automacoes", label: "Auto", icon: Zap },
 ] as const;
 
