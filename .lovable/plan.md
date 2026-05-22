@@ -1,37 +1,20 @@
-## Problema
+## Padronização do Dock
 
-A tela `/login` já possui o formulário de "Criar conta" chamando `supabase.auth.signUp`, mas o cadastro não conclui o fluxo porque:
+O `PortalDock` já tem o padrão visual desejado (pílulas arredondadas, ícones 18px, label só no item ativo, separadores finos, container compacto). O `AdminDock` está com tamanhos maiores, `flex-1` esticando os itens, `rounded-xl` e label sempre visível — fora do padrão.
 
-1. **Não existe trigger `handle_new_user`** em `auth.users` — ou seja, ao criar uma conta, nenhuma linha é inserida em `public.profiles` nem em `public.user_roles`.
-2. Sem `user_roles`, a função `is_staff()` / `getCurrentUserRole()` falha ou retorna vazio, e o redirecionamento pós-login para `/portal` quebra (era a causa raiz do erro `permission denied for function is_staff` reportado antes).
-3. O `full_name` enviado em `options.data` nunca é persistido em `profiles`.
+### Alterações em `src/components/admin/AdminDock.tsx`
 
-## Plano
+Aplicar exatamente os mesmos tokens visuais do `PortalDock`:
 
-### 1. Migration — auto-provisionar perfil e role no signup
-
-Criar função `public.handle_new_user()` (SECURITY DEFINER, search_path fixo) e trigger `on_auth_user_created` em `auth.users AFTER INSERT`:
-
-- Insere em `public.profiles (id, full_name)` usando `NEW.id` e `NEW.raw_user_meta_data->>'full_name'` (fallback para parte antes do `@` do email).
-- Insere em `public.user_roles (user_id, role)` com role `'member'` por padrão.
-- `ON CONFLICT DO NOTHING` em ambos para idempotência (cobre casos de retry / usuários já existentes).
-
-Também rodar um **backfill único**: para todo `auth.users` que ainda não tem `profile`/`user_role`, criar as linhas correspondentes — assim contas já cadastradas (incluindo a sua que está dando erro) passam a funcionar.
-
-### 2. Front-end (`src/routes/login.tsx`)
-
-O código atual já está quase correto. Pequenos ajustes:
-
-- Após `signUp`, verificar `data.session`: se o Supabase retornou sessão (confirmação de e-mail desativada no projeto), invalidar o cache do React Query e redirecionar direto para `/portal` em vez de só mostrar mensagem "verifique seu e-mail". Se não houver sessão, manter a mensagem de confirmação.
-- Garantir `emailRedirectTo: ${window.location.origin}/portal` (já está) para o caso de confirmação por e-mail.
-
-### 3. Validação
-
-- Criar conta nova pela tela `/login` → confirmar que `profiles` e `user_roles` ganham linha automaticamente e o usuário entra em `/portal` sem o erro `permission denied`.
-- Logar com conta existente → mesmo fluxo funciona.
+- Container: `bg-brown-deep/95 backdrop-blur-xl border border-brown/40 rounded-2xl shadow-2xl` — manter, só ajustar largura para `max-w-3xl` (cabe os 7 itens + logo + portal + sair sem espremer).
+- `ul`: `flex items-center justify-between gap-0 px-2 py-2` (remover `items-stretch`, `gap-1`, `flex-1` dos itens).
+- Logo: `h-6 w-6` (igual ao portal, hoje está `h-7 w-7`).
+- Separadores: `w-px h-5 bg-brown/60 mx-0.5` (hoje é `self-stretch mx-1`).
+- Itens de navegação: substituir a classe atual pela do portal — `h-10 rounded-full`, padding `px-2.5` quando inativo / `px-3 gap-2` quando ativo, fundo `bg-admin-accent text-white` no ativo, ícone `h-[18px] w-[18px]`, label `text-[10px] font-display uppercase tracking-wide` dentro de `.dock-label` (CSS já existente faz a label aparecer só quando ativo).
+- Botões "Portal" e "Sair": mesmos tamanhos/raio do item de nav (pílula `h-10`, ícone 18px), `text-offwhite/50 hover:bg-brown/50`, `hover:text-red-brand` apenas no Sair.
 
 ### Fora de escopo
 
-- Não vou mexer em OAuth (Google/Apple) — não foi pedido.
-- Não vou criar tela separada de "esqueci minha senha" agora (pode ser pedido depois).
-- Não vou alterar a estética da tela (já aprovada).
+- Não alterar `PortalDock` (já é a referência).
+- Não mexer em rotas, lógica de logout ou itens do menu — só visual.
+- Não alterar CSS global `.admin-dock-item` / `.dock-label` (já controlam a exibição da label).
