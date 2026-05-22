@@ -56,7 +56,7 @@ export function PortalDock() {
               title="Sair"
             >
               <LogOut className="h-[18px] w-[18px]" />
-              <span className="dock-label text-[10px] font-unbounded uppercase tracking-wide">Sair</span>
+              <span className="dock-label text-[10px] font-display uppercase tracking-wide">Sair</span>
             </button>
           </li>
         </ul>
