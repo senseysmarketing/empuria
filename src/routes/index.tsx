@@ -44,13 +44,6 @@ const espacoChecklist = [
 
 void fastServices;
 
-const espacoChecklist = [
-  { icon: Scissors, text: "Barbearia com estilo e corte brasileiro — só chegar e esperar." },
-  { icon: Beer, text: "Bar com cerveja gelada, Ruffles e petiscos com gosto de casa." },
-  { icon: Gamepad2, text: "Sofá, videogame e aquele bate-papo sem pressa." },
-  { icon: Sparkles, text: "Ambiente premium, 100% instagramável para registrar sua chegada." },
-];
-
 function HomePage() {
   const fetchServices = useServerFn(listPublicServices);
   const { data: services = [] } = useQuery({
