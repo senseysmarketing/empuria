@@ -32,10 +32,11 @@ export function PassportScannerDialog() {
   return (
     <>
       <Button
+        size="sm"
         onClick={() => setOpen(true)}
-        className="bg-orange-brand hover:bg-red-brand text-offwhite font-display"
+        className="bg-admin-accent hover:bg-admin-accent/90"
       >
-        <Camera className="h-4 w-4 mr-2" /> Escanear Passaporte
+        <Camera className="h-4 w-4" /> Escanear Passaporte
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
