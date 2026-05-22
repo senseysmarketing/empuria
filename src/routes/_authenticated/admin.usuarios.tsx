@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { startImpersonation } from "@/lib/impersonation";
 import {
   listUsers,
   setUserBlocked,
@@ -179,6 +180,7 @@ function MiniTile({ label, value, accent }: { label: string; value: number; acce
 }
 
 function UserRowCard({ user }: { user: UserRow }) {
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const block = useServerFn(setUserBlocked);
   const reset = useServerFn(forcePasswordReset);
@@ -220,11 +222,12 @@ function UserRowCard({ user }: { user: UserRow }) {
 
   const impersonateMut = useMutation({
     mutationFn: () => impersonate({ data: { id: user.id, reason } }),
-    onSuccess: ({ url }) => {
-      window.open(url, "_blank", "noopener,noreferrer");
-      toast.success("Sessão aberta em nova aba. Sua conta admin segue ativa aqui.");
+    onSuccess: ({ targetUserId, targetName }) => {
+      startImpersonation(targetUserId, targetName);
+      toast.success("Visualização de membro iniciada. Sua sessão admin segue ativa.");
       setImpersonateOpen(false);
       setReason("");
+      navigate({ to: "/portal" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -316,7 +319,7 @@ function UserRowCard({ user }: { user: UserRow }) {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-admin-accent" /> Acessar como {user.full_name ?? "usuário"}</AlertDialogTitle>
             <AlertDialogDescription className="text-admin-ink-muted">
-              Uma nova aba será aberta com a sessão deste cliente. Sua conta admin permanece ativa nesta aba.
+              O portal deste cliente será aberto sem trocar sua sessão real de admin.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="bg-yellow-brand/10 border border-yellow-brand/40 rounded-lg p-3 text-xs text-admin-ink">

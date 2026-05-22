@@ -4,13 +4,15 @@ import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
 
-
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
     
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+    const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+    const SUPABASE_PUBLISHABLE_KEY =
+      process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       const missing = [
@@ -69,10 +71,47 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Error('Unauthorized: No user ID found in token');
     }
 
+    let effectiveUserId = data.claims.sub;
+    let impersonation:
+      | { targetUserId: string; targetName: string | null }
+      | null = null;
+    const requestedImpersonation = request.headers.get('x-empuria-impersonate-user-id');
+
+    if (requestedImpersonation) {
+      if (!UUID_RE.test(requestedImpersonation)) {
+        throw new Error('Unauthorized: Invalid impersonation target');
+      }
+
+      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: data.claims.sub,
+        _role: 'admin',
+      });
+      if (roleError || !isAdmin) {
+        throw new Error('Acesso negado: impersonação restrita a admins');
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id,full_name')
+        .eq('id', requestedImpersonation)
+        .maybeSingle();
+      if (profileError || !profile) {
+        throw new Error('Usuário para impersonação não encontrado');
+      }
+
+      effectiveUserId = requestedImpersonation;
+      impersonation = {
+        targetUserId: requestedImpersonation,
+        targetName: profile.full_name ?? null,
+      };
+    }
+
     return next({
       context: {
         supabase,
         userId: data.claims.sub,
+        effectiveUserId,
+        impersonation,
         claims: data.claims,
       },
     });

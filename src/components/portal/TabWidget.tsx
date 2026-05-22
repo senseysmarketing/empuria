@@ -21,15 +21,21 @@ export function TabWidget({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (!userId) return;
+    const tabId = data?.tab.id;
     const ch = supabase
       .channel(`my-tab-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tabs", filter: `user_id=eq.${userId}` },
         () => qc.invalidateQueries({ queryKey: ["my-open-tab"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "tab_items" },
-        () => qc.invalidateQueries({ queryKey: ["my-open-tab"] }))
+      .on(
+        "postgres_changes",
+        tabId
+          ? { event: "*", schema: "public", table: "tab_items", filter: `tab_id=eq.${tabId}` }
+          : { event: "*", schema: "public", table: "tab_items" },
+        () => qc.invalidateQueries({ queryKey: ["my-open-tab"] }),
+      )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [userId, qc]);
+  }, [userId, qc, data?.tab.id]);
 
   if (!data) return null;
   const { tab, items } = data;

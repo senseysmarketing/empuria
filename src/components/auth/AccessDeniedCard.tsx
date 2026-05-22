@@ -2,7 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import logoCompleta from "@/assets/logo-empuria-completa.png";
 
-type Variant = "admin-required" | "member-only";
+type Variant = "admin-required" | "member-only" | "session-expired";
 
 interface Props {
   variant: Variant;
@@ -17,16 +17,23 @@ export function AccessDeniedCard({ variant }: Props) {
   };
 
   const isAdminRequired = variant === "admin-required";
+  const isSessionExpired = variant === "session-expired";
   const title = isAdminRequired
-    ? "Esta área é exclusiva da equipe"
-    : "Esta área é exclusiva de membros";
+    ? "Esta area e exclusiva da equipe"
+    : isSessionExpired
+      ? "Sessao expirada"
+      : "Esta area e exclusiva de membros";
   const description = isAdminRequired
-    ? "Sua conta não tem permissão para acessar o painel administrativo. Acesse o seu portal de membro para continuar."
-    : "Sua conta de equipe não usa o portal de membros. Acesse o painel administrativo para continuar.";
-  const primaryTo = isAdminRequired ? "/portal" : "/admin";
+    ? "Sua conta nao tem permissao para acessar o painel administrativo. Acesse o seu portal de membro para continuar."
+    : isSessionExpired
+      ? "Entre novamente para continuar com seguranca."
+      : "Sua conta de equipe nao usa o portal de membros. Acesse o painel administrativo para continuar.";
+  const primaryTo = isAdminRequired ? "/portal" : isSessionExpired ? "/login" : "/admin";
   const primaryLabel = isAdminRequired
     ? "Ir para meu painel"
-    : "Ir para o painel admin";
+    : isSessionExpired
+      ? "Entrar novamente"
+      : "Ir para o painel admin";
 
   return (
     <div className="min-h-screen bg-brown bg-topo flex items-center justify-center px-6 py-20">
@@ -37,7 +44,7 @@ export function AccessDeniedCard({ variant }: Props) {
 
         <div className="bg-brown-dark/80 border border-yellow-brand/20 rounded-xl p-8 backdrop-blur-sm text-center">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-brand/20 text-orange-brand mb-4 text-2xl">
-            ⚠
+            !
           </div>
           <h1 className="font-display text-2xl text-offwhite mb-2">{title}</h1>
           <p className="text-offwhite/70 font-body text-sm mb-6">{description}</p>

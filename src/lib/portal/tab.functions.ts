@@ -5,7 +5,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const getMyOpenTab = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
+    const userId = context.effectiveUserId ?? context.userId;
     const tabRes = await supabase
       .from("tabs")
       .select("*")
@@ -25,7 +26,8 @@ export const payMyTab = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ tabId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
+    const userId = context.effectiveUserId ?? context.userId;
     const { data: tab, error } = await supabase
       .from("tabs")
       .select("total_cents,user_id,status")
