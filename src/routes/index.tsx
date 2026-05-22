@@ -325,6 +325,10 @@ function HomePage() {
         </div>
       </section>
 
+      {/* EVENTOS - A Agenda Empuria */}
+      <HomeEventsSection />
+
+
       {/* CLUBE */}
       <section id="clube" className="bg-offwhite py-24">
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center">
