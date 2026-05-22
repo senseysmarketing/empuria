@@ -229,7 +229,7 @@ function EventsPage() {
                 ))}
               </div>
             </div>
-            <Button onClick={submit} className="w-full bg-admin-accent text-white">Salvar</Button>
+            <Button size="sm" onClick={submit} className="w-full bg-admin-accent hover:bg-admin-accent/90">Salvar</Button>
           </div>
         </DialogContent>
       </Dialog>
