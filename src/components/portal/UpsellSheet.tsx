@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, QrCode, Copy, Check, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export type ShopService = {
   id: string;
@@ -30,6 +31,7 @@ export function UpsellSheet({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
+  const { impersonation } = useCurrentUser();
   const navigate = useNavigate();
   const createIntent = useServerFn(createCheckoutIntent);
   const confirm = useServerFn(confirmMockPayment);
@@ -68,8 +70,8 @@ export function UpsellSheet({
         data: {
           serviceSlug: service.slug,
           contact: {
-            name: profile.data?.full_name ?? data.user.email ?? "Membro",
-            whatsapp: profile.data?.phone ?? "—",
+            name: impersonation?.targetName ?? profile.data?.full_name ?? data.user.email ?? "Membro",
+            whatsapp: impersonation ? "-" : profile.data?.phone ?? "-",
           },
           serviceData: {},
         },

@@ -12,10 +12,13 @@ export function useCurrentUser() {
 
   return {
     isLoading: query.isLoading,
+    isError: query.isError,
     data: query.data,
     isAdmin: query.data?.isAdmin ?? false,
     isStaff: query.data?.isStaff ?? false,
-    isMember: query.data ? !query.data.isStaff : false,
+    isImpersonating: !!query.data?.impersonation,
+    isMember: query.data ? !query.data.isStaff || !!query.data.impersonation : false,
     primaryRole: query.data?.primaryRole,
+    impersonation: query.data?.impersonation ?? null,
   };
 }

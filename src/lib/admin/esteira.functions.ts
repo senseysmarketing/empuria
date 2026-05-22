@@ -5,12 +5,18 @@ import { requireStaff } from "./auth";
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireStaff])
   .handler(async ({ context }) => {
+    const select = context.isAdmin
+      ? "*"
+      : "id,customer_name,customer_email,service_title,payment_status,delivery_status,voucher_code,created_at,executed_at";
     const { data } = await context.supabase
       .from("orders")
-      .select("*")
+      .select(select)
       .order("created_at", { ascending: false })
       .limit(200);
-    return data ?? [];
+    return (data ?? []).map((order) => ({
+      ...order,
+      canViewFinancials: !!context.isAdmin,
+    }));
   });
 
 export const updateOrder = createServerFn({ method: "POST" })
@@ -52,6 +58,7 @@ export const createOrder = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!context.isAdmin) throw new Error("Apenas admins podem criar pedidos com valor");
     const { error } = await context.supabase.from("orders").insert({
       customer_name: data.customer_name,
       customer_email: data.customer_email || null,

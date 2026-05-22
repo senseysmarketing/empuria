@@ -161,15 +161,17 @@ export const impersonateUser = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(data.id);
-    const email = authUser.user?.email;
-    if (!email) throw new Error("Usuário sem e-mail");
-    const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({ type: "magiclink", email });
-    if (error) throw new Error(error.message);
+    if (!context.isAdmin) throw new Error("Impersonação restrita a admins");
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id,full_name")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (profileError || !profile) throw new Error("Usuário não encontrado");
     await supabaseAdmin.from("impersonation_logs").insert({
       admin_id: context.userId,
       target_user_id: data.id,
       reason: data.reason,
     });
-    return { url: link.properties?.action_link ?? "" };
+    return { targetUserId: profile.id, targetName: profile.full_name };
   });

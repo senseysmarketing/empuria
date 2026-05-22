@@ -66,7 +66,7 @@ export const confirmTicketPurchase = createServerFn({ method: "POST" })
     }),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    const userId = context.effectiveUserId ?? context.userId;
 
     const { data: tier } = await supabaseAdmin
       .from("event_ticket_tiers").select("*, events!inner(*)").eq("id", data.tierId).maybeSingle();
@@ -120,7 +120,8 @@ export const confirmTicketPurchase = createServerFn({ method: "POST" })
 export const getMyTickets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
+    const userId = context.effectiveUserId ?? context.userId;
     const { data: tickets } = await supabase
       .from("event_tickets").select("id,event_id,tier_id,status,checked_in_at,code,created_at")
       .eq("user_id", userId).order("created_at", { ascending: false });

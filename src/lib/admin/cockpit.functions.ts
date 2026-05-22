@@ -6,6 +6,7 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
   .middleware([requireStaff])
   .handler(async ({ context }) => {
     const { supabase } = context;
+    const isAdmin = !!context.isAdmin;
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const isoToday = startOfDay.toISOString();
@@ -16,17 +17,21 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
 
     const [todayOrders, monthlyMembers, todayAppts, revenue30d, upcoming, arrivals] = await Promise.all([
-      supabase.from("orders").select("amount_cents,currency,payment_status")
-        .gte("created_at", isoToday).lt("created_at", isoTomorrow)
-        .eq("payment_status", "aprovado"),
+      isAdmin
+        ? supabase.from("orders").select("amount_cents,currency,payment_status")
+            .gte("created_at", isoToday).lt("created_at", isoTomorrow)
+            .eq("payment_status", "aprovado")
+        : Promise.resolve({ data: [] }),
       supabase.from("profiles").select("id", { count: "exact", head: true })
         .eq("is_club_member", true).gte("updated_at", thirtyDaysAgo.toISOString()),
       supabase.from("appointments").select("id,starts_at,status,services(title),profiles(full_name)")
         .gte("starts_at", isoToday).lt("starts_at", isoTomorrow)
         .order("starts_at", { ascending: true }),
-      supabase.from("orders").select("created_at,amount_cents")
-        .gte("created_at", thirtyDaysAgo.toISOString())
-        .eq("payment_status", "aprovado"),
+      isAdmin
+        ? supabase.from("orders").select("created_at,amount_cents")
+            .gte("created_at", thirtyDaysAgo.toISOString())
+            .eq("payment_status", "aprovado")
+        : Promise.resolve({ data: [] }),
       supabase.from("appointments").select("id,starts_at,services(title),profiles(full_name),staff_assignments(staff_id)")
         .gte("starts_at", new Date().toISOString())
         .order("starts_at", { ascending: true }).limit(5),
@@ -51,11 +56,12 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
 
     return {
       salesToday: salesToday / 100,
+      canViewFinancials: isAdmin,
       newMembers: monthlyMembers.count ?? 0,
       appointmentsToday: (todayAppts.data ?? []).length,
       todayAppointments: todayAppts.data ?? [],
       upcomingAppointments: upcoming.data ?? [],
-      revenueSeries,
+      revenueSeries: isAdmin ? revenueSeries : [],
       todayArrivals: arrivals.data ?? [],
     };
   });
@@ -68,6 +74,13 @@ export const getActivityFeed = createServerFn({ method: "GET" })
       .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
+    if (!context.isAdmin) {
+      return (data ?? []).map((item) =>
+        item.type === "order_created" || item.type === "order_paid"
+          ? { ...item, description: "Pedido atualizado" }
+          : item,
+      );
+    }
     return data ?? [];
   });
 

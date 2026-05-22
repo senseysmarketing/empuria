@@ -39,6 +39,10 @@ export function ActivityFeed({ initial }: { initial: ActivityRow[] }) {
   const [items, setItems] = useState<ActivityRow[]>(initial);
 
   useEffect(() => {
+    setItems(initial);
+  }, [initial]);
+
+  useEffect(() => {
     const channel = supabase
       .channel("activity_feed")
       .on(

@@ -67,12 +67,12 @@ export function AdminDock() {
           <li className="w-px h-5 bg-brown/60 mx-0.5" />
           <li>
             <Link
-              to="/portal"
+              to="/admin/usuarios"
               className="admin-dock-item flex items-center justify-center h-10 px-2.5 rounded-full text-offwhite/50 hover:text-offwhite hover:bg-brown/50 transition-colors"
-              title="Portal do cliente"
+              title="Impersonar membro"
             >
               <Home className="h-[18px] w-[18px]" />
-              <span className="dock-label text-[10px] font-display uppercase tracking-wide">Portal</span>
+              <span className="dock-label text-[10px] font-display uppercase tracking-wide">Membro</span>
             </Link>
           </li>
           <li>

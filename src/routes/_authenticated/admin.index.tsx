@@ -31,7 +31,7 @@ function CockpitPage() {
 
   const m = metricsQ.data;
   useTopBarQuickStat(
-    m ? { label: "Vendas hoje", value: `€ ${(m.salesToday / 100).toFixed(2)}` } : null,
+    m?.canViewFinancials ? { label: "Vendas hoje", value: `€ ${m.salesToday.toFixed(2)}` } : null,
   );
 
   if (metricsQ.error) {
@@ -48,15 +48,16 @@ function CockpitPage() {
 
 
       <div className="grid grid-cols-12 gap-4">
-        {/* Metric tiles */}
-        <MetricTile
-          className="col-span-12 sm:col-span-6 lg:col-span-3"
-          label="Vendas hoje"
-          value={m ? `€ ${m.salesToday.toFixed(2)}` : "—"}
-          hint="Esteira 1 (pagas)"
-          icon={Euro}
-          accent="success"
-        />
+        {m?.canViewFinancials && (
+          <MetricTile
+            className="col-span-12 sm:col-span-6 lg:col-span-3"
+            label="Vendas hoje"
+            value={`€ ${m.salesToday.toFixed(2)}`}
+            hint="Esteira 1 (pagas)"
+            icon={Euro}
+            accent="success"
+          />
+        )}
         <MetricTile
           className="col-span-12 sm:col-span-6 lg:col-span-3"
           label="Novos membros (30d)"
@@ -80,16 +81,17 @@ function CockpitPage() {
           icon={Users}
         />
 
-        {/* Revenue chart */}
-        <BentoCard
-          title="Receita · últimos 30 dias"
-          className="col-span-12 lg:col-span-8"
-        >
-          {m ? <RevenueChart data={m.revenueSeries} /> : <div className="h-56" />}
-        </BentoCard>
+        {m?.canViewFinancials && (
+          <BentoCard
+            title="Receita · últimos 30 dias"
+            className="col-span-12 lg:col-span-8"
+          >
+            <RevenueChart data={m.revenueSeries} />
+          </BentoCard>
+        )}
 
         {/* Activity feed */}
-        <BentoCard title="Feed de atividade" className="col-span-12 lg:col-span-4 row-span-2">
+        <BentoCard title="Feed de atividade" className={`${m?.canViewFinancials ? "col-span-12 lg:col-span-4" : "col-span-12 lg:col-span-8"} row-span-2`}>
           <ActivityFeed initial={feedQ.data ?? []} />
         </BentoCard>
 

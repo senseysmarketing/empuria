@@ -62,7 +62,8 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => createIntentSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId, claims } = context;
+    const { supabase, claims } = context;
+    const userId = context.effectiveUserId ?? context.userId;
 
     const { data: service, error: svcErr } = await supabase
       .from("services")
@@ -143,7 +144,8 @@ export const confirmMockPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ orderId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
+    const userId = context.effectiveUserId ?? context.userId;
     const { data: order } = await supabase
       .from("orders")
       .select("id,user_id,payment_status")

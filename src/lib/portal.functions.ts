@@ -5,7 +5,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const getMyDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
+    const userId = context.effectiveUserId ?? context.userId;
 
     const [profileRes, apptRes, rolesRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),

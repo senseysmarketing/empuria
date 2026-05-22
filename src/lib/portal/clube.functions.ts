@@ -4,7 +4,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const getClubContent = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
+    const userId = context.effectiveUserId ?? context.userId;
     const [profileRes, contentRes] = await Promise.all([
       supabase.from("profiles").select("is_club_member").eq("id", userId).maybeSingle(),
       supabase

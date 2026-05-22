@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2, Plus, QrCode } from "lucide-react";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/admin/esteira")({
   component: EsteiraPage,
@@ -25,6 +26,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 function EsteiraPage() {
+  const { isAdmin } = useCurrentUser();
   const fetchOrders = useServerFn(listOrders);
   const update = useServerFn(updateOrder);
   const create = useServerFn(createOrder);
@@ -44,6 +46,7 @@ function EsteiraPage() {
   );
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["orders"] });
+  const canViewFinancials = isAdmin;
 
   const showVoucher = async (code: string) => {
     const dataUrl = await QRCode.toDataURL(code, { width: 320, margin: 2 });
@@ -85,7 +88,7 @@ function EsteiraPage() {
               <SelectItem value="estornado">Estornado</SelectItem>
             </SelectContent>
           </Select>
-          <NewOrderDialog onCreated={refresh} create={create} />
+          {canViewFinancials && <NewOrderDialog onCreated={refresh} create={create} />}
         </div>
       </header>
 
@@ -101,7 +104,7 @@ function EsteiraPage() {
                 <tr>
                   <th className="text-left px-4 py-3">Cliente</th>
                   <th className="text-left px-4 py-3">Serviço</th>
-                  <th className="text-right px-4 py-3">Valor</th>
+                  {canViewFinancials && <th className="text-right px-4 py-3">Valor</th>}
                   <th className="text-left px-4 py-3">Status</th>
                   <th className="text-left px-4 py-3">Voucher</th>
                   <th className="text-left px-4 py-3">Data</th>
@@ -116,7 +119,11 @@ function EsteiraPage() {
                       {o.customer_email && <div className="text-xs text-admin-ink-muted">{o.customer_email}</div>}
                     </td>
                     <td className="px-4 py-3 text-admin-ink-soft">{o.service_title}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">€ {(o.amount_cents / 100).toFixed(2)}</td>
+                    {canViewFinancials && (
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        € {(((o as { amount_cents?: number }).amount_cents ?? 0) / 100).toFixed(2)}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <Select value={o.payment_status} onValueChange={(v) => setStatus(o.id, v as never)}>
                         <SelectTrigger className={`h-7 px-2 text-xs uppercase tracking-wider w-32 border-0 ${STATUS_COLOR[o.payment_status]}`}>

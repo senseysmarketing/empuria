@@ -24,5 +24,13 @@ export const getCurrentUserRole = createServerFn({ method: "GET" })
         ? "staff"
         : "member";
 
-    return { userId, roles, isAdmin, isStaff, primaryRole };
+    return {
+      userId,
+      effectiveUserId: context.effectiveUserId ?? userId,
+      roles,
+      isAdmin,
+      isStaff,
+      primaryRole,
+      impersonation: context.impersonation ?? null,
+    };
   });

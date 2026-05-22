@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TicketScannerDialog } from "@/components/admin/TicketScannerDialog";
 import { Plus, Trash2, Pencil, ExternalLink, X } from "lucide-react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { toast } from "sonner";
 
@@ -57,6 +58,7 @@ const emptyForm = (): FormState => ({
 });
 
 function EventsPage() {
+  const { isAdmin } = useCurrentUser();
   const fetchList = useServerFn(listEventsAdmin);
   const save = useServerFn(upsertEvent);
   const del = useServerFn(deleteEvent);
@@ -160,10 +162,10 @@ function EventsPage() {
                   {ev.is_published ? "Publicado" : "Rascunho"}
                 </span>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <div className={`mt-3 grid ${isAdmin ? "grid-cols-3" : "grid-cols-2"} gap-2 text-xs`}>
                 <div><div className="text-admin-ink-muted">Vendidos</div><div className="font-display text-admin-ink">{sold}{cap ? `/${cap}` : ""}</div></div>
                 <div><div className="text-admin-ink-muted">Categorias</div><div className="font-display text-admin-ink">{tiers.length}</div></div>
-                <div><div className="text-admin-ink-muted">Receita</div><div className="font-display text-admin-ink">€{(revenue / 100).toFixed(0)}</div></div>
+                {isAdmin && <div><div className="text-admin-ink-muted">Receita</div><div className="font-display text-admin-ink">€{(revenue / 100).toFixed(0)}</div></div>}
               </div>
               <div className="mt-3 flex gap-1.5">
                 <Button size="sm" variant="outline" onClick={() => openEdit(ev.id)}><Pencil className="h-3 w-3" /></Button>

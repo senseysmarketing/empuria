@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
 });
 
 function AdminLayout() {
-  const { isLoading, isStaff } = useCurrentUser();
+  const { isLoading, isError, isStaff } = useCurrentUser();
 
   if (isLoading) {
     return (
@@ -20,6 +20,10 @@ function AdminLayout() {
         </p>
       </div>
     );
+  }
+
+  if (isError) {
+    return <AccessDeniedCard variant="session-expired" />;
   }
 
   if (!isStaff) {

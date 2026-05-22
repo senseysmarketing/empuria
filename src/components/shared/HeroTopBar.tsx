@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SpainWatermark } from "./SpainWatermark";
 import { useTopBarSlots } from "./TopBarActionsContext";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { stopImpersonation } from "@/lib/impersonation";
 import logoIcone from "@/assets/logo-empuria-icone.png";
 
 type Variant = "admin" | "portal";
@@ -22,6 +26,9 @@ function formatDate(d: Date) {
 
 export function HeroTopBar({ variant }: { variant: Variant }) {
   const { actions, quickStat } = useTopBarSlots();
+  const { impersonation } = useCurrentUser();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   const [name, setName] = useState<string>("");
 
@@ -53,7 +60,13 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
   const logoRing = isAdmin ? "bg-brown-deep/60 ring-orange-brand/20" : "bg-white/30 ring-brown-deep/20";
   const greeting = isAdmin
     ? `${greetingFor(now)}, ${name || "equipe"}`
-    : `Bem-vindo de volta, ${name || "imigrante"}`;
+    : `Bem-vindo de volta, ${impersonation?.targetName?.split(" ")[0] || name || "imigrante"}`;
+
+  const returnToAdmin = async () => {
+    stopImpersonation();
+    await queryClient.invalidateQueries({ queryKey: ["current-user"] });
+    navigate({ to: "/admin" });
+  };
 
   return (
     <header className={`relative overflow-hidden ${bg}`}>
@@ -88,6 +101,22 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
 
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
+      {variant === "portal" && impersonation && (
+        <div className="relative bg-brown-deep text-offwhite border-t border-offwhite/10">
+          <div className="max-w-7xl mx-auto px-6 py-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs md:text-sm font-display">
+              Visualizando como: <strong>{impersonation.targetName ?? "membro"}</strong>
+            </p>
+            <button
+              type="button"
+              onClick={returnToAdmin}
+              className="text-[11px] uppercase tracking-wider font-display text-yellow-brand hover:text-offwhite transition-colors"
+            >
+              Voltar ao admin
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
