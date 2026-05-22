@@ -1,42 +1,44 @@
-# Ajustes visuais portal
+# Modal de detalhes do serviço
 
-## 1. Topbar do /portal (HeroTopBar variant="portal")
+## Landing (`/`) e `/servicos`
 
-Hoje: `bg-gradient-to-br from-[#c2956b] via-orange-brand to-yellow-brand` — degradê laranja saturado, conflita com a identidade quente/sóbria da landing.
+Hoje o botão "Detalhes" no `ServiceCard` é um `Link` para `/servicos/$slug`. Trocar por um modal rico, sem sair da página.
 
-Trocar por uma paleta alinhada à landing (marrom profundo + acentos âmbar/laranja), espelhando o admin mas mantendo diferenciação:
+1. Novo componente `src/components/services/ServiceDetailsModal.tsx`:
+   - Usa `Dialog` (shadcn) com `max-w-2xl`, `max-h-[90vh] overflow-y-auto`.
+   - Hero: imagem do serviço (`image_url` ou placeholder por `kind`, reaproveitando o mesmo mapa `KIND_IMAGE` do portal — extrair para `src/lib/service-images.ts` para uso compartilhado).
+   - Cabeçalho: ícone do kind, título, badge "Esteira 1", preço grande à direita.
+   - Corpo: `short_description`, `description` (preserva quebras), e quando existir:
+     - "O que está incluído" a partir de `document_checklist` (lista de bullets).
+     - "Local" com `meeting_address` quando aplicável.
+     - Aviso "Requer agendamento" quando `requires_slot`.
+   - Rodapé: dois botões — "Comprar agora" (fecha o modal e dispara `onBuy(service)` que abre o `CheckoutModal` existente) e "Fechar".
 
-- Fundo: `bg-gradient-to-br from-brown via-[#6b2e1f] to-brown-deep` (tons quentes amadeirados, sem o amarelo cru).
-- Texto principal: `text-offwhite` (em vez de brown-deep escuro).
-- Texto secundário: `text-offwhite/65`.
-- Acento (ponto + quickStat + greeting accent): `text-yellow-brand`.
-- Aro do logo: `bg-brown-deep/60 ring-yellow-brand/25`.
-- Watermark Espanha: `text-yellow-brand/12` (sutil, sem poluir).
-- Borda do quickStat: `border-offwhite/15`.
-- Banner "Visualizando como" continua igual.
+2. `ServiceCard` (`src/components/services/ServiceCard.tsx`):
+   - Adicionar prop opcional `onDetails?: (s: PublicService) => void`.
+   - Se `onDetails` for passado, o "Detalhes" vira `<button>` chamando o handler; senão mantém o `Link` atual (compat).
 
-Diferenciação vs admin:
-- Admin = marrom→preto + acento laranja.
-- Portal = marrom→âmbar quente + acento amarelo (mesma família, vibe mais "boas-vindas").
+3. `src/routes/index.tsx` e `src/routes/servicos.tsx`:
+   - Adicionar estado `detailsService` + `detailsOpen`.
+   - Passar `onDetails={(s) => { setDetailsService(s); setDetailsOpen(true); }}` para cada `ServiceCard`.
+   - Renderizar `<ServiceDetailsModal>` ao lado do `CheckoutModal` já existente, com `onBuy={(s) => { setDetailsOpen(false); setSelected(s); setCheckoutOpen(true); }}`.
 
-Arquivo: `src/components/shared/HeroTopBar.tsx` — só ajustar as constantes `bg`, `textMain`, `textMuted`, `accent`, `watermark`, `logoRing` quando `variant === "portal"`.
+## `/portal/servicos` (Loja Empuria)
 
-## 2. Imagens de exemplo nos cards da /portal/servicos
+Já abre o `UpsellSheet` ao clicar no card, e o sheet já mostra título, preço, `short_description` e `description`. Pequenos ajustes para igualar o nível de detalhe do modal público:
 
-Hoje em `src/routes/_authenticated/portal.loja.tsx`, quando `s.image_url` é nulo, renderiza o degradê marrom→laranja (visto no print). Trocar o fallback por uma imagem placeholder por `kind`:
+1. `src/components/portal/UpsellSheet.tsx`:
+   - Hero: sempre mostrar imagem (usa `image_url` ou placeholder por kind via `service-images.ts`), removendo o `if` que só renderiza quando há `image_url`.
+   - Adicionar `ShopService.document_checklist`, `requires_slot`, `meeting_address` ao tipo e ao select do server fn.
+   - Renderizar bloco "O que está incluído" + endereço + aviso de agendamento, com os mesmos componentes visuais do modal público adaptados ao tema admin.
 
-- Mapa `KIND_IMAGE` apontando para Unsplash (URLs estáveis, foco em Madrid/Espanha):
-  - `airport` → foto de avião/terminal
-  - `tour` → foto de Madrid (Gran Vía / Plaza Mayor)
-  - `consulting` → mesa de trabalho / documentos
-  - `banking` → fachada de banco / cartão
-  - `meeting` → sala de reunião
-- Fallback genérico: foto de Madrid.
-- Usar `?w=800&auto=format&fit=crop` para peso controlado.
-- Manter `object-cover` e o hover scale existente.
-- Manter prioridade: se `s.image_url` existir, usa o real; senão, usa o placeholder por kind.
+2. `src/lib/services-public.functions.ts`: o `listPublicServices` já retorna esses campos, então o `select` no portal só precisa garantir que o tipo bate (sem mudar lógica).
+
+## Reuso
+
+`src/lib/service-images.ts` exporta `KIND_IMAGE` + `FALLBACK_IMAGE` + helper `getServiceImage(service)`. `portal.loja.tsx`, `UpsellSheet`, `ServiceDetailsModal` e o hero do `ServiceCard` (opcional, futuro) consomem daqui — única fonte de verdade.
 
 ## Fora de escopo
-- Lógica de upload/gestão de imagens reais dos serviços (continua usando `image_url` quando existir).
-- Tela /admin (já tem paleta definida e aprovada).
-- Outras telas do portal além do topbar e da loja.
+- Backend / novos campos no schema.
+- Mudanças no fluxo de checkout.
+- Rota `/servicos/$slug` (continua existindo como página SEO; modal não a substitui).

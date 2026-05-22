@@ -5,10 +5,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { createCheckoutIntent, confirmMockPayment } from "@/lib/checkout/checkout.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, QrCode, Copy, Check, ShoppingBag } from "lucide-react";
+import { Loader2, QrCode, Copy, Check, ShoppingBag, MapPin, Clock } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { getServiceImage } from "@/lib/service-images";
 
 export type ShopService = {
   id: string;
@@ -20,6 +21,9 @@ export type ShopService = {
   price_cents: number;
   currency: string;
   image_url: string | null;
+  requires_slot?: boolean;
+  document_checklist?: string[] | null;
+  meeting_address?: string | null;
 };
 
 export function UpsellSheet({
@@ -109,11 +113,9 @@ export function UpsellSheet({
           <SheetTitle className="font-display text-2xl text-admin-ink">{service.title}</SheetTitle>
         </SheetHeader>
 
-        {service.image_url && (
-          <div className="aspect-video rounded-xl overflow-hidden mt-4 bg-admin-surface-2">
-            <img src={service.image_url} alt={service.title} className="w-full h-full object-cover" />
-          </div>
-        )}
+        <div className="aspect-video rounded-xl overflow-hidden mt-4 bg-admin-surface-2">
+          <img src={getServiceImage(service)} alt={service.title} className="w-full h-full object-cover" />
+        </div>
 
         <div className="mt-4 space-y-3">
           <div className="text-3xl font-display font-bold text-admin-accent">€ {priceEUR}</div>
@@ -122,6 +124,42 @@ export function UpsellSheet({
           )}
           {service.description && (
             <div className="text-sm text-admin-ink-muted font-body whitespace-pre-line">{service.description}</div>
+          )}
+
+          {Array.isArray(service.document_checklist) && service.document_checklist.length > 0 && (
+            <div className="pt-2">
+              <h4 className="font-display font-bold uppercase tracking-widest text-[10px] text-admin-ink-muted mb-2">
+                O que está incluído
+              </h4>
+              <ul className="space-y-1.5">
+                {service.document_checklist.map((item, i) => (
+                  <li key={i} className="flex gap-2 text-xs font-body text-admin-ink-soft">
+                    <Check className="w-3.5 h-3.5 text-admin-accent shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {service.meeting_address && (
+            <div className="rounded-lg border border-admin-border bg-admin-surface-2 p-3">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-display text-admin-ink-muted mb-1">
+                <MapPin className="w-3 h-3" /> Local
+              </div>
+              <div className="text-xs font-body text-admin-ink-soft">{service.meeting_address}</div>
+            </div>
+          )}
+
+          {service.requires_slot && (
+            <div className="rounded-lg border border-admin-accent/30 bg-admin-accent/10 p-3">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-display text-admin-accent mb-1">
+                <Clock className="w-3 h-3" /> Agendamento
+              </div>
+              <div className="text-xs font-body text-admin-ink-soft">
+                Você escolhe data e horário após confirmar a compra.
+              </div>
+            </div>
           )}
         </div>
 

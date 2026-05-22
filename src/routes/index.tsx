@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Reveal } from "@/components/Reveal";
 import { ServiceCard, type PublicService } from "@/components/services/ServiceCard";
 import { CheckoutModal } from "@/components/checkout/CheckoutModal";
+import { ServiceDetailsModal } from "@/components/services/ServiceDetailsModal";
 import { HomeEventsSection } from "@/components/events/HomeEventsSection";
 import { ConsultoriaWizardModal } from "@/components/leads/ConsultoriaWizardModal";
 import { listPublicServices } from "@/lib/services-public.functions";
@@ -54,13 +55,18 @@ function HomePage() {
   });
   const [selected, setSelected] = useState<PublicService | null>(null);
   const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState<PublicService | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const onBuy = (s: PublicService) => { setSelected(s); setOpen(true); };
+  const onDetails = (s: PublicService) => { setDetails(s); setDetailsOpen(true); };
 
   return (
     <div className="min-h-screen bg-offwhite text-brown-deep overflow-x-hidden">
       <SiteHeader />
       <CheckoutModal service={selected} open={open} onOpenChange={setOpen} />
+      <ServiceDetailsModal service={details} open={detailsOpen} onOpenChange={setDetailsOpen} onBuy={onBuy} />
+
 
 
       {/* HERO */}
@@ -287,7 +293,7 @@ function HomePage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {services.slice(0, 6).map((s, i) => (
                 <Reveal key={s.id} delay={i * 70}>
-                  <ServiceCard service={s as PublicService} onBuy={onBuy} variant="dark" />
+                  <ServiceCard service={s as PublicService} onBuy={onBuy} onDetails={onDetails} variant="dark" />
                 </Reveal>
               ))}
             </div>

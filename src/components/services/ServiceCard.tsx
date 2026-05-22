@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Plane, MapPin, CreditCard, Landmark, Users, ArrowRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+
 const ICONS: Record<string, LucideIcon> = {
   airport: Plane,
   tour: MapPin,
@@ -24,10 +25,12 @@ export type PublicService = {
 export function ServiceCard({
   service,
   onBuy,
+  onDetails,
   variant = "dark",
 }: {
   service: PublicService;
   onBuy: (s: PublicService) => void;
+  onDetails?: (s: PublicService) => void;
   variant?: "dark" | "light";
 }) {
   const Icon = ICONS[service.kind] ?? MapPin;
@@ -64,13 +67,22 @@ export function ServiceCard({
         >
           Comprar <ArrowRight className="w-3.5 h-3.5" />
         </button>
-        <Link
-          to="/servicos/$slug"
-          params={{ slug: service.slug }}
-          className="inline-flex items-center justify-center gap-2 border border-border text-brown-deep px-4 py-2.5 rounded-md font-display font-semibold text-xs uppercase tracking-widest hover:bg-muted transition-all"
-        >
-          Detalhes
-        </Link>
+        {onDetails ? (
+          <button
+            onClick={() => onDetails(service)}
+            className="inline-flex items-center justify-center gap-2 border border-border text-brown-deep px-4 py-2.5 rounded-md font-display font-semibold text-xs uppercase tracking-widest hover:bg-muted transition-all"
+          >
+            Detalhes
+          </button>
+        ) : (
+          <Link
+            to="/servicos/$slug"
+            params={{ slug: service.slug }}
+            className="inline-flex items-center justify-center gap-2 border border-border text-brown-deep px-4 py-2.5 rounded-md font-display font-semibold text-xs uppercase tracking-widest hover:bg-muted transition-all"
+          >
+            Detalhes
+          </Link>
+        )}
       </div>
     </div>
   );

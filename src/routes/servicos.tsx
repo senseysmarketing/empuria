@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ServiceCard, type PublicService } from "@/components/services/ServiceCard";
 import { CheckoutModal } from "@/components/checkout/CheckoutModal";
+import { ServiceDetailsModal } from "@/components/services/ServiceDetailsModal";
 import { listPublicServices } from "@/lib/services-public.functions";
 
 export const Route = createFileRoute("/servicos")({
@@ -28,10 +29,16 @@ function ServicosPage() {
   });
   const [selected, setSelected] = useState<PublicService | null>(null);
   const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState<PublicService | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const onBuy = (s: PublicService) => {
     setSelected(s);
     setOpen(true);
+  };
+  const onDetails = (s: PublicService) => {
+    setDetails(s);
+    setDetailsOpen(true);
   };
 
   return (
@@ -57,13 +64,15 @@ function ServicosPage() {
                   <div key={i} className="h-56 bg-offwhite/10 animate-pulse rounded-xl" />
                 ))
               : services.map((s) => (
-                  <ServiceCard key={s.id} service={s as PublicService} onBuy={onBuy} variant="dark" />
+                  <ServiceCard key={s.id} service={s as PublicService} onBuy={onBuy} onDetails={onDetails} variant="dark" />
                 ))}
           </div>
         </div>
       </section>
       <SiteFooter />
       <CheckoutModal service={selected} open={open} onOpenChange={setOpen} />
+      <ServiceDetailsModal service={details} open={detailsOpen} onOpenChange={setDetailsOpen} onBuy={onBuy} />
+
     </div>
   );
 }
