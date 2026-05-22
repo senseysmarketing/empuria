@@ -53,14 +53,6 @@ function PortalPage() {
             </span>
           </Link>
           <div className="flex items-center gap-3">
-            {isStaff && (
-              <Link
-                to="/admin"
-                className="text-xs uppercase font-display tracking-wider text-yellow-brand hover:text-orange-brand"
-              >
-                Painel Admin
-              </Link>
-            )}
             <button
               onClick={logout}
               className="text-xs uppercase font-display tracking-wider text-offwhite/70 hover:text-yellow-brand"
