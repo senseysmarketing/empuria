@@ -83,7 +83,7 @@ export function HomeEventsSection() {
                       ) : (
                         <div className="absolute inset-0 bg-gradient-to-br from-brown to-brown-deep" />
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-brown via-brown/20 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-brown via-brown/20 to-transparent transition-transform duration-700 group-hover:scale-105" />
                       <div className="absolute top-4 left-4 bg-yellow-brand text-brown rounded-lg px-3 py-2 text-center shadow-warm">
                         <div className="font-display font-extrabold text-2xl leading-none">{day}</div>
                         <div className="font-display font-semibold text-[10px] tracking-widest mt-0.5">{month}</div>
