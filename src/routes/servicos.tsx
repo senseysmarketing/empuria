@@ -29,10 +29,16 @@ function ServicosPage() {
   });
   const [selected, setSelected] = useState<PublicService | null>(null);
   const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState<PublicService | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const onBuy = (s: PublicService) => {
     setSelected(s);
     setOpen(true);
+  };
+  const onDetails = (s: PublicService) => {
+    setDetails(s);
+    setDetailsOpen(true);
   };
 
   return (
