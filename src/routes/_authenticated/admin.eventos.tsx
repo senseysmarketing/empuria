@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TicketScannerDialog } from "@/components/admin/TicketScannerDialog";
 import { Plus, Trash2, Pencil, ExternalLink, X } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/eventos")({
