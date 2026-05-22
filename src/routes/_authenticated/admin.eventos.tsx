@@ -132,8 +132,8 @@ function EventsPage() {
         </div>
         <div className="flex gap-2">
           <TicketScannerDialog events={(data?.events ?? []).filter((e) => e.is_published)} />
-          <Button onClick={openNew} className="bg-admin-accent text-white">
-            <Plus className="h-4 w-4 mr-1" /> Novo evento
+          <Button size="sm" onClick={openNew} className="bg-admin-accent hover:bg-admin-accent/90">
+            <Plus className="h-4 w-4" /> Novo evento
           </Button>
         </div>
       </header>
@@ -229,7 +229,7 @@ function EventsPage() {
                 ))}
               </div>
             </div>
-            <Button onClick={submit} className="w-full bg-admin-accent text-white">Salvar</Button>
+            <Button size="sm" onClick={submit} className="w-full bg-admin-accent hover:bg-admin-accent/90">Salvar</Button>
           </div>
         </DialogContent>
       </Dialog>

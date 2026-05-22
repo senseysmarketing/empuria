@@ -306,7 +306,7 @@ function UserRowCard({ user }: { user: UserRow }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEmailDialog(false)}>Cancelar</Button>
-            <Button onClick={() => emailMut.mutate()} disabled={emailMut.isPending} className="bg-admin-accent text-white">Salvar</Button>
+            <Button size="sm" onClick={() => emailMut.mutate()} disabled={emailMut.isPending} className="bg-admin-accent hover:bg-admin-accent/90">Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
