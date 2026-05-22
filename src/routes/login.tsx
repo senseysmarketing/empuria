@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import logoCompleta from "@/assets/logo-empuria-completa.png";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -73,13 +74,12 @@ function LoginPage() {
   return (
     <div className="min-h-screen bg-brown bg-topo flex items-center justify-center px-6 py-20">
       <div className="w-full max-w-md">
-        <Link to="/" className="block text-center mb-8">
-          <div className="font-display font-extrabold text-offwhite text-lg tracking-widest uppercase">
-            Empuria
-          </div>
-          <div className="font-body italic text-yellow-brand/80 text-xs">
-            Embaixada Emocional · Madrid
-          </div>
+        <Link to="/" className="flex items-center justify-center mb-8" aria-label="Instituto Empuria">
+          <img
+            src={logoCompleta}
+            alt="Instituto Empuria"
+            className="h-14 w-auto object-contain"
+          />
         </Link>
 
         <div className="bg-brown-dark/80 border border-yellow-brand/20 rounded-xl p-8 backdrop-blur-sm">
