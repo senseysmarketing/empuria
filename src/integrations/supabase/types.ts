@@ -340,6 +340,173 @@ export type Database = {
         }
         Relationships: []
       }
+      event_ticket_tiers: {
+        Row: {
+          benefits: Json
+          capacity: number | null
+          created_at: string
+          event_id: string
+          id: string
+          is_active: boolean
+          name: string
+          position: number
+          price_cents: number
+          sold: number
+          updated_at: string
+        }
+        Insert: {
+          benefits?: Json
+          capacity?: number | null
+          created_at?: string
+          event_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          position?: number
+          price_cents?: number
+          sold?: number
+          updated_at?: string
+        }
+        Update: {
+          benefits?: Json
+          capacity?: number | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          position?: number
+          price_cents?: number
+          sold?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_ticket_tiers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_tickets: {
+        Row: {
+          checked_in_at: string | null
+          checked_in_by: string | null
+          code: string
+          created_at: string
+          event_id: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          status: Database["public"]["Enums"]["event_ticket_status"]
+          tier_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          code: string
+          created_at?: string
+          event_id: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          status?: Database["public"]["Enums"]["event_ticket_status"]
+          tier_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          code?: string
+          created_at?: string
+          event_id?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          status?: Database["public"]["Enums"]["event_ticket_status"]
+          tier_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_tickets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_tickets_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "event_ticket_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          cover_kind: string
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          ends_at: string | null
+          id: string
+          is_published: boolean
+          location_address: string | null
+          location_lat: number | null
+          location_lng: number | null
+          sales_mode: Database["public"]["Enums"]["event_sales_mode"]
+          slug: string
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_kind?: string
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          is_published?: boolean
+          location_address?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          sales_mode?: Database["public"]["Enums"]["event_sales_mode"]
+          slug: string
+          starts_at: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_kind?: string
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          is_published?: boolean
+          location_address?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          sales_mode?: Database["public"]["Enums"]["event_sales_mode"]
+          slug?: string
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           budget_range: string | null
@@ -837,6 +1004,8 @@ export type Database = {
       automation_channel: "whatsapp" | "email" | "painel"
       benefit_kind: "desconto_pct" | "desconto_fixo" | "cortesia"
       benefit_scope: "produto" | "categoria"
+      event_sales_mode: "simples" | "categorias"
+      event_ticket_status: "valido" | "usado" | "cancelado"
       lead_pipeline_stage: "novo" | "analise" | "qualificado" | "descartado"
       lead_status: "novo" | "contatado" | "qualificado" | "fechado" | "perdido"
       order_delivery_status:
@@ -994,6 +1163,8 @@ export const Constants = {
       automation_channel: ["whatsapp", "email", "painel"],
       benefit_kind: ["desconto_pct", "desconto_fixo", "cortesia"],
       benefit_scope: ["produto", "categoria"],
+      event_sales_mode: ["simples", "categorias"],
+      event_ticket_status: ["valido", "usado", "cancelado"],
       lead_pipeline_stage: ["novo", "analise", "qualificado", "descartado"],
       lead_status: ["novo", "contatado", "qualificado", "fechado", "perdido"],
       order_delivery_status: [

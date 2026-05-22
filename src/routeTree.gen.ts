@@ -14,16 +14,19 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServicosSlugRouteImport } from './routes/servicos.$slug'
+import { Route as EventoSlugRouteImport } from './routes/evento.$slug'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
 import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
+import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_authenticated/portal.ingressos'
 import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenticated/portal.clube'
 import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
 import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
 import { Route as AuthenticatedAdminPdvRouteImport } from './routes/_authenticated/admin.pdv'
+import { Route as AuthenticatedAdminEventosRouteImport } from './routes/_authenticated/admin.eventos'
 import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authenticated/admin.esteira'
 import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authenticated/admin.clube'
 import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
@@ -52,6 +55,11 @@ const ServicosSlugRoute = ServicosSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => ServicosRoute,
+} as any)
+const EventoSlugRoute = EventoSlugRouteImport.update({
+  id: '/evento/$slug',
+  path: '/evento/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedPortalRoute = AuthenticatedPortalRouteImport.update({
   id: '/portal',
@@ -85,6 +93,12 @@ const AuthenticatedPortalLojaRoute = AuthenticatedPortalLojaRouteImport.update({
   path: '/loja',
   getParentRoute: () => AuthenticatedPortalRoute,
 } as any)
+const AuthenticatedPortalIngressosRoute =
+  AuthenticatedPortalIngressosRouteImport.update({
+    id: '/ingressos',
+    path: '/ingressos',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
 const AuthenticatedPortalClubeRoute =
   AuthenticatedPortalClubeRouteImport.update({
     id: '/clube',
@@ -107,6 +121,12 @@ const AuthenticatedAdminPdvRoute = AuthenticatedAdminPdvRouteImport.update({
   path: '/pdv',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminEventosRoute =
+  AuthenticatedAdminEventosRouteImport.update({
+    id: '/eventos',
+    path: '/eventos',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminEsteiraRoute =
   AuthenticatedAdminEsteiraRouteImport.update({
     id: '/esteira',
@@ -137,15 +157,18 @@ export interface FileRoutesByFullPath {
   '/servicos': typeof ServicosRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/portal': typeof AuthenticatedPortalRouteWithChildren
+  '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -155,15 +178,18 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/servicos': typeof ServicosRouteWithChildren
+  '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -177,15 +203,18 @@ export interface FileRoutesById {
   '/servicos': typeof ServicosRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/portal': typeof AuthenticatedPortalRouteWithChildren
+  '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/_authenticated/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/_authenticated/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/_authenticated/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/_authenticated/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/_authenticated/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/_authenticated/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/_authenticated/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/_authenticated/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/_authenticated/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/_authenticated/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -199,15 +228,18 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/admin'
     | '/portal'
+    | '/evento/$slug'
     | '/servicos/$slug'
     | '/admin/agenda'
     | '/admin/automacoes'
     | '/admin/clube'
     | '/admin/esteira'
+    | '/admin/eventos'
     | '/admin/pdv'
     | '/admin/slots'
     | '/admin/triagem'
     | '/portal/clube'
+    | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
     | '/admin/'
@@ -217,15 +249,18 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/servicos'
+    | '/evento/$slug'
     | '/servicos/$slug'
     | '/admin/agenda'
     | '/admin/automacoes'
     | '/admin/clube'
     | '/admin/esteira'
+    | '/admin/eventos'
     | '/admin/pdv'
     | '/admin/slots'
     | '/admin/triagem'
     | '/portal/clube'
+    | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
     | '/admin'
@@ -238,15 +273,18 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/_authenticated/admin'
     | '/_authenticated/portal'
+    | '/evento/$slug'
     | '/servicos/$slug'
     | '/_authenticated/admin/agenda'
     | '/_authenticated/admin/automacoes'
     | '/_authenticated/admin/clube'
     | '/_authenticated/admin/esteira'
+    | '/_authenticated/admin/eventos'
     | '/_authenticated/admin/pdv'
     | '/_authenticated/admin/slots'
     | '/_authenticated/admin/triagem'
     | '/_authenticated/portal/clube'
+    | '/_authenticated/portal/ingressos'
     | '/_authenticated/portal/loja'
     | '/_authenticated/portal/servicos'
     | '/_authenticated/admin/'
@@ -258,6 +296,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ServicosRoute: typeof ServicosRouteWithChildren
+  EventoSlugRoute: typeof EventoSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -296,6 +335,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/servicos/$slug'
       preLoaderRoute: typeof ServicosSlugRouteImport
       parentRoute: typeof ServicosRoute
+    }
+    '/evento/$slug': {
+      id: '/evento/$slug'
+      path: '/evento/$slug'
+      fullPath: '/evento/$slug'
+      preLoaderRoute: typeof EventoSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/portal': {
       id: '/_authenticated/portal'
@@ -339,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPortalLojaRouteImport
       parentRoute: typeof AuthenticatedPortalRoute
     }
+    '/_authenticated/portal/ingressos': {
+      id: '/_authenticated/portal/ingressos'
+      path: '/ingressos'
+      fullPath: '/portal/ingressos'
+      preLoaderRoute: typeof AuthenticatedPortalIngressosRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
     '/_authenticated/portal/clube': {
       id: '/_authenticated/portal/clube'
       path: '/clube'
@@ -365,6 +418,13 @@ declare module '@tanstack/react-router' {
       path: '/pdv'
       fullPath: '/admin/pdv'
       preLoaderRoute: typeof AuthenticatedAdminPdvRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/eventos': {
+      id: '/_authenticated/admin/eventos'
+      path: '/eventos'
+      fullPath: '/admin/eventos'
+      preLoaderRoute: typeof AuthenticatedAdminEventosRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/esteira': {
@@ -403,6 +463,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAutomacoesRoute: typeof AuthenticatedAdminAutomacoesRoute
   AuthenticatedAdminClubeRoute: typeof AuthenticatedAdminClubeRoute
   AuthenticatedAdminEsteiraRoute: typeof AuthenticatedAdminEsteiraRoute
+  AuthenticatedAdminEventosRoute: typeof AuthenticatedAdminEventosRoute
   AuthenticatedAdminPdvRoute: typeof AuthenticatedAdminPdvRoute
   AuthenticatedAdminSlotsRoute: typeof AuthenticatedAdminSlotsRoute
   AuthenticatedAdminTriagemRoute: typeof AuthenticatedAdminTriagemRoute
@@ -414,6 +475,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAutomacoesRoute: AuthenticatedAdminAutomacoesRoute,
   AuthenticatedAdminClubeRoute: AuthenticatedAdminClubeRoute,
   AuthenticatedAdminEsteiraRoute: AuthenticatedAdminEsteiraRoute,
+  AuthenticatedAdminEventosRoute: AuthenticatedAdminEventosRoute,
   AuthenticatedAdminPdvRoute: AuthenticatedAdminPdvRoute,
   AuthenticatedAdminSlotsRoute: AuthenticatedAdminSlotsRoute,
   AuthenticatedAdminTriagemRoute: AuthenticatedAdminTriagemRoute,
@@ -425,6 +487,7 @@ const AuthenticatedAdminRouteWithChildren =
 
 interface AuthenticatedPortalRouteChildren {
   AuthenticatedPortalClubeRoute: typeof AuthenticatedPortalClubeRoute
+  AuthenticatedPortalIngressosRoute: typeof AuthenticatedPortalIngressosRoute
   AuthenticatedPortalLojaRoute: typeof AuthenticatedPortalLojaRoute
   AuthenticatedPortalServicosRoute: typeof AuthenticatedPortalServicosRoute
   AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
@@ -432,6 +495,7 @@ interface AuthenticatedPortalRouteChildren {
 
 const AuthenticatedPortalRouteChildren: AuthenticatedPortalRouteChildren = {
   AuthenticatedPortalClubeRoute: AuthenticatedPortalClubeRoute,
+  AuthenticatedPortalIngressosRoute: AuthenticatedPortalIngressosRoute,
   AuthenticatedPortalLojaRoute: AuthenticatedPortalLojaRoute,
   AuthenticatedPortalServicosRoute: AuthenticatedPortalServicosRoute,
   AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,
@@ -471,6 +535,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   ServicosRoute: ServicosRouteWithChildren,
+  EventoSlugRoute: EventoSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
