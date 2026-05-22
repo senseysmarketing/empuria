@@ -1,91 +1,78 @@
+## Diagnóstico
 
-# Módulo de Vendas — Esteira 1 (Checkout Frictionless)
+- Usuário `senseystrafego@gmail.com` existe, está confirmado e tem role `admin` no banco. ✅
+- O fluxo atual de login (`src/routes/login.tsx`) faz `signInWithPassword` e sempre redireciona para `/portal` (ou para o `?redirect=` da URL) — **sem consultar a role**. Por isso o admin cai no portal de membro em vez do `/admin`.
+- O layout `_authenticated/admin.tsx` **não tem nenhum guard de role** — qualquer usuário autenticado consegue abrir `/admin`.
+- O `_authenticated.tsx` chama `await supabase.auth.getSession()` no `beforeLoad`. Após login, a sessão é gravada no `localStorage` antes do `navigate`, então o problema do "não consigo logar" provavelmente é o redirect indo pro `/portal` (que pode estar quebrando por outro motivo) e parecendo que o login falhou. Vou adicionar logging defensivo + redirect correto por role para descartar.
 
-## 1. Banco de dados (migration única)
+## O que vou construir
 
-**Novas tabelas / colunas**
-- `availability_slots` — `id, service_id, starts_at, ends_at, capacity (int), booked (int default 0), is_active`. Slots cadastrados pelo Admin; checkout consome decrementando capacity.
-- `orders` — adicionar colunas: `service_metadata jsonb` (voo, malas, slot_id, terminal, etc.), `slot_id uuid null`, `delivery_status text` (`aguardando_documentos`, `processando`, `agendado`, `concluido`), `staff_id uuid null`, `host_profile_id uuid null` (anfitrião do aeroporto).
-- `order_documents` — checklist interativo do membro: `id, order_id, label, checked bool, updated_at`.
-- `services` — popular as 5 linhas oficiais via seed (Recepção, Tour Econômico, Tour Raiz, Vale Transporte, Conta Bancária, Reunião Presencial) com `category` adequada e flags `requires_slot`, `requires_documents`, `kind` (`airport|tour|consulting|banking|meeting`).
-- Trigger: ao mudar `payment_status='aprovado'` gera `voucher_code` e cria `activity_feed` (já existe parcialmente — estender).
-- Trava de overlap entre Tour Raiz e Reunião Presencial compartilhando staff: validação no server function que cria slot/reserva (não CHECK constraint).
+### 1. Hook compartilhado de role (`src/hooks/use-current-user.ts`)
+- Server function `getCurrentUserRole` (em `src/lib/auth.functions.ts`) protegida por `requireSupabaseAuth`, retornando `{ userId, email, roles: string[], primaryRole: 'admin' | 'staff' | 'member' }`.
+- Hook React (`useCurrentUser`) usando TanStack Query (`queryKey: ['current-user']`) para chamar a server-fn e expor `{ isLoading, role, isAdmin, isStaff, isMember }`.
 
-**RLS**
-- `availability_slots`: SELECT público (`is_active=true`), staff manage.
-- `order_documents`: dono do pedido + staff.
+### 2. Login com redirecionamento por role (`src/routes/login.tsx`)
+- Após `signInWithPassword`:
+  - Invalida `queryClient` para limpar cache.
+  - Busca a role via server-fn (`getCurrentUserRole`).
+  - Se admin/staff → `navigate({ to: '/admin' })`.
+  - Senão → `navigate({ to: '/portal' })`.
+  - Se houver `?redirect=` explícito **e** a role permite acessar, respeita o redirect; caso contrário, ignora.
+- Adiciona `try/catch` com mensagem de erro mais clara (mostra `error.message` do Supabase: "Invalid login credentials", "Email not confirmed" etc).
+- `beforeLoad`: se já estiver logado, redireciona para a tela certa por role (evita ficar preso na tela de login).
 
-## 2. Backend — Server Functions
+### 3. Guard de admin (`src/routes/_authenticated/admin.tsx`)
+- Converte `AdminLayout` para verificar a role via `useCurrentUser`.
+- Se a role **não** for admin/staff → renderiza componente `<AccessDeniedCard variant="admin-required" />` em vez do `<Outlet />`.
+- Card amigável com:
+  - Logo + título "Esta área é exclusiva da equipe."
+  - Texto curto explicando.
+  - Botão primário "Voltar ao meu painel" → `/portal`.
+  - Botão secundário "Sair" (signOut).
 
-`src/lib/checkout/`
-- `checkout.functions.ts`
-  - `checkEmail({email})` — público, retorna `{exists: boolean}` (consulta `auth.users` via `supabaseAdmin`).
-  - `createCheckoutIntent({serviceSlug, contact:{name,email,whatsapp,password}, serviceData})` — Regra de Ouro: numa única transação (a) cria usuário se não existir / autentica se existir, (b) reserva slot se aplicável (incrementa `booked`), (c) insere `orders` status `pendente`, (d) retorna `{orderId, voucherPreview, mockPix:{qr,copyPaste}, sessionToken}`.
-  - `confirmMockPayment({orderId})` — simula webhook: marca `aprovado`, gera voucher, cria activity_feed, e devolve sessão autenticada (auto-login).
-  - `getSlotsForService({serviceId, from, to})` — público.
-- `src/lib/admin/slots.functions.ts` — CRUD de `availability_slots` (staff).
-- `src/lib/portal/services.functions.ts` — `getMyServices()` para o painel do membro (orders + documentos + slot + host).
-- `src/lib/admin/delivery.functions.ts` — atualizar `delivery_status`, atribuir `host_profile_id` (aeroporto) / `staff_id` (banco), avançar etapas.
+### 4. Guard inverso no portal (`src/routes/_authenticated/portal.tsx`)
+- Se a role for admin/staff → renderiza `<AccessDeniedCard variant="member-only" />` com:
+  - "Esta área é exclusiva de membros."
+  - Botão primário "Ir para o painel admin" → `/admin`.
+  - (Mantém botão de logout.)
+- Observação: hoje o portal já mostra um link "Ir para Admin" quando staff. Vou substituir por **bloqueio total** conforme pedido.
 
-## 3. UI — Vitrine pública
+### 5. Componente reutilizável `src/components/auth/AccessDeniedCard.tsx`
+- Props: `variant: 'admin-required' | 'member-only'`.
+- Visual coerente com o tema (`bg-brown`/`bg-admin-bg` conforme variante), usando design tokens existentes.
 
-- **Landing (home)**: nova seção `#servicos` com bento grid 5 cards resumidos (ícone, título, preço, CTA "Ver detalhes" → `/servicos/[slug]`, CTA "Comprar" abre Checkout modal direto).
-- **Nova rota `/servicos`**: bento grid completo com descrição + CTA.
-- **Nova rota `/servicos/$slug`**: página de detalhe com hero, inclusões, FAQ curto, e bloco de compra (calendário se aplicável + botão Comprar).
-
-Componentes:
-- `src/components/checkout/CheckoutModal.tsx` — wrapper Dialog responsivo.
-- `src/components/checkout/ServiceDataStep.tsx` — render condicional por `service.kind`:
-  - `airport` → data, hora, voo, terminal, malas
-  - `tour|meeting` → `SlotPicker` (calendário consumindo `getSlotsForService`)
-  - `consulting|banking` → sem dados extras
-- `src/components/checkout/ContactStep.tsx` — Nome, WhatsApp, Email. Email com debounce `checkEmail` → renderiza input senha com label condicional (novo usuário vs login).
-- `src/components/checkout/PaymentStep.tsx` — após "Comprar Agora": chama `createCheckoutIntent`, mostra tabs PIX (QR mock + copia-cola) / Cartão (form fake) com botão "Simular pagamento aprovado" → `confirmMockPayment` → redireciona `/portal`.
-- `src/components/services/ServiceCard.tsx` e `ServiceDetail.tsx`.
-
-## 4. UI — Portal do Membro (entrega)
-
-Estender `/portal` com aba "Meus Serviços" renderizando card por `order.payment_status='aprovado'`, com layout específico por `service.kind`:
-
-- **Aeroporto**: foto+nome do `host_profile`, botão "Falar com meu anfitrião" (link `wa.me` — UI pronta).
-- **Tour**: voucher animado + endereço Gran Vía + QR check-in + checklist estático.
-- **Vale Transporte**: `order_documents` como checklist interativo + botão "Documentos em mãos? Prosseguir" (atualiza `delivery_status`).
-- **Banco**: checklist + barra de progresso 3 etapas baseada em `delivery_status` + card final com endereço da agência quando `concluido`.
-- **Reunião**: data/hora + botão Google Maps + badge de lembrete 24h (push fake / toast on mount se faltar <24h).
-
-## 5. UI — Admin (gestão)
-
-- **Esteira (existente)**: estender tabela para mostrar `kind`, `slot`, `delivery_status`, e ações específicas (atribuir host/staff, avançar etapa, marcar concluído). Drawer lateral com detalhes do pedido.
-- **Nova rota `/admin/slots`**: gerenciar `availability_slots` por serviço, calendário visual com criar/desativar slot.
-- **Agenda**: refletir bloqueio mútuo Tour×Reunião (já compatível com appointments_no_overlap; adicionar select de tipo).
-
-## 6. Estética
-
-- Vitrine pública: identidade marrom/yellow-brand existente.
-- Checkout modal: Light Mode (mesmo dos painéis admin) — fundo off-white, sombra Apple, tipografia display nos títulos.
-- Cards do Portal: aproveitar `BentoCard` adaptado para tema marrom.
+### 6. Invalidação no logout
+- No `__root.tsx` (ou no portal/admin), adicionar listener `supabase.auth.onAuthStateChange` que chama `queryClient.invalidateQueries()` + `router.invalidate()` para não vazar dados entre usuários.
 
 ## Detalhes técnicos
 
-- Auto-login pós-mock: `confirmMockPayment` retorna nada sensível; cliente já está autenticado desde `createCheckoutIntent` (login feito via `supabase.auth.signInWithPassword` no servidor é impossível — fazer `signUp/signInWithPassword` no cliente após `checkEmail`, antes de chamar `createCheckoutIntent`). Ajuste: o cliente cuida da auth Supabase; o server function recebe a sessão via middleware.
-- Gateway swap futuro: isolar `mockPayment` atrás de uma interface `PaymentProvider` em `src/lib/checkout/providers/`.
-- QR code: reusar `qrcode` já instalado.
-- Validação: Zod em todos os server functions, limites de tamanho.
-- Sem WhatsApp real — botões apenas geram link `wa.me`.
-
-## Entregáveis
-
 ```text
-migration: availability_slots, orders+cols, order_documents, services seed
-src/lib/checkout/* (3 server functions + provider mock)
-src/lib/admin/slots.functions.ts, delivery.functions.ts
-src/lib/portal/services.functions.ts
-src/components/checkout/* (modal + 3 steps + SlotPicker)
-src/components/services/* (card, detail, grid)
-src/routes/servicos.tsx, src/routes/servicos.$slug.tsx
-src/routes/_authenticated/admin.slots.tsx
-update: src/routes/index.tsx (seção #servicos),
-        src/routes/_authenticated/portal.tsx (aba Meus Serviços),
-        src/routes/_authenticated/admin.esteira.tsx (ações de entrega),
-        AdminDock (novo ícone Slots)
+Fluxo de login:
+  signInWithPassword
+    → queryClient.invalidateQueries({ queryKey: ['current-user'] })
+    → role = await getCurrentUserRole()
+    → navigate(role.isAdmin ? '/admin' : '/portal')
+
+Guard /admin:
+  _authenticated (sessão ok?) → admin.tsx (role admin/staff?)
+    sim → <Outlet />
+    não → <AccessDeniedCard variant="admin-required" />
+
+Guard /portal:
+  _authenticated → portal.tsx (role member?)
+    sim → painel normal
+    não (admin/staff) → <AccessDeniedCard variant="member-only" />
 ```
+
+Arquivos novos:
+- `src/lib/auth.functions.ts`
+- `src/hooks/use-current-user.ts`
+- `src/components/auth/AccessDeniedCard.tsx`
+
+Arquivos editados:
+- `src/routes/login.tsx` (redirect por role + beforeLoad)
+- `src/routes/_authenticated/admin.tsx` (guard de admin)
+- `src/routes/_authenticated/portal.tsx` (guard inverso)
+- `src/routes/__root.tsx` (listener de auth state para invalidar cache)
+
+Não preciso de migração — a tabela `user_roles` e a função `has_role` já existem.
