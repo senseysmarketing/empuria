@@ -61,7 +61,7 @@ function AutomationCard({ automation }: { automation: Automation }) {
   const meta = CHANNEL_META[channel];
   const variables = Array.isArray(automation.variables) ? (automation.variables as string[]) : [];
 
-  const save = async (patch: Parameters<typeof update>[0]["data"]) => {
+  const save = async (patch: { id: string; is_enabled?: boolean; template?: string; channel?: "whatsapp" | "email" | "painel" }) => {
     setSaving(true);
     try {
       await update({ data: patch });
