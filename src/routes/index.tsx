@@ -55,13 +55,18 @@ function HomePage() {
   });
   const [selected, setSelected] = useState<PublicService | null>(null);
   const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState<PublicService | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const onBuy = (s: PublicService) => { setSelected(s); setOpen(true); };
+  const onDetails = (s: PublicService) => { setDetails(s); setDetailsOpen(true); };
 
   return (
     <div className="min-h-screen bg-offwhite text-brown-deep overflow-x-hidden">
       <SiteHeader />
       <CheckoutModal service={selected} open={open} onOpenChange={setOpen} />
+      <ServiceDetailsModal service={details} open={detailsOpen} onOpenChange={setDetailsOpen} onBuy={onBuy} />
+
 
 
       {/* HERO */}
