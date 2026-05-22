@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Philosopher:ital,wght@0,400;0,700;1,400;1,700&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -13,7 +14,6 @@
   font-display: swap;
   src: url("https://fonts.gstatic.com/s/unbounded/v9/Yq6F-LOTXCb04q32xlpat-6uR42XTqtG6xjx04m4Mw.woff2") format("woff2");
 }
-@import url("https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Philosopher:ital,wght@0,400;0,700;1,400;1,700&display=swap");
 
 @theme inline {
   --font-display: "Unbounded", system-ui, sans-serif;
