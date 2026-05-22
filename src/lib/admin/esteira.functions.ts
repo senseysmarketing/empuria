@@ -13,7 +13,7 @@ export const listOrders = createServerFn({ method: "GET" })
       .select(select)
       .order("created_at", { ascending: false })
       .limit(200);
-    return (data ?? []).map((order) => ({
+    return ((data ?? []) as Record<string, unknown>[]).map((order) => ({
       ...order,
       canViewFinancials: !!context.isAdmin,
     }));
