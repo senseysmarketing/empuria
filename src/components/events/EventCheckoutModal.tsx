@@ -117,7 +117,7 @@ export function EventCheckoutModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg bg-offwhite text-brown-deep">
+      <DialogContent className="max-w-lg bg-offwhite text-brown-deep max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display uppercase tracking-tight text-2xl">{event.title}</DialogTitle>
           <p className="text-sm text-brown-deep/60">{tier.name} × {qty} · {isFree ? "Gratuito" : `€ ${totalEUR}`}</p>
