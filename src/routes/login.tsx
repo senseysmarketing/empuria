@@ -66,7 +66,7 @@ function LoginPage() {
           email: fd.get("email"),
           password: fd.get("password"),
         });
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: parsed.email,
           password: parsed.password,
           options: {
@@ -75,7 +75,12 @@ function LoginPage() {
           },
         });
         if (error) throw error;
-        setInfo("Cadastro realizado. Verifique seu e-mail para confirmar a conta.");
+        if (data.session) {
+          await queryClient.invalidateQueries();
+          navigate({ to: "/portal" });
+        } else {
+          setInfo("Cadastro realizado. Verifique seu e-mail para confirmar a conta.");
+        }
       } else {
         const parsed = loginSchema.parse({
           email: fd.get("email"),
