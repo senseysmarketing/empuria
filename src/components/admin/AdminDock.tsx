@@ -25,6 +25,7 @@ const items = [
   { to: "/admin/triagem", label: "Triagem", icon: Filter },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/admin/clube", label: "Clube", icon: Crown },
+  { to: "/admin/usuarios", label: "Usuários", icon: Users },
   { to: "/admin/automacoes", label: "Auto", icon: Zap },
 ] as const;
 
