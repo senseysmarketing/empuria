@@ -13,14 +13,14 @@ export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) return;
-    // Already logged in — send to the right place by role
+    let isStaff = false;
     try {
       const role = await getCurrentUserRole();
-      throw routerRedirect({ to: role.isStaff ? "/admin" : "/portal" });
-    } catch (e) {
-      // If it's a router redirect, rethrow; otherwise fall through to login page
-      if (e && typeof e === "object" && "isRedirect" in e) throw e;
+      isStaff = role.isStaff;
+    } catch {
+      // fall through and send to portal as safe default
     }
+    throw routerRedirect({ to: isStaff ? "/admin" : "/portal" });
   },
   component: LoginPage,
 });
