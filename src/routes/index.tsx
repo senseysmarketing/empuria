@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Reveal } from "@/components/Reveal";
 import { ServiceCard, type PublicService } from "@/components/services/ServiceCard";
 import { CheckoutModal } from "@/components/checkout/CheckoutModal";
+import { ServiceDetailsModal } from "@/components/services/ServiceDetailsModal";
 import { HomeEventsSection } from "@/components/events/HomeEventsSection";
 import { ConsultoriaWizardModal } from "@/components/leads/ConsultoriaWizardModal";
 import { listPublicServices } from "@/lib/services-public.functions";
