@@ -1,13 +1,27 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, redirect as routerRedirect } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserRole } from "@/lib/auth.functions";
 import logoCompleta from "@/assets/logo-empuria-completa.png";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>) => ({
-    redirect: (s.redirect as string) || "/portal",
+    redirect: typeof s.redirect === "string" ? s.redirect : undefined,
   }),
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return;
+    let isStaff = false;
+    try {
+      const role = await getCurrentUserRole();
+      isStaff = role.isStaff;
+    } catch {
+      // fall through and send to portal as safe default
+    }
+    throw routerRedirect({ to: isStaff ? "/admin" : "/portal" });
+  },
   component: LoginPage,
 });
 
@@ -22,12 +36,20 @@ const loginSchema = z.object({
   password: z.string().min(1, "Informe sua senha"),
 });
 
+function translateAuthError(message: string): string {
+  if (/invalid login credentials/i.test(message)) return "E-mail ou senha incorretos.";
+  if (/email not confirmed/i.test(message)) return "Confirme seu e-mail antes de entrar.";
+  if (/too many requests/i.test(message)) return "Muitas tentativas. Aguarde alguns minutos.";
+  return message;
+}
+
 function LoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { redirect } = Route.useSearch();
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -59,13 +81,30 @@ function LoginPage() {
           email: fd.get("email"),
           password: fd.get("password"),
         });
-        const { error } = await supabase.auth.signInWithPassword(parsed);
-        if (error) throw error;
-        navigate({ to: redirect });
+        const { error: signInError } = await supabase.auth.signInWithPassword(parsed);
+        if (signInError) throw signInError;
+
+        // Clear any stale cache from previous user
+        await queryClient.invalidateQueries();
+
+        // Determine role and route accordingly
+        const role = await getCurrentUserRole();
+        const defaultTarget = role.isStaff ? "/admin" : "/portal";
+
+        // Respect ?redirect= only if user has permission
+        let target = defaultTarget;
+        if (redirect) {
+          const goingToAdmin = redirect.startsWith("/admin");
+          const goingToPortal = redirect.startsWith("/portal");
+          if (goingToAdmin && role.isStaff) target = redirect;
+          else if (goingToPortal && !role.isStaff) target = redirect;
+        }
+
+        navigate({ to: target });
       }
     } catch (err) {
       if (err instanceof z.ZodError) setError(err.issues[0]?.message ?? "Dados inválidos");
-      else setError(err instanceof Error ? err.message : "Falha na autenticação");
+      else setError(err instanceof Error ? translateAuthError(err.message) : "Falha na autenticação");
     } finally {
       setLoading(false);
     }
