@@ -26,6 +26,28 @@ export const listPublishedEvents = createServerFn({ method: "GET" })
     return events ?? [];
   });
 
+export const listHomeEvents = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const nowIso = new Date().toISOString();
+    const [{ data: upcoming }, { data: past }] = await Promise.all([
+      supabaseAdmin
+        .from("events")
+        .select("id,slug,title,starts_at,cover_url,location_address")
+        .eq("is_published", true)
+        .gte("starts_at", nowIso)
+        .order("starts_at", { ascending: true })
+        .limit(3),
+      supabaseAdmin
+        .from("events")
+        .select("id,slug,title,starts_at,cover_url,location_address")
+        .eq("is_published", true)
+        .lt("starts_at", nowIso)
+        .order("starts_at", { ascending: false })
+        .limit(12),
+    ]);
+    return { upcoming: upcoming ?? [], past: past ?? [] };
+  });
+
 const generateCode = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
