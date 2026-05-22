@@ -293,7 +293,7 @@ function HomePage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {services.slice(0, 6).map((s, i) => (
                 <Reveal key={s.id} delay={i * 70}>
-                  <ServiceCard service={s as PublicService} onBuy={onBuy} variant="dark" />
+                  <ServiceCard service={s as PublicService} onBuy={onBuy} onDetails={onDetails} variant="dark" />
                 </Reveal>
               ))}
             </div>
