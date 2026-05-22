@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getMyDashboard } from "@/lib/portal.functions";
 import { supabase } from "@/integrations/supabase/client";
+import logoCompleta from "@/assets/logo-empuria-completa.png";
 
 export const Route = createFileRoute("/_authenticated/portal")({
   component: PortalPage,
@@ -27,8 +28,11 @@ function PortalPage() {
     <div className="min-h-screen bg-brown bg-topo">
       <header className="border-b border-yellow-brand/20 bg-brown-dark/60 backdrop-blur">
         <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
-          <Link to="/" className="font-display font-extrabold text-offwhite uppercase tracking-widest text-sm">
-            Empuria · Portal
+          <Link to="/" className="flex items-center gap-3" aria-label="Instituto Empuria · Portal">
+            <img src={logoCompleta} alt="Instituto Empuria" className="h-8 w-auto object-contain" />
+            <span className="hidden sm:inline font-display text-xs uppercase tracking-widest text-yellow-brand/80">
+              Portal
+            </span>
           </Link>
           <div className="flex items-center gap-3">
             {isStaff && (

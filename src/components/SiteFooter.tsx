@@ -1,3 +1,5 @@
+import logoCompleta from "@/assets/logo-empuria-completa.png";
+
 export function SiteFooter() {
   return (
     <footer id="contato" className="bg-topo relative text-offwhite">
@@ -5,10 +7,11 @@ export function SiteFooter() {
       <div className="relative max-w-7xl mx-auto px-6 py-16">
         <div className="grid md:grid-cols-4 gap-10">
           <div className="md:col-span-2">
-            <div className="font-display font-extrabold text-3xl tracking-tight">
-              Instituto<br />
-              <span className="text-yellow-brand">Empuria</span>
-            </div>
+            <img
+              src={logoCompleta}
+              alt="Instituto Empuria"
+              className="h-12 w-auto object-contain"
+            />
             <p className="font-body italic mt-4 text-offwhite/80 max-w-sm">
               A Embaixada Emocional do Brasileiro no Exterior.
             </p>

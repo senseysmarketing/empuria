@@ -8,6 +8,7 @@ import { ActivityFeed } from "@/components/admin/ActivityFeed";
 import { ArrivalDialog } from "@/components/admin/ArrivalDialog";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { Euro, Crown, CalendarClock, Users } from "lucide-react";
+import logoIcone from "@/assets/logo-empuria-icone.png";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: CockpitPage,
@@ -34,11 +35,16 @@ function CockpitPage() {
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-4xl font-bold tracking-tight">Cockpit</h1>
-          <p className="text-admin-ink-muted text-sm mt-1">
-            Visão em tempo real da operação Empuria — vendas, leads, agenda e chegadas.
-          </p>
+        <div className="flex items-center gap-4">
+          <div className="h-12 w-12 rounded-xl bg-brown-deep flex items-center justify-center shrink-0">
+            <img src={logoIcone} alt="Instituto Empuria" className="h-8 w-8 object-contain" />
+          </div>
+          <div>
+            <h1 className="font-display text-4xl font-bold tracking-tight">Cockpit</h1>
+            <p className="text-admin-ink-muted text-sm mt-1">
+              Visão em tempo real da operação Empuria — vendas, leads, agenda e chegadas.
+            </p>
+          </div>
         </div>
         <ArrivalDialog />
       </header>
