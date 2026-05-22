@@ -15,6 +15,15 @@ const KIND_ICON: Record<string, typeof Plane> = {
   meeting: Users,
 };
 
+const KIND_IMAGE: Record<string, string> = {
+  airport: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&auto=format&fit=crop",
+  tour: "https://images.unsplash.com/photo-1543783207-ec64e4d95325?w=800&auto=format&fit=crop",
+  consulting: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop",
+  banking: "https://images.unsplash.com/photo-1601597111158-2fceff292cdc?w=800&auto=format&fit=crop",
+  meeting: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&auto=format&fit=crop",
+};
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1543783207-ec64e4d95325?w=800&auto=format&fit=crop";
+
 export const Route = createFileRoute("/_authenticated/portal/loja")({
   component: LojaPage,
 });
@@ -56,15 +65,12 @@ function LojaPage() {
                 className="text-left bg-admin-surface border border-admin-border rounded-2xl overflow-hidden shadow-[var(--shadow-admin)] hover:shadow-[var(--shadow-admin-hover)] hover:-translate-y-0.5 transition-all group"
               >
                 <div className="aspect-[16/10] bg-admin-surface-2 relative overflow-hidden">
-                  {s.image_url ? (
-                    <img
-                      src={s.image_url}
-                      alt={s.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-brown via-red-brand to-orange-brand" />
-                  )}
+                  <img
+                    src={s.image_url ?? KIND_IMAGE[s.kind ?? ""] ?? FALLBACK_IMAGE}
+                    alt={s.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                   <div className="absolute top-3 left-3 h-9 w-9 rounded-lg bg-admin-surface/95 backdrop-blur flex items-center justify-center text-admin-accent shadow">
                     <Icon className="h-4 w-4" />
                   </div>
