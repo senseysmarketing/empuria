@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
@@ -40,9 +41,32 @@ export function SiteHeader() {
           <a href="#contato" className="hover:text-yellow-brand transition">Contato</a>
         </nav>
 
-        <button className="hidden md:inline-flex items-center gap-2 bg-orange-brand hover:bg-red-brand text-offwhite px-5 py-2.5 rounded-md font-display font-semibold text-xs uppercase tracking-wider transition-all hover:shadow-warm">
-          Portal / Login
-        </button>
+        <PortalButton />
+      </div>
+    </header>
+  );
+}
+
+function PortalButton() {
+  const [authed, setAuthed] = useState(false);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setAuthed(!!s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+  return (
+    <Link
+      to={authed ? "/portal" : "/login"}
+      className="hidden md:inline-flex items-center gap-2 bg-orange-brand hover:bg-red-brand text-offwhite px-5 py-2.5 rounded-md font-display font-semibold text-xs uppercase tracking-wider transition-all hover:shadow-warm"
+    >
+      {authed ? "Meu Portal" : "Portal / Login"}
+    </Link>);
+}
+
+function _End() {
+  return (
+    <>
+      {null}
       </div>
     </header>
   );
