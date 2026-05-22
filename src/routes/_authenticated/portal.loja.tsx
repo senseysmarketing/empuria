@@ -75,10 +75,6 @@ function LojaPage() {
                     <Icon className="h-4 w-4" />
                   </div>
                 </div>
-                  <div className="absolute top-3 left-3 h-9 w-9 rounded-lg bg-admin-surface/95 backdrop-blur flex items-center justify-center text-admin-accent shadow">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                </div>
                 <div className="p-5">
                   <h3 className="font-display text-base font-bold text-admin-ink line-clamp-1">{s.title}</h3>
                   {s.short_description && (
