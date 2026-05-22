@@ -23,7 +23,11 @@ export const updateAutomation = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      is_enabled?: boolean;
+      template?: string;
+      channel?: "whatsapp" | "email" | "painel";
+    } = {};
     if (data.is_enabled !== undefined) patch.is_enabled = data.is_enabled;
     if (data.template !== undefined) patch.template = data.template;
     if (data.channel) patch.channel = data.channel;

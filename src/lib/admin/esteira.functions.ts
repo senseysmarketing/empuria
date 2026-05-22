@@ -23,7 +23,11 @@ export const updateOrder = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      payment_status?: "pendente" | "aprovado" | "recusado" | "estornado";
+      voucher_code?: string;
+      executed_at?: string;
+    } = {};
     if (data.payment_status) {
       patch.payment_status = data.payment_status;
       if (data.payment_status === "aprovado") {

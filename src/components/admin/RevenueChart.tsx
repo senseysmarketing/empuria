@@ -15,7 +15,7 @@ export function RevenueChart({ data }: { data: { date: string; value: number }[]
           <YAxis fontSize={10} stroke="oklch(0.62 0.025 50)" tickLine={false} axisLine={false} width={40} />
           <Tooltip
             contentStyle={{ background: "white", border: "1px solid oklch(0.91 0.008 70)", borderRadius: 12, fontSize: 12 }}
-            formatter={(v: number) => [`€ ${v.toFixed(2)}`, "Receita"]}
+            formatter={(v) => [`€ ${Number(v).toFixed(2)}`, "Receita"]}
             labelFormatter={(l) => l}
           />
           <Area type="monotone" dataKey="value" stroke="oklch(0.58 0.18 45)" strokeWidth={2} fill="url(#rev)" />
