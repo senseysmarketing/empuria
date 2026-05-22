@@ -10,10 +10,10 @@ export const listOrders = createServerFn({ method: "GET" })
       : "id,customer_name,customer_email,service_title,payment_status,delivery_status,voucher_code,created_at,executed_at";
     const { data } = await context.supabase
       .from("orders")
-      .select(select)
+      .select(select as "*")
       .order("created_at", { ascending: false })
       .limit(200);
-    return ((data ?? []) as Record<string, unknown>[]).map((order) => ({
+    return (data ?? []).map((order) => ({
       ...order,
       canViewFinancials: !!context.isAdmin,
     }));
