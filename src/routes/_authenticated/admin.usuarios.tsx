@@ -1,11 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { Search, MoreVertical, Eye, KeyRound, Mail, Ban, ShieldCheck, Pencil, Copy, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -21,10 +24,17 @@ import {
   type UserRow,
 } from "@/lib/admin/usuarios.functions";
 import { UsuarioEditSheet } from "@/components/admin/UsuarioEditSheet";
+import { ClubeContentManager, ClubeWallManager, useClubData } from "@/components/admin/ClubeManagers";
+
+const searchSchema = z.object({
+  tab: fallback(z.enum(["passaportes", "clube-conteudo", "clube-mural"]), "passaportes").default("passaportes"),
+});
 
 export const Route = createFileRoute("/_authenticated/admin/usuarios")({
+  validateSearch: zodValidator(searchSchema),
   component: UsuariosPage,
 });
+
 
 function passportCode(id: string, createdAt: string) {
   const year = new Date(createdAt).getFullYear();
