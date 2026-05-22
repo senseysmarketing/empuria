@@ -531,6 +531,44 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_activity_log: {
+        Row: {
+          actor_id: string | null
+          actor_label: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["lead_activity_kind"]
+          lead_id: string
+          payload: Json
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_label?: string | null
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["lead_activity_kind"]
+          lead_id: string
+          payload?: Json
+        }
+        Update: {
+          actor_id?: string | null
+          actor_label?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["lead_activity_kind"]
+          lead_id?: string
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_activity_log_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           budget_range: string | null
@@ -1036,7 +1074,20 @@ export type Database = {
       benefit_scope: "produto" | "categoria"
       event_sales_mode: "simples" | "categorias"
       event_ticket_status: "valido" | "usado" | "cancelado"
-      lead_pipeline_stage: "novo" | "analise" | "qualificado" | "descartado"
+      lead_activity_kind:
+        | "created"
+        | "stage_changed"
+        | "note_added"
+        | "meeting_scheduled"
+        | "whatsapp_opened"
+      lead_pipeline_stage:
+        | "novo"
+        | "analise"
+        | "qualificado"
+        | "descartado"
+        | "em_contato"
+        | "reuniao"
+        | "fechado"
       lead_status: "novo" | "contatado" | "qualificado" | "fechado" | "perdido"
       order_delivery_status:
         | "aguardando_pagamento"
@@ -1195,7 +1246,22 @@ export const Constants = {
       benefit_scope: ["produto", "categoria"],
       event_sales_mode: ["simples", "categorias"],
       event_ticket_status: ["valido", "usado", "cancelado"],
-      lead_pipeline_stage: ["novo", "analise", "qualificado", "descartado"],
+      lead_activity_kind: [
+        "created",
+        "stage_changed",
+        "note_added",
+        "meeting_scheduled",
+        "whatsapp_opened",
+      ],
+      lead_pipeline_stage: [
+        "novo",
+        "analise",
+        "qualificado",
+        "descartado",
+        "em_contato",
+        "reuniao",
+        "fechado",
+      ],
       lead_status: ["novo", "contatado", "qualificado", "fechado", "perdido"],
       order_delivery_status: [
         "aguardando_pagamento",
