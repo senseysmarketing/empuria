@@ -6,6 +6,7 @@ import { listPublicServices } from "@/lib/services-public.functions";
 import { UpsellSheet, type ShopService } from "@/components/portal/UpsellSheet";
 import { GridSkeleton } from "@/components/portal/PortalSkeleton";
 import { ShoppingBag, ArrowRight, Plane, MapPin, CreditCard, Landmark, Users } from "lucide-react";
+import { getServiceImage } from "@/lib/service-images";
 
 const KIND_ICON: Record<string, typeof Plane> = {
   airport: Plane,
