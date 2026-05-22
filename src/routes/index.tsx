@@ -8,6 +8,7 @@ import { Reveal } from "@/components/Reveal";
 import { ServiceCard, type PublicService } from "@/components/services/ServiceCard";
 import { CheckoutModal } from "@/components/checkout/CheckoutModal";
 import { HomeEventsSection } from "@/components/events/HomeEventsSection";
+import { ConsultoriaWizardModal } from "@/components/leads/ConsultoriaWizardModal";
 import { listPublicServices } from "@/lib/services-public.functions";
 import lounge from "@/assets/instituto-lounge.jpg";
 import barbearia from "@/assets/instituto-barbearia.jpg";
@@ -53,6 +54,7 @@ function HomePage() {
   });
   const [selected, setSelected] = useState<PublicService | null>(null);
   const [open, setOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const onBuy = (s: PublicService) => { setSelected(s); setOpen(true); };
 
   return (
@@ -312,12 +314,13 @@ function HomePage() {
                   </p>
                 </div>
                 <div className="md:col-span-4 flex md:justify-end">
-                  <a
-                    href="#"
+                  <button
+                    type="button"
+                    onClick={() => setWizardOpen(true)}
                     className="inline-flex items-center gap-2 bg-orange-brand hover:bg-yellow-brand hover:text-brown text-offwhite px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all hover:shadow-warm w-full md:w-auto justify-center"
                   >
                     Aplicar para Consultoria <ArrowRight className="w-4 h-4" />
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>
@@ -394,6 +397,7 @@ function HomePage() {
       </section>
 
       <SiteFooter />
+      <ConsultoriaWizardModal open={wizardOpen} onOpenChange={setWizardOpen} />
     </div>
   );
 }
