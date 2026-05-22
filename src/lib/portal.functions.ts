@@ -28,14 +28,15 @@ export const getAdminOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    const isStaff = (roles ?? []).some((r) =>
-      ["admin", "staff"].includes(r.role as string),
-    );
-    if (!isStaff) throw new Error("Acesso negado");
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    const { data: isStaffRole } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "staff",
+    });
+    if (!isAdmin && !isStaffRole) throw new Error("Acesso negado");
 
     const [leadsRes, apptRes, membersRes] = await Promise.all([
       supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(100),
