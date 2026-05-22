@@ -1,78 +1,33 @@
-## Hero TopBar imersivo para /admin e /portal
+# Conter QR Code PIX dentro dos modais
 
-Faixa decorativa fixa no topo de cada layout, com mesma estrutura nos dois ambientes e paletas distintas.
+## Problema
+Em `EventCheckoutModal`, `CheckoutModal` e `UpsellSheet` o bloco de pagamento PIX (QR + payload + botão) pode estourar o modal: o `<img>` do QR é renderizado em 240px sem `max-width`, o `DialogContent` não tem `max-height` nem scroll interno, e em viewports curtos o conteúdo é cortado (sintoma visto no screenshot — título colado no topo, sem respiro, payload longo apertando o layout).
 
-### Componente base: `src/components/shared/HeroTopBar.tsx`
+## Onde aparece QR PIX
+- `src/components/events/EventCheckoutModal.tsx` (step "payment")
+- `src/components/checkout/CheckoutModal.tsx` (método PIX)
+- `src/components/portal/UpsellSheet.tsx` (intent.mockPix)
 
-Props:
-```ts
-type HeroTopBarProps = {
-  variant: "admin" | "portal";
-  userName: string;
-  avatarUrl?: string | null;
-  quickStat?: { label: string; value: string };   // KPI do dia
-  actions?: React.ReactNode;                      // botões (Escanear, Registrar…)
-};
-```
+## Ajustes (somente UI, sem mudar lógica)
 
-Estrutura visual (altura ~140px):
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  [SVG Espanha watermark — opacity 8%, posicionado à direita]    │
-│                                                                 │
-│  ◆ Logo  Bom dia, Gabriel                    [KPI]  [ações]    │
-│          quinta · 22 maio · 14:32              €1.240   ▢ ▢    │
-└─────────────────────────────────────────────────────────────────┘
-```
+### 1. `EventCheckoutModal.tsx`
+- `DialogContent`: adicionar `max-h-[90vh] overflow-y-auto p-6` e manter `max-w-lg`.
+- Wrapper do step "payment": `space-y-4 text-center` → manter, mas envolver a imagem em um container `flex justify-center`.
+- `<img>` QR: trocar classes para `w-full max-w-[220px] h-auto rounded-lg border border-brown/15 bg-white p-2`.
+- Bloco "PIX Copia e Cola": adicionar `overflow-hidden`; trocar `<code class="truncate">` por `break-all line-clamp-2` para evitar overflow horizontal em telas pequenas.
 
-Elementos:
-- Saudação dinâmica (`Bom dia/tarde/noite, {primeiroNome}`) em Unbounded 28px
-- Sublinha: dia da semana + data formatada em pt-BR + hora ao vivo (atualiza a cada 30s via `useEffect`/`setInterval`)
-- Watermark SVG do contorno da Espanha (mesmo line-art usado no SuccessFinale, opacity baixa, lado direito)
-- Slot `quickStat` à direita (ex.: vendas do dia no admin, próximo evento no portal)
-- Slot `actions` para botões (já padronizados)
-- Avatar circular no canto direito com menu (sair, perfil)
+### 2. `CheckoutModal.tsx`
+- `DialogContent`: adicionar `max-h-[90vh] overflow-y-auto`.
+- `<img>` QR: aplicar `w-full max-w-[220px] h-auto` (igual ao Event).
+- Bloco PIX Copia e Cola: mesma correção `break-all line-clamp-2` no `<code>`.
 
-### Paletas
+### 3. `UpsellSheet.tsx`
+- Garantir que o `Sheet`/container do PIX permita scroll (`overflow-y-auto` no body do sheet) e aplicar mesmas regras de tamanho ao `<img>` QR e ao payload.
 
-**Admin (`variant="admin"`):**
-- Background: gradiente `from-brown-deep via-brown-deep to-[#3a1f15]`
-- Texto principal: `text-offwhite`
-- Acento: `text-orange-brand` (KPI, hora)
-- Watermark: `stroke-orange-brand/15`
+## Resultado
+- QR sempre centralizado, no máximo 220px, nunca estoura.
+- Modal nunca passa de 90% da altura da viewport e ganha scroll interno quando precisa.
+- Payload PIX longo quebra em até 2 linhas em vez de empurrar largura.
 
-**Portal (`variant="portal"`):**
-- Background: gradiente `from-[#c2956b] via-orange-brand to-yellow-brand`
-- Texto principal: `text-brown-deep`
-- Acento: `text-brown-deep` em bold (KPI)
-- Watermark: `stroke-brown-deep/12`
-- Saudação mais calorosa: "Bem-vindo de volta, Gabriel"
-
-### Integração
-
-1. **`src/routes/_authenticated/admin.tsx`**: renderizar `<HeroTopBar variant="admin" …/>` antes do `<main>`. Ajustar `pt-8` → `pt-0` (o topbar já dá respiro).
-
-2. **`src/routes/_authenticated/portal.tsx`**: idem com `variant="portal"`.
-
-3. **Remover headers redundantes** das páginas internas:
-   - `admin.index.tsx` (linhas 38-54): remover o bloco logo+título+ações, pois agora vem no TopBar. Os botões `PassportScannerDialog` e `ArrivalDialog` migram para o slot `actions` do TopBar (pode ser via context ou prop no layout).
-   - Para evitar prop drilling complexo, criar um contexto leve `TopBarActionsContext` que cada página pode preencher com seus botões via hook `useTopBarActions([...])`. Páginas sem ações deixam vazio.
-
-4. **Dados do usuário**: usar `useCurrentUser()` (já existe) para nome e avatar.
-
-### Arquivos
-
-**Criar:**
-- `src/components/shared/HeroTopBar.tsx`
-- `src/components/shared/TopBarActionsContext.tsx`
-- `src/components/shared/SpainWatermark.tsx` (SVG reusado)
-
-**Editar:**
-- `src/routes/_authenticated/admin.tsx` (provider + topbar)
-- `src/routes/_authenticated/portal.tsx` (provider + topbar)
-- `src/routes/_authenticated/admin.index.tsx` (remover header local, usar `useTopBarActions`)
-- Demais páginas admin.* e portal.* mantêm seus h1 internos por enquanto (só Cockpit/portal.index ganham KPI no TopBar)
-
-### Resultado
-
-Topbar decorativo, presente em todas as rotas /admin e /portal, com nome do usuário, saudação contextual, hora ao vivo, KPI do dia, ações rápidas e watermark da Espanha. Mesma estrutura nos dois mundos, paletas distintas reforçando o tom executivo (admin) vs acolhedor (portal).
+## Fora de escopo
+Nenhuma alteração em lógica de pagamento, geração de payload, ou server functions.
