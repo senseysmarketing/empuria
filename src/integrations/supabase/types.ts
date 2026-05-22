@@ -174,6 +174,53 @@ export type Database = {
         }
         Relationships: []
       }
+      availability_slots: {
+        Row: {
+          booked: number
+          capacity: number
+          created_at: string
+          ends_at: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          service_id: string
+          starts_at: string
+          updated_at: string
+        }
+        Insert: {
+          booked?: number
+          capacity?: number
+          created_at?: string
+          ends_at: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          service_id: string
+          starts_at: string
+          updated_at?: string
+        }
+        Update: {
+          booked?: number
+          capacity?: number
+          created_at?: string
+          ends_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          service_id?: string
+          starts_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_slots_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_content: {
         Row: {
           created_at: string
@@ -306,6 +353,44 @@ export type Database = {
         }
         Relationships: []
       }
+      order_documents: {
+        Row: {
+          checked: boolean
+          created_at: string
+          id: string
+          label: string
+          order_id: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          checked?: boolean
+          created_at?: string
+          id?: string
+          label: string
+          order_id: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          checked?: boolean
+          created_at?: string
+          id?: string
+          label?: string
+          order_id?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_documents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           amount_cents: number
@@ -314,12 +399,16 @@ export type Database = {
           currency: string
           customer_email: string | null
           customer_name: string
+          delivery_status: Database["public"]["Enums"]["order_delivery_status"]
           executed_at: string | null
+          host_profile_id: string | null
           id: string
           notes: string | null
           payment_status: Database["public"]["Enums"]["order_payment_status"]
           service_id: string | null
+          service_metadata: Json
           service_title: string
+          slot_id: string | null
           updated_at: string
           user_id: string | null
           voucher_code: string | null
@@ -331,12 +420,16 @@ export type Database = {
           currency?: string
           customer_email?: string | null
           customer_name: string
+          delivery_status?: Database["public"]["Enums"]["order_delivery_status"]
           executed_at?: string | null
+          host_profile_id?: string | null
           id?: string
           notes?: string | null
           payment_status?: Database["public"]["Enums"]["order_payment_status"]
           service_id?: string | null
+          service_metadata?: Json
           service_title: string
+          slot_id?: string | null
           updated_at?: string
           user_id?: string | null
           voucher_code?: string | null
@@ -348,12 +441,16 @@ export type Database = {
           currency?: string
           customer_email?: string | null
           customer_name?: string
+          delivery_status?: Database["public"]["Enums"]["order_delivery_status"]
           executed_at?: string | null
+          host_profile_id?: string | null
           id?: string
           notes?: string | null
           payment_status?: Database["public"]["Enums"]["order_payment_status"]
           service_id?: string | null
+          service_metadata?: Json
           service_title?: string
+          slot_id?: string | null
           updated_at?: string
           user_id?: string | null
           voucher_code?: string | null
@@ -407,12 +504,18 @@ export type Database = {
           created_at: string
           currency: string
           description: string | null
+          document_checklist: Json
           duration_minutes: number | null
           id: string
           image_url: string | null
           is_active: boolean
+          kind: Database["public"]["Enums"]["service_kind"] | null
+          meeting_address: string | null
           price_cents: number
           requires_booking: boolean
+          requires_documents: boolean
+          requires_slot: boolean
+          short_description: string | null
           slug: string
           title: string
           updated_at: string
@@ -422,12 +525,18 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          document_checklist?: Json
           duration_minutes?: number | null
           id?: string
           image_url?: string | null
           is_active?: boolean
+          kind?: Database["public"]["Enums"]["service_kind"] | null
+          meeting_address?: string | null
           price_cents?: number
           requires_booking?: boolean
+          requires_documents?: boolean
+          requires_slot?: boolean
+          short_description?: string | null
           slug: string
           title: string
           updated_at?: string
@@ -437,12 +546,18 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          document_checklist?: Json
           duration_minutes?: number | null
           id?: string
           image_url?: string | null
           is_active?: boolean
+          kind?: Database["public"]["Enums"]["service_kind"] | null
+          meeting_address?: string | null
           price_cents?: number
           requires_booking?: boolean
+          requires_documents?: boolean
+          requires_slot?: boolean
+          short_description?: string | null
           slug?: string
           title?: string
           updated_at?: string
@@ -533,8 +648,15 @@ export type Database = {
       automation_channel: "whatsapp" | "email" | "painel"
       lead_pipeline_stage: "novo" | "analise" | "qualificado" | "descartado"
       lead_status: "novo" | "contatado" | "qualificado" | "fechado" | "perdido"
+      order_delivery_status:
+        | "aguardando_pagamento"
+        | "aguardando_documentos"
+        | "processando"
+        | "agendado"
+        | "concluido"
       order_payment_status: "pendente" | "aprovado" | "recusado" | "estornado"
       service_category: "esteira1" | "esteira2" | "clube"
+      service_kind: "airport" | "tour" | "consulting" | "banking" | "meeting"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -679,8 +801,16 @@ export const Constants = {
       automation_channel: ["whatsapp", "email", "painel"],
       lead_pipeline_stage: ["novo", "analise", "qualificado", "descartado"],
       lead_status: ["novo", "contatado", "qualificado", "fechado", "perdido"],
+      order_delivery_status: [
+        "aguardando_pagamento",
+        "aguardando_documentos",
+        "processando",
+        "agendado",
+        "concluido",
+      ],
       order_payment_status: ["pendente", "aprovado", "recusado", "estornado"],
       service_category: ["esteira1", "esteira2", "clube"],
+      service_kind: ["airport", "tour", "consulting", "banking", "meeting"],
     },
   },
 } as const
