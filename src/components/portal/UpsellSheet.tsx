@@ -5,10 +5,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { createCheckoutIntent, confirmMockPayment } from "@/lib/checkout/checkout.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, QrCode, Copy, Check, ShoppingBag } from "lucide-react";
+import { Loader2, QrCode, Copy, Check, ShoppingBag, MapPin, Clock } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { getServiceImage } from "@/lib/service-images";
 
 export type ShopService = {
   id: string;
@@ -20,6 +21,9 @@ export type ShopService = {
   price_cents: number;
   currency: string;
   image_url: string | null;
+  requires_slot?: boolean;
+  document_checklist?: string[] | null;
+  meeting_address?: string | null;
 };
 
 export function UpsellSheet({
