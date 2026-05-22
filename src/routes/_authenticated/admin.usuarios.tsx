@@ -1,11 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { Search, MoreVertical, Eye, KeyRound, Mail, Ban, ShieldCheck, Pencil, Copy, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -21,10 +24,17 @@ import {
   type UserRow,
 } from "@/lib/admin/usuarios.functions";
 import { UsuarioEditSheet } from "@/components/admin/UsuarioEditSheet";
+import { ClubeContentManager, ClubeWallManager, useClubData } from "@/components/admin/ClubeManagers";
+
+const searchSchema = z.object({
+  tab: fallback(z.enum(["passaportes", "clube-conteudo", "clube-mural"]), "passaportes").default("passaportes"),
+});
 
 export const Route = createFileRoute("/_authenticated/admin/usuarios")({
+  validateSearch: zodValidator(searchSchema),
   component: UsuariosPage,
 });
+
 
 function passportCode(id: string, createdAt: string) {
   const year = new Date(createdAt).getFullYear();
@@ -45,6 +55,45 @@ function relativeTime(iso: string | null) {
 }
 
 function UsuariosPage() {
+  const { tab } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const club = useClubData();
+
+  return (
+    <div className="space-y-6">
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-admin-ink flex items-center gap-2">
+            <Users className="h-7 w-7 text-admin-accent" /> Passaportes Empuria
+          </h1>
+          <p className="text-sm text-admin-ink-muted">Gestão de clientes, membros do clube e impersonação segura.</p>
+        </div>
+      </header>
+
+      <Tabs value={tab} onValueChange={(v) => navigate({ search: { tab: v as "passaportes" | "clube-conteudo" | "clube-mural" } })}>
+        <TabsList>
+          <TabsTrigger value="passaportes">Passaportes</TabsTrigger>
+          <TabsTrigger value="clube-conteudo">Clube — Conteúdo</TabsTrigger>
+          <TabsTrigger value="clube-mural">Clube — Mural</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="passaportes" className="mt-4">
+          <PassaportesPanel />
+        </TabsContent>
+
+        <TabsContent value="clube-conteudo" className="mt-4">
+          <ClubeContentManager items={club.data?.content ?? []} />
+        </TabsContent>
+
+        <TabsContent value="clube-mural" className="mt-4">
+          <ClubeWallManager posts={club.data?.posts ?? []} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function PassaportesPanel() {
   const list = useServerFn(listUsers);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"todos" | "ativos" | "bloqueados">("todos");
@@ -62,15 +111,6 @@ function UsuariosPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-admin-ink flex items-center gap-2">
-            <Users className="h-7 w-7 text-admin-accent" /> Passaportes Empuria
-          </h1>
-          <p className="text-sm text-admin-ink-muted">Gestão de clientes e impersonação segura.</p>
-        </div>
-      </header>
-
       {/* Bento controle */}
       <div className="bg-offwhite rounded-2xl p-5 shadow-sm border border-admin-border/30 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3">
@@ -127,6 +167,7 @@ function UsuariosPage() {
     </div>
   );
 }
+
 
 function MiniTile({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
   return (

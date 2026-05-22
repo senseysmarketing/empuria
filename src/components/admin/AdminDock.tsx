@@ -4,8 +4,6 @@ import {
   PackageCheck,
   Filter,
   CalendarDays,
-  CalendarClock,
-  Crown,
   Zap,
   LogOut,
   Home,
@@ -21,13 +19,12 @@ const items = [
   { to: "/admin/pdv", label: "PDV", icon: Wine },
   { to: "/admin/eventos", label: "Eventos", icon: Ticket },
   { to: "/admin/esteira", label: "Esteira", icon: PackageCheck },
-  { to: "/admin/slots", label: "Vagas", icon: CalendarClock },
   { to: "/admin/triagem", label: "Triagem", icon: Filter },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
-  { to: "/admin/clube", label: "Clube", icon: Crown },
   { to: "/admin/usuarios", label: "Usuários", icon: Users },
   { to: "/admin/automacoes", label: "Auto", icon: Zap },
 ] as const;
+
 
 export function AdminDock() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

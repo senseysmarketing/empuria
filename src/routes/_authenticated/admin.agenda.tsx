@@ -1,19 +1,28 @@
 import { useState, useMemo } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { listWeekAppointments } from "@/lib/admin/agenda.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { startOfWeek, addDays, addWeeks, format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { SlotsPanel } from "@/components/admin/SlotsPanel";
+
+const searchSchema = z.object({
+  tab: fallback(z.enum(["calendario", "slots"]), "calendario").default("calendario"),
+});
 
 export const Route = createFileRoute("/_authenticated/admin/agenda")({
+  validateSearch: zodValidator(searchSchema),
   component: AgendaPage,
 });
 
-const HOURS = Array.from({ length: 12 }, (_, i) => 8 + i); // 8-19
+const HOURS = Array.from({ length: 12 }, (_, i) => 8 + i);
 
 const CATEGORY_COLOR: Record<string, string> = {
   consultoria: "bg-blue-100 border-blue-400 text-blue-900",
@@ -23,6 +32,35 @@ const CATEGORY_COLOR: Record<string, string> = {
 };
 
 function AgendaPage() {
+  const { tab } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+
+  return (
+    <div className="space-y-6">
+      <header>
+        <h1 className="font-display text-4xl font-bold tracking-tight">Agenda</h1>
+        <p className="text-admin-ink-muted text-sm mt-1">Compromissos, vagas para Tours e Reuniões Presenciais. Bloqueio automático contra sobreposição.</p>
+      </header>
+
+      <Tabs value={tab} onValueChange={(v) => navigate({ search: { tab: v as "calendario" | "slots" } })}>
+        <TabsList>
+          <TabsTrigger value="calendario">Calendário</TabsTrigger>
+          <TabsTrigger value="slots">Vagas & Slots</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calendario" className="mt-4">
+          <CalendarView />
+        </TabsContent>
+
+        <TabsContent value="slots" className="mt-4">
+          <SlotsPanel />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function CalendarView() {
   const fetchWeek = useServerFn(listWeekAppointments);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
 
@@ -34,26 +72,19 @@ function AgendaPage() {
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-4xl font-bold tracking-tight">Agenda</h1>
-          <p className="text-admin-ink-muted text-sm mt-1">Sala Gran Vía + tours pela cidade. Bloqueio automático contra sobreposição.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setWeekStart(addWeeks(weekStart, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-          <span className="text-sm font-display tabular-nums px-3">
-            {format(weekStart, "dd MMM", { locale: ptBR })} – {format(addDays(weekStart, 6), "dd MMM yyyy", { locale: ptBR })}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => setWeekStart(addWeeks(weekStart, 1))}><ChevronRight className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Hoje</Button>
-        </div>
-      </header>
+    <div className="space-y-4">
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => setWeekStart(addWeeks(weekStart, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+        <span className="text-sm font-display tabular-nums px-3">
+          {format(weekStart, "dd MMM", { locale: ptBR })} – {format(addDays(weekStart, 6), "dd MMM yyyy", { locale: ptBR })}
+        </span>
+        <Button variant="outline" size="sm" onClick={() => setWeekStart(addWeeks(weekStart, 1))}><ChevronRight className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="sm" onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Hoje</Button>
+      </div>
 
       <BentoCard padded={false}>
         <div className="overflow-x-auto">
           <div className="grid min-w-[900px]" style={{ gridTemplateColumns: "60px repeat(7, 1fr)" }}>
-            {/* Day headers */}
             <div className="border-b border-r border-admin-border" />
             {days.map((d) => {
               const today = isSameDay(d, new Date());
@@ -65,7 +96,6 @@ function AgendaPage() {
               );
             })}
 
-            {/* Hour rows */}
             {HOURS.map((h) => (
               <div key={h} className="contents">
                 <div className="border-r border-b border-admin-border text-right pr-2 py-2 text-[10px] text-admin-ink-muted tabular-nums">{`${h}:00`}</div>
