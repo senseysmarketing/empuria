@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServicosSlugRouteImport } from './routes/servicos.$slug'
+import { Route as EventoSlugRouteImport } from './routes/evento.$slug'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
@@ -52,6 +53,11 @@ const ServicosSlugRoute = ServicosSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => ServicosRoute,
+} as any)
+const EventoSlugRoute = EventoSlugRouteImport.update({
+  id: '/evento/$slug',
+  path: '/evento/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedPortalRoute = AuthenticatedPortalRouteImport.update({
   id: '/portal',
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/servicos': typeof ServicosRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/portal': typeof AuthenticatedPortalRouteWithChildren
+  '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
@@ -155,6 +162,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/servicos': typeof ServicosRouteWithChildren
+  '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/servicos': typeof ServicosRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/portal': typeof AuthenticatedPortalRouteWithChildren
+  '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/_authenticated/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/_authenticated/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/admin'
     | '/portal'
+    | '/evento/$slug'
     | '/servicos/$slug'
     | '/admin/agenda'
     | '/admin/automacoes'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/servicos'
+    | '/evento/$slug'
     | '/servicos/$slug'
     | '/admin/agenda'
     | '/admin/automacoes'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/_authenticated/admin'
     | '/_authenticated/portal'
+    | '/evento/$slug'
     | '/servicos/$slug'
     | '/_authenticated/admin/agenda'
     | '/_authenticated/admin/automacoes'
@@ -258,6 +270,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ServicosRoute: typeof ServicosRouteWithChildren
+  EventoSlugRoute: typeof EventoSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -296,6 +309,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/servicos/$slug'
       preLoaderRoute: typeof ServicosSlugRouteImport
       parentRoute: typeof ServicosRoute
+    }
+    '/evento/$slug': {
+      id: '/evento/$slug'
+      path: '/evento/$slug'
+      fullPath: '/evento/$slug'
+      preLoaderRoute: typeof EventoSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/portal': {
       id: '/_authenticated/portal'
@@ -471,7 +491,18 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   ServicosRoute: ServicosRouteWithChildren,
+  EventoSlugRoute: EventoSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
