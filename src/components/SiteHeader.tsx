@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import logoCompleta from "@/assets/logo-empuria-completa.png";
 
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
@@ -28,18 +29,12 @@ export function SiteHeader() {
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          <div className="w-9 h-9 rounded-full bg-yellow-brand flex items-center justify-center text-brown font-display font-extrabold">
-            E
-          </div>
-          <div className="leading-none">
-            <div className="font-display font-extrabold text-offwhite text-sm tracking-widest uppercase">
-              Empuria
-            </div>
-            <div className="font-body italic text-yellow-brand/80 text-[10px]">
-              Instituto · Madrid
-            </div>
-          </div>
+        <Link to="/" className="flex items-center group" aria-label="Instituto Empuria">
+          <img
+            src={logoCompleta}
+            alt="Instituto Empuria"
+            className="h-9 w-auto object-contain"
+          />
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-body text-offwhite/90">
