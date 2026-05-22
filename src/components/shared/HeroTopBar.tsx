@@ -89,7 +89,7 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
         </div>
 
         {quickStat && (
-          <div className={`hidden md:block text-right border-l ${isAdmin ? "border-offwhite/15" : "border-brown-deep/20"} pl-4`}>
+          <div className={`hidden md:block text-right border-l border-offwhite/15 pl-4`}>
             <div className={`text-[10px] uppercase tracking-widest ${textMuted} font-display`}>
               {quickStat.label}
             </div>
