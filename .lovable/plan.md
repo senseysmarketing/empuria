@@ -1,53 +1,17 @@
-## Consolidação de telas redundantes no Admin
+## Bug
+No card de evento em `HomeEventsSection.tsx`, a `<img>` tem `group-hover:scale-105` mas o overlay de gradiente (`absolute inset-0 bg-gradient-to-t ...`) é um elemento irmão e fica estático. Quando a imagem cresce 5%, ela "sai" por baixo do gradiente, expondo uma faixa sem escurecimento entre o topo da imagem escalada e o topo do card — é o "espaço no meio" do print.
 
-Concordo — `/admin/slots` e `/admin/agenda` resolvem o mesmo domínio (horários/atendimentos), e `/admin/clube` é basicamente uma aba a mais de gestão de pessoas que já vive em `/admin/usuarios`. Vou fundir tudo em **duas telas únicas com abas internas**, e enxugar o dock.
+## Correção
+Aplicar a mesma transformação de escala no overlay de gradiente, para que imagem e gradiente cresçam juntos e o degradê continue cobrindo toda a área visível.
 
-### 1. `/admin/agenda` absorve `/admin/slots`
+Arquivo: `src/components/events/HomeEventsSection.tsx` (card do cenário A, dentro do `<Link>` do mapa `upcoming.map`).
 
-Transformar a página em `Tabs` no topo:
-- **Aba "Calendário"** — a grade semanal atual (visualização de compromissos).
-- **Aba "Vagas & Slots"** — o conteúdo atual de `/admin/slots` (lista de vagas + filtro por serviço + diálogo "Nova vaga").
-
-Header unificado: título "Agenda", subtítulo "Compromissos, vagas para Tours e Reuniões Presenciais". Os controles de navegação semanal (◀ ▶ Hoje) só aparecem na aba Calendário; o botão "Nova vaga" e o filtro de serviço só aparecem na aba Vagas.
-
-### 2. `/admin/usuarios` absorve `/admin/clube`
-
-Adicionar `Tabs` no topo:
-- **Aba "Passaportes"** — toda a UI atual de `/admin/usuarios` (busca, filtros, métricas, lista, impersonação).
-- **Aba "Clube — Conteúdo"** — o `ContentManager` atual de `/admin/clube` (cards de conteúdo + diálogo de criação/edição).
-- **Aba "Clube — Mural"** — o `WallManager` atual (novo post + lista de posts fixáveis).
-
-A gestão de "Membros" (toggle `is_club_member`) some como aba dedicada porque **já existe** na lista de Passaportes (filtro "Clube" + pill verde + ação no `UsuarioEditSheet.tsx`). Sem duplicação.
-
-Métricas do clube (X membros · Y conteúdos · Z posts) viram um `MetricTile` extra na linha de métricas de `/admin/usuarios` quando a aba ativa for de Clube.
-
-### 3. Dock enxuto
-
-`AdminDock` passa de 10 para 8 itens, removendo `Vagas` e `Clube`:
+Mudança pontual na div do gradiente:
 
 ```text
-Cockpit · PDV · Eventos · Esteira · Triagem · Agenda · Usuários · Auto
+- <div className="absolute inset-0 bg-gradient-to-t from-brown via-brown/20 to-transparent" />
++ <div className="absolute inset-0 bg-gradient-to-t from-brown via-brown/20 to-transparent
++                 transition-transform duration-700 group-hover:scale-105" />
 ```
 
-### 4. Compatibilidade de rotas
-
-Em vez de deletar os arquivos (e quebrar links antigos do dock/breadcrumbs), `admin.slots.tsx` e `admin.clube.tsx` viram redirects:
-
-```tsx
-// admin.slots.tsx
-beforeLoad: () => { throw redirect({ to: "/admin/agenda", search: { tab: "slots" } }) }
-```
-
-Mesma coisa para `admin.clube.tsx` → `/admin/usuarios?tab=clube-conteudo`.
-
-A aba ativa é controlada por `search param` (`?tab=`) para deep-linking e para o redirect funcionar.
-
-### Arquivos afetados
-
-- **Editado** `src/routes/_authenticated/admin.agenda.tsx` — envelopar em `Tabs`, importar conteúdo do slots.
-- **Editado** `src/routes/_authenticated/admin.usuarios.tsx` — envelopar em `Tabs`, importar managers do clube.
-- **Editado** `src/routes/_authenticated/admin.slots.tsx` — vira redirect (preserva URL).
-- **Editado** `src/routes/_authenticated/admin.clube.tsx` — vira redirect.
-- **Editado** `src/components/admin/AdminDock.tsx` — remover itens `Vagas` e `Clube`.
-
-Nenhum server function ou tabela é alterada — só reorganização de UI.
+Nada mais muda: mesma duração/easing da imagem (`duration-700`), mesmo fator (`scale-105`), então os dois transformam em sincronia e o gap desaparece. Não altera o card de eventos passados (que usa grayscale, sem esse problema) nem afeta layout, acessibilidade ou tokens de design.
