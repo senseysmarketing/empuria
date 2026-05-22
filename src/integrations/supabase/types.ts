@@ -507,6 +507,30 @@ export type Database = {
         }
         Relationships: []
       }
+      impersonation_logs: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          reason: string
+          target_user_id: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          reason: string
+          target_user_id: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           budget_range: string | null
@@ -720,31 +744,37 @@ export type Database = {
       }
       profiles: {
         Row: {
+          admin_notes: string | null
           avatar_url: string | null
           country_origin: string | null
           created_at: string
           full_name: string | null
           id: string
+          is_blocked: boolean
           is_club_member: boolean
           phone: string | null
           updated_at: string
         }
         Insert: {
+          admin_notes?: string | null
           avatar_url?: string | null
           country_origin?: string | null
           created_at?: string
           full_name?: string | null
           id: string
+          is_blocked?: boolean
           is_club_member?: boolean
           phone?: string | null
           updated_at?: string
         }
         Update: {
+          admin_notes?: string | null
           avatar_url?: string | null
           country_origin?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
+          is_blocked?: boolean
           is_club_member?: boolean
           phone?: string | null
           updated_at?: string
