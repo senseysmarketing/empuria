@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Plane, MapPin, CreditCard, Landmark, Users, ArrowRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+
 const ICONS: Record<string, LucideIcon> = {
   airport: Plane,
   tour: MapPin,
