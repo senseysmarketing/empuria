@@ -14,6 +14,12 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
+import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authenticated/admin.esteira'
+import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authenticated/admin.clube'
+import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
+import { Route as AuthenticatedAdminAgendaRouteImport } from './routes/_authenticated/admin.agenda'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -39,32 +45,102 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminTriagemRoute =
+  AuthenticatedAdminTriagemRouteImport.update({
+    id: '/triagem',
+    path: '/triagem',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminEsteiraRoute =
+  AuthenticatedAdminEsteiraRouteImport.update({
+    id: '/esteira',
+    path: '/esteira',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminClubeRoute = AuthenticatedAdminClubeRouteImport.update({
+  id: '/clube',
+  path: '/clube',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminAutomacoesRoute =
+  AuthenticatedAdminAutomacoesRouteImport.update({
+    id: '/automacoes',
+    path: '/automacoes',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminAgendaRoute =
+  AuthenticatedAdminAgendaRouteImport.update({
+    id: '/agenda',
+    path: '/agenda',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/portal': typeof AuthenticatedPortalRoute
+  '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
+  '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
+  '/admin/clube': typeof AuthenticatedAdminClubeRoute
+  '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/admin': typeof AuthenticatedAdminRoute
   '/portal': typeof AuthenticatedPortalRoute
+  '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
+  '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
+  '/admin/clube': typeof AuthenticatedAdminClubeRoute
+  '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/portal': typeof AuthenticatedPortalRoute
+  '/_authenticated/admin/agenda': typeof AuthenticatedAdminAgendaRoute
+  '/_authenticated/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
+  '/_authenticated/admin/clube': typeof AuthenticatedAdminClubeRoute
+  '/_authenticated/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
+  '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/admin' | '/portal'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/admin'
+    | '/portal'
+    | '/admin/agenda'
+    | '/admin/automacoes'
+    | '/admin/clube'
+    | '/admin/esteira'
+    | '/admin/triagem'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/admin' | '/portal'
+  to:
+    | '/'
+    | '/login'
+    | '/portal'
+    | '/admin/agenda'
+    | '/admin/automacoes'
+    | '/admin/clube'
+    | '/admin/esteira'
+    | '/admin/triagem'
+    | '/admin'
   id:
     | '__root__'
     | '/'
@@ -72,6 +148,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/admin'
     | '/_authenticated/portal'
+    | '/_authenticated/admin/agenda'
+    | '/_authenticated/admin/automacoes'
+    | '/_authenticated/admin/clube'
+    | '/_authenticated/admin/esteira'
+    | '/_authenticated/admin/triagem'
+    | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,16 +199,79 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/triagem': {
+      id: '/_authenticated/admin/triagem'
+      path: '/triagem'
+      fullPath: '/admin/triagem'
+      preLoaderRoute: typeof AuthenticatedAdminTriagemRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/esteira': {
+      id: '/_authenticated/admin/esteira'
+      path: '/esteira'
+      fullPath: '/admin/esteira'
+      preLoaderRoute: typeof AuthenticatedAdminEsteiraRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/clube': {
+      id: '/_authenticated/admin/clube'
+      path: '/clube'
+      fullPath: '/admin/clube'
+      preLoaderRoute: typeof AuthenticatedAdminClubeRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/automacoes': {
+      id: '/_authenticated/admin/automacoes'
+      path: '/automacoes'
+      fullPath: '/admin/automacoes'
+      preLoaderRoute: typeof AuthenticatedAdminAutomacoesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/agenda': {
+      id: '/_authenticated/admin/agenda'
+      path: '/agenda'
+      fullPath: '/admin/agenda'
+      preLoaderRoute: typeof AuthenticatedAdminAgendaRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAgendaRoute: typeof AuthenticatedAdminAgendaRoute
+  AuthenticatedAdminAutomacoesRoute: typeof AuthenticatedAdminAutomacoesRoute
+  AuthenticatedAdminClubeRoute: typeof AuthenticatedAdminClubeRoute
+  AuthenticatedAdminEsteiraRoute: typeof AuthenticatedAdminEsteiraRoute
+  AuthenticatedAdminTriagemRoute: typeof AuthenticatedAdminTriagemRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAgendaRoute: AuthenticatedAdminAgendaRoute,
+  AuthenticatedAdminAutomacoesRoute: AuthenticatedAdminAutomacoesRoute,
+  AuthenticatedAdminClubeRoute: AuthenticatedAdminClubeRoute,
+  AuthenticatedAdminEsteiraRoute: AuthenticatedAdminEsteiraRoute,
+  AuthenticatedAdminTriagemRoute: AuthenticatedAdminTriagemRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
 interface AuthenticatedRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedPortalRoute: typeof AuthenticatedPortalRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedPortalRoute: AuthenticatedPortalRoute,
 }
 

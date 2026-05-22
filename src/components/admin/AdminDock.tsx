@@ -1,0 +1,77 @@
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import {
+  LayoutDashboard,
+  PackageCheck,
+  Filter,
+  CalendarDays,
+  Crown,
+  Zap,
+  LogOut,
+  Home,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+const items = [
+  { to: "/admin", label: "Cockpit", icon: LayoutDashboard, exact: true },
+  { to: "/admin/esteira", label: "Esteira 1", icon: PackageCheck },
+  { to: "/admin/triagem", label: "Triagem", icon: Filter },
+  { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
+  { to: "/admin/clube", label: "Clube", icon: Crown },
+  { to: "/admin/automacoes", label: "Automações", icon: Zap },
+] as const;
+
+export function AdminDock() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+
+  const isActive = (to: string, exact?: boolean) =>
+    exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
+
+  return (
+    <nav className="fixed bottom-0 inset-x-0 z-40 px-4 pb-4">
+      <div className="mx-auto max-w-5xl bg-brown-deep/95 backdrop-blur-xl border border-brown/40 rounded-2xl shadow-2xl">
+        <ul className="flex items-stretch justify-between gap-1 px-3 py-2">
+          {items.map((it) => {
+            const active = isActive(it.to, "exact" in it ? it.exact : false);
+            return (
+              <li key={it.to} className="flex-1">
+                <Link
+                  to={it.to}
+                  data-active={active}
+                  className="admin-dock-item group flex items-center justify-center h-12 px-3 rounded-xl text-offwhite/80 hover:text-offwhite hover:bg-brown/60 data-[active=true]:bg-orange-brand data-[active=true]:text-offwhite transition-colors"
+                >
+                  <it.icon className="h-5 w-5 shrink-0" />
+                  <span className="dock-label text-xs font-display uppercase tracking-wider">{it.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+          <li className="w-px self-stretch bg-brown/60 mx-1" />
+          <li>
+            <Link
+              to="/portal"
+              className="admin-dock-item flex items-center justify-center h-12 px-3 rounded-xl text-offwhite/60 hover:text-offwhite hover:bg-brown/60 transition-colors"
+              title="Portal do cliente"
+            >
+              <Home className="h-5 w-5" />
+              <span className="dock-label text-xs font-display uppercase tracking-wider">Portal</span>
+            </Link>
+          </li>
+          <li>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/login" });
+              }}
+              className="admin-dock-item flex items-center justify-center h-12 px-3 rounded-xl text-offwhite/60 hover:text-red-brand hover:bg-brown/60 transition-colors"
+              title="Sair"
+            >
+              <LogOut className="h-5 w-5" />
+              <span className="dock-label text-xs font-display uppercase tracking-wider">Sair</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  );
+}
