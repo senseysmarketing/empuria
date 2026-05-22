@@ -21,6 +21,7 @@ import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
 import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
+import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_authenticated/portal.ingressos'
 import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenticated/portal.clube'
 import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
 import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
@@ -91,6 +92,12 @@ const AuthenticatedPortalLojaRoute = AuthenticatedPortalLojaRouteImport.update({
   path: '/loja',
   getParentRoute: () => AuthenticatedPortalRoute,
 } as any)
+const AuthenticatedPortalIngressosRoute =
+  AuthenticatedPortalIngressosRouteImport.update({
+    id: '/ingressos',
+    path: '/ingressos',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
 const AuthenticatedPortalClubeRoute =
   AuthenticatedPortalClubeRouteImport.update({
     id: '/clube',
@@ -153,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -172,6 +180,7 @@ export interface FileRoutesByTo {
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -195,6 +204,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/_authenticated/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/_authenticated/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/_authenticated/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/_authenticated/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -218,6 +228,7 @@ export interface FileRouteTypes {
     | '/admin/slots'
     | '/admin/triagem'
     | '/portal/clube'
+    | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
     | '/admin/'
@@ -237,6 +248,7 @@ export interface FileRouteTypes {
     | '/admin/slots'
     | '/admin/triagem'
     | '/portal/clube'
+    | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
     | '/admin'
@@ -259,6 +271,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/slots'
     | '/_authenticated/admin/triagem'
     | '/_authenticated/portal/clube'
+    | '/_authenticated/portal/ingressos'
     | '/_authenticated/portal/loja'
     | '/_authenticated/portal/servicos'
     | '/_authenticated/admin/'
@@ -359,6 +372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPortalLojaRouteImport
       parentRoute: typeof AuthenticatedPortalRoute
     }
+    '/_authenticated/portal/ingressos': {
+      id: '/_authenticated/portal/ingressos'
+      path: '/ingressos'
+      fullPath: '/portal/ingressos'
+      preLoaderRoute: typeof AuthenticatedPortalIngressosRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
     '/_authenticated/portal/clube': {
       id: '/_authenticated/portal/clube'
       path: '/clube'
@@ -445,6 +465,7 @@ const AuthenticatedAdminRouteWithChildren =
 
 interface AuthenticatedPortalRouteChildren {
   AuthenticatedPortalClubeRoute: typeof AuthenticatedPortalClubeRoute
+  AuthenticatedPortalIngressosRoute: typeof AuthenticatedPortalIngressosRoute
   AuthenticatedPortalLojaRoute: typeof AuthenticatedPortalLojaRoute
   AuthenticatedPortalServicosRoute: typeof AuthenticatedPortalServicosRoute
   AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
@@ -452,6 +473,7 @@ interface AuthenticatedPortalRouteChildren {
 
 const AuthenticatedPortalRouteChildren: AuthenticatedPortalRouteChildren = {
   AuthenticatedPortalClubeRoute: AuthenticatedPortalClubeRoute,
+  AuthenticatedPortalIngressosRoute: AuthenticatedPortalIngressosRoute,
   AuthenticatedPortalLojaRoute: AuthenticatedPortalLojaRoute,
   AuthenticatedPortalServicosRoute: AuthenticatedPortalServicosRoute,
   AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,
@@ -496,3 +518,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
