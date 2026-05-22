@@ -10,6 +10,7 @@ import {
   Home,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import logoIcone from "@/assets/logo-empuria-icone.png";
 
 const items = [
   { to: "/admin", label: "Cockpit", icon: LayoutDashboard, exact: true },
@@ -31,6 +32,10 @@ export function AdminDock() {
     <nav className="fixed bottom-0 inset-x-0 z-40 px-4 pb-4">
       <div className="mx-auto max-w-5xl bg-brown-deep/95 backdrop-blur-xl border border-brown/40 rounded-2xl shadow-2xl">
         <ul className="flex items-stretch justify-between gap-1 px-3 py-2">
+          <li className="flex items-center px-2">
+            <img src={logoIcone} alt="Empuria" className="h-7 w-7 object-contain opacity-90" />
+          </li>
+          <li className="w-px self-stretch bg-brown/60 mx-1" />
           {items.map((it) => {
             const active = isActive(it.to, "exact" in it ? it.exact : false);
             return (
