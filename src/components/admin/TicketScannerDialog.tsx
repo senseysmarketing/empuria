@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { validateEventTicket, checkInTicket } from "@/lib/admin/events.functions";
+import { parsePassportQrPayload } from "@/lib/passport-qr";
 import { ScanLine, Check, X, Camera } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,22 +14,37 @@ export function TicketScannerDialog({ events }: { events: Array<{ id: string; ti
   const [open, setOpen] = useState(false);
   const [eventId, setEventId] = useState<string>(events[0]?.id ?? "");
   const [result, setResult] = useState<ValidationResult | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const scanLockRef = useRef(false);
   const validate = useServerFn(validateEventTicket);
   const checkIn = useServerFn(checkInTicket);
 
   const eventName = useMemo(() => events.find((e) => e.id === eventId)?.title, [eventId, events]);
 
   const handle = async (raw: string) => {
-    let userId = raw.trim();
-    if (userId.startsWith("empuria:")) userId = userId.slice("empuria:".length);
-    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuid.test(userId)) { toast.error("Código inválido"); return; }
-    if (!eventId) { toast.error("Selecione um evento"); return; }
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
+    const userId = parsePassportQrPayload(raw);
+    if (!userId) {
+      toast.error("Codigo de passaporte invalido");
+      window.setTimeout(() => { scanLockRef.current = false; }, 1000);
+      return;
+    }
+    if (!eventId) {
+      toast.error("Selecione um evento");
+      window.setTimeout(() => { scanLockRef.current = false; }, 1000);
+      return;
+    }
+
     try {
+      setScanning(true);
       const res = await validate({ data: { eventId, userId } });
       setResult(res);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      scanLockRef.current = false;
+      setScanning(false);
     }
   };
 
@@ -36,13 +52,14 @@ export function TicketScannerDialog({ events }: { events: Array<{ id: string; ti
     try {
       await checkIn({ data: { ticketId } });
       toast.success("Check-in realizado");
-      // refresh
       if (result?.ok && eventId) {
         const userId = result.profile.id;
         const fresh = await validate({ data: { eventId, userId } });
         setResult(fresh);
       }
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro");
+    }
   };
 
   return (
@@ -71,7 +88,7 @@ export function TicketScannerDialog({ events }: { events: Array<{ id: string; ti
                 {open && (
                   <Scanner
                     onScan={(results) => { if (results.length > 0) handle(results[0].rawValue); }}
-                    onError={() => {}}
+                    onError={() => toast.error("Nao foi possivel acessar a camera")}
                     constraints={{ facingMode: "environment" }}
                     styles={{ container: { width: "100%", height: "100%" }, video: { objectFit: "cover" } }}
                   />
@@ -89,7 +106,7 @@ export function TicketScannerDialog({ events }: { events: Array<{ id: string; ti
               <h3 className="font-display text-2xl mt-3">Acesso negado</h3>
               <p className="mt-1 opacity-90">{result.reason}</p>
               <p className="text-xs opacity-70 mt-2">Evento: {eventName}</p>
-              <Button onClick={() => setResult(null)} className="mt-4 bg-white text-red-brand hover:bg-white/90">Próximo</Button>
+              <Button onClick={() => setResult(null)} className="mt-4 bg-white text-red-brand hover:bg-white/90">Proximo</Button>
             </div>
           )}
 
@@ -107,14 +124,14 @@ export function TicketScannerDialog({ events }: { events: Array<{ id: string; ti
                 {result.tickets.map((t) => (
                   <div key={t.id} className={`flex items-center justify-between gap-2 ${t.status === "usado" ? "opacity-50" : ""}`}>
                     <div className="min-w-0">
-                      <div className="font-display text-sm">{t.tier?.name ?? "—"}</div>
+                      <div className="font-display text-sm">{t.tier?.name ?? "-"}</div>
                       {t.status === "usado" && t.checked_in_at && (
                         <div className="text-[10px] opacity-80">
                           Check-in: {new Date(t.checked_in_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </div>
                       )}
                       {Array.isArray(t.tier?.benefits) && (t.tier!.benefits as string[]).length > 0 && (
-                        <div className="text-[10px] opacity-80 truncate">{(t.tier!.benefits as string[]).join(" · ")}</div>
+                        <div className="text-[10px] opacity-80 truncate">{(t.tier!.benefits as string[]).join(" / ")}</div>
                       )}
                     </div>
                     {t.status === "valido" ? (
@@ -127,7 +144,7 @@ export function TicketScannerDialog({ events }: { events: Array<{ id: string; ti
                   </div>
                 ))}
               </div>
-              <Button onClick={() => setResult(null)} className="bg-white text-green-700 hover:bg-white/90 w-full">Próximo</Button>
+              <Button onClick={() => setResult(null)} className="bg-white text-green-700 hover:bg-white/90 w-full">Proximo</Button>
             </div>
           )}
         </DialogContent>

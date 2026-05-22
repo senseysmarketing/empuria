@@ -7,6 +7,7 @@ import {
   listProducts, getTab, addTabItem, removeTabItem, closeTabAsStaff, openTab, lookupPassport,
 } from "@/lib/admin/pdv.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { parsePassportQrPayload } from "@/lib/passport-qr";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ function PdvPage() {
   const { tab: tabIdSearch } = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
 
   const productsQ = useQuery({ queryKey: ["pdv-products"], queryFn: () => listProducts() });
   const tabQ = useQuery({
@@ -65,11 +67,20 @@ function PdvPage() {
 
   const tab = tabQ.data?.tab;
   const items = tabQ.data?.items ?? [];
+  const tabIsOpen = !tab || tab.status === "aberta";
 
   const handleAdd = async (productId: string) => {
     if (!tabIdSearch) { toast.error("Abra uma comanda primeiro"); return; }
-    try { await addFn({ data: { tabId: tabIdSearch, productId, qty: 1 } }); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    if (!tabIsOpen) { toast.error("Comanda ja esta fechada"); return; }
+    try {
+      setAddingProductId(productId);
+      await addFn({ data: { tabId: tabIdSearch, productId, qty: 1 } });
+      await qc.invalidateQueries({ queryKey: ["pdv-tab", tabIdSearch] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      setAddingProductId(null);
+    }
   };
 
   const handleClose = async (method: "dinheiro" | "cartao" | "cliente_app") => {
@@ -78,6 +89,7 @@ function PdvPage() {
       const r = await closeFn({ data: { tabId: tabIdSearch, paymentMethod: method } });
       if (r.awaitClient) {
         toast.success("Aguardando pagamento do cliente no app");
+        qc.invalidateQueries({ queryKey: ["pdv-tab", tabIdSearch] });
       } else {
         toast.success("Comanda fechada");
         navigate({ to: "/admin/pdv", search: {} });
@@ -114,7 +126,7 @@ function PdvPage() {
                       <button
                         key={p.id}
                         onClick={() => handleAdd(p.id)}
-                        disabled={!tabIdSearch}
+                        disabled={!tabIdSearch || !tabIsOpen || addingProductId === p.id}
                         className="bg-admin-surface-2 hover:bg-admin-accent/10 border border-admin-border hover:border-admin-accent disabled:opacity-40 disabled:cursor-not-allowed rounded-xl p-4 text-left transition-all group"
                       >
                         <div className="text-3xl mb-1">{p.emoji}</div>
@@ -169,7 +181,15 @@ function PdvPage() {
                         <div className="text-sm font-display tabular-nums text-admin-ink">€ {(subtotal / 100).toFixed(2)}</div>
                       </div>
                       <button
-                        onClick={() => rmFn({ data: { itemId: it.id } })}
+                        onClick={async () => {
+                          try {
+                            await rmFn({ data: { itemId: it.id } });
+                            qc.invalidateQueries({ queryKey: ["pdv-tab", tabIdSearch] });
+                          } catch (e) {
+                            toast.error(e instanceof Error ? e.message : "Erro");
+                          }
+                        }}
+                        disabled={!tabIsOpen}
                         className="text-admin-ink-muted hover:text-red-brand opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -185,9 +205,9 @@ function PdvPage() {
                   <span className="font-display text-3xl font-bold text-admin-accent tabular-nums">€ {(tab.total_cents / 100).toFixed(2)}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <Button size="sm" variant="outline" onClick={() => handleClose("dinheiro")} disabled={items.length === 0}>Dinheiro</Button>
-                  <Button size="sm" variant="outline" onClick={() => handleClose("cartao")} disabled={items.length === 0}>Cartão</Button>
-                  <Button size="sm" onClick={() => handleClose("cliente_app")} disabled={items.length === 0} className="bg-yellow-brand text-brown-deep hover:bg-yellow-brand/80">App</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleClose("dinheiro")} disabled={items.length === 0 || !tabIsOpen}>Dinheiro</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleClose("cartao")} disabled={items.length === 0 || !tabIsOpen}>Cartão</Button>
+                  <Button size="sm" onClick={() => handleClose("cliente_app")} disabled={items.length === 0 || !tabIsOpen} className="bg-yellow-brand text-brown-deep hover:bg-yellow-brand/80">App</Button>
                 </div>
               </div>
             </div>
@@ -205,8 +225,11 @@ function EmptyTabPanel() {
   const [id, setId] = useState("");
 
   const go = async () => {
-    let userId = id.trim();
-    if (userId.startsWith("empuria:")) userId = userId.slice(8);
+    const userId = parsePassportQrPayload(id);
+    if (!userId) {
+      toast.error("Codigo de passaporte invalido");
+      return;
+    }
     try {
       await lookup({ data: { userId } });
       const { tabId } = await openFn({ data: { userId } });
@@ -221,7 +244,7 @@ function EmptyTabPanel() {
       <Wine className="h-10 w-10 mx-auto text-admin-ink-muted" />
       <p className="text-sm text-admin-ink-muted">Escaneie um passaporte ou cole o ID</p>
       <div className="flex gap-2">
-        <Input value={id} onChange={(e) => setId(e.target.value)} placeholder="empuria:uuid" className="bg-admin-surface-2 border-admin-border text-xs" />
+        <Input value={id} onChange={(e) => setId(e.target.value)} placeholder="empuria:passport:v1:uuid" className="bg-admin-surface-2 border-admin-border text-xs" />
         <Button size="sm" onClick={go}>Abrir</Button>
       </div>
       <PassportScannerDialog />

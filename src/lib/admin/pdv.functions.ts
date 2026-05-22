@@ -12,7 +12,7 @@ export const lookupPassport = createServerFn({ method: "POST" })
     const endOfDay = new Date(startOfDay); endOfDay.setDate(endOfDay.getDate() + 1);
 
     const [profileRes, arrivalsRes, todayApptsRes, nextApptRes, openTabRes, activeOrdersRes] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, avatar_url, is_club_member, created_at, phone").eq("id", data.userId).maybeSingle(),
+      supabase.from("profiles").select("id, full_name, avatar_url, is_club_member, is_blocked, created_at, phone").eq("id", data.userId).maybeSingle(),
       supabase.from("arrivals").select("id", { count: "exact", head: true }).eq("user_id", data.userId),
       supabase.from("appointments").select("id, starts_at, status, services(title)").eq("user_id", data.userId).gte("starts_at", startOfDay.toISOString()).lt("starts_at", endOfDay.toISOString()).order("starts_at"),
       supabase.from("appointments").select("id, starts_at, status, services(title)").eq("user_id", data.userId).gte("starts_at", now.toISOString()).order("starts_at").limit(1).maybeSingle(),
@@ -20,7 +20,8 @@ export const lookupPassport = createServerFn({ method: "POST" })
       supabase.from("orders").select("id, service_title, delivery_status").eq("user_id", data.userId).neq("delivery_status", "concluido").limit(10),
     ]);
 
-    if (!profileRes.data) throw new Error("Passaporte não encontrado");
+    if (!profileRes.data) throw new Error("Passaporte nao encontrado");
+    if (profileRes.data.is_blocked) throw new Error("Conta bloqueada. Procure um admin.");
 
     return {
       profile: profileRes.data,
@@ -69,14 +70,29 @@ export const openTab = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => z.object({ userId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { data: profile, error: profileError } = await context.supabase
+      .from("profiles")
+      .select("id,is_blocked")
+      .eq("id", data.userId)
+      .maybeSingle();
+    if (profileError || !profile) throw new Error("Membro nao encontrado");
+    if (profile.is_blocked) throw new Error("Conta bloqueada. Procure um admin.");
+
     const existing = await context.supabase
       .from("tabs").select("id").eq("user_id", data.userId).eq("status", "aberta").maybeSingle();
     if (existing.data) return { tabId: existing.data.id };
+
     const { data: row, error } = await context.supabase
       .from("tabs")
       .insert({ user_id: data.userId, opened_by: context.userId })
       .select("id").single();
-    if (error || !row) throw new Error(error?.message ?? "Erro ao abrir comanda");
+    if (error) {
+      const retry = await context.supabase
+        .from("tabs").select("id").eq("user_id", data.userId).eq("status", "aberta").maybeSingle();
+      if (retry.data) return { tabId: retry.data.id };
+      throw new Error("Erro ao abrir comanda");
+    }
+    if (!row) throw new Error("Erro ao abrir comanda");
     return { tabId: row.id };
   });
 
@@ -88,7 +104,7 @@ export const getTab = createServerFn({ method: "POST" })
       context.supabase.from("tabs").select("*, profiles(full_name, is_club_member, avatar_url)").eq("id", data.tabId).single(),
       context.supabase.from("tab_items").select("*").eq("tab_id", data.tabId).order("created_at"),
     ]);
-    if (tabRes.error) throw new Error(tabRes.error.message);
+    if (tabRes.error) throw new Error("Comanda nao encontrada");
     return { tab: tabRes.data, items: itemsRes.data ?? [] };
   });
 
@@ -102,9 +118,30 @@ export const addTabItem = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
-    const { data: product, error: pErr } = await context.supabase
-      .from("products").select("name, emoji, price_cents").eq("id", data.productId).single();
-    if (pErr || !product) throw new Error("Produto não encontrado");
+    const [{ data: tab, error: tabErr }, { data: product, error: pErr }] = await Promise.all([
+      context.supabase.from("tabs").select("id,status").eq("id", data.tabId).single(),
+      context.supabase
+        .from("products")
+        .select("id,name,emoji,price_cents,is_active")
+        .eq("id", data.productId)
+        .single(),
+    ]);
+    if (tabErr || !tab) throw new Error("Comanda nao encontrada");
+    if (tab.status !== "aberta") throw new Error("Comanda ja esta fechada");
+    if (pErr || !product || !product.is_active) throw new Error("Produto nao encontrado");
+
+    const duplicateWindow = new Date(Date.now() - 3000).toISOString();
+    const { data: recentDuplicate } = await context.supabase
+      .from("tab_items")
+      .select("id")
+      .eq("tab_id", data.tabId)
+      .eq("product_id", data.productId)
+      .eq("added_by", context.userId)
+      .gte("created_at", duplicateWindow)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (recentDuplicate) return { itemId: recentDuplicate.id, deduped: true };
 
     const { data: row, error } = await context.supabase
       .from("tab_items")
@@ -126,6 +163,15 @@ export const removeTabItem = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => z.object({ itemId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { data: item, error: itemErr } = await context.supabase
+      .from("tab_items")
+      .select("id,tab_id,tabs(status)")
+      .eq("id", data.itemId)
+      .single();
+    if (itemErr || !item) throw new Error("Item nao encontrado");
+    const tab = (item as { tabs?: { status?: string } | null }).tabs;
+    if (tab?.status !== "aberta") throw new Error("Comanda ja esta fechada");
+
     const { error } = await context.supabase.from("tab_items").delete().eq("id", data.itemId);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -144,8 +190,11 @@ export const closeTabAsStaff = createServerFn({ method: "POST" })
       return { ok: true, awaitClient: true };
     }
     const { data: tab, error: tErr } = await context.supabase
-      .from("tabs").select("total_cents").eq("id", data.tabId).single();
-    if (tErr || !tab) throw new Error("Comanda não encontrada");
+      .from("tabs").select("total_cents,status").eq("id", data.tabId).single();
+    if (tErr || !tab) throw new Error("Comanda nao encontrada");
+    if (tab.status !== "aberta") throw new Error("Comanda ja esta fechada");
+    if (tab.total_cents <= 0) throw new Error("Comanda sem itens para pagamento");
+
     const { error } = await context.supabase
       .from("tabs")
       .update({
@@ -154,7 +203,10 @@ export const closeTabAsStaff = createServerFn({ method: "POST" })
         paid_cents: tab.total_cents,
         closed_at: new Date().toISOString(),
       })
-      .eq("id", data.tabId);
-    if (error) throw new Error(error.message);
+      .eq("id", data.tabId)
+      .eq("status", "aberta")
+      .select("id")
+      .single();
+    if (error) throw new Error("Nao foi possivel fechar a comanda");
     return { ok: true };
   });
