@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ServiceCard, type PublicService } from "@/components/services/ServiceCard";
 import { CheckoutModal } from "@/components/checkout/CheckoutModal";
+import { ServiceDetailsModal } from "@/components/services/ServiceDetailsModal";
 import { listPublicServices } from "@/lib/services-public.functions";
 
 export const Route = createFileRoute("/servicos")({
