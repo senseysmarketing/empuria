@@ -22,7 +22,13 @@ export const updateDelivery = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      delivery_status?: typeof data.delivery_status;
+      host_profile_id?: string | null;
+      assigned_staff_id?: string | null;
+      notes?: string;
+      executed_at?: string;
+    } = {};
     if (data.delivery_status) patch.delivery_status = data.delivery_status;
     if (data.host_profile_id !== undefined) patch.host_profile_id = data.host_profile_id;
     if (data.assigned_staff_id !== undefined) patch.assigned_staff_id = data.assigned_staff_id;
