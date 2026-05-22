@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getMyDashboard } from "@/lib/portal.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { MyServicesPanel } from "@/components/portal/MyServicesPanel";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { AccessDeniedCard } from "@/components/auth/AccessDeniedCard";
 import logoCompleta from "@/assets/logo-empuria-completa.png";
 
 export const Route = createFileRoute("/_authenticated/portal")({
@@ -13,9 +15,11 @@ export const Route = createFileRoute("/_authenticated/portal")({
 function PortalPage() {
   const fetchDash = useServerFn(getMyDashboard);
   const navigate = useNavigate();
+  const { isLoading: roleLoading, isStaff } = useCurrentUser();
   const { data, isLoading } = useQuery({
     queryKey: ["my-dashboard"],
     queryFn: () => fetchDash(),
+    enabled: !roleLoading && !isStaff,
   });
 
   const logout = async () => {
@@ -23,7 +27,20 @@ function PortalPage() {
     navigate({ to: "/login" });
   };
 
-  const isStaff = data?.roles.some((r) => r === "admin" || r === "staff");
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-brown bg-topo flex items-center justify-center">
+        <p className="text-sm text-offwhite/60 font-display uppercase tracking-wider">
+          Carregando...
+        </p>
+      </div>
+    );
+  }
+
+  if (isStaff) {
+    return <AccessDeniedCard variant="member-only" />;
+  }
+
 
   return (
     <div className="min-h-screen bg-brown bg-topo">
