@@ -16,7 +16,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServicosSlugRouteImport } from './routes/servicos.$slug'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
+import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
+import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenticated/portal.clube'
 import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
 import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
 import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authenticated/admin.esteira'
@@ -58,11 +62,34 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPortalIndexRoute =
+  AuthenticatedPortalIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedPortalServicosRoute =
+  AuthenticatedPortalServicosRouteImport.update({
+    id: '/servicos',
+    path: '/servicos',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
+const AuthenticatedPortalLojaRoute = AuthenticatedPortalLojaRouteImport.update({
+  id: '/loja',
+  path: '/loja',
+  getParentRoute: () => AuthenticatedPortalRoute,
+} as any)
+const AuthenticatedPortalClubeRoute =
+  AuthenticatedPortalClubeRouteImport.update({
+    id: '/clube',
+    path: '/clube',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
 const AuthenticatedAdminTriagemRoute =
   AuthenticatedAdminTriagemRouteImport.update({
     id: '/triagem',
@@ -103,7 +130,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/servicos': typeof ServicosRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/portal': typeof AuthenticatedPortalRoute
+  '/portal': typeof AuthenticatedPortalRouteWithChildren
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
@@ -111,13 +138,16 @@ export interface FileRoutesByFullPath {
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/portal/loja': typeof AuthenticatedPortalLojaRoute
+  '/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/portal/': typeof AuthenticatedPortalIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/servicos': typeof ServicosRouteWithChildren
-  '/portal': typeof AuthenticatedPortalRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
@@ -125,7 +155,11 @@ export interface FileRoutesByTo {
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/portal/loja': typeof AuthenticatedPortalLojaRoute
+  '/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/portal': typeof AuthenticatedPortalIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,7 +168,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/servicos': typeof ServicosRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/_authenticated/portal': typeof AuthenticatedPortalRoute
+  '/_authenticated/portal': typeof AuthenticatedPortalRouteWithChildren
   '/servicos/$slug': typeof ServicosSlugRoute
   '/_authenticated/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/_authenticated/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
@@ -142,7 +176,11 @@ export interface FileRoutesById {
   '/_authenticated/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
   '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
+  '/_authenticated/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/_authenticated/portal/loja': typeof AuthenticatedPortalLojaRoute
+  '/_authenticated/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,13 +197,16 @@ export interface FileRouteTypes {
     | '/admin/esteira'
     | '/admin/slots'
     | '/admin/triagem'
+    | '/portal/clube'
+    | '/portal/loja'
+    | '/portal/servicos'
     | '/admin/'
+    | '/portal/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/servicos'
-    | '/portal'
     | '/servicos/$slug'
     | '/admin/agenda'
     | '/admin/automacoes'
@@ -173,7 +214,11 @@ export interface FileRouteTypes {
     | '/admin/esteira'
     | '/admin/slots'
     | '/admin/triagem'
+    | '/portal/clube'
+    | '/portal/loja'
+    | '/portal/servicos'
     | '/admin'
+    | '/portal'
   id:
     | '__root__'
     | '/'
@@ -189,7 +234,11 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/esteira'
     | '/_authenticated/admin/slots'
     | '/_authenticated/admin/triagem'
+    | '/_authenticated/portal/clube'
+    | '/_authenticated/portal/loja'
+    | '/_authenticated/portal/servicos'
     | '/_authenticated/admin/'
+    | '/_authenticated/portal/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -250,12 +299,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/portal/': {
+      id: '/_authenticated/portal/'
+      path: '/'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof AuthenticatedPortalIndexRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/portal/servicos': {
+      id: '/_authenticated/portal/servicos'
+      path: '/servicos'
+      fullPath: '/portal/servicos'
+      preLoaderRoute: typeof AuthenticatedPortalServicosRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
+    '/_authenticated/portal/loja': {
+      id: '/_authenticated/portal/loja'
+      path: '/loja'
+      fullPath: '/portal/loja'
+      preLoaderRoute: typeof AuthenticatedPortalLojaRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
+    '/_authenticated/portal/clube': {
+      id: '/_authenticated/portal/clube'
+      path: '/clube'
+      fullPath: '/portal/clube'
+      preLoaderRoute: typeof AuthenticatedPortalClubeRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
     }
     '/_authenticated/admin/triagem': {
       id: '/_authenticated/admin/triagem'
@@ -325,14 +402,31 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
+interface AuthenticatedPortalRouteChildren {
+  AuthenticatedPortalClubeRoute: typeof AuthenticatedPortalClubeRoute
+  AuthenticatedPortalLojaRoute: typeof AuthenticatedPortalLojaRoute
+  AuthenticatedPortalServicosRoute: typeof AuthenticatedPortalServicosRoute
+  AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
+}
+
+const AuthenticatedPortalRouteChildren: AuthenticatedPortalRouteChildren = {
+  AuthenticatedPortalClubeRoute: AuthenticatedPortalClubeRoute,
+  AuthenticatedPortalLojaRoute: AuthenticatedPortalLojaRoute,
+  AuthenticatedPortalServicosRoute: AuthenticatedPortalServicosRoute,
+  AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,
+}
+
+const AuthenticatedPortalRouteWithChildren =
+  AuthenticatedPortalRoute._addFileChildren(AuthenticatedPortalRouteChildren)
+
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
-  AuthenticatedPortalRoute: typeof AuthenticatedPortalRoute
+  AuthenticatedPortalRoute: typeof AuthenticatedPortalRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
-  AuthenticatedPortalRoute: AuthenticatedPortalRoute,
+  AuthenticatedPortalRoute: AuthenticatedPortalRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
