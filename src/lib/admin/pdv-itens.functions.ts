@@ -67,7 +67,7 @@ export const updatePdvItem = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { id, ...patch } = data;
     const { data: old } = await supabaseAdmin.from("products").select("*").eq("id", id).maybeSingle();
-    const finalPatch: Record<string, unknown> = { ...patch };
+    const finalPatch = { ...patch } as typeof patch & { category?: LegacyEnum };
     if (patch.category_id) {
       finalPatch.category = await resolveLegacyEnum(patch.category_id);
     }
