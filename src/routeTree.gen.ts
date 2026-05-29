@@ -29,9 +29,11 @@ import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminPdvRouteImport } from './routes/_authenticated/admin.pdv'
 import { Route as AuthenticatedAdminEventosRouteImport } from './routes/_authenticated/admin.eventos'
 import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authenticated/admin.esteira'
+import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_authenticated/admin.configuracoes'
 import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authenticated/admin.clube'
 import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
 import { Route as AuthenticatedAdminAgendaRouteImport } from './routes/_authenticated/admin.agenda'
+import { Route as AuthenticatedAdminAcessoNegadoRouteImport } from './routes/_authenticated/admin.acesso-negado'
 
 const ServicosRoute = ServicosRouteImport.update({
   id: '/servicos',
@@ -140,6 +142,12 @@ const AuthenticatedAdminEsteiraRoute =
     path: '/esteira',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminConfiguracoesRoute =
+  AuthenticatedAdminConfiguracoesRouteImport.update({
+    id: '/configuracoes',
+    path: '/configuracoes',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminClubeRoute = AuthenticatedAdminClubeRouteImport.update({
   id: '/clube',
   path: '/clube',
@@ -157,6 +165,12 @@ const AuthenticatedAdminAgendaRoute =
     path: '/agenda',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminAcessoNegadoRoute =
+  AuthenticatedAdminAcessoNegadoRouteImport.update({
+    id: '/acesso-negado',
+    path: '/acesso-negado',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -166,9 +180,11 @@ export interface FileRoutesByFullPath {
   '/portal': typeof AuthenticatedPortalRouteWithChildren
   '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
+  '/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
+  '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
   '/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
@@ -188,9 +204,11 @@ export interface FileRoutesByTo {
   '/servicos': typeof ServicosRouteWithChildren
   '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
+  '/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
+  '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
   '/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
@@ -214,9 +232,11 @@ export interface FileRoutesById {
   '/_authenticated/portal': typeof AuthenticatedPortalRouteWithChildren
   '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
+  '/_authenticated/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/_authenticated/admin/agenda': typeof AuthenticatedAdminAgendaRoute
   '/_authenticated/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/_authenticated/admin/clube': typeof AuthenticatedAdminClubeRoute
+  '/_authenticated/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/_authenticated/admin/esteira': typeof AuthenticatedAdminEsteiraRoute
   '/_authenticated/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/_authenticated/admin/pdv': typeof AuthenticatedAdminPdvRoute
@@ -240,9 +260,11 @@ export interface FileRouteTypes {
     | '/portal'
     | '/evento/$slug'
     | '/servicos/$slug'
+    | '/admin/acesso-negado'
     | '/admin/agenda'
     | '/admin/automacoes'
     | '/admin/clube'
+    | '/admin/configuracoes'
     | '/admin/esteira'
     | '/admin/eventos'
     | '/admin/pdv'
@@ -262,9 +284,11 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/evento/$slug'
     | '/servicos/$slug'
+    | '/admin/acesso-negado'
     | '/admin/agenda'
     | '/admin/automacoes'
     | '/admin/clube'
+    | '/admin/configuracoes'
     | '/admin/esteira'
     | '/admin/eventos'
     | '/admin/pdv'
@@ -287,9 +311,11 @@ export interface FileRouteTypes {
     | '/_authenticated/portal'
     | '/evento/$slug'
     | '/servicos/$slug'
+    | '/_authenticated/admin/acesso-negado'
     | '/_authenticated/admin/agenda'
     | '/_authenticated/admin/automacoes'
     | '/_authenticated/admin/clube'
+    | '/_authenticated/admin/configuracoes'
     | '/_authenticated/admin/esteira'
     | '/_authenticated/admin/eventos'
     | '/_authenticated/admin/pdv'
@@ -454,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminEsteiraRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/configuracoes': {
+      id: '/_authenticated/admin/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/admin/configuracoes'
+      preLoaderRoute: typeof AuthenticatedAdminConfiguracoesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/clube': {
       id: '/_authenticated/admin/clube'
       path: '/clube'
@@ -475,13 +508,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAgendaRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/acesso-negado': {
+      id: '/_authenticated/admin/acesso-negado'
+      path: '/acesso-negado'
+      fullPath: '/admin/acesso-negado'
+      preLoaderRoute: typeof AuthenticatedAdminAcessoNegadoRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAcessoNegadoRoute: typeof AuthenticatedAdminAcessoNegadoRoute
   AuthenticatedAdminAgendaRoute: typeof AuthenticatedAdminAgendaRoute
   AuthenticatedAdminAutomacoesRoute: typeof AuthenticatedAdminAutomacoesRoute
   AuthenticatedAdminClubeRoute: typeof AuthenticatedAdminClubeRoute
+  AuthenticatedAdminConfiguracoesRoute: typeof AuthenticatedAdminConfiguracoesRoute
   AuthenticatedAdminEsteiraRoute: typeof AuthenticatedAdminEsteiraRoute
   AuthenticatedAdminEventosRoute: typeof AuthenticatedAdminEventosRoute
   AuthenticatedAdminPdvRoute: typeof AuthenticatedAdminPdvRoute
@@ -492,9 +534,11 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAcessoNegadoRoute: AuthenticatedAdminAcessoNegadoRoute,
   AuthenticatedAdminAgendaRoute: AuthenticatedAdminAgendaRoute,
   AuthenticatedAdminAutomacoesRoute: AuthenticatedAdminAutomacoesRoute,
   AuthenticatedAdminClubeRoute: AuthenticatedAdminClubeRoute,
+  AuthenticatedAdminConfiguracoesRoute: AuthenticatedAdminConfiguracoesRoute,
   AuthenticatedAdminEsteiraRoute: AuthenticatedAdminEsteiraRoute,
   AuthenticatedAdminEventosRoute: AuthenticatedAdminEventosRoute,
   AuthenticatedAdminPdvRoute: AuthenticatedAdminPdvRoute,

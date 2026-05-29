@@ -4,7 +4,6 @@ import {
   PackageCheck,
   Filter,
   CalendarDays,
-  Zap,
   LogOut,
   Home,
   Wine,
@@ -12,26 +11,29 @@ import {
   Users,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useModuleAccess } from "@/hooks/use-module-access";
 import logoIcone from "@/assets/logo-empuria-icone.png";
 
 const items = [
-  { to: "/admin", label: "Cockpit", icon: LayoutDashboard, exact: true },
-  { to: "/admin/pdv", label: "PDV", icon: Wine },
-  { to: "/admin/eventos", label: "Eventos", icon: Ticket },
-  { to: "/admin/esteira", label: "Esteira", icon: PackageCheck },
-  { to: "/admin/triagem", label: "Triagem", icon: Filter },
-  { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
-  { to: "/admin/usuarios", label: "Usuários", icon: Users },
-  { to: "/admin/automacoes", label: "Auto", icon: Zap },
+  { to: "/admin", label: "Cockpit", icon: LayoutDashboard, exact: true, module: "cockpit" },
+  { to: "/admin/pdv", label: "PDV", icon: Wine, module: "pdv" },
+  { to: "/admin/eventos", label: "Eventos", icon: Ticket, module: "eventos" },
+  { to: "/admin/esteira", label: "Esteira", icon: PackageCheck, module: "esteira" },
+  { to: "/admin/triagem", label: "Triagem", icon: Filter, module: "triagem" },
+  { to: "/admin/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
+  { to: "/admin/usuarios", label: "Usuários", icon: Users, module: "usuarios" },
 ] as const;
 
 
 export function AdminDock() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
+  const { can } = useModuleAccess();
 
   const isActive = (to: string, exact?: boolean) =>
     exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
+
+  const visibleItems = items.filter((it) => can(it.module));
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 px-4 pb-4">
@@ -43,7 +45,7 @@ export function AdminDock() {
             </Link>
           </li>
           <li className="w-px h-5 bg-brown/60 mx-0.5" />
-          {items.map((it) => {
+          {visibleItems.map((it) => {
             const active = isActive(it.to, "exact" in it ? it.exact : false);
             return (
               <li key={it.to}>
