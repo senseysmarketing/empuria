@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SpainWatermark } from "./SpainWatermark";
 import { useTopBarSlots } from "./TopBarActionsContext";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useModuleAccess } from "@/hooks/use-module-access";
 import { stopImpersonation } from "@/lib/impersonation";
 import logoIcone from "@/assets/logo-empuria-icone.png";
 
@@ -27,6 +29,7 @@ function formatDate(d: Date) {
 export function HeroTopBar({ variant }: { variant: Variant }) {
   const { actions, quickStat } = useTopBarSlots();
   const { impersonation } = useCurrentUser();
+  const { can } = useModuleAccess();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
@@ -100,6 +103,18 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
         )}
 
         {actions && <div className="flex items-center gap-2">{actions}</div>}
+
+        {isAdmin && can("configuracoes") && (
+          <Link
+            to="/admin/configuracoes"
+            search={{ tab: "perfil" }}
+            className="inline-flex items-center gap-2 px-3 h-10 rounded-lg bg-brown-deep/60 hover:bg-brown-deep border border-orange-brand/30 hover:border-orange-brand/60 text-offwhite hover:text-orange-brand transition-colors font-display text-xs uppercase tracking-wider"
+            title="Configurações"
+          >
+            <Settings className="h-4 w-4" />
+            <span className="hidden md:inline">Configurações</span>
+          </Link>
+        )}
       </div>
       {variant === "portal" && impersonation && (
         <div className="relative bg-brown-deep text-offwhite border-t border-offwhite/10">
