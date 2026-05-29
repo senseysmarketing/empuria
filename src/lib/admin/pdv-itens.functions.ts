@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const CATEGORIES = ["bebida", "comida", "cafeteria", "drink", "experiencia", "outro"] as const;
+const CATEGORIES = ["bebida", "comida", "barbearia", "outro"] as const;
 
 export const listPdvItems = createServerFn({ method: "GET" })
   .middleware([requireModule("pdv_itens")])
