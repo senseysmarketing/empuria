@@ -7,21 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Plus, Pencil, Trash2, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { listPdvItems, createPdvItem, updatePdvItem, deletePdvItem } from "@/lib/admin/pdv-itens.functions";
+import { listCategories } from "@/lib/admin/categories.functions";
+import { CategoriesManagerModal } from "./CategoriesManagerModal";
 
 type Item = Awaited<ReturnType<typeof listPdvItems>>[number];
-
-const CATEGORIES = ["bebida", "comida", "barbearia", "outro"] as const;
-type Category = (typeof CATEGORIES)[number];
 
 const emptyForm = {
   name: "",
   slug: "",
   price_cents: 0,
-  category: "bebida" as Category,
+  category_id: "",
   emoji: "",
   is_active: true,
   position: 0,
@@ -29,6 +28,7 @@ const emptyForm = {
 
 export function PdvItensTab() {
   const fetchList = useServerFn(listPdvItems);
+  const fetchCategories = useServerFn(listCategories);
   const create = useServerFn(createPdvItem);
   const update = useServerFn(updatePdvItem);
   const remove = useServerFn(deletePdvItem);
@@ -39,19 +39,29 @@ export function PdvItensTab() {
     queryFn: () => fetchList(),
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ["pdv-categories"],
+    queryFn: () => fetchCategories(),
+  });
+
   const [editing, setEditing] = useState<Item | null>(null);
   const [open, setOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, position: items.length }); setOpen(true); };
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ ...emptyForm, position: items.length, category_id: categories[0]?.id ?? "" });
+    setOpen(true);
+  };
   const openEdit = (item: Item) => {
     setEditing(item);
     setForm({
       name: item.name,
       slug: item.slug,
       price_cents: item.price_cents,
-      category: item.category as Category,
+      category_id: item.category_id ?? "",
       emoji: item.emoji ?? "",
       is_active: item.is_active,
       position: item.position,
@@ -67,13 +77,14 @@ export function PdvItensTab() {
   };
 
   const save = async () => {
+    if (!form.category_id) { toast.error("Selecione uma categoria"); return; }
     setSaving(true);
     try {
       const payload = {
         name: form.name.trim(),
         slug: form.slug.trim().toLowerCase(),
         price_cents: Math.round(form.price_cents),
-        category: form.category,
+        category_id: form.category_id,
         emoji: form.emoji.trim() || null,
         is_active: form.is_active,
         position: form.position,
@@ -98,12 +109,19 @@ export function PdvItensTab() {
 
   return (
     <BentoCard padded={false}>
-      <div className="p-5 border-b border-admin-border flex items-center justify-between">
+      <div className="p-5 border-b border-admin-border flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h3 className="font-display text-lg text-admin-ink">Itens do PDV</h3>
           <p className="text-xs text-admin-ink-muted mt-1">{items.length} itens cadastrados</p>
         </div>
-        <Button onClick={openCreate} className="bg-admin-accent text-white"><Plus className="h-4 w-4" /> Novo item</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setCategoriesOpen(true)} className="border-admin-border">
+            <Tags className="h-4 w-4" /> Gerenciar Categorias
+          </Button>
+          <Button onClick={openCreate} className="bg-admin-accent text-white">
+            <Plus className="h-4 w-4" /> Novo item
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -122,31 +140,36 @@ export function PdvItensTab() {
               </tr>
             </thead>
             <tbody>
-              {items.map((it) => (
-                <tr key={it.id} className="border-t border-admin-border hover:bg-admin-bg/50">
-                  <td className="p-3 text-admin-ink-muted tabular-nums">{it.position}</td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      {it.emoji && <span className="text-lg">{it.emoji}</span>}
-                      <div>
-                        <div className="font-medium text-admin-ink">{it.name}</div>
-                        <div className="text-[11px] text-admin-ink-muted">{it.slug}</div>
+              {items.map((it) => {
+                const cat = (it as Item & { product_categories?: { name: string; emoji: string | null } | null }).product_categories;
+                return (
+                  <tr key={it.id} className="border-t border-admin-border hover:bg-admin-bg/50">
+                    <td className="p-3 text-admin-ink-muted tabular-nums">{it.position}</td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        {it.emoji && <span className="text-lg">{it.emoji}</span>}
+                        <div>
+                          <div className="font-medium text-admin-ink">{it.name}</div>
+                          <div className="text-[11px] text-admin-ink-muted">{it.slug}</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="p-3 text-admin-ink-muted capitalize">{it.category}</td>
-                  <td className="p-3 text-right tabular-nums">€ {(it.price_cents / 100).toFixed(2)}</td>
-                  <td className="p-3 text-center">
-                    <Switch checked={it.is_active} onCheckedChange={(v) => toggleActive(it, v)} />
-                  </td>
-                  <td className="p-3 text-right">
-                    <div className="inline-flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(it)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="sm" onClick={() => del(it)}><Trash2 className="h-3.5 w-3.5 text-red-500" /></Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="p-3 text-admin-ink-muted">
+                      {cat ? `${cat.emoji ?? ""} ${cat.name}`.trim() : <span className="italic opacity-60">—</span>}
+                    </td>
+                    <td className="p-3 text-right tabular-nums">€ {(it.price_cents / 100).toFixed(2)}</td>
+                    <td className="p-3 text-center">
+                      <Switch checked={it.is_active} onCheckedChange={(v) => toggleActive(it, v)} />
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="inline-flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(it)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => del(it)}><Trash2 className="h-3.5 w-3.5 text-red-500" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {items.length === 0 && (
                 <tr><td colSpan={6} className="p-8 text-center text-admin-ink-muted text-sm">Nenhum item ainda</td></tr>
               )}
@@ -155,10 +178,13 @@ export function PdvItensTab() {
         </div>
       )}
 
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="bg-admin-surface border-admin-border text-admin-ink overflow-y-auto">
-          <SheetHeader><SheetTitle className="font-display">{editing ? "Editar item" : "Novo item"}</SheetTitle></SheetHeader>
-          <div className="space-y-4 py-4">
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-admin-surface border-admin-border text-admin-ink">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">{editing ? "Editar item" : "Novo item"}</DialogTitle>
+            <DialogDescription>Preencha os dados do item do PDV.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
             <div className="grid grid-cols-[60px_1fr] gap-3">
               <div className="space-y-1.5">
                 <Label>Emoji</Label>
@@ -186,10 +212,12 @@ export function PdvItensTab() {
               </div>
               <div className="space-y-1.5">
                 <Label>Categoria</Label>
-                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v as Category })}>
-                  <SelectTrigger className="bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+                <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
+                  <SelectTrigger className="bg-admin-bg border-admin-border"><SelectValue placeholder="Selecione…" /></SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
+                    {categories.filter((c) => c.is_active || c.id === form.category_id).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.emoji ? `${c.emoji} ` : ""}{c.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -205,12 +233,14 @@ export function PdvItensTab() {
               </div>
             </div>
           </div>
-          <SheetFooter>
+          <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={save} disabled={saving || !form.name.trim() || !form.slug.trim()} className="bg-admin-accent text-white">Salvar</Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+            <Button onClick={save} disabled={saving || !form.name.trim() || !form.slug.trim() || !form.category_id} className="bg-admin-accent text-white">Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <CategoriesManagerModal open={categoriesOpen} onOpenChange={setCategoriesOpen} />
     </BentoCard>
   );
 }
