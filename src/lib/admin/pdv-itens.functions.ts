@@ -3,14 +3,26 @@ import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const CATEGORIES = ["bebida", "comida", "barbearia", "outro"] as const;
+const LEGACY_ENUM = ["bebida", "comida", "barbearia", "outro"] as const;
+type LegacyEnum = (typeof LEGACY_ENUM)[number];
+
+async function resolveLegacyEnum(categoryId: string): Promise<LegacyEnum> {
+  const { data } = await supabaseAdmin
+    .from("product_categories")
+    .select("slug")
+    .eq("id", categoryId)
+    .maybeSingle();
+  const slug = data?.slug as string | undefined;
+  if (slug && (LEGACY_ENUM as readonly string[]).includes(slug)) return slug as LegacyEnum;
+  return "outro";
+}
 
 export const listPdvItems = createServerFn({ method: "GET" })
   .middleware([requireModule("pdv_itens")])
   .handler(async () => {
     const { data, error } = await supabaseAdmin
       .from("products")
-      .select("*")
+      .select("*, product_categories(id, slug, name, emoji)")
       .order("position", { ascending: true })
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
@@ -21,7 +33,7 @@ const itemSchema = z.object({
   name: z.string().trim().min(1).max(160),
   slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9_-]+$/, "Use apenas letras minúsculas, números, - ou _"),
   price_cents: z.number().int().min(0).max(10_000_000),
-  category: z.enum(CATEGORIES),
+  category_id: z.string().uuid(),
   emoji: z.string().trim().max(8).nullable().optional(),
   is_active: z.boolean().default(true),
   position: z.number().int().min(0).max(9999).default(0),
@@ -31,7 +43,12 @@ export const createPdvItem = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv_itens")])
   .inputValidator((d) => itemSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await supabaseAdmin.from("products").insert(data).select("id").single();
+    const legacy = await resolveLegacyEnum(data.category_id);
+    const { data: row, error } = await supabaseAdmin
+      .from("products")
+      .insert({ ...data, category: legacy })
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
@@ -50,7 +67,11 @@ export const updatePdvItem = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { id, ...patch } = data;
     const { data: old } = await supabaseAdmin.from("products").select("*").eq("id", id).maybeSingle();
-    const { error } = await supabaseAdmin.from("products").update(patch).eq("id", id);
+    const finalPatch: Record<string, unknown> = { ...patch };
+    if (patch.category_id) {
+      finalPatch.category = await resolveLegacyEnum(patch.category_id);
+    }
+    const { error } = await supabaseAdmin.from("products").update(finalPatch).eq("id", id);
     if (error) throw new Error(error.message);
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
