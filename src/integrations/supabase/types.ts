@@ -809,9 +809,43 @@ export type Database = {
           },
         ]
       }
+      product_categories: {
+        Row: {
+          created_at: string
+          emoji: string | null
+          id: string
+          is_active: boolean
+          name: string
+          position: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          position?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          position?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: Database["public"]["Enums"]["product_category"]
+          category_id: string
           created_at: string
           emoji: string | null
           id: string
@@ -824,6 +858,7 @@ export type Database = {
         }
         Insert: {
           category?: Database["public"]["Enums"]["product_category"]
+          category_id: string
           created_at?: string
           emoji?: string | null
           id?: string
@@ -836,6 +871,7 @@ export type Database = {
         }
         Update: {
           category?: Database["public"]["Enums"]["product_category"]
+          category_id?: string
           created_at?: string
           emoji?: string | null
           id?: string
@@ -846,7 +882,15 @@ export type Database = {
           slug?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
