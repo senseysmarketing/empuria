@@ -809,6 +809,116 @@ export type Database = {
           },
         ]
       }
+      pdv_sale_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_emoji_snapshot: string | null
+          product_id: string | null
+          product_name_snapshot: string
+          qty: number
+          sale_id: string
+          total_brl_cents: number
+          total_eur_cents: number
+          unit_price_brl_cents: number
+          unit_price_eur_cents: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_emoji_snapshot?: string | null
+          product_id?: string | null
+          product_name_snapshot: string
+          qty: number
+          sale_id: string
+          total_brl_cents?: number
+          total_eur_cents?: number
+          unit_price_brl_cents?: number
+          unit_price_eur_cents?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_emoji_snapshot?: string | null
+          product_id?: string | null
+          product_name_snapshot?: string
+          qty?: number
+          sale_id?: string
+          total_brl_cents?: number
+          total_eur_cents?: number
+          unit_price_brl_cents?: number
+          unit_price_eur_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdv_sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "pdv_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pdv_sales: {
+        Row: {
+          cashier_id: string
+          closed_at: string
+          created_at: string
+          customer_id: string
+          discount_brl_cents: number
+          discount_eur_cents: number
+          discount_type: string
+          discount_value: number
+          id: string
+          notes: string | null
+          payment_method: string
+          status: string
+          subtotal_brl_cents: number
+          subtotal_eur_cents: number
+          total_brl_cents: number
+          total_eur_cents: number
+          updated_at: string
+        }
+        Insert: {
+          cashier_id: string
+          closed_at?: string
+          created_at?: string
+          customer_id: string
+          discount_brl_cents?: number
+          discount_eur_cents?: number
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          notes?: string | null
+          payment_method: string
+          status?: string
+          subtotal_brl_cents?: number
+          subtotal_eur_cents?: number
+          total_brl_cents?: number
+          total_eur_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          cashier_id?: string
+          closed_at?: string
+          created_at?: string
+          customer_id?: string
+          discount_brl_cents?: number
+          discount_eur_cents?: number
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          status?: string
+          subtotal_brl_cents?: number
+          subtotal_eur_cents?: number
+          total_brl_cents?: number
+          total_eur_cents?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       product_categories: {
         Row: {
           created_at: string
@@ -842,6 +952,60 @@ export type Database = {
         }
         Relationships: []
       }
+      product_stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          new_stock: number
+          previous_stock: number
+          product_id: string
+          quantity: number
+          reason: string | null
+          sale_id: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          new_stock?: number
+          previous_stock?: number
+          product_id: string
+          quantity: number
+          reason?: string | null
+          sale_id?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          new_stock?: number
+          previous_stock?: number
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          sale_id?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_stock_movements_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "pdv_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category: Database["public"]["Enums"]["product_category"]
@@ -850,10 +1014,16 @@ export type Database = {
           emoji: string | null
           id: string
           is_active: boolean
+          item_type: string
           name: string
           position: number
+          price_brl_cents: number
           price_cents: number
+          price_eur_cents: number
           slug: string
+          stock_min_quantity: number
+          stock_quantity: number
+          track_stock: boolean
           updated_at: string
         }
         Insert: {
@@ -863,10 +1033,16 @@ export type Database = {
           emoji?: string | null
           id?: string
           is_active?: boolean
+          item_type?: string
           name: string
           position?: number
+          price_brl_cents?: number
           price_cents?: number
+          price_eur_cents?: number
           slug: string
+          stock_min_quantity?: number
+          stock_quantity?: number
+          track_stock?: boolean
           updated_at?: string
         }
         Update: {
@@ -876,10 +1052,16 @@ export type Database = {
           emoji?: string | null
           id?: string
           is_active?: boolean
+          item_type?: string
           name?: string
           position?: number
+          price_brl_cents?: number
           price_cents?: number
+          price_eur_cents?: number
           slug?: string
+          stock_min_quantity?: number
+          stock_quantity?: number
+          track_stock?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -1213,6 +1395,18 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      pdv_close_sale: {
+        Args: {
+          p_cashier_id: string
+          p_customer_id: string
+          p_discount_type: string
+          p_discount_value: number
+          p_items: Json
+          p_notes: string
+          p_payment_method: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       activity_type:
