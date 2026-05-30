@@ -235,7 +235,7 @@ function LeadDetailBody({ lead }: { lead: Lead }) {
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <SheetHeader className="sticky top-0 bg-admin-surface border-b border-admin-border p-6 z-10">
+      <DialogHeader className="sticky top-0 bg-admin-surface border-b border-admin-border p-6 z-10">
         <div className="flex items-start justify-between gap-3">
           <div>
             <SheetTitle className="font-display text-2xl">{lead.full_name}</SheetTitle>
