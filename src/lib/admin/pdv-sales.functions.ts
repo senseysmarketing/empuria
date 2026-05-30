@@ -106,8 +106,8 @@ export const getPdvSale = createServerFn({ method: "POST" })
       from: (t: string) => {
         select: (s: string) => {
           eq: (c: string, v: string) => {
-            single: () => Promise<{ data: unknown; error: { message: string } | null }>;
-            order: (c: string) => Promise<{ data: unknown[]; error: { message: string } | null }>;
+            single: () => Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+            order: (c: string) => Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
           };
         };
       };
@@ -118,4 +118,5 @@ export const getPdvSale = createServerFn({ method: "POST" })
     ]);
     if (saleRes.error) throw new Error(saleRes.error.message);
     return { sale: saleRes.data, items: itemsRes.data ?? [] };
+
   });
