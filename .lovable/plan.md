@@ -1,59 +1,115 @@
-# PDV Itens — Modal de edição e Gerenciar Categorias
+# Refatoração da tela /admin/pdv — PDV de Balcão
 
 ## Objetivo
-1. Trocar o `Sheet` lateral de criar/editar item por um **Modal (Dialog)**.
-2. Adicionar botão **"Gerenciar Categorias"** ao lado esquerdo de "Novo item", que abre um modal próprio com CRUD de categorias (criar, editar, excluir com confirmação e bloqueio se houver itens vinculados).
+Substituir o fluxo atual (passaporte/QR/comanda/tabs) por um PDV operacional de balcão: buscar/cadastrar cliente → carrinho → desconto → fechar venda (dinheiro/cartão) → baixa de estoque → auditoria → reset.
 
-## Mudanças
+---
 
-### 1. Banco de dados (migration)
-Hoje `products.category` é o enum `product_category` (`bebida`, `comida`, `barbearia`, `outro`) — não dá para criar/editar/excluir dinamicamente. Vamos migrar para tabela:
+## Fase 1 — Banco de dados (migração única)
 
-- Criar tabela `public.product_categories`:
-  - `id uuid pk`, `slug text unique`, `name text`, `emoji text null`, `position int default 0`, `is_active bool default true`, `created_at`, `updated_at`.
-  - GRANTs: `select` para `authenticated` (PDV/portal precisam ler), `all` para `service_role`. RLS: leitura para autenticados ativos OR staff; manage só staff.
-- Seed com as 4 categorias atuais preservando slugs (`bebida`, `comida`, `barbearia`, `outro`).
-- Adicionar `products.category_id uuid` (nullable inicialmente), backfill a partir do enum atual (`UPDATE products SET category_id = pc.id FROM product_categories pc WHERE pc.slug = products.category::text`), depois `NOT NULL` + FK `ON DELETE RESTRICT`.
-- Manter a coluna `category` (enum) por compatibilidade temporária com `pdv.functions.ts` e demais consumidores — apenas leitura. Novas escritas passam a usar `category_id` (e mantemos `category` sincronizada quando o slug corresponder a um valor do enum; caso o slug não exista no enum, salvamos `'outro'`).
-- Trigger `update_updated_at` em `product_categories`.
+### Nova tabela `pdv_sales`
+Campos: `id`, `customer_id` (uuid → profiles), `cashier_id` (uuid), `subtotal_eur_cents`, `subtotal_brl_cents`, `discount_type` ('none'|'amount'|'percent'), `discount_value` (numeric), `discount_eur_cents`, `discount_brl_cents`, `total_eur_cents`, `total_brl_cents`, `payment_method` ('dinheiro'|'cartao'), `status` ('concluida'|'cancelada'), `notes`, `closed_at`, `created_at`, `updated_at`.
 
-### 2. Server functions (`src/lib/admin/`)
-- **`categories.functions.ts`** (novo, `requireModule("pdv_itens")`):
-  - `listCategories()` → todas as categorias com `item_count` (subselect em `products`).
-  - `createCategory({ name, slug, emoji?, position? })` — Zod, slug `[a-z0-9_-]+` único.
-  - `updateCategory({ id, ... })`.
-  - `deleteCategory({ id })` — primeiro `count` de products; se >0 → `throw new Error("Existem N itens nesta categoria. Mova ou exclua os itens antes.")`. Audit log em todas as ações.
-- **`pdv-itens.functions.ts`**: trocar campo `category` por `category_id` no schema/zod; ao inserir/atualizar, buscar `slug` da categoria e popular também a coluna enum `category` (fallback `'outro'`) para não quebrar `pdv.functions.ts`.
-- **`listPdvItems`**: incluir join com nome/emoji da categoria (`select *, product_categories(id, slug, name, emoji)`).
+### Nova tabela `pdv_sale_items`
+Campos: `id`, `sale_id` (FK CASCADE), `product_id`, `product_name_snapshot`, `product_emoji_snapshot`, `qty`, `unit_price_eur_cents`, `unit_price_brl_cents`, `total_eur_cents`, `total_brl_cents`, `created_at`.
 
-### 3. Frontend
+### Nova tabela `product_stock_movements`
+Campos: `id`, `product_id`, `type` ('entrada'|'saida'|'ajuste'|'venda'|'cancelamento'), `quantity`, `previous_stock`, `new_stock`, `reason` (text), `sale_id` (nullable), `created_by`, `created_at`.
 
-`src/components/admin/configuracoes/PdvItensTab.tsx`:
-- Substituir `Sheet` por `Dialog` (`DialogContent` com `max-w-lg`, `max-h-[85vh] overflow-y-auto`).
-- Carregar categorias via novo hook/query `["pdv-categories"]`.
-- `Select` de categoria passa a usar lista dinâmica (label = `emoji + name`, value = `id`).
-- Novo botão **"Gerenciar Categorias"** (variant `outline`, ícone `Tags`) à esquerda de "Novo item" abrindo `<CategoriesManagerModal />`.
-- Tabela: exibir nome da categoria vindo do join (não mais capitalização do enum).
+### Ampliação de `products`
+Adicionar: `item_type` ('produto'|'servico', default 'produto'), `price_eur_cents` (int, backfill = `price_cents`), `price_brl_cents` (int, default 0), `stock_quantity` (int, default 0), `stock_min_quantity` (int, default 0), `track_stock` (bool, default false). Mantém `price_cents` por compatibilidade.
 
-`src/components/admin/configuracoes/CategoriesManagerModal.tsx` (novo):
-- `Dialog` com lista das categorias (emoji, nome, slug, contador `N itens`, switch ativo, editar, excluir).
-- Form inline / linha de criação no topo (nome, slug auto-gerado editável, emoji).
-- Editar abre form inline na linha.
-- Excluir → `AlertDialog` de confirmação. Se servidor retornar erro de itens vinculados, `toast.error` com a mensagem; modal mantém-se aberto.
-- Após qualquer mutação: `invalidateQueries(["pdv-categories", "pdv-itens"])`.
+### Segurança
+- GRANTs para `authenticated` + `service_role`.
+- RLS: `is_staff(auth.uid())` para SELECT/INSERT; UPDATE/DELETE restrito a admin (vendas só editadas por servidor via service role para garantir atomicidade).
+- Permissão de módulo: `pdv` (já existe via `has_module_access`).
 
-### 4. Impactos colaterais
-- `pdv.functions.ts` continua usando a coluna `category` (enum) — sem mudanças.
-- Como o enum não muda, qualquer **nova categoria criada pelo admin** será gravada com fallback `category='outro'` na coluna enum (mantém compatibilidade). O `category_id` é a fonte de verdade para UI; o enum existe só para os consumidores legados.
-- Documentar essa nuance em comentário no código.
+---
 
-### 5. Fora do escopo
-- Refatorar `pdv.functions.ts` para usar `category_id` (próximo passo).
-- Remover a coluna enum `category`.
-- Reordenação drag-and-drop de categorias (usaremos campo `position` editável manualmente).
+## Fase 2 — Server functions (`src/lib/admin/pdv.functions.ts` reescrito)
+
+Remover: `lookupPassport`, `registerCheckIn`, `openTab`, `getTab`, `addTabItem`, `removeTabItem`, `closeTabAsStaff`. (Manter arquivo legado renomeado `pdv-legacy.functions.ts` se algo do portal ainda usar — verificar; senão deletar.)
+
+Novas funções com `requireModule("pdv")`:
+- `searchCustomers({ query })` — busca em profiles por nome/telefone/email (ilike, limit 10).
+- `createCustomerQuick({ fullName, phone, email, password })` — usa `supabaseAdmin.auth.admin.createUser` → cria profile + role member; audit `cliente_criado_pdv`.
+- `listPdvCatalog()` — lista produtos ativos com `item_type`, preços EUR/BRL, estoque, categoria (join `product_categories`).
+- `closePdvSale({ customerId, items:[{productId, qty}], discount:{type,value}, paymentMethod, notes? })` — **atômico via RPC Postgres** `pdv_close_sale` (security definer). Valida cliente, valida estoque para itens com `track_stock=true`, calcula totais EUR/BRL com snapshots, insere `pdv_sales`+`pdv_sale_items`, decrementa `stock_quantity` e cria `product_stock_movements` (type='venda'), grava `audit_logs`. Retorna `{ saleId }`.
+- `getPdvSale({ saleId })` — recibo pós-venda.
+- `listRecentSales({ limit })` — opcional para dashboard caixa.
+
+### Server functions de estoque (`src/lib/admin/pdv-itens.functions.ts` expandido)
+- `registerStockEntry({ productId, quantity, reason })`
+- `registerStockExit({ productId, quantity, reason })`
+- `adjustStock({ productId, newQuantity, reason })`
+- `getProductStockHistory({ productId })`
+
+Cada uma grava em `product_stock_movements` e atualiza `products.stock_quantity` + audit log.
+
+---
+
+## Fase 3 — Frontend `/admin/pdv` (reescrita completa)
+
+Substitui `src/routes/_authenticated/admin.pdv.tsx`. Remove `PassportScannerDialog`. Não usa mais `?tab=` na URL — estado vive na tela.
+
+### Componentes (novos em `src/components/admin/pdv/`)
+- `CustomerSearchPanel.tsx` — input grande central, debounce 250ms, lista resultados (avatar + nome + telefone), botão "Cadastrar novo cliente" abre `QuickCustomerDialog`.
+- `QuickCustomerDialog.tsx` — modal com nome, telefone, email, senha (zod min 6); ao salvar seleciona o cliente.
+- `SaleCatalogGrid.tsx` — catálogo agrupado por categoria, cards com emoji/nome/preço EUR/BRL, badge de estoque baixo, botão `+` (desabilitado se sem estoque e `track_stock`).
+- `SaleCartPanel.tsx` — header com cliente selecionado, lista de itens (qty +/-, remover), seletor de desconto (valor/percentual), totais EUR e BRL, botões `[Dinheiro] [Cartão]`.
+- `SaleSuccessOverlay.tsx` — confete (lib `canvas-confetti`), resumo, botão "Nova venda", auto-reset 5s.
+
+### Estados da página
+1. `idle` → CustomerSearchPanel ocupa centro.
+2. `selling` → header com cliente + trocar; grid 8/4 catálogo + carrinho.
+3. `success` → overlay com confete.
+
+Hook `useModuleAccess().can('pdv')` controla acesso (rota já protegida por `_authenticated` + `requireModule` no backend).
+
+---
+
+## Fase 4 — Aba "PDV Itens" em `/admin/configuracoes`
+
+Atualizar `src/components/admin/configuracoes/PdvItensTab.tsx`:
+- Form do item ganha: toggle `item_type` (produto/serviço), `price_eur_cents`, `price_brl_cents`, toggle `track_stock`, `stock_min_quantity`. Campo `stock_quantity` é read-only (só muda via movimentações).
+- Nova coluna na tabela: estoque atual (badge vermelho se ≤ mínimo).
+- Novo botão por linha: "Movimentações" → abre `StockMovementsDialog` (histórico + ações: entrada, saída, ajuste).
+
+---
+
+## Fase 5 — Limpeza
+
+- Remover dependência de `?tab=` em links/atalhos para `/admin/pdv` (verificar `AdminDock`, `HeroTopBar`).
+- **Manter** `tabs` / `tab_items` no banco (portal pode usar). Não remover nesta entrega.
+- Remover do PDV: imports de `PassportScannerDialog`, `parsePassportQrPayload`.
+
+---
+
+## Detalhes técnicos relevantes
+
+### Atomicidade
+Implementar `pdv_close_sale` como **função Postgres SECURITY DEFINER** chamada pela server function. Toda a lógica (validação de estoque, inserts, decrementos, audit) roda em uma única transação — se qualquer step falhar, rollback automático. A server function apenas valida input (zod), chama RPC e grava audit log de alto nível.
+
+### Preço BRL
+Armazenado por item; soma simples no fechamento. Sem conversão de câmbio automática.
+
+### Auditoria
+`audit_logs` com `module='pdv'` e ações: `venda_fechada`, `cliente_criado_pdv`, `estoque_entrada`, `estoque_saida`, `estoque_ajuste`, `item_editado`, `preco_alterado`.
+
+### Fora de escopo
+- Cancelamento de venda (deixar tabela preparada com status, mas UI futura).
+- Impressão de recibo.
+- Câmbio EUR/BRL automático.
+- Remoção de `tabs`/`tab_items`.
+- Multi-caixa / abertura-fechamento de caixa.
+
+---
 
 ## Ordem de execução
-1. Migration (`product_categories` + `category_id` + backfill).
-2. `categories.functions.ts` + ajustes em `pdv-itens.functions.ts`.
-3. `CategoriesManagerModal.tsx`.
-4. Reescrever `PdvItensTab.tsx` (Sheet → Dialog, novo botão, select dinâmico).
+1. Migração SQL (tabelas + função `pdv_close_sale` + RLS + grants).
+2. Server functions PDV e estoque.
+3. `PdvItensTab` (form expandido + movimentações).
+4. Componentes `src/components/admin/pdv/*`.
+5. Reescrita de `admin.pdv.tsx`.
+6. Instalar `canvas-confetti`.
+7. Smoke test do fluxo completo.
