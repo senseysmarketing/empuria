@@ -1,0 +1,75 @@
+import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { createCustomerQuick } from "@/lib/admin/pdv-sales.functions";
+import type { PdvCustomer } from "./CustomerSearchPanel";
+
+export function QuickCustomerDialog({
+  open, onOpenChange, onCreated,
+}: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: (c: PdvCustomer) => void }) {
+  const create = useServerFn(createCustomerQuick);
+  const [form, setForm] = useState({ fullName: "", phone: "", email: "", password: "" });
+  const [saving, setSaving] = useState(false);
+
+  const reset = () => setForm({ fullName: "", phone: "", email: "", password: "" });
+
+  const save = async () => {
+    if (!form.fullName.trim() || !form.email.trim() || form.password.length < 6) {
+      toast.error("Preencha nome, e-mail e senha (mín. 6 caracteres)");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await create({ data: form });
+      toast.success("Cliente cadastrado");
+      reset();
+      onOpenChange(false);
+      onCreated({
+        id: res.id,
+        full_name: res.full_name,
+        phone: res.phone,
+        avatar_url: null,
+        is_club_member: false,
+        is_blocked: false,
+      });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md bg-admin-surface border-admin-border text-admin-ink">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl">Cadastrar cliente</DialogTitle>
+          <DialogDescription>Cadastro rápido para iniciar a venda.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <Label>Nome completo</Label>
+            <Input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="bg-admin-bg border-admin-border" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Telefone</Label>
+            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="bg-admin-bg border-admin-border" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>E-mail</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="bg-admin-bg border-admin-border" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Senha</Label>
+            <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="bg-admin-bg border-admin-border" placeholder="mínimo 6 caracteres" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={save} disabled={saving} className="bg-admin-accent text-white">Cadastrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

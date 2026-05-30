@@ -33,10 +33,15 @@ const itemSchema = z.object({
   name: z.string().trim().min(1).max(160),
   slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9_-]+$/, "Use apenas letras minúsculas, números, - ou _"),
   price_cents: z.number().int().min(0).max(10_000_000),
+  price_eur_cents: z.number().int().min(0).max(10_000_000).default(0),
+  price_brl_cents: z.number().int().min(0).max(10_000_000).default(0),
   category_id: z.string().uuid(),
   emoji: z.string().trim().max(8).nullable().optional(),
   is_active: z.boolean().default(true),
   position: z.number().int().min(0).max(9999).default(0),
+  item_type: z.enum(["produto", "servico"]).default("produto"),
+  track_stock: z.boolean().default(false),
+  stock_min_quantity: z.number().int().min(0).max(1_000_000).default(0),
 });
 
 export const createPdvItem = createServerFn({ method: "POST" })
