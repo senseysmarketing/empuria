@@ -98,16 +98,48 @@ export const closePdvSale = createServerFn({ method: "POST" })
     return { saleId: saleId as unknown as string };
   });
 
+export type PdvSaleRecord = {
+  id: string;
+  customer_id: string;
+  cashier_id: string;
+  subtotal_eur_cents: number;
+  subtotal_brl_cents: number;
+  discount_type: string;
+  discount_value: number;
+  discount_eur_cents: number;
+  discount_brl_cents: number;
+  total_eur_cents: number;
+  total_brl_cents: number;
+  payment_method: string;
+  status: string;
+  notes: string | null;
+  closed_at: string;
+};
+export type PdvSaleItemRecord = {
+  id: string;
+  sale_id: string;
+  product_id: string | null;
+  product_name_snapshot: string;
+  product_emoji_snapshot: string | null;
+  qty: number;
+  unit_price_eur_cents: number;
+  unit_price_brl_cents: number;
+  total_eur_cents: number;
+  total_brl_cents: number;
+};
+
 export const getPdvSale = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((d) => z.object({ saleId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
+    type SingleRes<T> = Promise<{ data: T | null; error: { message: string } | null }>;
+    type ListRes<T> = Promise<{ data: T[] | null; error: { message: string } | null }>;
     const admin = supabaseAdmin as unknown as {
       from: (t: string) => {
         select: (s: string) => {
           eq: (c: string, v: string) => {
-            single: () => Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
-            order: (c: string) => Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+            single: () => SingleRes<PdvSaleRecord>;
+            order: (c: string) => ListRes<PdvSaleItemRecord>;
           };
         };
       };
@@ -118,5 +150,4 @@ export const getPdvSale = createServerFn({ method: "POST" })
     ]);
     if (saleRes.error) throw new Error(saleRes.error.message);
     return { sale: saleRes.data, items: itemsRes.data ?? [] };
-
   });
