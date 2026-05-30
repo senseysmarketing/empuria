@@ -163,14 +163,11 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 
 function LeadDetail({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {
   return (
-    <Sheet open={!!lead} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-xl overflow-y-auto bg-admin-surface p-0"
-      >
+    <Dialog open={!!lead} onOpenChange={(o: boolean) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-admin-surface p-0">
         {lead && <LeadDetailBody lead={lead} />}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
