@@ -238,7 +238,7 @@ function LeadDetailBody({ lead }: { lead: Lead }) {
       <DialogHeader className="sticky top-0 bg-admin-surface border-b border-admin-border p-6 z-10">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <SheetTitle className="font-display text-2xl">{lead.full_name}</SheetTitle>
+            <DialogTitle className="font-display text-2xl">{lead.full_name}</DialogTitle>
             <p className="text-xs text-admin-ink-muted mt-1">
               Entrou em {new Date(lead.created_at).toLocaleString("pt-BR")}
             </p>
