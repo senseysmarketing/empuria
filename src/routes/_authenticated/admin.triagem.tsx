@@ -10,7 +10,7 @@ import {
   addLeadNote,
   logWhatsappOpened,
 } from "@/lib/admin/triagem.functions";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -163,14 +163,11 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 
 function LeadDetail({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {
   return (
-    <Sheet open={!!lead} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-xl overflow-y-auto bg-admin-surface p-0"
-      >
+    <Dialog open={!!lead} onOpenChange={(o: boolean) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-admin-surface p-0">
         {lead && <LeadDetailBody lead={lead} />}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -238,10 +235,10 @@ function LeadDetailBody({ lead }: { lead: Lead }) {
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <SheetHeader className="sticky top-0 bg-admin-surface border-b border-admin-border p-6 z-10">
+      <DialogHeader className="sticky top-0 bg-admin-surface border-b border-admin-border p-6 z-10">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <SheetTitle className="font-display text-2xl">{lead.full_name}</SheetTitle>
+            <DialogTitle className="font-display text-2xl">{lead.full_name}</DialogTitle>
             <p className="text-xs text-admin-ink-muted mt-1">
               Entrou em {new Date(lead.created_at).toLocaleString("pt-BR")}
             </p>
@@ -265,7 +262,7 @@ function LeadDetailBody({ lead }: { lead: Lead }) {
             </SelectContent>
           </Select>
         </div>
-      </SheetHeader>
+      </DialogHeader>
 
       <div className="p-6 space-y-5">
         {/* Bloco 1 — Dossier */}
