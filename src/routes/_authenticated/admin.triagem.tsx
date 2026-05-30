@@ -262,7 +262,7 @@ function LeadDetailBody({ lead }: { lead: Lead }) {
             </SelectContent>
           </Select>
         </div>
-      </SheetHeader>
+      </DialogHeader>
 
       <div className="p-6 space-y-5">
         {/* Bloco 1 — Dossier */}
