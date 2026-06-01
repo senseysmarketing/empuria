@@ -69,6 +69,19 @@ function EventsPage() {
   const { data } = useQuery({ queryKey: ["admin-events"], queryFn: () => fetchList() });
 
   const openNew = () => { setForm(emptyForm()); setOpen(true); };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") === "1") {
+      openNew();
+      // limpa o query param para evitar reabrir ao recarregar
+      const url = new URL(window.location.href);
+      url.searchParams.delete("new");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
   const openEdit = (eventId: string) => {
     const ev = data?.events.find((e) => e.id === eventId);
     const tiers = (data?.tiers ?? []).filter((t) => t.event_id === eventId).sort((a, b) => a.position - b.position);
