@@ -30,7 +30,6 @@ const CATEGORY_COLOR: Record<string, string> = {
 };
 
 function AgendaPage() {
-  const navigate = useNavigate();
   const fetchWeek = useServerFn(listWeekAppointments);
   const fetchServices = useServerFn(listServicesAdmin);
   const create = useServerFn(createSlot);
