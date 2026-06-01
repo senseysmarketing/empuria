@@ -15,7 +15,7 @@ import { SlotsPanel } from "@/components/admin/SlotsPanel";
 import { NewSlotDialog } from "@/components/admin/SlotsPanel";
 import { AppointmentDialog } from "@/components/admin/agenda/AppointmentDialog";
 import { TaskDialog } from "@/components/admin/agenda/TaskDialog";
-import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/admin/agenda")({
   component: AgendaPage,
