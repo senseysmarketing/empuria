@@ -64,7 +64,7 @@ function AgendaPage() {
   const handleCreate = (kind: "compromisso" | "tarefa" | "vaga" | "evento") => {
     if (kind === "compromisso") setShowAppointment(true);
     else if (kind === "vaga") setShowSlot(true);
-    else if (kind === "evento") navigate({ to: "/admin/eventos", search: { new: 1 } as never });
+    else if (kind === "evento") window.location.href = "/admin/eventos?new=1";
     else toast.info("Tarefas chegam em breve — depende da nova tabela calendar_tasks.");
   };
 
