@@ -22,7 +22,11 @@ export function PortalDock() {
       <div className="mx-auto max-w-md bg-brown-deep/95 backdrop-blur-xl border border-brown/40 rounded-2xl shadow-2xl">
         <ul className="flex items-center justify-between gap-0 px-2 py-2">
           <li className="flex items-center px-1.5">
-            <Link to="/portal" aria-label="Início" className="flex items-center transition-opacity hover:opacity-100 opacity-90">
+            <Link
+              to="/portal"
+              aria-label="Início"
+              className="flex items-center transition-opacity hover:opacity-100 opacity-90"
+            >
               <img src={logoIcone} alt="Empuria" className="h-6 w-6 object-contain" />
             </Link>
           </li>
@@ -53,13 +57,15 @@ export function PortalDock() {
             <button
               onClick={async () => {
                 await supabase.auth.signOut();
-                navigate({ to: "/login" });
+                navigate({ to: "/login", search: { redirect: undefined } });
               }}
               className="admin-dock-item flex items-center justify-center h-10 px-2.5 rounded-full text-offwhite/50 hover:text-red-brand hover:bg-brown/50 transition-colors"
               title="Sair"
             >
               <LogOut className="h-[18px] w-[18px]" />
-              <span className="dock-label text-[10px] font-display uppercase tracking-wide">Sair</span>
+              <span className="dock-label text-[10px] font-display uppercase tracking-wide">
+                Sair
+              </span>
             </button>
           </li>
         </ul>

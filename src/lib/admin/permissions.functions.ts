@@ -8,6 +8,7 @@ export const ALL_MODULES = [
   "pdv",
   "eventos",
   "esteira",
+  "crm",
   "triagem",
   "agenda",
   "usuarios",
@@ -25,6 +26,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   pdv: "PDV",
   eventos: "Eventos",
   esteira: "Esteira",
+  crm: "CRM",
   triagem: "Triagem",
   agenda: "Agenda",
   usuarios: "Usuários",
@@ -65,7 +67,10 @@ export const listStaffWithPermissions = createServerFn({ method: "GET" })
     const userIds = Array.from(new Set((roles ?? []).map((r) => r.user_id)));
     const [{ data: profiles }, { data: perms }] = await Promise.all([
       supabaseAdmin.from("profiles").select("id, full_name, avatar_url").in("id", userIds),
-      supabaseAdmin.from("staff_module_permissions").select("user_id, module_key, is_allowed").in("user_id", userIds),
+      supabaseAdmin
+        .from("staff_module_permissions")
+        .select("user_id, module_key, is_allowed")
+        .in("user_id", userIds),
     ]);
 
     const roleByUser = new Map<string, "admin" | "staff">();
@@ -93,11 +98,13 @@ export const listStaffWithPermissions = createServerFn({ method: "GET" })
 export const setStaffPermission = createServerFn({ method: "POST" })
   .middleware([requireAdmin()])
   .inputValidator((d) =>
-    z.object({
-      user_id: z.string().uuid(),
-      module_key: z.enum(ALL_MODULES),
-      is_allowed: z.boolean(),
-    }).parse(d),
+    z
+      .object({
+        user_id: z.string().uuid(),
+        module_key: z.enum(ALL_MODULES),
+        is_allowed: z.boolean(),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { error } = await supabaseAdmin
