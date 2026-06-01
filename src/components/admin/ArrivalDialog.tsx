@@ -39,9 +39,14 @@ export function ArrivalDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="bg-admin-accent hover:bg-admin-accent/90">
-          <DoorOpen className="h-4 w-4" /> Registrar chegada
-        </Button>
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 px-3 h-10 rounded-lg bg-brown-deep/60 hover:bg-brown-deep border border-orange-brand/30 hover:border-orange-brand/60 text-offwhite hover:text-orange-brand transition-colors font-display text-xs uppercase tracking-wider"
+          title="Registrar chegada"
+        >
+          <DoorOpen className="h-4 w-4" />
+          <span className="hidden md:inline">Registrar chegada</span>
+        </button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
