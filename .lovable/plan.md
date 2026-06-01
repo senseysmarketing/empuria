@@ -1,35 +1,17 @@
-## Objetivo
+## Ajustes de espaçamento e tamanho no HeroTopBar
 
-Deixar os botões "Escanear Passaporte" e "Registrar chegada" (no topo do `/admin`) com a mesma estética do botão "CONFIGURAÇÕES" do HeroTopBar — em vez do laranja sólido atual.
+### 1. `src/components/shared/HeroTopBar.tsx`
 
-## Estilo de referência (Configurações)
+- Unificar o gap entre actions e Configurações: trocar o `<div className="flex items-center gap-2">` (linha 105) para `gap-3`, e aumentar o gap principal da topbar de `gap-4` para `gap-5` (linha 80) — assim "VENDAS HOJE", botões de ação e Configurações ficam com respiro consistente.
+- Aumentar o bloco "VENDAS HOJE" (quickStat):
+  - Label: `text-[10px]` → `text-[11px]`.
+  - Valor: `text-2xl` → `text-3xl`.
+  - Padding/separação: `pl-4` → `pl-5`.
+- Aumentar levemente os botões padrão (Configurações, Escanear Passaporte, Registrar chegada) para casar com o novo tamanho do quickStat:
+  - Altura `h-10` → `h-11`, padding `px-3` → `px-4`, gap interno `gap-2` → `gap-2.5`, ícone `h-4 w-4` → `h-[18px] w-[18px]`.
 
-Definido em `src/components/shared/HeroTopBar.tsx`:
+### 2. `src/components/admin/ArrivalDialog.tsx` e `src/components/admin/PassportScannerDialog.tsx`
 
-```
-inline-flex items-center gap-2 px-3 h-10 rounded-lg
-bg-brown-deep/60 hover:bg-brown-deep
-border border-orange-brand/30 hover:border-orange-brand/60
-text-offwhite hover:text-orange-brand transition-colors
-font-display text-xs uppercase tracking-wider
-```
+- Aplicar exatamente a mesma atualização de classes do botão Configurações (`h-11 px-4 gap-2.5`) e ícone (`h-[18px] w-[18px]`), para que os três botões fiquem visualmente idênticos.
 
-Ícone: `h-4 w-4`, label em uppercase com tracking-wider.
-
-## Mudanças
-
-1. `src/components/admin/ArrivalDialog.tsx`
-   - Trocar o `<Button size="sm" className="bg-admin-accent ...">` do `DialogTrigger` por um `<button>` (ou `Button variant="ghost"` com `asChild`) usando exatamente a mesma classe do Configurações.
-   - Texto "REGISTRAR CHEGADA" em uppercase (via `uppercase` class, mantendo string original).
-   - Manter `DoorOpen` em `h-4 w-4`.
-
-2. `src/components/admin/PassportScannerDialog.tsx`
-   - Trocar o `<Button size="sm" className="bg-admin-accent ...">` que abre o dialog pelo mesmo estilo.
-   - Texto "ESCANEAR PASSAPORTE" em uppercase.
-   - Manter `Camera` em `h-4 w-4`.
-
-3. Sem alterações no botão Configurações nem em lógica/handlers/dialog content — só o gatilho visual.
-
-## Resultado esperado
-
-Os três botões no topo do `/admin` ficam visualmente idênticos: mesma altura (h-10), mesmo fundo escuro translúcido, mesma borda laranja sutil, mesma tipografia uppercase font-display, ícone 16px à esquerda.
+Nenhuma mudança de lógica — apenas classes Tailwind para padronizar espaçamento e tamanho.
