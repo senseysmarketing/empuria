@@ -268,6 +268,60 @@ export type Database = {
           },
         ]
       }
+      calendar_tasks: {
+        Row: {
+          appointment_id: string | null
+          assignee_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_at: string | null
+          event_id: string | null
+          id: string
+          lead_id: string | null
+          priority: Database["public"]["Enums"]["calendar_task_priority"]
+          status: Database["public"]["Enums"]["calendar_task_status"]
+          tags: string[]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          assignee_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_at?: string | null
+          event_id?: string | null
+          id?: string
+          lead_id?: string | null
+          priority?: Database["public"]["Enums"]["calendar_task_priority"]
+          status?: Database["public"]["Enums"]["calendar_task_status"]
+          tags?: string[]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          assignee_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_at?: string | null
+          event_id?: string | null
+          id?: string
+          lead_id?: string | null
+          priority?: Database["public"]["Enums"]["calendar_task_priority"]
+          status?: Database["public"]["Enums"]["calendar_task_status"]
+          tags?: string[]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       club_benefits: {
         Row: {
           category: Database["public"]["Enums"]["product_category"] | null
@@ -1425,6 +1479,12 @@ export type Database = {
       automation_channel: "whatsapp" | "email" | "painel"
       benefit_kind: "desconto_pct" | "desconto_fixo" | "cortesia"
       benefit_scope: "produto" | "categoria"
+      calendar_task_priority: "baixa" | "media" | "alta" | "urgente"
+      calendar_task_status:
+        | "pendente"
+        | "em_andamento"
+        | "concluida"
+        | "cancelada"
       event_sales_mode: "simples" | "categorias"
       event_ticket_status: "valido" | "usado" | "cancelado"
       lead_activity_kind:
@@ -1597,6 +1657,13 @@ export const Constants = {
       automation_channel: ["whatsapp", "email", "painel"],
       benefit_kind: ["desconto_pct", "desconto_fixo", "cortesia"],
       benefit_scope: ["produto", "categoria"],
+      calendar_task_priority: ["baixa", "media", "alta", "urgente"],
+      calendar_task_status: [
+        "pendente",
+        "em_andamento",
+        "concluida",
+        "cancelada",
+      ],
       event_sales_mode: ["simples", "categorias"],
       event_ticket_status: ["valido", "usado", "cancelado"],
       lead_activity_kind: [

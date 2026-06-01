@@ -14,7 +14,8 @@ import { ptBR } from "date-fns/locale";
 import { SlotsPanel } from "@/components/admin/SlotsPanel";
 import { NewSlotDialog } from "@/components/admin/SlotsPanel";
 import { AppointmentDialog } from "@/components/admin/agenda/AppointmentDialog";
-import { toast } from "sonner";
+import { TaskDialog } from "@/components/admin/agenda/TaskDialog";
+
 
 export const Route = createFileRoute("/_authenticated/admin/agenda")({
   component: AgendaPage,
@@ -37,6 +38,7 @@ function AgendaPage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [showAppointment, setShowAppointment] = useState(false);
   const [showSlot, setShowSlot] = useState(false);
+  const [showTask, setShowTask] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["agenda", weekStart.toISOString()],
@@ -64,8 +66,8 @@ function AgendaPage() {
   const handleCreate = (kind: "compromisso" | "tarefa" | "vaga" | "evento") => {
     if (kind === "compromisso") setShowAppointment(true);
     else if (kind === "vaga") setShowSlot(true);
+    else if (kind === "tarefa") setShowTask(true);
     else if (kind === "evento") window.location.href = "/admin/eventos?new=1";
-    else toast.info("Tarefas chegam em breve — depende da nova tabela calendar_tasks.");
   };
 
   return (
@@ -117,7 +119,6 @@ function AgendaPage() {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleCreate("tarefa")}>
                 <CheckSquare className="h-4 w-4 mr-2" /> Tarefa
-                <span className="ml-auto text-[10px] uppercase text-admin-ink-muted">Em breve</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleCreate("vaga")}>
                 <Ticket className="h-4 w-4 mr-2" /> Vaga
@@ -202,6 +203,7 @@ function AgendaPage() {
       {isLoading && <p className="text-sm text-admin-ink-muted">Carregando...</p>}
 
       <AppointmentDialog open={showAppointment} onOpenChange={setShowAppointment} />
+      <TaskDialog open={showTask} onOpenChange={setShowTask} />
       <NewSlotDialog
         services={slotServices}
         onCreated={() => refetch()}
