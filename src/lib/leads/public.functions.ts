@@ -19,8 +19,11 @@ export const submitConsultoriaLead = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const score = scoreLead(data.timeline, data.budget_range);
     const firstName = data.full_name.split(/\s+/)[0];
+    // CRM columns are added by the companion migration; generated Supabase types lag until regeneration.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabaseAdmin as any;
 
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await db
       .from("leads")
       .insert({
         full_name: data.full_name,
@@ -31,8 +34,12 @@ export const submitConsultoriaLead = createServerFn({ method: "POST" })
         timeline: TIMELINE_LABEL[data.timeline] ?? data.timeline,
         budget_range: BUDGET_LABEL[data.budget_range] ?? data.budget_range,
         message: data.message || null,
+        first_message: data.message || null,
         pipeline_stage: "novo",
         status: "novo",
+        source: "site",
+        source_detail: "consultoria_public_form",
+        last_interaction_at: new Date().toISOString(),
         qualification_score: score,
         qualification_answers: {
           current_country: data.current_country,

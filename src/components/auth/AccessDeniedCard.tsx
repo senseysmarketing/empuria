@@ -13,7 +13,7 @@ export function AccessDeniedCard({ variant }: Props) {
 
   const logout = async () => {
     await supabase.auth.signOut();
-    navigate({ to: "/login" });
+    navigate({ to: "/login", search: { redirect: undefined } });
   };
 
   const isAdminRequired = variant === "admin-required";
@@ -38,7 +38,11 @@ export function AccessDeniedCard({ variant }: Props) {
   return (
     <div className="min-h-screen bg-brown bg-topo flex items-center justify-center px-6 py-20">
       <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center justify-center mb-8" aria-label="Instituto Empuria">
+        <Link
+          to="/"
+          className="flex items-center justify-center mb-8"
+          aria-label="Instituto Empuria"
+        >
           <img src={logoCompleta} alt="Instituto Empuria" className="h-12 w-auto object-contain" />
         </Link>
 
