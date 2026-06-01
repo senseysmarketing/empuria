@@ -43,13 +43,15 @@ export function PassportScannerDialog() {
 
   return (
     <>
-      <Button
-        size="sm"
+      <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="bg-admin-accent hover:bg-admin-accent/90"
+        className="inline-flex items-center gap-2 px-3 h-10 rounded-lg bg-brown-deep/60 hover:bg-brown-deep border border-orange-brand/30 hover:border-orange-brand/60 text-offwhite hover:text-orange-brand transition-colors font-display text-xs uppercase tracking-wider"
+        title="Escanear Passaporte"
       >
-        <Camera className="h-4 w-4" /> Escanear Passaporte
-      </Button>
+        <Camera className="h-4 w-4" />
+        <span className="hidden md:inline">Escanear Passaporte</span>
+      </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-admin-surface border-admin-border text-admin-ink max-w-md">
