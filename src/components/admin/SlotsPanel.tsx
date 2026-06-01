@@ -35,19 +35,30 @@ export function SlotsPanel() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin-slots"] });
   const slotServices = services.filter((s) => s.requires_slot);
 
+  const now = Date.now();
+  const computeStatus = (s: { is_active: boolean; ends_at: string; booked: number; capacity: number }) => {
+    if (!s.is_active) return { label: "Inativa", cls: "bg-slate-200 text-slate-600", dim: true };
+    if (new Date(s.ends_at).getTime() < now) return { label: "Encerrada", cls: "bg-zinc-200 text-zinc-700", dim: true };
+    if (s.booked >= s.capacity) return { label: "Lotada", cls: "bg-amber-100 text-amber-900", dim: false };
+    return { label: "Aberta", cls: "bg-emerald-100 text-emerald-900", dim: false };
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap justify-end gap-2">
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-56 bg-admin-surface"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os serviços</SelectItem>
-            {slotServices.map((s) => (
-              <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <NewSlotDialog services={slotServices} onCreated={refresh} create={create} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-xl text-admin-ink">Vagas & Slots</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-56 bg-admin-surface"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os serviços</SelectItem>
+              {slotServices.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <NewSlotDialog services={slotServices} onCreated={refresh} create={create} />
+        </div>
       </div>
 
       <BentoCard padded={false}>
@@ -67,27 +78,35 @@ export function SlotsPanel() {
                 </tr>
               </thead>
               <tbody>
-                {slots.map((s) => (
-                  <tr key={s.id} className="border-t border-admin-border">
-                    <td className="px-4 py-3">{(s as { services?: { title?: string } }).services?.title ?? "—"}</td>
-                    <td className="px-4 py-3 text-admin-ink-soft">{new Date(s.starts_at).toLocaleString("pt-BR")}</td>
-                    <td className="px-4 py-3 text-admin-ink-soft">{new Date(s.ends_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{s.booked} / {s.capacity}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs uppercase tracking-wider font-display px-2 py-1 rounded ${s.is_active ? "bg-emerald-100 text-emerald-900" : "bg-slate-200 text-slate-600"}`}>
-                        {s.is_active ? "Ativa" : "Inativa"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button size="sm" variant="ghost" onClick={async () => { await toggle({ data: { id: s.id, is_active: !s.is_active } }); refresh(); }}>
-                        <Power className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={async () => { if (confirm("Excluir esta vaga?")) { await remove({ data: { id: s.id } }); refresh(); } }}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {slots.map((s) => {
+                  const st = computeStatus(s);
+                  return (
+                    <tr key={s.id} className={`border-t border-admin-border ${st.dim ? "opacity-60" : ""}`}>
+                      <td className="px-4 py-3">{(s as { services?: { title?: string } }).services?.title ?? "—"}</td>
+                      <td className="px-4 py-3 text-admin-ink-soft">{new Date(s.starts_at).toLocaleString("pt-BR")}</td>
+                      <td className="px-4 py-3 text-admin-ink-soft">{new Date(s.ends_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{s.booked} / {s.capacity}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs uppercase tracking-wider font-display px-2 py-1 rounded ${st.cls}`}>
+                          {st.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="ghost" onClick={async () => { await toggle({ data: { id: s.id, is_active: !s.is_active } }); refresh(); }}>
+                          <Power className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          const msg = s.booked > 0
+                            ? `Esta vaga possui ${s.booked} reserva(s). Excluir mesmo assim?`
+                            : "Excluir esta vaga?";
+                          if (confirm(msg)) { await remove({ data: { id: s.id } }); refresh(); }
+                        }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

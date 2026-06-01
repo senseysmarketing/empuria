@@ -47,6 +47,22 @@ export const listEventsAdmin = createServerFn({ method: "GET" })
     return { events: events ?? [], tiers: tiers ?? [] };
   });
 
+export const listWeekEvents = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) => z.object({ weekStart: z.string() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const start = new Date(data.weekStart);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+    const { data: events } = await context.supabase
+      .from("events")
+      .select("id,slug,title,starts_at,ends_at,is_published,cover_url")
+      .gte("starts_at", start.toISOString())
+      .lt("starts_at", end.toISOString())
+      .order("starts_at", { ascending: true });
+    return events ?? [];
+  });
+
 export const getEventAdmin = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))

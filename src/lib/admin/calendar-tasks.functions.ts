@@ -27,6 +27,24 @@ export const listCalendarTasks = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+export const listWeekCalendarTasks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ weekStart: z.string() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const start = new Date(data.weekStart);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+    const { supabase } = context;
+    const { data: rows, error } = await supabase
+      .from("calendar_tasks")
+      .select("*")
+      .gte("due_at", start.toISOString())
+      .lt("due_at", end.toISOString())
+      .order("due_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
 export const createCalendarTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => CreateInput.parse(input))
