@@ -1,89 +1,65 @@
-# Evolução da tela /admin/agenda
+## Objetivo
+Aplicar correções pedidas e fechar as lacunas restantes do escopo PDF na tela `/admin/agenda`.
 
-Transformar a /admin/agenda em uma central única (sem abas) inspirada no Google Agenda, com criação unificada de Compromissos, Tarefas, Vagas e Eventos, validações fortes contra datas passadas, e um ponto visual para futura integração com Google Agenda.
+## 1. Cabeçalho da seção Vagas & Slots
+`src/components/admin/SlotsPanel.tsx`
+- Colocar o título "Vagas & Slots" na **mesma linha** que o `Select` de filtro e o botão "Nova vaga" (`flex items-center justify-between`).
+- Remover o `<h2>` solto que hoje fica em `admin.agenda.tsx` (passa a viver dentro do painel).
 
-A implementação será incremental, em fases, priorizando primeiro as validações críticas (vagas retroativas / vencidas) e depois a unificação visual.
+## 2. Vagas aparecerem no calendário (faltava)
+`src/routes/_authenticated/admin.agenda.tsx`
+- Buscar `availability_slots` da semana via `listSlots` (já existe) e mesclar na grade horária junto com `appointments`.
+- Renderizar slots com estilo distinto (borda pontilhada / contorno) conforme PDF §14, mostrando "Vaga · serviço · X/Y".
+- Cor por categoria do serviço quando disponível.
 
----
-
-## 1. Estrutura da nova tela
-
-Remove as abas atuais (`Calendário` / `Vagas & Slots`) e adota um único layout:
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ Agenda Empuria                                               │
-│ [Hoje] [<] 01 jun – 07 jun [>]   [Dia|Semana|Mês]            │
-│                       [Conectar Google Agenda — Em breve]    │
-│                       [+ Criar ▾]                            │
-├──────────────────────────────────────────────────────────────┤
-│ Resumo: Hoje · Agora · Próximos · Vagas abertas · Pendências │
-│ Filtros: Todos · Compromissos · Tarefas · Vagas · Eventos ·  │
-│          Consultoria · Tour · Clube · Burocracia             │
-├────────────────────────────────────┬─────────────────────────┤
-│ Calendário unificado (semana       │ Lateral:                │
-│ inicialmente — Dia/Mês como        │  · Hoje                 │
-│ evolução)                          │  · Próximos             │
-│ Compromissos + Tarefas + Vagas     │  · Já ocorreu           │
-│ + Eventos, cores por categoria     │  · Alertas              │
-└────────────────────────────────────┴─────────────────────────┘
+## 3. Status calculado (Aberta / Lotada / Encerrada / Inativa) — PDF §17
+`src/components/admin/SlotsPanel.tsx` (badge da tabela) e cards do calendário:
 ```
+is_active === false  -> Inativa
+ends_at < now        -> Encerrada
+booked >= capacity   -> Lotada
+caso contrário       -> Aberta
+```
+Aplicar opacidade reduzida em Encerrada/Inativa.
 
-Cores mantidas: Consultoria azul, Tour verde, Burocracia âmbar, Clube roxo, Tarefa cinza neutro, Vaga com contorno pontilhado, Evento com cor de destaque, cancelados/encerrados com opacidade reduzida.
+`src/lib/checkout/checkout.functions.ts` já bloqueia compra vencida ✓.
+`src/lib/portal/services.functions.ts` / lista pública de slots: garantir filtro `ends_at > now()` e `is_active = true` na consulta para o portal não oferecer slot vencido.
 
-## 2. Botão + Criar
+## 4. Eventos no calendário (faltava) — PDF §5, §14
+- Buscar eventos da semana (`events` via nova função `listWeekEvents` em `events.functions.ts`) e renderizar na grade com cor própria.
+- Edição/criação continua usando o modal de `/admin/eventos` (já redireciona).
 
-Um único `DropdownMenu` no topo abre quatro opções, cada uma abrindo um modal específico (sem trocar de rota):
+## 5. Tarefas no calendário (faltava parcial)
+- Buscar `calendar_tasks` da semana via nova `listWeekCalendarTasks` em `calendar-tasks.functions.ts`.
+- Renderizar com cinza/neutro; tarefa com `due_at < now` e status `pendente` recebe destaque "Atrasada".
+- Botão de concluir/cancelar em tooltip/clique.
 
-- **Compromisso** → modal novo (serviço, cliente, data/hora início e fim, notas) gravando em `appointments`.
-- **Tarefa** → modal novo (título, descrição, vencimento, responsável, prioridade) gravando em nova tabela `calendar_tasks`.
-- **Vaga** → reaproveita o `NewSlotDialog` atual do `SlotsPanel`, com validações reforçadas.
-- **Evento** → reaproveita o **mesmo modal de criação/edição** já existente em `/admin/eventos`, extraindo-o para um componente compartilhado.
+## 6. Resumo correto — PDF §6
+Corrigir a barra de tiles:
+- Hoje · Agora · Próximos · **Vagas abertas (computado de slots, não de appointments)** · **Tarefas pendentes**.
 
-## 3. Validações críticas (prioridade máxima)
+## 7. Filtros (faltava) — PDF §7
+Adicionar barra de chips: Todos / Compromissos / Tarefas / Vagas / Eventos / Consultoria / Tour / Clube / Burocracia, controlando a renderização do calendário.
 
-Aplicar tanto no client quanto no server (`createServerFn` em `slots.functions.ts` e `agenda.functions.ts`):
+## 8. Lateral (faltava) — PDF §6/§14
+Adicionar coluna lateral à direita com:
+- Hoje · Próximos · Já ocorreu · Alertas (vagas vencidas ainda ativas, tarefas atrasadas).
+Layout: `grid lg:grid-cols-[1fr_320px]` no bloco do calendário.
 
-- Vaga: `starts_at >= now()` e `ends_at > starts_at`.
-- Compromisso: mesma regra de data/hora não retroativa + checar sobreposição (já existe `appointments_no_overlap`).
-- Vagas vencidas (`ends_at < now()`) nunca aparecem como disponíveis para compra/agendamento no portal.
-- Vagas lotadas (`booked >= capacity`) idem.
-- Status calculado (fase 1, sem migração): `Inativa | Encerrada | Lotada | Aberta`.
+## 9. Views Dia / Semana / Mês — PDF §7
+Adicionar `ToggleGroup` visual (Dia/Semana/Mês). Implementar **Semana** (atual) e **Dia** (mesma grade filtrada a 1 coluna). **Mês** entra como visual desabilitado "Em breve" para evolução incremental (PDF permite).
 
-Atualizar `listSlots` e queries públicas usadas pelo portal (`SlotPicker`) para filtrar `starts_at > now()` e `is_active = true` antes de retornar.
+## 10. Checklist do PDF não coberto antes — confirmação
+- [x] Validações de data passada em slots/appointments (já feito anteriormente)
+- [x] Checkout bloqueia slot vencido (já feito)
+- [ ] Portal não listar slots vencidos → ajuste na query pública
+- [ ] Logs/auditoria ao cancelar vaga com reservas → fora desta fase, manter `confirm()` com aviso mais explícito quando `booked > 0`
 
-## 4. Tarefas internas — nova tabela
+## Arquivos a alterar/criar
+- `src/components/admin/SlotsPanel.tsx` (header inline, status calculado)
+- `src/routes/_authenticated/admin.agenda.tsx` (filtros, lateral, tiles, views, merge slots+events+tasks)
+- `src/lib/admin/events.functions.ts` (+ `listWeekEvents`)
+- `src/lib/admin/calendar-tasks.functions.ts` (+ `listWeekCalendarTasks`)
+- `src/lib/portal/services.functions.ts` ou equivalente (filtro `ends_at > now()` e ativo)
 
-Migração para `calendar_tasks` (status, prioridade, vencimento, responsável, criador). Apenas staff pode ler/escrever (RLS via `is_staff`). A migração será apresentada para aprovação antes da implementação.
-
-## 5. Botão Google Agenda — Em breve
-
-Botão estilizado igual aos demais do topo, desabilitado (`cursor-not-allowed`), com tooltip "Integração em breve". Nenhum código de OAuth/sync nesta fase.
-
-## 6. Reaproveitamento do modal de Evento
-
-Extrair o modal/form atual de `/admin/eventos` para `src/components/admin/eventos/EventFormDialog.tsx` controlado por props (`open`, `onOpenChange`, `eventId?`). A página `/admin/eventos` e o `+ Criar → Evento` da agenda passam a usar o mesmo componente, invalidando as queries `["admin-events"]` e `["agenda", ...]` após salvar para refletir nas duas telas.
-
-## 7. Fases de implementação
-
-1. **Fase 1 — Validações críticas** (server + portal): bloquear vaga retroativa, ocultar vagas vencidas/lotadas.
-2. **Fase 2 — Nova UI da agenda**: remover abas, adicionar topo unificado, cards de resumo, filtros, botão Google Agenda (visual) e botão `+ Criar` com as 4 opções.
-3. **Fase 3 — Modais Compromisso e Vaga** integrados ao `+ Criar`.
-4. **Fase 4 — Tarefas**: migração `calendar_tasks` + modal + exibição no calendário/lateral/resumo.
-5. **Fase 5 — Eventos integrados**: extrair `EventFormDialog`, usar na agenda, garantir sincronização de queries.
-6. **Fase 6 — Documentar** pontos da futura integração Google Agenda (sem código).
-
-## Detalhes técnicos
-
-- Arquivos principais alterados: `src/routes/_authenticated/admin.agenda.tsx`, `src/components/admin/SlotsPanel.tsx`, `src/lib/admin/slots.functions.ts`, `src/lib/admin/agenda.functions.ts`, `src/routes/_authenticated/admin.eventos.tsx`, `src/lib/checkout/checkout.functions.ts` / `src/components/checkout/SlotPicker.tsx` (filtro de vagas vencidas).
-- Novos arquivos: `src/components/admin/agenda/CreateMenu.tsx`, `AppointmentDialog.tsx`, `TaskDialog.tsx`, `AgendaSidebar.tsx`, `AgendaSummary.tsx`, `AgendaFilters.tsx`, `src/components/admin/eventos/EventFormDialog.tsx`, `src/lib/admin/tasks.functions.ts`.
-- Migração Supabase: tabela `calendar_tasks` com RLS `is_staff`, grants para `authenticated` e `service_role`, trigger `update_updated_at_column`.
-- Rota antiga `/admin/agenda?tab=slots` continua redirecionando (compat) para `/admin/agenda`.
-
-## Fora de escopo
-
-- Integração real com Google Agenda (OAuth, sync, conflitos).
-- CRM / follow-ups.
-- Migração de `status` persistido em `availability_slots` (fica para fase futura).
-
-Confirmando este plano, começo pela Fase 1 (validações) e a migração `calendar_tasks` para aprovação.
+Sem migrações de banco nesta etapa.
