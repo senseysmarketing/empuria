@@ -77,7 +77,7 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
         <SpainWatermark className="w-full h-full" />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-6 py-6 flex flex-wrap items-center gap-4">
+      <div className="relative max-w-7xl mx-auto px-6 py-6 flex flex-wrap items-center gap-5">
         <div className={`h-14 w-14 rounded-2xl ring-1 flex items-center justify-center shrink-0 ${logoRing}`}>
           <img src={logoIcone} alt="Empuria" className="h-9 w-9 object-contain" />
         </div>
@@ -92,29 +92,30 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
         </div>
 
         {quickStat && (
-          <div className={`hidden md:block text-right border-l border-offwhite/15 pl-4`}>
-            <div className={`text-[10px] uppercase tracking-widest ${textMuted} font-display`}>
+          <div className={`hidden md:block text-right border-l border-offwhite/15 pl-5`}>
+            <div className={`text-[11px] uppercase tracking-widest ${textMuted} font-display`}>
               {quickStat.label}
             </div>
-            <div className={`font-display font-bold text-2xl tabular-nums ${accent}`}>
+            <div className={`font-display font-bold text-3xl tabular-nums ${accent}`}>
               {quickStat.value}
             </div>
           </div>
         )}
 
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        {actions && <div className="flex items-center gap-3">{actions}</div>}
 
         {isAdmin && can("configuracoes") && (
           <Link
             to="/admin/configuracoes"
             search={{ tab: "perfil" }}
-            className="inline-flex items-center gap-2 px-3 h-10 rounded-lg bg-brown-deep/60 hover:bg-brown-deep border border-orange-brand/30 hover:border-orange-brand/60 text-offwhite hover:text-orange-brand transition-colors font-display text-xs uppercase tracking-wider"
+            className="inline-flex items-center gap-2.5 px-4 h-11 rounded-lg bg-brown-deep/60 hover:bg-brown-deep border border-orange-brand/30 hover:border-orange-brand/60 text-offwhite hover:text-orange-brand transition-colors font-display text-xs uppercase tracking-wider"
             title="Configurações"
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-[18px] w-[18px]" />
             <span className="hidden md:inline">Configurações</span>
           </Link>
         )}
+
       </div>
       {variant === "portal" && impersonation && (
         <div className="relative bg-brown-deep text-offwhite border-t border-offwhite/10">
