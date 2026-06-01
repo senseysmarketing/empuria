@@ -92,6 +92,7 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
         .eq("id", data.serviceData.slotId)
         .single();
       if (!slot || !slot.is_active) throw new Error("Vaga indisponível");
+      if (new Date(slot.ends_at).getTime() <= Date.now()) throw new Error("Vaga já encerrada");
       if (slot.booked >= slot.capacity) throw new Error("Vaga lotada");
       const { error: updErr } = await supabaseAdmin
         .from("availability_slots")

@@ -97,16 +97,28 @@ export function SlotsPanel() {
   );
 }
 
-function NewSlotDialog({
+export function NewSlotDialog({
   services,
   onCreated,
   create,
+  open: controlledOpen,
+  onOpenChange,
+  trigger,
 }: {
   services: { id: string; title: string }[];
   onCreated: () => void;
   create: ReturnType<typeof useServerFn<typeof createSlot>>;
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  trigger?: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (v: boolean) => {
+    if (!isControlled) setInternalOpen(v);
+    onOpenChange?.(v);
+  };
   const [form, setForm] = useState({ service_id: "", date: "", start: "10:00", end: "12:00", capacity: 4 });
 
   const submit = async () => {
@@ -114,6 +126,8 @@ function NewSlotDialog({
       if (!form.service_id || !form.date) throw new Error("Preencha serviço e data");
       const starts_at = new Date(`${form.date}T${form.start}:00`).toISOString();
       const ends_at = new Date(`${form.date}T${form.end}:00`).toISOString();
+      if (new Date(starts_at).getTime() <= Date.now()) throw new Error("Não é possível criar vaga em data/hora passada");
+      if (new Date(ends_at).getTime() <= new Date(starts_at).getTime()) throw new Error("O fim deve ser maior que o início");
       await create({ data: { service_id: form.service_id, starts_at, ends_at, capacity: form.capacity } });
       toast.success("Vaga criada");
       setOpen(false);
@@ -123,11 +137,17 @@ function NewSlotDialog({
     }
   };
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-admin-accent hover:bg-admin-accent/90"><Plus className="h-4 w-4" /> Nova vaga</Button>
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button className="bg-admin-accent hover:bg-admin-accent/90"><Plus className="h-4 w-4" /> Nova vaga</Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader><DialogTitle>Nova vaga</DialogTitle></DialogHeader>
         <div className="space-y-3">
@@ -142,7 +162,7 @@ function NewSlotDialog({
               </SelectContent>
             </Select>
           </div>
-          <div><Label>Data</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
+          <div><Label>Data</Label><Input type="date" min={todayIso} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Início</Label><Input type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></div>
             <div><Label>Fim</Label><Input type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></div>

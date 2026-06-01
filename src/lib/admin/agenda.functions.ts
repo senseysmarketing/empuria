@@ -33,6 +33,17 @@ export const createAppointment = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const start = new Date(data.starts_at);
+    const end = new Date(data.ends_at);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new Error("Datas inválidas");
+    }
+    if (start.getTime() <= Date.now()) {
+      throw new Error("Não é possível criar compromisso em data/hora passada");
+    }
+    if (end.getTime() <= start.getTime()) {
+      throw new Error("O horário de fim deve ser maior que o de início");
+    }
     const { error } = await context.supabase.from("appointments").insert({
       service_id: data.service_id,
       user_id: data.user_id,

@@ -1,24 +1,22 @@
 import { useState, useMemo } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
-import { z } from "zod";
 import { listWeekAppointments } from "@/lib/admin/agenda.functions";
+import { listServicesAdmin, createSlot } from "@/lib/admin/slots.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { startOfWeek, addDays, addWeeks, format, isSameDay } from "date-fns";
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, CheckSquare, Ticket, PartyPopper, Link2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { startOfWeek, addDays, addWeeks, format, isSameDay, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { SlotsPanel } from "@/components/admin/SlotsPanel";
-
-const searchSchema = z.object({
-  tab: fallback(z.enum(["calendario", "slots"]), "calendario").default("calendario"),
-});
+import { NewSlotDialog } from "@/components/admin/SlotsPanel";
+import { AppointmentDialog } from "@/components/admin/agenda/AppointmentDialog";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/agenda")({
-  validateSearch: zodValidator(searchSchema),
   component: AgendaPage,
 });
 
@@ -32,56 +30,115 @@ const CATEGORY_COLOR: Record<string, string> = {
 };
 
 function AgendaPage() {
-  const { tab } = Route.useSearch();
-  const navigate = useNavigate({ from: Route.fullPath });
-
-  return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-4xl font-bold tracking-tight">Agenda</h1>
-        <p className="text-admin-ink-muted text-sm mt-1">Compromissos, vagas para Tours e Reuniões Presenciais. Bloqueio automático contra sobreposição.</p>
-      </header>
-
-      <Tabs value={tab} onValueChange={(v) => navigate({ search: { tab: v as "calendario" | "slots" } })}>
-        <TabsList>
-          <TabsTrigger value="calendario">Calendário</TabsTrigger>
-          <TabsTrigger value="slots">Vagas & Slots</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="calendario" className="mt-4">
-          <CalendarView />
-        </TabsContent>
-
-        <TabsContent value="slots" className="mt-4">
-          <SlotsPanel />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-function CalendarView() {
   const fetchWeek = useServerFn(listWeekAppointments);
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const fetchServices = useServerFn(listServicesAdmin);
+  const create = useServerFn(createSlot);
 
-  const { data, isLoading } = useQuery({
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [showAppointment, setShowAppointment] = useState(false);
+  const [showSlot, setShowSlot] = useState(false);
+
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["agenda", weekStart.toISOString()],
     queryFn: () => fetchWeek({ data: { weekStart: weekStart.toISOString() } }),
   });
 
+  const { data: services = [] } = useQuery({
+    queryKey: ["admin-services"],
+    queryFn: () => fetchServices(),
+  });
+
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const slotServices = services.filter((s) => s.requires_slot);
+
+  // Resumo do dia
+  const todayAppts = (data?.appointments ?? []).filter((a) => isToday(new Date(a.starts_at)));
+  const now = Date.now();
+  const happeningNow = todayAppts.filter((a) => {
+    const s = new Date(a.starts_at).getTime();
+    const e = new Date(a.ends_at).getTime();
+    return s <= now && e >= now;
+  });
+  const upcoming = (data?.appointments ?? []).filter((a) => new Date(a.starts_at).getTime() > now);
+
+  const handleCreate = (kind: "compromisso" | "tarefa" | "vaga" | "evento") => {
+    if (kind === "compromisso") setShowAppointment(true);
+    else if (kind === "vaga") setShowSlot(true);
+    else if (kind === "evento") window.location.href = "/admin/eventos?new=1";
+    else toast.info("Tarefas chegam em breve — depende da nova tabela calendar_tasks.");
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => setWeekStart(addWeeks(weekStart, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-        <span className="text-sm font-display tabular-nums px-3">
-          {format(weekStart, "dd MMM", { locale: ptBR })} – {format(addDays(weekStart, 6), "dd MMM yyyy", { locale: ptBR })}
-        </span>
-        <Button variant="outline" size="sm" onClick={() => setWeekStart(addWeeks(weekStart, 1))}><ChevronRight className="h-4 w-4" /></Button>
-        <Button variant="ghost" size="sm" onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Hoje</Button>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-4xl font-bold tracking-tight">Agenda Empuria</h1>
+          <p className="text-admin-ink-muted text-sm mt-1">
+            Central de compromissos, tarefas, vagas e eventos do Instituto.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Hoje</Button>
+          <Button variant="outline" size="sm" onClick={() => setWeekStart(addWeeks(weekStart, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+          <span className="text-sm font-display tabular-nums px-2">
+            {format(weekStart, "dd MMM", { locale: ptBR })} – {format(addDays(weekStart, 6), "dd MMM yyyy", { locale: ptBR })}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setWeekStart(addWeeks(weekStart, 1))}><ChevronRight className="h-4 w-4" /></Button>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="opacity-70 cursor-not-allowed gap-2"
+                  >
+                    <Link2 className="h-4 w-4" /> Conectar Google Agenda
+                    <span className="ml-1 text-[10px] uppercase tracking-wider rounded bg-muted px-1.5 py-0.5">Em breve</span>
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Integração com Google Agenda em breve</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="bg-admin-accent hover:bg-admin-accent/90 gap-2">
+                <Plus className="h-4 w-4" /> Criar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => handleCreate("compromisso")}>
+                <CalendarIcon className="h-4 w-4 mr-2" /> Compromisso
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCreate("tarefa")}>
+                <CheckSquare className="h-4 w-4 mr-2" /> Tarefa
+                <span className="ml-auto text-[10px] uppercase text-admin-ink-muted">Em breve</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCreate("vaga")}>
+                <Ticket className="h-4 w-4 mr-2" /> Vaga
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCreate("evento")}>
+                <PartyPopper className="h-4 w-4 mr-2" /> Evento
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
+
+      {/* Resumo */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <SummaryTile label="Hoje" value={todayAppts.length} />
+        <SummaryTile label="Acontecendo agora" value={happeningNow.length} />
+        <SummaryTile label="Próximos" value={upcoming.length} />
+        <SummaryTile label="Vagas (semana)" value={(data?.appointments ?? []).length} />
       </div>
 
+      {/* Calendário semanal unificado */}
       <BentoCard padded={false}>
         <div className="overflow-x-auto">
           <div className="grid min-w-[900px]" style={{ gridTemplateColumns: "60px repeat(7, 1fr)" }}>
@@ -130,13 +187,37 @@ function CalendarView() {
         </div>
       </BentoCard>
 
-      <div className="flex gap-4 text-xs">
+      <div className="flex flex-wrap gap-4 text-xs">
         {Object.entries(CATEGORY_COLOR).map(([k, c]) => (
           <span key={k} className={`${c} border-l-4 px-2 py-0.5 rounded capitalize`}>{k}</span>
         ))}
       </div>
 
+      {/* Vagas e slots — integrados na mesma tela (sem aba) */}
+      <section className="space-y-3">
+        <h2 className="font-display text-xl text-admin-ink">Vagas & Slots</h2>
+        <SlotsPanel />
+      </section>
+
       {isLoading && <p className="text-sm text-admin-ink-muted">Carregando...</p>}
+
+      <AppointmentDialog open={showAppointment} onOpenChange={setShowAppointment} />
+      <NewSlotDialog
+        services={slotServices}
+        onCreated={() => refetch()}
+        create={create}
+        open={showSlot}
+        onOpenChange={setShowSlot}
+      />
     </div>
+  );
+}
+
+function SummaryTile({ label, value }: { label: string; value: number }) {
+  return (
+    <BentoCard padded>
+      <div className="text-[11px] uppercase tracking-wider text-admin-ink-muted">{label}</div>
+      <div className="font-display text-3xl text-admin-ink mt-1">{value}</div>
+    </BentoCard>
   );
 }
