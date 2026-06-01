@@ -302,7 +302,7 @@ export const cancelOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("orders")
-      .update({ payment_status: "recusado", delivery_status: "cancelado" })
+      .update({ payment_status: "recusado" })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     await supabaseAdmin.from("audit_logs").insert({
@@ -353,8 +353,9 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
         payment_provider: "mercadopago",
         payment_provider_reference: reference,
         payment_status: "pendente",
-      })
+      } as never)
       .eq("id", data.id);
+
     if (error) throw new Error(error.message);
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,

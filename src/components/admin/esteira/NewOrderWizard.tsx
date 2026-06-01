@@ -122,8 +122,9 @@ export function NewOrderWizard({
     }
     try {
       const c = await createCustomer({ data: newCust });
-      setCustomer(c);
+      setCustomer({ id: c.user_id, full_name: c.full_name, email: c.email, phone: c.phone });
       toast.success("Cliente vinculado");
+
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
     }
