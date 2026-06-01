@@ -41,10 +41,11 @@ export const updateOrder = createServerFn({ method: "POST" })
       }
     }
     if (data.executed) patch.executed_at = new Date().toISOString();
-    const { error } = await context.supabase.from("orders").update(patch).eq("id", data.id);
+    const { error } = await context.supabase.from("orders").update(patch as never).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 // --- Customer search & lite creation ----------------------------------------
 
@@ -204,30 +205,32 @@ export const createOrderFull = createServerFn({ method: "POST" })
         ? `EMP-${Date.now().toString(36).toUpperCase()}`
         : null;
 
+    const insertPayload: Record<string, unknown> = {
+      user_id: data.user_id ?? null,
+      customer_name: data.customer_name,
+      customer_email: data.customer_email ?? null,
+      service_id: data.service_id ?? null,
+      service_title: data.service_title,
+      amount_cents: data.amount_cents,
+      currency: data.currency,
+      slot_id: data.slot_id ?? null,
+      notes: data.notes ?? null,
+      payment_status,
+      payment_method: data.payment_method,
+      payment_currency: data.payment_currency ?? data.currency,
+      payment_amount_cents: data.payment_amount_cents ?? data.amount_cents,
+      fx_rate: data.fx_rate ?? null,
+      fx_source: data.fx_rate ? "manual" : null,
+      fx_locked_at: data.fx_rate ? new Date().toISOString() : null,
+      paid_at: payment_status === "aprovado" ? new Date().toISOString() : null,
+      voucher_code: voucher,
+    };
     const { data: order, error } = await context.supabase
       .from("orders")
-      .insert({
-        user_id: data.user_id ?? null,
-        customer_name: data.customer_name,
-        customer_email: data.customer_email ?? null,
-        service_id: data.service_id ?? null,
-        service_title: data.service_title,
-        amount_cents: data.amount_cents,
-        currency: data.currency,
-        slot_id: data.slot_id ?? null,
-        notes: data.notes ?? null,
-        payment_status,
-        payment_method: data.payment_method,
-        payment_currency: data.payment_currency ?? data.currency,
-        payment_amount_cents: data.payment_amount_cents ?? data.amount_cents,
-        fx_rate: data.fx_rate ?? null,
-        fx_source: data.fx_rate ? "manual" : null,
-        fx_locked_at: data.fx_rate ? new Date().toISOString() : null,
-        paid_at: payment_status === "aprovado" ? new Date().toISOString() : null,
-        voucher_code: voucher,
-      })
+      .insert(insertPayload as never)
       .select("id")
       .single();
+
     if (error || !order) throw new Error(error?.message ?? "Erro ao criar pedido");
 
     // Audit log
@@ -264,16 +267,18 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const patch: Record<string, unknown> = {
+      payment_status: "aprovado",
+      payment_method: "manual",
+      paid_at: new Date().toISOString(),
+      voucher_code: `EMP-${Date.now().toString(36).toUpperCase()}`,
+    };
     const { error } = await context.supabase
       .from("orders")
-      .update({
-        payment_status: "aprovado",
-        payment_method: "manual",
-        paid_at: new Date().toISOString(),
-        voucher_code: `EMP-${Date.now().toString(36).toUpperCase()}`,
-      })
+      .update(patch as never)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+
 
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
