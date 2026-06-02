@@ -21,6 +21,7 @@ export const ALL_MODULES = [
   "pdv_itens",
   "automacoes",
   "logs",
+  "relatorios",
 ] as const;
 export type ModuleKey = (typeof ALL_MODULES)[number];
 
