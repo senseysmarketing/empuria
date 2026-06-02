@@ -701,6 +701,30 @@ export const getReportsServicos = createServerFn({ method: "POST" })
       count,
     })).sort((a, b) => b.count - a.count);
 
+    // Slots / ocupação
+    const { data: slotRows } = await db
+      .from("availability_slots")
+      .select("id,service_id,capacity,booked,is_active,starts_at")
+      .eq("is_active", true)
+      .gte("starts_at", range.start + "T00:00:00")
+      .lte("starts_at", range.end + "T23:59:59")
+      .limit(10000);
+    const slots = (slotRows ?? []) as Array<{
+      capacity: number;
+      booked: number;
+    }>;
+    let totalCapacity = 0,
+      totalBooked = 0,
+      slotsOpen = 0,
+      slotsFull = 0;
+    for (const s of slots) {
+      totalCapacity += s.capacity;
+      totalBooked += s.booked;
+      if (s.booked >= s.capacity) slotsFull += 1;
+      else slotsOpen += 1;
+    }
+    const occupancyRate = totalCapacity > 0 ? (totalBooked / totalCapacity) * 100 : 0;
+
     return {
       range,
       compareRange,
@@ -712,6 +736,9 @@ export const getReportsServicos = createServerFn({ method: "POST" })
         noShow: { current: curr.noShow, previous: prev.noShow, deltaPct: pctDelta(curr.noShow, prev.noShow) },
         noShowRate: { current: curr.noShowRate, previous: prev.noShowRate, deltaPct: null },
         cancelRate: { current: curr.cancelRate, previous: prev.cancelRate, deltaPct: null },
+        occupancyRate: { current: occupancyRate, previous: 0, deltaPct: null },
+        slotsOpen: { current: slotsOpen, previous: 0, deltaPct: null },
+        slotsFull: { current: slotsFull, previous: 0, deltaPct: null },
       },
       topServices,
       byCategory,
