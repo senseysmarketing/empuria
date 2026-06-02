@@ -1121,7 +1121,26 @@ function ServicosTab({ filters }: { filters: ReportFilters }) {
           icon={TrendingDown}
           tone="red"
         />
+        <MetricCard
+          label="Taxa de ocupação"
+          value={`${c.occupancyRate.current.toFixed(1)}%`}
+          icon={Activity}
+          tone="blue"
+        />
+        <MetricCard
+          label="Slots abertos"
+          value={number(c.slotsOpen.current)}
+          icon={CalendarCheck}
+          tone="green"
+        />
+        <MetricCard
+          label="Slots lotados"
+          value={number(c.slotsFull.current)}
+          icon={CalendarX}
+          tone="amber"
+        />
       </div>
+
 
       <div className="grid grid-cols-12 gap-4">
         <BentoCard title="Serviços mais agendados" className="col-span-12 lg:col-span-6">
