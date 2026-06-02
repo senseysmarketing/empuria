@@ -182,3 +182,24 @@
 }
 .reveal { opacity: 0; }
 .reveal.in { animation: fade-in-up 0.8s ease-out forwards; }
+
+/* Print: hide admin chrome when generating a PDF from /admin/relatorios */
+@media print {
+  body.relatorios-printing aside,
+  body.relatorios-printing nav[aria-label="Admin"],
+  body.relatorios-printing [data-admin-dock],
+  body.relatorios-printing [data-admin-topbar],
+  body.relatorios-printing .print\\:hidden {
+    display: none !important;
+  }
+  body.relatorios-printing {
+    background: white !important;
+  }
+  body.relatorios-printing main {
+    padding: 0 !important;
+  }
+  body.relatorios-printing .bg-admin-bg,
+  body.relatorios-printing .bg-admin-surface {
+    background: white !important;
+  }
+}
