@@ -447,7 +447,7 @@ export const getReportsPdv = createServerFn({ method: "POST" })
     const fetchSales = async (r: Range): Promise<PdvSaleLite[]> => {
       const { data: rows, error } = await db
         .from("pdv_sales")
-        .select("id,cashier_id,payment_method,total_eur_cents,status,closed_at")
+        .select("id,cashier_id,payment_method,total_eur_cents,discount_eur_cents,status,closed_at")
         .gte("closed_at", r.start + "T00:00:00")
         .lte("closed_at", r.end + "T23:59:59")
         .limit(5000);
@@ -463,20 +463,31 @@ export const getReportsPdv = createServerFn({ method: "POST" })
     const summarize = (sales: PdvSaleLite[]) => {
       let revenue = 0,
         voided = 0,
-        completed = 0;
+        completed = 0,
+        discounts = 0;
       for (const s of sales) {
         if (VOIDED_STATUSES.includes(s.status)) {
           voided++;
           continue;
         }
         revenue += s.total_eur_cents;
+        discounts += s.discount_eur_cents ?? 0;
         completed++;
       }
       const ticket = completed > 0 ? Math.round(revenue / completed) : 0;
-      return { revenue, voided, completed, ticket };
+      return { revenue, voided, completed, ticket, discounts };
     };
     const curr = summarize(currentSales);
     const prev = summarize(prevSales);
+
+    // Histograma por hora do dia
+    const hourly = new Array(24).fill(0).map((_, h) => ({ hour: h, revenue: 0, sales: 0 }));
+    for (const s of currentSales) {
+      if (VOIDED_STATUSES.includes(s.status)) continue;
+      const h = new Date(s.closed_at).getHours();
+      hourly[h].revenue += s.total_eur_cents;
+      hourly[h].sales += 1;
+    }
 
     const completedIds = currentSales
       .filter((s) => !VOIDED_STATUSES.includes(s.status))
