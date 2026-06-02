@@ -16,6 +16,11 @@ import {
   Loader2,
   AlertTriangle,
   Construction,
+  Package,
+  CalendarCheck,
+  CalendarX,
+  UserCheck,
+  Boxes,
 } from "lucide-react";
 import {
   Area,
