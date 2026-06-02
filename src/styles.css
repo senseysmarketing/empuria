@@ -8,11 +8,11 @@
 
 /* Instituto Empuria — Quiet Luxury Brazil x Madrid */
 
-/* Unbounded & Philosopher carregadas via <link> em src/routes/__root.tsx */
+/* Philosopher carregada via <link> em src/routes/__root.tsx; títulos usam system-ui */
 
 
 @theme inline {
-  --font-display: "Unbounded", system-ui, sans-serif;
+  --font-display: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-body: "Philosopher", Georgia, serif;
 
   --radius-sm: calc(var(--radius) - 4px);

@@ -1,39 +1,41 @@
-## Verificação da tipografia
+## Recuperar tipografia do print antigo (image-25)
 
-Estado atual após as últimas correções:
+O visual antigo usava na verdade `system-ui` nos títulos (a Unbounded nunca carregava por causa do `@import url(...)` quebrado). Vamos remover a Unbounded e tornar `system-ui` a fonte de display oficial.
 
-**`src/routes/__root.tsx`** — já carrega via `<link>` em `head()`:
-```
-https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Philosopher:ital,wght@0,400;0,700;1,400;1,700&display=swap
-```
-Inclui exatamente Unbounded 600/700/800 e Philosopher 400/700 + itálicos. Preconnect para `fonts.googleapis.com` e `fonts.gstatic.com` já está presente. **Nenhuma alteração necessária.**
+### Mudanças
 
-**`src/styles.css`** — variáveis e aplicação já preservadas:
-- `--font-display: "Unbounded", system-ui, sans-serif;` ✓
-- `--font-body: "Philosopher", Georgia, serif;` ✓
-- `@theme inline` expõe ambas → classes `font-display` e `font-body` do Tailwind continuam funcionando ✓
-- `body { font-family: var(--font-body); }` e `h1..h6 { font-family: var(--font-display); letter-spacing: -0.02em; }` ✓
+**1. `src/routes/__root.tsx`** — atualizar o `<link>` do Google Fonts para carregar **apenas Philosopher** (titulos passam a usar system-ui, não precisa mais de Unbounded):
 
-### Único ajuste proposto
-
-Remover o bloco `@font-face` local de Unbounded (linhas ~12-18 de `styles.css`):
-
-```css
-@font-face {
-  font-family: "Unbounded";
-  ...
-  src: url("https://fonts.gstatic.com/s/unbounded/v9/...woff2") format("woff2");
+```ts
+{
+  rel: "stylesheet",
+  href: "https://fonts.googleapis.com/css2?family=Philosopher:ital,wght@0,400;0,700;1,400;1,700&display=swap",
 }
 ```
 
-Motivos:
-1. É redundante — o `<link>` do Google Fonts em `__root.tsx` já carrega Unbounded 600/700/800.
-2. Aponta para uma URL `https://...` dentro do CSS. Mesmo sendo `@font-face` (não `@import`), o lightningcss em modo estrito pode tentar tratar como recurso local e reproduzir um erro `ENOENT` semelhante ao já corrigido. Removê-lo elimina esse risco.
-3. Não altera identidade visual: a mesma família/peso já é servida pelo Google Fonts via `<link>`.
+Preconnects para `fonts.googleapis.com` e `fonts.gstatic.com` permanecem.
 
-Nenhuma outra mudança em `styles.css`, `__root.tsx`, `vite.config.ts`, auth, ou regras de permissão.
+**2. `src/styles.css`** — trocar a variável display para system-ui:
 
-### Verificação após o ajuste
+```css
+--font-display: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+--font-body: "Philosopher", Georgia, serif;
+```
 
-- Confirmar visualmente no preview que títulos seguem em Unbounded e corpo em Philosopher (incluindo itálico onde usado).
-- Confirmar que utilitários Tailwind `font-display` e `font-body` continuam aplicando as famílias corretas.
+Tudo o mais fica intacto:
+- `@theme inline` continua expondo `--color-*` e `--font-display`/`--font-body` → classes `font-display` e `font-body` seguem funcionando.
+- Regras `body { font-family: var(--font-body) }` e `h1..h6 { font-family: var(--font-display); letter-spacing: -0.02em }` permanecem.
+- Nenhuma classe de peso (`font-bold`, `font-extrabold`) é alterada — system-ui renderiza esses pesos com as proporções vistas no image-25.
+- Comentário sobre carregamento de fonte no CSS é atualizado para refletir que só Philosopher vem do Google Fonts.
+
+### Fora de escopo
+
+- `vite.config.ts`: não tocar.
+- Auth, permissões, admin/staff: não tocar.
+- Nenhum componente .tsx é editado — só CSS e o `<link>` do head.
+
+### Verificação
+
+- Conferir no preview que "Bom dia, Admin", "RECEITA · ÚLTIMOS 30 DIAS", labels de cards e título "FEED DE ATIVIDADE" voltem ao traço fino e proporcional do image-25.
+- Confirmar que o corpo (ex: "Pedido criado", "Nenhuma reunião marcada para hoje.") continua em Philosopher serif com itálico funcional.
+- Conferir que classes utilitárias `font-display` aplicam system-ui (não Unbounded).
