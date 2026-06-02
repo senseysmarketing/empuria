@@ -77,6 +77,8 @@ export const Route = createFileRoute("/_authenticated/admin/relatorios")({
   component: RelatoriosPage,
 });
 
+type SearchSchema = z.infer<typeof searchSchema>;
+
 // ---------- Helpers ----------
 
 const PERIOD_LABEL: Record<string, string> = {
