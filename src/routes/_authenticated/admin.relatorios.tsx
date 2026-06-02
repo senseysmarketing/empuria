@@ -46,6 +46,8 @@ import { Input } from "@/components/ui/input";
 import {
   getReportsOverview,
   getReportsVendas,
+  getReportsPdv,
+  getReportsServicos,
   type ReportFilters,
 } from "@/lib/admin/reports.functions";
 
