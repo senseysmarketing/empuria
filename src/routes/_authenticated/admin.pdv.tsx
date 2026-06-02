@@ -2,13 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Wine, Loader2 } from "lucide-react";
+import { Wine, Loader2, History, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { CustomerSearchPanel, type PdvCustomer } from "@/components/admin/pdv/CustomerSearchPanel";
 import { SaleCatalogGrid, type PdvCatalogItem } from "@/components/admin/pdv/SaleCatalogGrid";
 import { SaleCartPanel, type CartLine, type Discount } from "@/components/admin/pdv/SaleCartPanel";
 import { SaleSuccessOverlay } from "@/components/admin/pdv/SaleSuccessOverlay";
+import { PdvHistoryPanel } from "@/components/admin/pdv/PdvHistoryPanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listPdvCatalog, closePdvSale } from "@/lib/admin/pdv-sales.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/pdv")({
@@ -22,6 +24,7 @@ function PdvPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [closing, setClosing] = useState(false);
   const [success, setSuccess] = useState<number | null>(null);
+  const [tab, setTab] = useState("venda");
 
   const catalogQ = useQuery({
     queryKey: ["pdv-catalog"],
@@ -55,9 +58,11 @@ function PdvPage() {
     try {
       const totalEur = cart.reduce((acc, l) => acc + l.qty * l.item.price_eur_cents, 0);
       const discountEur =
-        discount.type === "amount" ? Math.min(Math.round(discount.value * 100), totalEur)
-        : discount.type === "percent" ? Math.floor((totalEur * Math.max(0, Math.min(discount.value, 100))) / 100)
-        : 0;
+        discount.type === "amount"
+          ? Math.min(Math.round(discount.value * 100), totalEur)
+          : discount.type === "percent"
+            ? Math.floor((totalEur * Math.max(0, Math.min(discount.value, 100))) / 100)
+            : 0;
       await closeFn({
         data: {
           customerId: customer.id,
@@ -82,35 +87,65 @@ function PdvPage() {
         </div>
         <div>
           <h1 className="font-display text-4xl font-bold tracking-tight">PDV Empuria</h1>
-          <p className="text-admin-ink-muted text-sm mt-1">Caixa de balcão · Barbearia · Instituto</p>
+          <p className="text-admin-ink-muted text-sm mt-1">
+            Caixa de balcão · Barbearia · Instituto
+          </p>
         </div>
       </header>
 
-      {!customer ? (
-        <BentoCard padded className="p-10">
-          <CustomerSearchPanel onSelect={setCustomer} />
-        </BentoCard>
-      ) : (
-        <div className="grid grid-cols-12 gap-4">
-          <BentoCard className="col-span-12 lg:col-span-8" padded>
-            {catalogQ.isLoading ? (
-              <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-admin-accent" /></div>
-            ) : (
-              <SaleCatalogGrid items={(catalogQ.data ?? []) as unknown as PdvCatalogItem[]} onAdd={handleAdd} />
-            )}
-          </BentoCard>
-          <BentoCard className="col-span-12 lg:col-span-4" padded>
-            <SaleCartPanel
-              customer={customer}
-              cart={cart}
-              setCart={setCart}
-              onChangeCustomer={reset}
-              onClose={handleClose}
-              closing={closing}
-            />
-          </BentoCard>
-        </div>
-      )}
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList className="bg-admin-surface border border-admin-border">
+          <TabsTrigger
+            value="venda"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <ShoppingCart className="h-4 w-4" /> Venda
+          </TabsTrigger>
+          <TabsTrigger
+            value="historico"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <History className="h-4 w-4" /> Historico
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="venda" className="mt-0">
+          {!customer ? (
+            <BentoCard padded className="p-10">
+              <CustomerSearchPanel onSelect={setCustomer} />
+            </BentoCard>
+          ) : (
+            <div className="grid grid-cols-12 gap-4">
+              <BentoCard className="col-span-12 lg:col-span-8" padded>
+                {catalogQ.isLoading ? (
+                  <div className="flex items-center justify-center h-40">
+                    <Loader2 className="h-6 w-6 animate-spin text-admin-accent" />
+                  </div>
+                ) : (
+                  <SaleCatalogGrid
+                    items={(catalogQ.data ?? []) as unknown as PdvCatalogItem[]}
+                    onAdd={handleAdd}
+                  />
+                )}
+              </BentoCard>
+              <BentoCard className="col-span-12 lg:col-span-4" padded>
+                <SaleCartPanel
+                  customer={customer}
+                  cart={cart}
+                  setCart={setCart}
+                  onChangeCustomer={reset}
+                  onClose={handleClose}
+                  closing={closing}
+                />
+              </BentoCard>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="historico" className="mt-0">
+          <PdvHistoryPanel />
+        </TabsContent>
+      </Tabs>
 
       {success !== null && <SaleSuccessOverlay totalEurCents={success} onReset={reset} />}
     </div>
