@@ -1,42 +1,39 @@
-## Objetivo
+## Verificação da tipografia
 
-Adicionar na aba **Configurações → Equipe & Permissões** um botão para que admins criem novos usuários da equipe (staff ou admin), reutilizando o fluxo de "primeiro acesso" já existente (sem definir senha na criação). Staff continua precisando de permissões por módulo; admin recebe acesso total automático. Ao logar pela primeira vez, o usuário é direcionado para `/admin` (já tratado em `login.tsx` via `role.isStaff`).
+Estado atual após as últimas correções:
 
-## Mudanças
+**`src/routes/__root.tsx`** — já carrega via `<link>` em `head()`:
+```
+https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Philosopher:ital,wght@0,400;0,700;1,400;1,700&display=swap
+```
+Inclui exatamente Unbounded 600/700/800 e Philosopher 400/700 + itálicos. Preconnect para `fonts.googleapis.com` e `fonts.gstatic.com` já está presente. **Nenhuma alteração necessária.**
 
-### 1. Server function — `src/lib/admin/permissions.functions.ts`
-Adicionar `createStaffMember` (POST, protegida por `requireAdmin()`):
-- Input (zod): `full_name`, `email`, `phone` (opcional), `role` (`"staff" | "admin"`).
-- Reusa `createOrReuseManualCustomer({ origin: "admin_created", actorId, ... })` para criar/reaproveitar o usuário no Auth + `profiles` com `password_setup_required = true`.
-- Insere a role correspondente em `user_roles` via `supabaseAdmin.upsert({ user_id, role }, { onConflict: "user_id,role" })`. Se admin foi escolhido, também garante que tenha role `admin` (sem remover `member` herdada do helper).
-- Registra `audit_logs` com `action: "staff.created"` ou `"staff.role_granted"` se o usuário já existia.
-- Retorna `{ user_id, created, role }`.
+**`src/styles.css`** — variáveis e aplicação já preservadas:
+- `--font-display: "Unbounded", system-ui, sans-serif;` ✓
+- `--font-body: "Philosopher", Georgia, serif;` ✓
+- `@theme inline` expõe ambas → classes `font-display` e `font-body` do Tailwind continuam funcionando ✓
+- `body { font-family: var(--font-body); }` e `h1..h6 { font-family: var(--font-display); letter-spacing: -0.02em; }` ✓
 
-### 2. Modal — `src/components/admin/configuracoes/NewStaffDialog.tsx` (novo)
-Espelha o visual de `QuickCustomerDialog.tsx` (mesmas classes `bg-admin-surface/border-admin-border`, mesmo aviso amarelo sobre primeiro acesso).
-Campos:
-- Nome completo (obrigatório)
-- E-mail (obrigatório)
-- Telefone (opcional)
-- Função: `RadioGroup` ou `Select` com `Staff` / `Admin` (descrição curta de cada um)
-- Aviso: "Nenhuma senha será definida. O membro deverá usar **Primeiro acesso** no login para criar sua senha. Staff é direcionado para /admin automaticamente."
+### Único ajuste proposto
 
-Ao salvar: chama `createStaffMember`, mostra toast, invalida `["staff-permissions"]` e fecha.
+Remover o bloco `@font-face` local de Unbounded (linhas ~12-18 de `styles.css`):
 
-### 3. Tab — `src/components/admin/configuracoes/EquipePermissoesTab.tsx`
-- Adicionar header com botão **"Novo membro"** (ícone `UserPlus`) à direita do título.
-- Botão só aparece para admins. Como `listStaffWithPermissions` já exige admin (retorna 403 senão), usar `useCurrentUser().isAdmin` para esconder/desabilitar para staff.
-- Estado local `openNew` controlando o `NewStaffDialog`.
+```css
+@font-face {
+  font-family: "Unbounded";
+  ...
+  src: url("https://fonts.gstatic.com/s/unbounded/v9/...woff2") format("woff2");
+}
+```
 
-### 4. Permissão de toggles (defensivo)
-Os toggles de permissão hoje já chamam `setStaffPermission` que está protegida por `requireAdmin()`. Para UX, desabilitar os `<Switch>` quando o usuário corrente não é admin (mesma checagem `useCurrentUser().isAdmin`), evitando erros visuais. Isso não muda a regra de segurança no servidor.
+Motivos:
+1. É redundante — o `<link>` do Google Fonts em `__root.tsx` já carrega Unbounded 600/700/800.
+2. Aponta para uma URL `https://...` dentro do CSS. Mesmo sendo `@font-face` (não `@import`), o lightningcss em modo estrito pode tentar tratar como recurso local e reproduzir um erro `ENOENT` semelhante ao já corrigido. Removê-lo elimina esse risco.
+3. Não altera identidade visual: a mesma família/peso já é servida pelo Google Fonts via `<link>`.
 
-## Banco de dados
+Nenhuma outra mudança em `styles.css`, `__root.tsx`, `vite.config.ts`, auth, ou regras de permissão.
 
-Nenhuma migração necessária — tabelas `profiles`, `user_roles`, `staff_module_permissions`, `audit_logs` e o enum `app_role` já suportam `staff` e `admin`.
+### Verificação após o ajuste
 
-## Fora de escopo
-
-- Remoção de role / exclusão de membro (pode vir depois).
-- Edição de nome/email do membro após criação (já existe na aba Usuários).
-- Fluxo de e-mail de convite (continuamos com "Primeiro acesso" manual, conforme pedido).
+- Confirmar visualmente no preview que títulos seguem em Unbounded e corpo em Philosopher (incluindo itálico onde usado).
+- Confirmar que utilitários Tailwind `font-display` e `font-body` continuam aplicando as famílias corretas.

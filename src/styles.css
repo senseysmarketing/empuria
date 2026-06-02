@@ -8,13 +8,8 @@
 
 /* Instituto Empuria — Quiet Luxury Brazil x Madrid */
 
-@font-face {
-  font-family: "Unbounded";
-  font-style: normal;
-  font-weight: 600 800;
-  font-display: swap;
-  src: url("https://fonts.gstatic.com/s/unbounded/v9/Yq6F-LOTXCb04q32xlpat-6uR42XTqtG6xjx04m4Mw.woff2") format("woff2");
-}
+/* Unbounded & Philosopher carregadas via <link> em src/routes/__root.tsx */
+
 
 @theme inline {
   --font-display: "Unbounded", system-ui, sans-serif;
