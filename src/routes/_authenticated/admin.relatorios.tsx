@@ -1028,6 +1028,39 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
   );
 }
 
+        <BentoCard title="Horários de maior venda" className="col-span-12">
+          <HourlySalesChart data={d.hourly} />
+        </BentoCard>
+      </div>
+    </div>
+  );
+}
+
+function HourlySalesChart({ data }: { data: { hour: number; revenue: number; sales: number }[] }) {
+  if (!data.some((d) => d.sales > 0))
+    return <EmptyState label="Sem vendas no período." />;
+  const chart = data.map((d) => ({ label: `${String(d.hour).padStart(2, "0")}h`, value: d.revenue / 100, sales: d.sales }));
+  return (
+    <div className="h-56 w-full">
+      <ResponsiveContainer>
+        <BarChart data={chart} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.008 70)" vertical={false} />
+          <XAxis dataKey="label" fontSize={10} stroke="oklch(0.62 0.025 50)" tickLine={false} axisLine={false} interval={1} />
+          <YAxis fontSize={10} stroke="oklch(0.62 0.025 50)" tickLine={false} axisLine={false} width={50} tickFormatter={(v) => `€${Number(v).toFixed(0)}`} />
+          <Tooltip
+            contentStyle={{ background: "white", border: "1px solid oklch(0.91 0.008 70)", borderRadius: 12, fontSize: 12 }}
+            formatter={(v: unknown, n: unknown) => {
+              if (n === "sales") return [`${v}`, "Vendas"];
+              return [`€ ${Number(v).toFixed(2)}`, "Receita"];
+            }}
+          />
+          <Bar dataKey="value" name="Receita" fill="oklch(0.58 0.18 45)" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // ---------- Serviços & Agenda ----------
 
 function ServicosTab({ filters }: { filters: ReportFilters }) {
