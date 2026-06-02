@@ -125,7 +125,7 @@ function formatDate(iso: string) {
 
 function RelatoriosPage() {
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: Route.fullPath });
+  const navigate = useNavigate();
 
   const filters: ReportFilters = useMemo(
     () => ({
