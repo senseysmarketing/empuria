@@ -108,10 +108,10 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
           <Link
             to="/admin/configuracoes"
             search={{ tab: "perfil" }}
-            className="inline-flex items-center gap-2.5 px-4 h-11 rounded-lg bg-brown-deep/60 hover:bg-brown-deep border border-orange-brand/30 hover:border-orange-brand/60 text-offwhite hover:text-orange-brand transition-colors font-display text-xs uppercase tracking-wider"
+            className="inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-brown-deep/60 hover:bg-brown-deep border border-orange-brand/30 hover:border-orange-brand/60 text-offwhite hover:text-orange-brand transition-colors font-display text-[11px] uppercase tracking-wider"
             title="Configurações"
           >
-            <Settings className="h-[18px] w-[18px]" />
+            <Settings className="h-4 w-4" />
             <span className="hidden md:inline">Configurações</span>
           </Link>
         )}
