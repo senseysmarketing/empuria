@@ -1133,36 +1133,51 @@ export type Database = {
           admin_notes: string | null
           avatar_url: string | null
           country_origin: string | null
+          created_by_admin: boolean
+          created_by_staff_id: string | null
           created_at: string
+          first_access_completed_at: string | null
           full_name: string | null
           id: string
           is_blocked: boolean
           is_club_member: boolean
+          password_setup_required: boolean
           phone: string | null
+          profile_origin: string
           updated_at: string
         }
         Insert: {
           admin_notes?: string | null
           avatar_url?: string | null
           country_origin?: string | null
+          created_by_admin?: boolean
+          created_by_staff_id?: string | null
           created_at?: string
+          first_access_completed_at?: string | null
           full_name?: string | null
           id: string
           is_blocked?: boolean
           is_club_member?: boolean
+          password_setup_required?: boolean
           phone?: string | null
+          profile_origin?: string
           updated_at?: string
         }
         Update: {
           admin_notes?: string | null
           avatar_url?: string | null
           country_origin?: string | null
+          created_by_admin?: boolean
+          created_by_staff_id?: string | null
           created_at?: string
+          first_access_completed_at?: string | null
           full_name?: string | null
           id?: string
           is_blocked?: boolean
           is_club_member?: boolean
+          password_setup_required?: boolean
           phone?: string | null
+          profile_origin?: string
           updated_at?: string
         }
         Relationships: []

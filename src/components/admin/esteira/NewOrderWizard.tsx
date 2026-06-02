@@ -10,7 +10,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Search, UserPlus, AlertTriangle } from "lucide-react";
@@ -116,15 +122,14 @@ export function NewOrderWizard({
   };
 
   const createCust = async () => {
-    if (!newCust.full_name || !newCust.email) {
-      toast.error("Nome e e-mail são obrigatórios");
+    if (!newCust.full_name || !newCust.email || !newCust.phone) {
+      toast.error("Nome, e-mail e telefone sao obrigatorios");
       return;
     }
     try {
       const c = await createCustomer({ data: newCust });
       setCustomer({ id: c.user_id, full_name: c.full_name, email: c.email, phone: c.phone });
-      toast.success("Cliente vinculado");
-
+      toast.success("Cliente vinculado. Oriente o primeiro acesso pelo login.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
     }
@@ -139,9 +144,7 @@ export function NewOrderWizard({
   };
 
   const amountCents = Math.round(parseFloat(amount || "0") * 100);
-  const payCents = payAmount
-    ? Math.round(parseFloat(payAmount) * 100)
-    : amountCents;
+  const payCents = payAmount ? Math.round(parseFloat(payAmount) * 100) : amountCents;
   const isFree = amountCents === 0;
 
   const canSubmit =
@@ -238,7 +241,7 @@ export function NewOrderWizard({
                   onChange={(e) => setNewCust({ ...newCust, email: e.target.value })}
                 />
                 <Input
-                  placeholder="Telefone (opcional)"
+                  placeholder="Telefone"
                   value={newCust.phone}
                   onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })}
                 />
@@ -247,16 +250,19 @@ export function NewOrderWizard({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                A conta é criada sem senha. O cliente pode acessar depois via magic link / recuperação.
+                A conta e criada sem senha. O cliente acessa depois pelo link Primeiro acesso na
+                tela de login.
               </p>
             </div>
 
             {customer && (
               <div className="bg-admin-accent-soft border rounded p-3 text-sm">
-                <strong>Selecionado:</strong> {customer.full_name ?? "—"} · {customer.email ?? "sem e-mail"}
+                <strong>Selecionado:</strong> {customer.full_name ?? "—"} ·{" "}
+                {customer.email ?? "sem e-mail"}
                 {!customer.email && (
                   <div className="text-xs text-amber-700 mt-1 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Sem e-mail: pedido não aparecerá no portal.
+                    <AlertTriangle className="h-3 w-3" /> Sem e-mail: pedido não aparecerá no
+                    portal.
                   </div>
                 )}
               </div>
@@ -267,7 +273,9 @@ export function NewOrderWizard({
         {step === 2 && (
           <div className="space-y-4">
             <Select value={serviceMode} onValueChange={(v) => setServiceMode(v as never)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="cadastrado">Serviço cadastrado</SelectItem>
                 <SelectItem value="avulso">Serviço avulso</SelectItem>
@@ -275,7 +283,9 @@ export function NewOrderWizard({
             </Select>
             {serviceMode === "cadastrado" ? (
               <Select value={service?.id ?? ""} onValueChange={onSelectService}>
-                <SelectTrigger><SelectValue placeholder="Escolha o serviço" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha o serviço" />
+                </SelectTrigger>
                 <SelectContent>
                   {services.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
@@ -309,7 +319,9 @@ export function NewOrderWizard({
               <div>
                 <Label>Moeda</Label>
                 <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="EUR">EUR</SelectItem>
                     <SelectItem value="BRL">BRL</SelectItem>
@@ -329,7 +341,9 @@ export function NewOrderWizard({
               <div>
                 <Label>Moeda cobrança</Label>
                 <Select value={payCurrency} onValueChange={(v) => setPayCurrency(v as Currency)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="BRL">BRL</SelectItem>
                     <SelectItem value="EUR">EUR</SelectItem>
@@ -359,7 +373,8 @@ export function NewOrderWizard({
                     className="mt-1"
                   />
                   <span>
-                    Este pedido será criado com valor zero. Confirmo como <strong>pedido gratuito</strong>.
+                    Este pedido será criado com valor zero. Confirmo como{" "}
+                    <strong>pedido gratuito</strong>.
                   </span>
                 </label>
               </div>
@@ -371,12 +386,20 @@ export function NewOrderWizard({
           <div className="space-y-4">
             <div>
               <Label>Forma de pagamento</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)} disabled={isFree}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={method}
+                onValueChange={(v) => setMethod(v as PaymentMethod)}
+                disabled={isFree}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="mercadopago">Gerar link Mercado Pago</SelectItem>
                   <SelectItem value="manual">Marcar como pago manualmente</SelectItem>
-                  <SelectItem value="gratuito" disabled={!isFree}>Gratuito</SelectItem>
+                  <SelectItem value="gratuito" disabled={!isFree}>
+                    Gratuito
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -392,14 +415,21 @@ export function NewOrderWizard({
             </div>
             <div className="text-xs text-muted-foreground">
               Cliente: <strong>{customer?.full_name}</strong> · Serviço:{" "}
-              <strong>{serviceMode === "cadastrado" ? service?.title : customTitle}</strong> · Valor:{" "}
-              <strong>{currency} {amount}</strong>
+              <strong>{serviceMode === "cadastrado" ? service?.title : customTitle}</strong> ·
+              Valor:{" "}
+              <strong>
+                {currency} {amount}
+              </strong>
             </div>
           </div>
         )}
 
         <div className="flex justify-between pt-4 border-t">
-          <Button variant="ghost" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1}>
+          <Button
+            variant="ghost"
+            onClick={() => setStep((s) => Math.max(1, s - 1))}
+            disabled={step === 1}
+          >
             Voltar
           </Button>
           {step < 4 ? (
@@ -407,14 +437,19 @@ export function NewOrderWizard({
               onClick={() => setStep((s) => s + 1)}
               disabled={
                 (step === 1 && !customer) ||
-                (step === 2 && (serviceMode === "cadastrado" ? !service : customTitle.length < 2)) ||
+                (step === 2 &&
+                  (serviceMode === "cadastrado" ? !service : customTitle.length < 2)) ||
                 (step === 3 && (amount === "" || (isFree && !confirmFree)))
               }
             >
               Próximo
             </Button>
           ) : (
-            <Button onClick={submit} disabled={!canSubmit} className="bg-admin-accent hover:bg-admin-accent/90">
+            <Button
+              onClick={submit}
+              disabled={!canSubmit}
+              className="bg-admin-accent hover:bg-admin-accent/90"
+            >
               Criar pedido
             </Button>
           )}

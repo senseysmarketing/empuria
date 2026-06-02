@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createOrReuseManualCustomer } from "./manual-users";
 
 // ---------- Catálogo ----------
 export const listPdvCatalog = createServerFn({ method: "GET" })
@@ -31,48 +32,60 @@ export const searchCustomers = createServerFn({ method: "POST" })
       .or(`full_name.ilike.${like},phone.ilike.${like}`)
       .limit(10);
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    const byId = new Map((rows ?? []).map((row) => [row.id, row]));
+
+    if (q.includes("@") || q.length >= 3) {
+      const { data: users } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      const matching = (users?.users ?? []).filter((user) =>
+        (user.email ?? "").toLowerCase().includes(q.toLowerCase()),
+      );
+      const missingIds = matching.map((user) => user.id).filter((id) => !byId.has(id));
+      if (missingIds.length) {
+        const { data: profileMatches } = await supabaseAdmin
+          .from("profiles")
+          .select("id, full_name, phone, avatar_url, is_club_member, is_blocked")
+          .in("id", missingIds);
+        for (const row of profileMatches ?? []) byId.set(row.id, row);
+      }
+    }
+
+    return Array.from(byId.values()).slice(0, 10);
   });
 
 export const createCustomerQuick = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((d) =>
-    z.object({
-      fullName: z.string().trim().min(2).max(160),
-      phone: z.string().trim().min(5).max(40),
-      email: z.string().trim().email().max(200),
-      password: z.string().min(6).max(120),
-    }).parse(d)
+    z
+      .object({
+        fullName: z.string().trim().min(2).max(160),
+        phone: z.string().trim().min(5).max(40),
+        email: z.string().trim().email().max(200),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+    const customer = await createOrReuseManualCustomer({
+      fullName: data.fullName,
       email: data.email,
-      password: data.password,
-      email_confirm: true,
-      user_metadata: { full_name: data.fullName },
+      phone: data.phone,
+      origin: "pdv",
+      actorId: context.userId,
     });
-    if (error || !created.user) throw new Error(error?.message ?? "Erro ao criar cliente");
-    const uid = created.user.id;
-    // Trigger handle_new_user already creates profile + member role; update phone.
-    await supabaseAdmin.from("profiles").update({ full_name: data.fullName, phone: data.phone }).eq("id", uid);
-    await supabaseAdmin.from("audit_logs").insert({
-      actor_id: context.userId,
-      action: "cliente_criado_pdv",
-      module: "pdv",
-      entity_type: "profile",
-      entity_id: uid,
-      new_data: { full_name: data.fullName, email: data.email },
-    });
-    return { id: uid, full_name: data.fullName, phone: data.phone };
+    return { id: customer.user_id, full_name: customer.full_name, phone: customer.phone };
   });
 
 // ---------- Fechar venda (atômico) ----------
 const closeSchema = z.object({
   customerId: z.string().uuid(),
-  items: z.array(z.object({
-    productId: z.string().uuid(),
-    qty: z.number().int().min(1).max(99),
-  })).min(1).max(50),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        qty: z.number().int().min(1).max(99),
+      }),
+    )
+    .min(1)
+    .max(50),
   discount: z.object({
     type: z.enum(["none", "amount", "percent"]),
     value: z.number().min(0).max(100000),
@@ -137,7 +150,10 @@ export const getPdvSale = createServerFn({ method: "POST" })
     const admin = supabaseAdmin as unknown as {
       from: (t: string) => {
         select: (s: string) => {
-          eq: (c: string, v: string) => {
+          eq: (
+            c: string,
+            v: string,
+          ) => {
             single: () => SingleRes<PdvSaleRecord>;
             order: (c: string) => ListRes<PdvSaleItemRecord>;
           };

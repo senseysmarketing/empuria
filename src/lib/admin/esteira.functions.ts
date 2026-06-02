@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireStaff, requireAdmin } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createOrReuseManualCustomer } from "./manual-users";
 
 const ORDER_SELECT_ADMIN = "*";
 const ORDER_SELECT_STAFF =
@@ -25,11 +26,13 @@ export const listOrders = createServerFn({ method: "GET" })
 export const updateOrder = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) =>
-    z.object({
-      id: z.string().uuid(),
-      payment_status: z.enum(["pendente", "aprovado", "recusado", "estornado"]).optional(),
-      executed: z.boolean().optional(),
-    }).parse(d),
+    z
+      .object({
+        id: z.string().uuid(),
+        payment_status: z.enum(["pendente", "aprovado", "recusado", "estornado"]).optional(),
+        executed: z.boolean().optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const patch: Record<string, unknown> = {};
@@ -41,11 +44,13 @@ export const updateOrder = createServerFn({ method: "POST" })
       }
     }
     if (data.executed) patch.executed_at = new Date().toISOString();
-    const { error } = await context.supabase.from("orders").update(patch as never).eq("id", data.id);
+    const { error } = await context.supabase
+      .from("orders")
+      .update(patch as never)
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
-
 
 // --- Customer search & lite creation ----------------------------------------
 
@@ -53,16 +58,11 @@ const phoneNorm = (s: string) => s.replace(/\D+/g, "");
 
 export const searchCustomers = createServerFn({ method: "POST" })
   .middleware([requireStaff])
-  .inputValidator((d) =>
-    z.object({ q: z.string().trim().min(1).max(120) }).parse(d),
-  )
+  .inputValidator((d) => z.object({ q: z.string().trim().min(1).max(120) }).parse(d))
   .handler(async ({ data }) => {
     const q = data.q;
     const digits = phoneNorm(q);
-    const orParts = [
-      `full_name.ilike.%${q}%`,
-      `phone.ilike.%${q}%`,
-    ];
+    const orParts = [`full_name.ilike.%${q}%`, `phone.ilike.%${q}%`];
     if (digits.length >= 4) orParts.push(`phone.ilike.%${digits}%`);
 
     const { data: byProfile } = await supabaseAdmin
@@ -74,18 +74,26 @@ export const searchCustomers = createServerFn({ method: "POST" })
     const ids = new Set((byProfile ?? []).map((p) => p.id));
 
     // Also search auth users by email
-    let byEmail: { id: string; full_name: string | null; phone: string | null; email: string | null }[] = [];
+    let byEmail: {
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      email: string | null;
+    }[] = [];
     if (q.includes("@") || q.length >= 3) {
       const { data: users } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 50 });
-      const matching = (users?.users ?? []).filter((u) =>
-        u.email && u.email.toLowerCase().includes(q.toLowerCase()),
+      const matching = (users?.users ?? []).filter(
+        (u) => u.email && u.email.toLowerCase().includes(q.toLowerCase()),
       );
       const missing = matching.filter((u) => !ids.has(u.id));
       if (missing.length) {
         const { data: profs } = await supabaseAdmin
           .from("profiles")
           .select("id, full_name, phone")
-          .in("id", missing.map((u) => u.id));
+          .in(
+            "id",
+            missing.map((u) => u.id),
+          );
         const profMap = new Map((profs ?? []).map((p) => [p.id, p]));
         byEmail = matching.map((u) => ({
           id: u.id,
@@ -119,41 +127,29 @@ export const searchCustomers = createServerFn({ method: "POST" })
 export const createCustomerLite = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) =>
-    z.object({
-      full_name: z.string().trim().min(2).max(120),
-      email: z.string().trim().email().max(255),
-      phone: z.string().trim().min(4).max(40).optional(),
-    }).parse(d),
+    z
+      .object({
+        full_name: z.string().trim().min(2).max(120),
+        email: z.string().trim().email().max(255),
+        phone: z.string().trim().min(5).max(40),
+      })
+      .parse(d),
   )
-  .handler(async ({ data }) => {
-    // Look up existing auth user first
-    const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    const match = (existing?.users ?? []).find(
-      (u) => (u.email ?? "").toLowerCase() === data.email.toLowerCase(),
-    );
-    let userId = match?.id ?? null;
+  .handler(async ({ data, context }) => {
+    const customer = await createOrReuseManualCustomer({
+      fullName: data.full_name,
+      email: data.email,
+      phone: data.phone,
+      origin: "esteira",
+      actorId: context.userId,
+    });
 
-    if (!userId) {
-      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-        email: data.email,
-        email_confirm: false,
-        user_metadata: { full_name: data.full_name, phone: data.phone ?? null },
-      });
-      if (error || !created.user) throw new Error(error?.message ?? "Falha ao criar cliente");
-      userId = created.user.id;
-    }
-
-    // Upsert profile
-    await supabaseAdmin.from("profiles").upsert(
-      {
-        id: userId,
-        full_name: data.full_name,
-        phone: data.phone ?? null,
-      },
-      { onConflict: "id" },
-    );
-
-    return { user_id: userId, email: data.email, full_name: data.full_name, phone: data.phone ?? null };
+    return {
+      user_id: customer.user_id,
+      email: customer.email,
+      full_name: customer.full_name,
+      phone: customer.phone,
+    };
   });
 
 // --- Full order creation ----------------------------------------------------
@@ -201,9 +197,7 @@ export const createOrderFull = createServerFn({ method: "POST" })
           : data.payment_status;
 
     const voucher =
-      payment_status === "aprovado"
-        ? `EMP-${Date.now().toString(36).toUpperCase()}`
-        : null;
+      payment_status === "aprovado" ? `EMP-${Date.now().toString(36).toUpperCase()}` : null;
 
     const insertPayload: Record<string, unknown> = {
       user_id: data.user_id ?? null,
@@ -261,10 +255,12 @@ export const createOrderFull = createServerFn({ method: "POST" })
 export const markOrderPaidManual = createServerFn({ method: "POST" })
   .middleware([requireAdmin()])
   .inputValidator((d) =>
-    z.object({
-      id: z.string().uuid(),
-      reason: z.string().trim().min(3).max(280),
-    }).parse(d),
+    z
+      .object({
+        id: z.string().uuid(),
+        reason: z.string().trim().min(3).max(280),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const patch: Record<string, unknown> = {
@@ -278,7 +274,6 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
       .update(patch as never)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
-
 
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
@@ -294,10 +289,12 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
 export const cancelOrder = createServerFn({ method: "POST" })
   .middleware([requireAdmin()])
   .inputValidator((d) =>
-    z.object({
-      id: z.string().uuid(),
-      reason: z.string().trim().min(3).max(280),
-    }).parse(d),
+    z
+      .object({
+        id: z.string().uuid(),
+        reason: z.string().trim().min(3).max(280),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
@@ -319,10 +316,12 @@ export const cancelOrder = createServerFn({ method: "POST" })
 export const refundOrder = createServerFn({ method: "POST" })
   .middleware([requireAdmin()])
   .inputValidator((d) =>
-    z.object({
-      id: z.string().uuid(),
-      reason: z.string().trim().min(3).max(280),
-    }).parse(d),
+    z
+      .object({
+        id: z.string().uuid(),
+        reason: z.string().trim().min(3).max(280),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
