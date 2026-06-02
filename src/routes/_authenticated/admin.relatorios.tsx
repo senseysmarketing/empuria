@@ -161,6 +161,7 @@ function RelatoriosPage() {
         value={search.tab}
         onValueChange={(v) =>
           navigate({
+            to: "/admin/relatorios",
             search: (prev) => ({ ...prev, tab: v as typeof search.tab }),
             replace: true,
           })
