@@ -16,8 +16,15 @@ import barbearia from "@/assets/instituto-barbearia.jpg";
 import bar from "@/assets/instituto-bar.jpg";
 import granvia from "@/assets/gran-via.jpg";
 import {
-  Compass, ShieldCheck, Handshake, Scissors, Beer, Gamepad2, Sparkles,
-  ArrowRight, Check,
+  Compass,
+  ShieldCheck,
+  Handshake,
+  Scissors,
+  Beer,
+  Gamepad2,
+  Sparkles,
+  ArrowRight,
+  Check,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -58,16 +65,25 @@ function HomePage() {
   const [details, setDetails] = useState<PublicService | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
-  const onBuy = (s: PublicService) => { setSelected(s); setOpen(true); };
-  const onDetails = (s: PublicService) => { setDetails(s); setDetailsOpen(true); };
+  const onBuy = (s: PublicService) => {
+    setSelected(s);
+    setOpen(true);
+  };
+  const onDetails = (s: PublicService) => {
+    setDetails(s);
+    setDetailsOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-offwhite text-brown-deep overflow-x-hidden">
       <SiteHeader />
       <CheckoutModal service={selected} open={open} onOpenChange={setOpen} />
-      <ServiceDetailsModal service={details} open={detailsOpen} onOpenChange={setDetailsOpen} onBuy={onBuy} />
-
-
+      <ServiceDetailsModal
+        service={details}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        onBuy={onBuy}
+      />
 
       {/* HERO */}
       <section className="relative min-h-screen flex items-center pt-24 pb-16 bg-topo">
@@ -89,17 +105,20 @@ function HomePage() {
             </Reveal>
             <Reveal delay={100}>
               <h1 className="font-display font-extrabold uppercase leading-[0.95] text-5xl md:text-7xl lg:text-[5.5rem] tracking-tight">
-                A Embaixada<br />
-                <span className="text-yellow-brand">Emocional</span><br />
-                do brasileiro<br />
+                A Embaixada
+                <br />
+                <span className="text-yellow-brand">Emocional</span>
+                <br />
+                do brasileiro
+                <br />
                 no exterior.
               </h1>
             </Reveal>
             <Reveal delay={250}>
               <p className="font-body text-lg md:text-xl mt-8 text-offwhite/85 max-w-2xl leading-relaxed">
-                Você cruzou o oceano para viver um sonho. Nós estamos aqui para garantir
-                que você não precise vivê-lo sozinho. O primeiro instituto de imigração
-                brasileiro do mundo, no coração de Madrid.
+                Você cruzou o oceano para viver um sonho. Nós estamos aqui para garantir que você
+                não precise vivê-lo sozinho. O primeiro instituto de imigração brasileiro do mundo,
+                no coração de Madrid.
               </p>
             </Reveal>
             <Reveal delay={400}>
@@ -127,7 +146,9 @@ function HomePage() {
                 <img src={lounge} alt="Lounge Empuria" className="w-full h-full object-cover" />
               </div>
               <div className="absolute -bottom-6 -left-6 bg-offwhite text-brown-deep px-5 py-3 rounded-md shadow-warm">
-                <div className="font-display font-extrabold text-xs uppercase tracking-widest text-orange-brand">Gran Vía</div>
+                <div className="font-display font-extrabold text-xs uppercase tracking-widest text-orange-brand">
+                  Gran Vía
+                </div>
                 <div className="font-body italic text-sm">Madrid · Espanha</div>
               </div>
             </div>
@@ -150,9 +171,12 @@ function HomePage() {
             </Reveal>
             <Reveal delay={100}>
               <h2 className="font-display font-extrabold text-4xl md:text-5xl uppercase leading-[1] text-brown">
-                Emigrar exige<br />
-                <span className="text-orange-brand">coragem.</span><br />
-                Mas o pouso não<br />
+                Emigrar exige
+                <br />
+                <span className="text-orange-brand">coragem.</span>
+                <br />
+                Mas o pouso não
+                <br />
                 precisa ser difícil.
               </h2>
             </Reveal>
@@ -160,18 +184,30 @@ function HomePage() {
           <div className="lg:col-span-7">
             <Reveal delay={150}>
               <p className="font-body text-lg leading-relaxed text-brown-deep/80">
-                Sabemos o que é chegar a um país novo. A burocracia intimida, a língua pode
-                ser uma barreira inicial e a saudade de casa bate à porta. Foi por isso que
-                o Instituto Empuria nasceu. Nós transformamos a jornada solitária do imigrante
-                em uma experiência acolhedora, segura e direcionada. Não somos apenas uma
-                agência; somos o seu ponto de apoio.
+                Sabemos o que é chegar a um país novo. A burocracia intimida, a língua pode ser uma
+                barreira inicial e a saudade de casa bate à porta. Foi por isso que o Instituto
+                Empuria nasceu. Nós transformamos a jornada solitária do imigrante em uma
+                experiência acolhedora, segura e direcionada. Não somos apenas uma agência; somos o
+                seu ponto de apoio.
               </p>
             </Reveal>
             <div className="grid md:grid-cols-3 gap-5 mt-10">
               {[
-                { icon: Compass, title: "Direção Clara", text: "Do visto ao vale-transporte, mostramos o caminho das pedras." },
-                { icon: ShieldCheck, title: "Apoio Seguro", text: "Chegue com tudo estruturado: aeroporto, moradia e banco." },
-                { icon: Handshake, title: "Comunidade Forte", text: "Cercado de quem fala a sua língua e entende sua cultura." },
+                {
+                  icon: Compass,
+                  title: "Direção Clara",
+                  text: "Do visto ao vale-transporte, mostramos o caminho das pedras.",
+                },
+                {
+                  icon: ShieldCheck,
+                  title: "Apoio Seguro",
+                  text: "Chegue com tudo estruturado: aeroporto, moradia e banco.",
+                },
+                {
+                  icon: Handshake,
+                  title: "Comunidade Forte",
+                  text: "Cercado de quem fala a sua língua e entende sua cultura.",
+                },
               ].map((b, i) => (
                 <Reveal key={b.title} delay={200 + i * 100}>
                   <div className="bg-muted/60 border border-border rounded-xl p-5 h-full hover:border-orange-brand/50 transition">
@@ -191,7 +227,10 @@ function HomePage() {
       </section>
 
       {/* MANIFESTO + ESPAÇO FÍSICO */}
-      <section id="instituto" className="relative bg-topo bg-topo-red text-offwhite py-24 overflow-hidden">
+      <section
+        id="instituto"
+        className="relative bg-topo bg-topo-red text-offwhite py-24 overflow-hidden"
+      >
         <div className="absolute inset-0 bg-red-brand/85" />
         <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-6">
@@ -202,8 +241,10 @@ function HomePage() {
             </Reveal>
             <Reveal delay={100}>
               <h2 className="font-display font-extrabold uppercase text-4xl md:text-6xl leading-[0.95]">
-                Nenhum<br />
-                brasileiro<br />
+                Nenhum
+                <br />
+                brasileiro
+                <br />
                 <span className="text-yellow-brand">está sozinho.</span>
               </h2>
             </Reveal>
@@ -214,9 +255,9 @@ function HomePage() {
             </Reveal>
             <Reveal delay={300}>
               <p className="font-body text-base mt-6 text-offwhite/85 leading-relaxed max-w-xl">
-                Criamos um espaço físico focado 100% no seu acolhimento. Sem custos, sem
-                necessidade de agendamento. Chegou em Madrid? A porta está aberta. Aqui
-                dentro, o idioma oficial é o português e a energia é do Brasil.
+                Criamos um espaço físico focado 100% no seu acolhimento. Sem custos, sem necessidade
+                de agendamento. Chegou em Madrid? A porta está aberta. Aqui dentro, o idioma oficial
+                é o português e a energia é do Brasil.
               </p>
             </Reveal>
             <ul className="mt-8 space-y-3">
@@ -247,8 +288,16 @@ function HomePage() {
           <div className="lg:col-span-6 relative h-[520px] overflow-hidden rounded-2xl border border-yellow-brand/30">
             <div className="flex marquee-track gap-4 h-full" style={{ width: "200%" }}>
               {[lounge, barbearia, bar, lounge, barbearia, bar].map((src, i) => (
-                <div key={i} className="relative h-full aspect-[3/4] shrink-0 rounded-xl overflow-hidden">
-                  <img src={src} alt="Espaço Empuria" className="w-full h-full object-cover" loading="lazy" />
+                <div
+                  key={i}
+                  className="relative h-full aspect-[3/4] shrink-0 rounded-xl overflow-hidden"
+                >
+                  <img
+                    src={src}
+                    alt="Espaço Empuria"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-brown/60 to-transparent" />
                 </div>
               ))}
@@ -293,12 +342,16 @@ function HomePage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {services.slice(0, 6).map((s, i) => (
                 <Reveal key={s.id} delay={i * 70}>
-                  <ServiceCard service={s as PublicService} onBuy={onBuy} onDetails={onDetails} variant="dark" />
+                  <ServiceCard
+                    service={s as PublicService}
+                    onBuy={onBuy}
+                    onDetails={onDetails}
+                    variant="dark"
+                  />
                 </Reveal>
               ))}
             </div>
           </div>
-
 
           {/* Esteira 2 — High ticket */}
           <Reveal>
@@ -310,13 +363,13 @@ function HomePage() {
                     Exclusivo · High-Ticket
                   </div>
                   <h3 className="font-display font-extrabold text-3xl md:text-4xl uppercase leading-tight">
-                    Consultoria Imigratória<br />
+                    Consultoria Imigratória
+                    <br />
                     <span className="text-yellow-brand">& Relocation.</span>
                   </h3>
                   <p className="font-body text-base mt-5 text-offwhite/80 max-w-xl leading-relaxed">
-                    Para processos de Visto, Autorização de Residência e mudança familiar
-                    completa, nosso time de especialistas oferece um acompanhamento técnico
-                    de alto nível.
+                    Para processos de Visto, Autorização de Residência e mudança familiar completa,
+                    nosso time de especialistas oferece um acompanhamento técnico de alto nível.
                   </p>
                 </div>
                 <div className="md:col-span-4 flex md:justify-end">
@@ -337,7 +390,6 @@ function HomePage() {
       {/* EVENTOS - A Agenda Empuria */}
       <HomeEventsSection />
 
-
       {/* CLUBE */}
       <section id="clube" className="bg-offwhite py-24">
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center">
@@ -349,21 +401,22 @@ function HomePage() {
             </Reveal>
             <Reveal delay={100}>
               <h2 className="font-display font-extrabold text-4xl md:text-5xl uppercase leading-[1] text-brown">
-                Muito mais que um serviço.<br />
+                Muito mais que um serviço.
+                <br />
                 Uma <span className="text-orange-brand">comunidade.</span>
               </h2>
             </Reveal>
             <Reveal delay={200}>
               <p className="font-body text-lg mt-6 text-brown-deep/80 leading-relaxed max-w-xl">
-                Faça parte do Clube de Imigração Empuria. Uma assinatura pensada para quem
-                quer estar sempre um passo à frente. Acesso imediato a cursos completos,
-                vídeos exclusivos sobre a vida na Europa, dicas de ouro de quem já trilhou
-                o caminho e uma rede de contatos que impulsiona sua jornada.
+                Faça parte do Clube de Imigração Empuria. Uma assinatura pensada para quem quer
+                estar sempre um passo à frente. Acesso imediato a cursos completos, vídeos
+                exclusivos sobre a vida na Europa, dicas de ouro de quem já trilhou o caminho e uma
+                rede de contatos que impulsiona sua jornada.
               </p>
             </Reveal>
             <Reveal delay={300}>
               <a
-                href="#"
+                href="/login?redirect=/portal/clube"
                 className="mt-8 inline-flex items-center gap-2 bg-orange-brand hover:bg-red-brand text-offwhite px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all hover:shadow-warm hover:-translate-y-0.5"
               >
                 Quero Fazer Parte do Clube <ArrowRight className="w-4 h-4" />
