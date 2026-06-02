@@ -444,6 +444,73 @@ function ComingSoon({ label }: { label: string }) {
   );
 }
 
+// ---------- Export buttons ----------
+
+function ExportButtons({
+  tab,
+  filters,
+}: {
+  tab: SearchSchema["tab"];
+  filters: ReportFilters;
+}) {
+  const xlsxFn = useServerFn(exportReportXlsx);
+  const [busy, setBusy] = useState(false);
+
+  const handleXlsx = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await xlsxFn({ data: { tab, filters } });
+      const binary = atob(res.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: res.mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Excel gerado", { description: res.filename });
+    } catch (e) {
+      toast.error("Falha ao exportar Excel", {
+        description: e instanceof Error ? e.message : "Erro desconhecido",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePrint = () => {
+    document.body.classList.add("relatorios-printing");
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => document.body.classList.remove("relatorios-printing"), 500);
+    }, 80);
+  };
+
+  return (
+    <div className="flex items-center gap-2 print:hidden">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleXlsx}
+        disabled={busy}
+        className="gap-2"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+        Excel
+      </Button>
+      <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+        <Printer className="h-4 w-4" />
+        PDF
+      </Button>
+    </div>
+  );
+}
+
 // ---------- Visão Geral ----------
 
 function VisaoGeralTab({ filters }: { filters: ReportFilters }) {
