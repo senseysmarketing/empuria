@@ -39,6 +39,8 @@ type CrmLeadRow = {
   assigned_to: string | null;
   crm_column_id: string | null;
   created_at: string;
+  last_inbound_at: string | null;
+  last_outbound_at: string | null;
   last_interaction_at: string | null;
   next_followup_at: string | null;
   pipeline_stage: string;
@@ -54,8 +56,44 @@ type CrmFollowupRow = {
   assigned_to: string | null;
   due_at: string;
   status: "pending" | "done" | "skipped" | "canceled";
+  type: string;
+  template_key: string | null;
+  mode: "manual" | "suggestion" | "automatic";
   message_preview: string | null;
+  created_at: string;
+  completed_at: string | null;
+  sent_at: string | null;
+  canceled_reason: string | null;
 };
+
+const FOLLOWUP_TEMPLATES: Record<string, { type: string; message: (lead: CrmLeadRow) => string }> =
+  {
+    primeiro_contato_2h: {
+      type: "primeiro_contato",
+      message: (lead) =>
+        `Oi, ${firstName(lead.full_name)}, tudo bem? Vi seu interesse pelo Instituto Empuria e queria entender melhor em qual etapa voce esta no seu plano de imigracao.`,
+    },
+    sem_resposta_24h: {
+      type: "sem_resposta",
+      message: (lead) =>
+        `Oi, ${firstName(lead.full_name)}. Passando so para saber se voce conseguiu ver minha mensagem anterior. Posso te ajudar com os proximos passos?`,
+    },
+    documentacao: {
+      type: "documentacao",
+      message: (lead) =>
+        `Oi, ${firstName(lead.full_name)}. Para avancarmos com sua analise, ainda preciso que voce me envie os documentos combinados. Posso te lembrar quais sao?`,
+    },
+    pre_reuniao: {
+      type: "pre_reuniao",
+      message: (lead) =>
+        `Oi, ${firstName(lead.full_name)}. Passando para confirmar nossa conversa marcada. Se precisar ajustar o horario, me avise por aqui.`,
+    },
+    retomada_final: {
+      type: "retomada",
+      message: (lead) =>
+        `Oi, ${firstName(lead.full_name)}. Como nao consegui retorno, vou deixar seu atendimento pausado por enquanto. Se quiser retomar seu plano, e so me chamar por aqui.`,
+    },
+  };
 
 function normalizeDbError(error: { message?: string } | null) {
   if (!error?.message) return "Erro inesperado no CRM";
@@ -74,6 +112,96 @@ function fallbackEmail(fullName: string, phone: string) {
     .replace(/(^\.|\.$)/g, "")
     .slice(0, 40);
   return `${slug || "lead"}.${digits || Date.now()}@crm.empuria.local`;
+}
+
+function firstName(fullName: string) {
+  return fullName.trim().split(/\s+/)[0] || "tudo bem";
+}
+
+function addHours(value: string, hours: number) {
+  const date = new Date(value);
+  date.setHours(date.getHours() + hours);
+  return date.toISOString();
+}
+
+function whatsappUrl(phone: string, message: string) {
+  const digits = phone.replace(/\D/g, "");
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
+function isFinalStage(stage: string | null | undefined) {
+  return stage === "fechado" || stage === "descartado";
+}
+
+async function refreshLeadNextFollowup(db: any, leadId: string) {
+  const { data: nextPending } = await db
+    .from("crm_followups")
+    .select("due_at")
+    .eq("lead_id", leadId)
+    .eq("status", "pending")
+    .order("due_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  await db
+    .from("leads")
+    .update({ next_followup_at: nextPending?.due_at ?? null })
+    .eq("id", leadId);
+}
+
+async function createSuggestedFollowupForLead(db: any, lead: CrmLeadRow, actorId?: string | null) {
+  if (!lead.assigned_to || isFinalStage(lead.pipeline_stage)) return false;
+  if (lead.last_inbound_at || lead.last_outbound_at) return false;
+
+  const templateKey = "primeiro_contato_2h";
+  const template = FOLLOWUP_TEMPLATES[templateKey];
+  const dueAt = addHours(lead.created_at, 2);
+  const { data: existing, error: existingError } = await db
+    .from("crm_followups")
+    .select("id")
+    .eq("lead_id", lead.id)
+    .eq("template_key", templateKey)
+    .neq("status", "canceled")
+    .limit(1)
+    .maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+  if (existing?.id) return false;
+
+  const { data: followup, error } = await db
+    .from("crm_followups")
+    .insert({
+      lead_id: lead.id,
+      assigned_to: lead.assigned_to,
+      type: template.type,
+      due_at: dueAt,
+      template_key: templateKey,
+      mode: "suggestion",
+      sequence_key: "lead_novo_sem_resposta",
+      step_index: 1,
+      message_preview: template.message(lead),
+      created_by: actorId ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") return false;
+    throw new Error(error.message);
+  }
+
+  await Promise.all([
+    refreshLeadNextFollowup(db, lead.id),
+    db.from("lead_activity_log").insert({
+      lead_id: lead.id,
+      kind: "followup_created",
+      payload: {
+        followup_id: followup.id,
+        due_at: dueAt,
+        mode: "suggestion",
+        template_key: templateKey,
+      },
+      actor_id: actorId ?? null,
+    }),
+  ]);
+  return true;
 }
 
 async function listAssignableUsers(db: any): Promise<CrmUser[]> {
@@ -124,36 +252,31 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const db = context.supabase as any;
 
-    const [
-      columnsRes,
-      leadsRes,
-      followupsRes,
-      inboxRes,
-      distributionRes,
-      membersRes,
-      activityRes,
-      users,
-    ] = await Promise.all([
-      db
-        .from("crm_columns")
-        .select("*")
-        .eq("is_active", true)
-        .order("position", { ascending: true }),
-      db.from("leads").select("*").order("created_at", { ascending: false }).limit(400),
-      db.from("crm_followups").select("*").order("due_at", { ascending: true }).limit(250),
-      db
-        .from("crm_inbox_messages")
-        .select("*")
-        .in("status", ["received", "suggested"])
-        .order("created_at", { ascending: false })
-        .limit(100),
-      db.from("crm_distribution_settings").select("*").eq("is_active", true).maybeSingle(),
-      db.from("crm_distribution_members").select("*").order("position", { ascending: true }),
-      db.from("lead_activity_log").select("*").order("created_at", { ascending: false }).limit(300),
-      listAssignableUsers(db),
-    ]);
+    const [columnsRes, leadsRes, inboxRes, distributionRes, membersRes, activityRes, users] =
+      await Promise.all([
+        db
+          .from("crm_columns")
+          .select("*")
+          .eq("is_active", true)
+          .order("position", { ascending: true }),
+        db.from("leads").select("*").order("created_at", { ascending: false }).limit(400),
+        db
+          .from("crm_inbox_messages")
+          .select("*")
+          .in("status", ["received", "suggested"])
+          .order("created_at", { ascending: false })
+          .limit(100),
+        db.from("crm_distribution_settings").select("*").eq("is_active", true).maybeSingle(),
+        db.from("crm_distribution_members").select("*").order("position", { ascending: true }),
+        db
+          .from("lead_activity_log")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(300),
+        listAssignableUsers(db),
+      ]);
 
-    for (const res of [columnsRes, leadsRes, followupsRes, inboxRes, membersRes, activityRes]) {
+    for (const res of [columnsRes, leadsRes, inboxRes, membersRes, activityRes]) {
       if (res.error) throw new Error(res.error.message);
     }
     if (distributionRes.error) throw new Error(distributionRes.error.message);
@@ -177,7 +300,24 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
       };
     });
 
-    const followups = ((followupsRes.data ?? []) as CrmFollowupRow[]).map(
+    const now = Date.now();
+    const suggestionCandidates = leads.filter(
+      (lead) =>
+        lead.pipeline_stage === "novo" &&
+        new Date(lead.created_at).getTime() + 2 * 60 * 60 * 1000 <= now,
+    );
+    for (const lead of suggestionCandidates.slice(0, 20)) {
+      await createSuggestedFollowupForLead(db, lead, context.userId);
+    }
+
+    const { data: followupRows, error: followupsError } = await db
+      .from("crm_followups")
+      .select("*")
+      .order("due_at", { ascending: true })
+      .limit(250);
+    if (followupsError) throw new Error(followupsError.message);
+
+    const followups = ((followupRows ?? []) as CrmFollowupRow[]).map(
       (followup: CrmFollowupRow) => ({
         ...followup,
         assigned_user: followup.assigned_to
@@ -246,6 +386,10 @@ export const createCrmLead = createServerFn({ method: "POST" })
       payload: { body: "Lead criado manualmente no CRM." },
       actor_id: context.userId,
     });
+
+    const { data: createdLead } = await db.from("leads").select("*").eq("id", row.id).single();
+    if (createdLead)
+      await createSuggestedFollowupForLead(db, createdLead as CrmLeadRow, context.userId);
 
     if (data.inbox_message_id) {
       await linkInboxToLeadInternal(db, data.inbox_message_id, row.id, context.userId);
@@ -377,6 +521,9 @@ export const createCrmFollowup = createServerFn({ method: "POST" })
         leadId: z.string().uuid(),
         assignedTo: z.string().uuid(),
         dueAt: z.string().datetime(),
+        type: z.string().trim().max(80).optional().or(z.literal("")),
+        templateKey: z.string().trim().max(120).optional().or(z.literal("")),
+        mode: z.enum(["manual", "suggestion"]).default("manual"),
         messagePreview: z.string().trim().max(1000).optional().or(z.literal("")),
       })
       .parse(d),
@@ -388,7 +535,10 @@ export const createCrmFollowup = createServerFn({ method: "POST" })
       .insert({
         lead_id: data.leadId,
         assigned_to: data.assignedTo,
+        type: data.type || "manual",
         due_at: data.dueAt,
+        template_key: data.templateKey || null,
+        mode: data.mode,
         message_preview: data.messagePreview || null,
         created_by: context.userId,
       })
@@ -401,7 +551,12 @@ export const createCrmFollowup = createServerFn({ method: "POST" })
       db.from("lead_activity_log").insert({
         lead_id: data.leadId,
         kind: "followup_created",
-        payload: { followup_id: followup.id, due_at: data.dueAt },
+        payload: {
+          followup_id: followup.id,
+          due_at: data.dueAt,
+          mode: data.mode,
+          template_key: data.templateKey || null,
+        },
         actor_id: context.userId,
       }),
     ]);
@@ -417,6 +572,8 @@ export const updateCrmFollowupStatus = createServerFn({ method: "POST" })
         followupId: z.string().uuid(),
         status: z.enum(["pending", "done", "skipped", "canceled"]),
         dueAt: z.string().datetime().optional(),
+        messagePreview: z.string().trim().max(1000).optional(),
+        canceledReason: z.string().trim().max(500).optional(),
       })
       .parse(d),
   )
@@ -424,6 +581,8 @@ export const updateCrmFollowupStatus = createServerFn({ method: "POST" })
     const db = context.supabase as any;
     const patch: Record<string, unknown> = { status: data.status };
     if (data.dueAt) patch.due_at = data.dueAt;
+    if (data.messagePreview !== undefined) patch.message_preview = data.messagePreview || null;
+    if (data.canceledReason) patch.canceled_reason = data.canceledReason;
     if (data.status === "done") patch.completed_at = new Date().toISOString();
 
     const { data: followup, error } = await db
@@ -442,21 +601,158 @@ export const updateCrmFollowupStatus = createServerFn({ method: "POST" })
         actor_id: context.userId,
       });
     }
+    if (data.status === "pending" && data.dueAt) {
+      await db.from("lead_activity_log").insert({
+        lead_id: followup.lead_id,
+        kind: "followup_delayed",
+        payload: { followup_id: data.followupId, due_at: data.dueAt },
+        actor_id: context.userId,
+      });
+    }
+    if (data.status === "canceled") {
+      await db.from("lead_activity_log").insert({
+        lead_id: followup.lead_id,
+        kind: "followup_canceled",
+        payload: {
+          followup_id: data.followupId,
+          reason: data.canceledReason ?? "Cancelado pela equipe.",
+        },
+        actor_id: context.userId,
+      });
+    }
 
-    const { data: nextPending } = await db
-      .from("crm_followups")
-      .select("due_at")
-      .eq("lead_id", followup.lead_id)
-      .eq("status", "pending")
-      .order("due_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    await db
-      .from("leads")
-      .update({ next_followup_at: nextPending?.due_at ?? null })
-      .eq("id", followup.lead_id);
+    await refreshLeadNextFollowup(db, followup.lead_id);
 
     return { ok: true };
+  });
+
+export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) =>
+    z
+      .object({
+        followupId: z.string().uuid(),
+        message: z.string().trim().min(1).max(1200),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as any;
+    const { data: followup, error: followupError } = await db
+      .from("crm_followups")
+      .select("*")
+      .eq("id", data.followupId)
+      .single();
+    if (followupError) throw new Error(followupError.message);
+    if (followup.status !== "pending") throw new Error("Este follow-up nao esta pendente.");
+
+    const { data: lead, error: leadError } = await db
+      .from("leads")
+      .select("*")
+      .eq("id", followup.lead_id)
+      .single();
+    if (leadError) throw new Error(leadError.message);
+    const leadRow = lead as CrmLeadRow;
+    const phoneDigits = leadRow.phone.replace(/\D/g, "");
+    if (phoneDigits.length < 8) throw new Error("Lead sem telefone valido para WhatsApp.");
+    if (isFinalStage(leadRow.pipeline_stage))
+      throw new Error("Lead em etapa final nao pode receber follow-up.");
+
+    if (
+      leadRow.last_inbound_at &&
+      new Date(leadRow.last_inbound_at).getTime() > new Date(followup.created_at).getTime()
+    ) {
+      await db
+        .from("crm_followups")
+        .update({
+          status: "canceled",
+          canceled_reason: "Lead respondeu apos a criacao do follow-up.",
+        })
+        .eq("id", data.followupId);
+      await refreshLeadNextFollowup(db, leadRow.id);
+      throw new Error("Follow-up cancelado: o lead respondeu depois que a tarefa foi criada.");
+    }
+
+    if (
+      leadRow.last_outbound_at &&
+      Date.now() - new Date(leadRow.last_outbound_at).getTime() < 15 * 60 * 1000
+    ) {
+      throw new Error("Ja houve uma mensagem enviada recentemente para este lead.");
+    }
+
+    const { data: conversation, error: conversationError } = await db
+      .from("crm_conversations")
+      .upsert(
+        {
+          lead_id: leadRow.id,
+          provider: "whatsapp",
+          provider_chat_id: `wa:${phoneDigits}`,
+          phone: leadRow.phone,
+          last_message_at: new Date().toISOString(),
+          last_outbound_at: new Date().toISOString(),
+        },
+        { onConflict: "provider,provider_chat_id" },
+      )
+      .select("id")
+      .single();
+    if (conversationError) throw new Error(conversationError.message);
+
+    const sentAt = new Date().toISOString();
+    const { data: message, error: messageError } = await db
+      .from("crm_messages")
+      .insert({
+        lead_id: leadRow.id,
+        conversation_id: conversation.id,
+        direction: "outbound",
+        provider: "whatsapp",
+        body: data.message,
+        message_type: "text",
+        status: "manual_sent",
+        sent_by: context.userId,
+        created_at: sentAt,
+      })
+      .select("id")
+      .single();
+    if (messageError) throw new Error(messageError.message);
+
+    await Promise.all([
+      db
+        .from("crm_followups")
+        .update({
+          status: "done",
+          completed_at: sentAt,
+          sent_at: sentAt,
+          sent_message_id: message.id,
+          message_preview: data.message,
+        })
+        .eq("id", data.followupId),
+      db
+        .from("crm_conversations")
+        .update({ last_message_at: sentAt, last_outbound_at: sentAt })
+        .eq("id", conversation.id),
+      db
+        .from("leads")
+        .update({ last_outbound_at: sentAt, last_interaction_at: sentAt })
+        .eq("id", leadRow.id),
+      db.from("lead_activity_log").insert([
+        {
+          lead_id: leadRow.id,
+          kind: "followup_sent",
+          payload: { followup_id: data.followupId, message_id: message.id },
+          actor_id: context.userId,
+        },
+        {
+          lead_id: leadRow.id,
+          kind: "message_outbound",
+          payload: { message_id: message.id, provider: "whatsapp" },
+          actor_id: context.userId,
+        },
+      ]),
+    ]);
+
+    await refreshLeadNextFollowup(db, leadRow.id);
+
+    return { ok: true, whatsappUrl: whatsappUrl(leadRow.phone, data.message) };
   });
 
 export const saveCrmColumn = createServerFn({ method: "POST" })

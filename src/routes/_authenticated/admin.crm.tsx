@@ -22,6 +22,7 @@ import {
   logCrmWhatsappOpened,
   saveCrmColumn,
   saveCrmDistribution,
+  sendCrmFollowupMessage,
   updateCrmFollowupStatus,
   updateCrmLeadColumn,
   updateCrmLeadNotes,
@@ -54,11 +55,14 @@ import {
   CheckCircle2,
   Clock,
   Columns3,
+  Pencil,
   MessageCircle,
   Plus,
+  Send,
   Search,
   Settings2,
   ShieldCheck,
+  XCircle,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -101,6 +105,8 @@ type Lead = {
   assigned_user: CrmUser | null;
   crm_column_id: string | null;
   created_at: string;
+  last_inbound_at: string | null;
+  last_outbound_at: string | null;
   last_interaction_at: string | null;
   next_followup_at: string | null;
   qualification_answers: JsonValue;
@@ -113,8 +119,16 @@ type Followup = {
   assigned_to: string;
   due_at: string;
   status: "pending" | "done" | "skipped" | "canceled";
+  type: string;
+  template_key: string | null;
+  mode: "manual" | "suggestion" | "automatic";
   message_preview: string | null;
+  created_at: string;
+  completed_at: string | null;
+  sent_at: string | null;
+  canceled_reason: string | null;
   lead: Lead | null;
+  assigned_user: CrmUser | null;
 };
 
 type InboxMessage = {
@@ -158,6 +172,44 @@ type Workspace = {
   isAdmin: boolean;
   whatsappMode: "sugestao" | "automatico" | "desativado";
 };
+
+const FOLLOWUP_TEMPLATE_OPTIONS = [
+  {
+    key: "primeiro_contato_2h",
+    type: "primeiro_contato",
+    label: "Primeiro contato",
+    message: (lead: Pick<Lead, "full_name">) =>
+      `Oi, ${firstName(lead.full_name)}, tudo bem? Vi seu interesse pelo Instituto Empuria e queria entender melhor em qual etapa voce esta no seu plano de imigracao.`,
+  },
+  {
+    key: "sem_resposta_24h",
+    type: "sem_resposta",
+    label: "Sem resposta 24h",
+    message: (lead: Pick<Lead, "full_name">) =>
+      `Oi, ${firstName(lead.full_name)}. Passando so para saber se voce conseguiu ver minha mensagem anterior. Posso te ajudar com os proximos passos?`,
+  },
+  {
+    key: "documentacao",
+    type: "documentacao",
+    label: "Documentos",
+    message: (lead: Pick<Lead, "full_name">) =>
+      `Oi, ${firstName(lead.full_name)}. Para avancarmos com sua analise, ainda preciso que voce me envie os documentos combinados. Posso te lembrar quais sao?`,
+  },
+  {
+    key: "pre_reuniao",
+    type: "pre_reuniao",
+    label: "Reuniao",
+    message: (lead: Pick<Lead, "full_name">) =>
+      `Oi, ${firstName(lead.full_name)}. Passando para confirmar nossa conversa marcada. Se precisar ajustar o horario, me avise por aqui.`,
+  },
+  {
+    key: "retomada_final",
+    type: "retomada",
+    label: "Retomada final",
+    message: (lead: Pick<Lead, "full_name">) =>
+      `Oi, ${firstName(lead.full_name)}. Como nao consegui retorno, vou deixar seu atendimento pausado por enquanto. Se quiser retomar seu plano, e so me chamar por aqui.`,
+  },
+] as const;
 
 function CrmPage() {
   const fetchWorkspace = useServerFn(listCrmWorkspace);
@@ -450,9 +502,15 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
         </div>
         <div className="flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5" />
-          <span>
+          <span
+            className={
+              lead.next_followup_at && new Date(lead.next_followup_at).getTime() < Date.now()
+                ? "font-medium text-red-700"
+                : ""
+            }
+          >
             {lead.next_followup_at
-              ? `Follow-up ${formatDateShort(lead.next_followup_at)}`
+              ? `${new Date(lead.next_followup_at).getTime() < Date.now() ? "Atrasado" : "Follow-up"} ${formatDateShort(lead.next_followup_at)}`
               : "Sem follow-up"}
           </span>
         </div>
@@ -619,12 +677,17 @@ function FollowupsTab({
   onOpenLead: (lead: Lead) => void;
 }) {
   const updateStatus = useServerFn(updateCrmFollowupStatus);
+  const sendMessage = useServerFn(sendCrmFollowupMessage);
   const qc = useQueryClient();
+  const [editing, setEditing] = useState<Followup | null>(null);
+  const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>({});
   const mutation = useMutation({
     mutationFn: (payload: {
       followupId: string;
       status: "pending" | "done" | "skipped" | "canceled";
       dueAt?: string;
+      messagePreview?: string;
+      canceledReason?: string;
     }) => updateStatus({ data: payload }),
     onSuccess: () => {
       toast.success("Follow-up atualizado");
@@ -634,26 +697,116 @@ function FollowupsTab({
       toast.error(error instanceof Error ? error.message : "Erro ao atualizar follow-up"),
   });
 
+  const send = useMutation({
+    mutationFn: (followup: Followup) =>
+      sendMessage({
+        data: {
+          followupId: followup.id,
+          message: messageDrafts[followup.id] ?? followup.message_preview ?? "",
+        },
+      }),
+    onSuccess: (result) => {
+      toast.success("Follow-up registrado. WhatsApp aberto para envio.");
+      window.open(result.whatsappUrl, "_blank", "noopener,noreferrer");
+      qc.invalidateQueries({ queryKey: ["crm-workspace"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao enviar follow-up"),
+  });
+
   const pending = followups.filter((item) => item.status === "pending");
-  const done = followups.filter((item) => item.status === "done").slice(0, 20);
-  const overdue = pending.filter((item) => new Date(item.due_at).getTime() < Date.now());
-  const upcoming = pending.filter((item) => new Date(item.due_at).getTime() >= Date.now());
+  const manualPending = pending.filter((item) => item.mode !== "suggestion");
+  const suggestions = pending.filter((item) => item.mode === "suggestion");
+  const done = followups
+    .filter((item) => item.status === "done")
+    .sort(
+      (a, b) =>
+        new Date(b.completed_at ?? b.due_at).getTime() -
+        new Date(a.completed_at ?? a.due_at).getTime(),
+    )
+    .slice(0, 20);
+  const now = Date.now();
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  const overdue = manualPending.filter((item) => new Date(item.due_at).getTime() < now);
+  const today = manualPending.filter((item) => {
+    const due = new Date(item.due_at).getTime();
+    return due >= now && due <= todayEnd.getTime();
+  });
+  const upcoming = manualPending.filter(
+    (item) => new Date(item.due_at).getTime() > todayEnd.getTime(),
+  );
+
+  const actions = {
+    onOpenLead,
+    onDraftChange: (id: string, value: string) =>
+      setMessageDrafts((old) => ({ ...old, [id]: value })),
+    onEdit: setEditing,
+    onSend: (item: Followup) => send.mutate(item),
+    onDone: (id: string) => mutation.mutate({ followupId: id, status: "done" }),
+    onDelay: (id: string) =>
+      mutation.mutate({
+        followupId: id,
+        status: "pending",
+        dueAt: addDays(new Date(), 1).toISOString(),
+      }),
+    onCancel: (id: string) =>
+      mutation.mutate({
+        followupId: id,
+        status: "canceled",
+        canceledReason: "Cancelado manualmente pela equipe.",
+      }),
+    busy: mutation.isPending || send.isPending,
+    messageDrafts,
+  };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="space-y-4">
+      <section className="grid gap-3 md:grid-cols-5">
+        <Metric icon={Clock} label="Atrasados" value={overdue.length} />
+        <Metric icon={CalendarClock} label="Hoje" value={today.length} />
+        <Metric icon={ArrowRight} label="Proximos" value={upcoming.length} />
+        <Metric icon={MessageCircle} label="Sugeridos" value={suggestions.length} />
+        <Metric icon={CheckCircle2} label="Concluidos" value={done.length} />
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <FollowupGroup title="Atrasados" items={overdue} tone="danger" actions={actions} />
+        <FollowupGroup title="Hoje" items={today} tone="accent" actions={actions} />
+        <FollowupGroup
+          title="Automaticos sugeridos"
+          items={suggestions}
+          tone="suggestion"
+          actions={actions}
+        />
+        <FollowupGroup title="Proximos" items={upcoming} tone="neutral" actions={actions} />
+      </div>
+
       <FollowupGroup
-        title="Atrasados"
-        items={overdue}
-        onOpenLead={onOpenLead}
-        onDone={(id) => mutation.mutate({ followupId: id, status: "done" })}
+        title="Concluidos recentes"
+        items={done}
+        tone="done"
+        actions={actions}
+        readonly
       />
-      <FollowupGroup
-        title="Proximos"
-        items={upcoming}
-        onOpenLead={onOpenLead}
-        onDone={(id) => mutation.mutate({ followupId: id, status: "done" })}
+
+      <EditFollowupMessageDialog
+        followup={editing}
+        value={editing ? (messageDrafts[editing.id] ?? editing.message_preview ?? "") : ""}
+        onChange={(value) =>
+          editing && setMessageDrafts((old) => ({ ...old, [editing.id]: value }))
+        }
+        onClose={() => setEditing(null)}
+        onSave={(value) => {
+          if (!editing) return;
+          mutation.mutate({
+            followupId: editing.id,
+            status: "pending",
+            messagePreview: value,
+          });
+          setEditing(null);
+        }}
       />
-      <FollowupGroup title="Concluidos" items={done} onOpenLead={onOpenLead} onDone={null} />
     </div>
   );
 }
@@ -661,60 +814,199 @@ function FollowupsTab({
 function FollowupGroup({
   title,
   items,
-  onOpenLead,
-  onDone,
+  tone,
+  actions,
+  readonly,
 }: {
   title: string;
   items: Followup[];
-  onOpenLead: (lead: Lead) => void;
-  onDone: ((id: string) => void) | null;
+  tone: "danger" | "accent" | "suggestion" | "neutral" | "done";
+  actions: {
+    onOpenLead: (lead: Lead) => void;
+    onDraftChange: (id: string, value: string) => void;
+    onEdit: (followup: Followup) => void;
+    onSend: (followup: Followup) => void;
+    onDone: (id: string) => void;
+    onDelay: (id: string) => void;
+    onCancel: (id: string) => void;
+    busy: boolean;
+    messageDrafts: Record<string, string>;
+  };
+  readonly?: boolean;
 }) {
+  const toneClass = {
+    danger: "border-red-500/30",
+    accent: "border-admin-accent/40",
+    suggestion: "border-amber-500/40",
+    neutral: "border-admin-border",
+    done: "border-emerald-500/30",
+  }[tone];
+
   return (
-    <section className="rounded-xl border border-admin-border bg-admin-surface">
+    <section className={`rounded-xl border bg-admin-surface ${toneClass}`}>
       <header className="border-b border-admin-border px-4 py-3">
-        <h3 className="font-display text-sm uppercase tracking-wider">{title}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-display text-sm uppercase tracking-wider">{title}</h3>
+          <span className="text-xs tabular-nums text-admin-ink-muted">{items.length}</span>
+        </div>
       </header>
       <div className="space-y-2 p-3">
         {items.length === 0 ? (
           <p className="py-6 text-center text-xs text-admin-ink-muted">Nada por aqui.</p>
         ) : (
           items.map((item) => (
-            <article
-              key={item.id}
-              className="rounded-lg border border-admin-border bg-admin-surface-2 p-3"
-            >
-              <div className="text-sm font-medium text-admin-ink">
-                {item.lead?.full_name ?? "Lead removido"}
-              </div>
-              <div className="mt-1 text-xs text-admin-ink-muted">{formatDateTime(item.due_at)}</div>
-              {item.message_preview && (
-                <p className="mt-2 line-clamp-3 text-sm text-admin-ink-soft">
-                  {item.message_preview}
-                </p>
-              )}
-              <div className="mt-3 flex gap-2">
-                {item.lead && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (item.lead) onOpenLead(item.lead);
-                    }}
-                  >
-                    Abrir
-                  </Button>
-                )}
-                {onDone && (
-                  <Button size="sm" onClick={() => onDone(item.id)} className="gap-2">
-                    <CheckCircle2 className="h-4 w-4" /> Feito
-                  </Button>
-                )}
-              </div>
-            </article>
+            <FollowupCard key={item.id} item={item} actions={actions} readonly={readonly} />
           ))
         )}
       </div>
     </section>
+  );
+}
+
+function FollowupCard({
+  item,
+  actions,
+  readonly,
+}: {
+  item: Followup;
+  actions: Parameters<typeof FollowupGroup>[0]["actions"];
+  readonly?: boolean;
+}) {
+  const draft = actions.messageDrafts[item.id] ?? item.message_preview ?? "";
+  const isObsolete =
+    item.lead?.last_inbound_at &&
+    new Date(item.lead.last_inbound_at).getTime() > new Date(item.created_at).getTime();
+  const canSend = Boolean(item.lead && draft.trim() && !isObsolete && item.status === "pending");
+
+  return (
+    <article className="rounded-lg border border-admin-border bg-admin-surface-2 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium text-admin-ink">
+            {item.lead?.full_name ?? "Lead removido"}
+          </div>
+          <div className="mt-1 text-xs text-admin-ink-muted">
+            {followupTypeLabel(item.type)} · {formatDateTime(item.due_at)}
+          </div>
+        </div>
+        <Badge variant={item.mode === "suggestion" ? "secondary" : "outline"}>
+          {item.mode === "suggestion" ? "sugerido" : item.status}
+        </Badge>
+      </div>
+
+      <div className="mt-2 text-xs text-admin-ink-muted">
+        Responsavel: {item.assigned_user?.full_name ?? item.lead?.assigned_user?.full_name ?? "-"}
+      </div>
+
+      {readonly ? (
+        <p className="mt-2 line-clamp-3 text-sm text-admin-ink-soft">
+          {item.message_preview || "Sem mensagem registrada."}
+        </p>
+      ) : (
+        <Textarea
+          value={draft}
+          onChange={(event) => actions.onDraftChange(item.id, event.target.value)}
+          rows={3}
+          className="mt-2 bg-admin-surface text-sm"
+          placeholder="Mensagem sugerida para revisar antes do envio."
+        />
+      )}
+
+      {isObsolete && (
+        <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-800">
+          O lead respondeu depois que este follow-up foi criado. Cancele ou revise antes de agir.
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {item.lead && (
+          <Button size="sm" variant="outline" onClick={() => actions.onOpenLead(item.lead!)}>
+            Abrir lead
+          </Button>
+        )}
+        {!readonly && (
+          <>
+            <Button
+              size="sm"
+              className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={!canSend || actions.busy}
+              onClick={() => actions.onSend(item)}
+            >
+              <Send className="h-4 w-4" /> Enviar agora
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => actions.onEdit(item)}
+            >
+              <Pencil className="h-4 w-4" /> Editar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => actions.onDelay(item.id)}
+              disabled={actions.busy}
+            >
+              Adiar 24h
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => actions.onDone(item.id)}
+              disabled={actions.busy}
+              className="gap-2"
+            >
+              <CheckCircle2 className="h-4 w-4" /> Concluir
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => actions.onCancel(item.id)}
+              disabled={actions.busy}
+              className="gap-2"
+            >
+              <XCircle className="h-4 w-4" /> Cancelar
+            </Button>
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function EditFollowupMessageDialog({
+  followup,
+  value,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  followup: Followup | null;
+  value: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onSave: (value: string) => void;
+}) {
+  return (
+    <Dialog open={Boolean(followup)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="bg-admin-surface sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Editar mensagem</DialogTitle>
+          <DialogDescription>
+            Revise a mensagem antes de registrar o envio pelo WhatsApp.
+          </DialogDescription>
+        </DialogHeader>
+        <Textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          rows={6}
+          className="bg-admin-bg"
+        />
+        <Button onClick={() => onSave(value)} disabled={!value.trim()}>
+          Salvar mensagem
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1274,7 +1566,13 @@ function FollowupDialog({
   const createFollowupFn = useServerFn(createCrmFollowup);
   const qc = useQueryClient();
   const [dueAt, setDueAt] = useState("");
+  const [templateKey, setTemplateKey] = useState("primeiro_contato_2h");
   const [messagePreview, setMessagePreview] = useState("");
+  const selectedTemplate = FOLLOWUP_TEMPLATE_OPTIONS.find(
+    (template) => template.key === templateKey,
+  );
+  const effectiveMessage =
+    messagePreview || (lead && selectedTemplate ? selectedTemplate.message(lead) : "");
   const mutation = useMutation({
     mutationFn: () =>
       createFollowupFn({
@@ -1282,12 +1580,16 @@ function FollowupDialog({
           leadId: lead!.id,
           assignedTo: lead!.assigned_to || users[0]?.id,
           dueAt: new Date(dueAt).toISOString(),
-          messagePreview,
+          type: selectedTemplate?.type ?? "manual",
+          templateKey,
+          mode: "manual",
+          messagePreview: effectiveMessage,
         },
       }),
     onSuccess: () => {
       toast.success("Follow-up criado");
       setDueAt("");
+      setTemplateKey("primeiro_contato_2h");
       setMessagePreview("");
       onClose();
       qc.invalidateQueries({ queryKey: ["crm-workspace"] });
@@ -1304,14 +1606,59 @@ function FollowupDialog({
           <DialogDescription>{lead?.full_name}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <Select
+            value={templateKey}
+            onValueChange={(value) => {
+              setTemplateKey(value);
+              const template = FOLLOWUP_TEMPLATE_OPTIONS.find((item) => item.key === value);
+              if (template && lead) setMessagePreview(template.message(lead));
+            }}
+          >
+            <SelectTrigger className="bg-admin-bg">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FOLLOWUP_TEMPLATE_OPTIONS.map((template) => (
+                <SelectItem key={template.key} value={template.key}>
+                  {template.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Input
             type="datetime-local"
             value={dueAt}
             onChange={(event) => setDueAt(event.target.value)}
             className="bg-admin-bg"
           />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setDueAt(toDateTimeLocal(addHours(new Date(), 2)))}
+            >
+              Em 2h
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setDueAt(toDateTimeLocal(addDays(new Date(), 1)))}
+            >
+              Amanha
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setDueAt(toDateTimeLocal(addDays(new Date(), 3)))}
+            >
+              Em 3 dias
+            </Button>
+          </div>
           <Textarea
-            value={messagePreview}
+            value={effectiveMessage}
             onChange={(event) => setMessagePreview(event.target.value)}
             placeholder="Mensagem ou objetivo do contato"
             className="bg-admin-bg"
@@ -1400,8 +1747,45 @@ function leadTemperature(lead: Lead) {
   return temperatureChip(temperatureOf(score));
 }
 
+function firstName(fullName: string) {
+  return fullName.trim().split(/\s+/)[0] || "tudo bem";
+}
+
+function addHours(date: Date, hours: number) {
+  const next = new Date(date);
+  next.setHours(next.getHours() + hours);
+  return next;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toDateTimeLocal(date: Date) {
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 16);
+}
+
 function formatDateShort(value: string) {
   return new Date(value).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+function followupTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    primeiro_contato: "Primeiro contato",
+    sem_resposta: "Sem resposta",
+    retomada: "Retomada",
+    documentacao: "Documentacao",
+    pre_reuniao: "Pre-reuniao",
+    pos_reuniao: "Pos-reuniao",
+    proposta: "Proposta",
+    reativacao: "Reativacao",
+    manual: "Manual",
+  };
+  return labels[type] ?? type;
 }
 
 function formatDateTime(value: string) {
@@ -1430,6 +1814,16 @@ function formatActivity(event: Workspace["activity"][number]) {
       return "Follow-up criado.";
     case "followup_done":
       return "Follow-up concluido.";
+    case "followup_sent":
+      return "Follow-up enviado e registrado.";
+    case "followup_delayed":
+      return `Follow-up adiado para ${payload.due_at ? formatDateTime(payload.due_at) : "nova data"}.`;
+    case "followup_canceled":
+      return `Follow-up cancelado: ${payload.reason ?? "sem motivo informado"}.`;
+    case "message_inbound":
+      return "Mensagem recebida do lead.";
+    case "message_outbound":
+      return "Mensagem enviada para o lead.";
     case "inbox_message_linked":
       return "Mensagem do inbox vinculada.";
     default:
