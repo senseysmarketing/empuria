@@ -10,6 +10,7 @@ import {
   Ticket,
   Users,
   WalletCards,
+  BarChart3,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useModuleAccess } from "@/hooks/use-module-access";
@@ -22,6 +23,7 @@ const items = [
   { to: "/admin/esteira", label: "Esteira", icon: PackageCheck, module: "esteira" },
   { to: "/admin/crm", label: "CRM", icon: Filter, module: "crm" },
   { to: "/admin/financeiro", label: "Caixa", icon: WalletCards, module: "financeiro" },
+  { to: "/admin/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
   { to: "/admin/usuarios", label: "Usuários", icon: Users, module: "usuarios" },
 ] as const;
