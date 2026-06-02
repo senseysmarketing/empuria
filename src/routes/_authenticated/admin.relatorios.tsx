@@ -204,10 +204,10 @@ function RelatoriosPage() {
           <VendasTab filters={filters} />
         </TabsContent>
         <TabsContent value="pdv" className="mt-0">
-          <ComingSoon label="PDV & Estoque" />
+          <PdvTab filters={filters} />
         </TabsContent>
         <TabsContent value="servicos" className="mt-0">
-          <ComingSoon label="Serviços & Agenda" />
+          <ServicosTab filters={filters} />
         </TabsContent>
         <TabsContent value="eventos" className="mt-0">
           <ComingSoon label="Eventos" />
