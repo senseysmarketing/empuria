@@ -1071,3 +1071,368 @@ function WeekdayBarChart({ data }: { data: { label: string; count: number }[] })
     </div>
   );
 }
+
+// ---------- Eventos ----------
+
+function EventosTab({ filters }: { filters: ReportFilters }) {
+  const fetchFn = useServerFn(getReportsEventos);
+  const q = useQuery({
+    queryKey: ["reports-eventos", filters],
+    queryFn: () => fetchFn({ data: filters }),
+  });
+
+  if (q.isLoading) return <LoadingBlock />;
+  if (q.error) return <ErrorBlock error={q.error} />;
+  if (!q.data) return null;
+  const d = q.data;
+  const c = d.cards;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-12 gap-4">
+        <MetricCard label="Eventos publicados" value={number(c.publishedEvents.current)} icon={Megaphone} tone="blue" />
+        <MetricCard label="Ingressos vendidos" value={number(c.ticketsSold.current)} deltaPct={c.ticketsSold.deltaPct} icon={TicketIcon} tone="green" />
+        <MetricCard label="Receita" value={money(c.revenue.current, "EUR")} deltaPct={c.revenue.deltaPct} icon={TrendingUp} tone="green" />
+        <MetricCard label="Check-ins" value={number(c.checkedIn.current)} deltaPct={c.checkedIn.deltaPct} icon={UserCheck} tone="blue" />
+        <MetricCard label="Taxa de comparecimento" value={`${c.attendanceRate.current.toFixed(1)}%`} icon={Activity} tone="amber" />
+        <MetricCard label="Cancelados" value={number(c.canceled.current)} deltaPct={c.canceled.deltaPct} icon={AlertTriangle} tone="red" />
+        <MetricCard label="Capacidade média vendida" value={`${c.avgCapacityPct.current.toFixed(1)}%`} icon={BarChart3} tone="neutral" />
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <BentoCard title="Top eventos por receita" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.topEventsByRevenue.map((e) => ({
+              label: `${e.label} · ${number(e.sold)} ing.`,
+              value: money(e.revenue, "EUR"),
+              raw: e.revenue,
+            }))}
+            empty="Sem vendas no período."
+          />
+        </BentoCard>
+        <BentoCard title="Top eventos por ingressos" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.topEventsBySold.map((e) => ({
+              label: `${e.label} · ${number(e.checkedIn)} check-ins`,
+              value: `${number(e.sold)}`,
+              raw: e.sold,
+            }))}
+            empty="Sem dados."
+          />
+        </BentoCard>
+        <BentoCard title="Receita por lote" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.tierRevenue.map((t) => ({
+              label: t.label,
+              value: money(t.revenue, "EUR"),
+              raw: t.revenue,
+            }))}
+            empty="Sem vendas por lote no período."
+          />
+        </BentoCard>
+        <BentoCard title="Eventos com baixa procura" className="col-span-12 lg:col-span-6">
+          {d.lowDemand.length === 0 ? (
+            <EmptyState label="Nenhum evento com baixa procura — ótimo!" />
+          ) : (
+            <ul className="space-y-2">
+              {d.lowDemand.map((e: { id: string; title: string; pct: number; sold: number; capacity: number }) => (
+                <li key={e.id} className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2 text-amber-900 truncate">
+                    <AlertTriangle className="h-4 w-4" />
+                    {e.title}
+                  </span>
+                  <span className="font-display tabular-nums text-amber-900">
+                    {e.sold}/{e.capacity} ({e.pct.toFixed(0)}%)
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </BentoCard>
+        <BentoCard title="Status dos ingressos" className="col-span-12 lg:col-span-4">
+          <RankingList
+            rows={d.ticketStatus.map((s) => ({
+              label: s.label,
+              value: `${number(s.count)}`,
+              raw: s.count,
+            }))}
+            empty="Sem dados."
+          />
+        </BentoCard>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Clube do Imigrante ----------
+
+function ClubeTab({ filters }: { filters: ReportFilters }) {
+  const fetchFn = useServerFn(getReportsClube);
+  const q = useQuery({
+    queryKey: ["reports-clube", filters],
+    queryFn: () => fetchFn({ data: filters }),
+  });
+
+  if (q.isLoading) return <LoadingBlock />;
+  if (q.error) return <ErrorBlock error={q.error} />;
+  if (!q.data) return null;
+  const d = q.data;
+  const c = d.cards;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-12 gap-4">
+        <MetricCard label="Membros ativos" value={number(c.activeMembers.current)} icon={Crown} tone="green" />
+        <MetricCard label="Novas assinaturas" value={number(c.newSubs.current)} deltaPct={c.newSubs.deltaPct} icon={Sparkles} tone="blue" />
+        <MetricCard label="Cancelamentos" value={number(c.canceled.current)} deltaPct={c.canceled.deltaPct} icon={UserMinus} tone="red" />
+        <MetricCard label="Inadimplentes/Inativos" value={number(c.inactive.current)} icon={AlertTriangle} tone="amber" />
+        <MetricCard label="Receita do Clube" value={money(c.revenue.current)} icon={TrendingUp} tone="green" />
+        <MetricCard label="MRR estimado" value={money(c.mrr.current)} icon={Wallet} tone="blue" />
+        <MetricCard label="Churn" value={`${c.churnPct.current.toFixed(1)}%`} icon={TrendingDown} tone="amber" />
+        <MetricCard label="Pagamentos aprovados" value={number(c.approved.current)} icon={ShoppingCart} tone="neutral" />
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <BentoCard title="Eventos Hubla no período" className="col-span-12 lg:col-span-4">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg bg-admin-bg p-3">
+              <p className="text-xs text-admin-ink-muted">Recebidos</p>
+              <p className="font-display text-2xl text-admin-ink">{number(d.hubla.received)}</p>
+            </div>
+            <div className="rounded-lg bg-amber-50 p-3">
+              <p className="text-xs text-amber-800">Pendentes</p>
+              <p className="font-display text-2xl text-amber-900">{number(d.hubla.pending)}</p>
+            </div>
+            <div className="rounded-lg bg-red-50 p-3">
+              <p className="text-xs text-red-800">Com erro</p>
+              <p className="font-display text-2xl text-red-900">{number(d.hubla.errors)}</p>
+            </div>
+          </div>
+        </BentoCard>
+        <BentoCard title="Tipos de evento Hubla" className="col-span-12 lg:col-span-4">
+          <RankingList
+            rows={d.eventTypes.map((e) => ({
+              label: e.label,
+              value: `${number(e.count)}`,
+              raw: e.count,
+            }))}
+            empty="Sem eventos Hubla no período."
+          />
+        </BentoCard>
+        <BentoCard title="Erros recentes Hubla" className="col-span-12 lg:col-span-4">
+          {d.recentErrors.length === 0 ? (
+            <EmptyState label="Nenhum erro de integração Hubla. 🎉" />
+          ) : (
+            <ul className="space-y-2">
+              {d.recentErrors.map((e: { id: string; event_type: string; error_message: string | null; created_at: string }) => (
+                <li key={e.id} className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-900">
+                  <div className="font-medium">{e.event_type}</div>
+                  <div className="opacity-80 truncate">{e.error_message ?? "Erro não detalhado"}</div>
+                  <div className="mt-1 text-[10px] opacity-60">
+                    {new Date(e.created_at).toLocaleString("pt-BR")}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </BentoCard>
+        <BentoCard title="Assinaturas vs cancelamentos (diário)" className="col-span-12">
+          <SubsDailyChart data={d.dailySeries} />
+        </BentoCard>
+      </div>
+    </div>
+  );
+}
+
+function SubsDailyChart({ data }: { data: { date: string; news: number; cancels: number }[] }) {
+  if (!data.some((d) => d.news > 0 || d.cancels > 0))
+    return <EmptyState label="Sem movimentações no período." />;
+  return (
+    <div className="h-64 w-full">
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.008 70)" vertical={false} />
+          <XAxis dataKey="date" tickFormatter={formatDate} fontSize={10} stroke="oklch(0.62 0.025 50)" tickLine={false} axisLine={false} />
+          <YAxis fontSize={10} stroke="oklch(0.62 0.025 50)" tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+          <Tooltip
+            contentStyle={{ background: "white", border: "1px solid oklch(0.91 0.008 70)", borderRadius: 12, fontSize: 12 }}
+            labelFormatter={(l) => formatDate(String(l))}
+          />
+          <Bar dataKey="news" name="Novas" fill="oklch(0.62 0.16 150)" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="cancels" name="Cancelamentos" fill="oklch(0.55 0.18 25)" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ---------- CRM & SLA ----------
+
+function CrmTab({ filters }: { filters: ReportFilters }) {
+  const fetchFn = useServerFn(getReportsCrm);
+  const q = useQuery({
+    queryKey: ["reports-crm", filters],
+    queryFn: () => fetchFn({ data: filters }),
+  });
+
+  if (q.isLoading) return <LoadingBlock />;
+  if (q.error) return <ErrorBlock error={q.error} />;
+  if (!q.data) return null;
+  const d = q.data;
+  const c = d.cards;
+
+  return (
+    <div className="space-y-4">
+      {/* CRM Comercial */}
+      <div>
+        <p className="font-display text-sm uppercase tracking-wide text-admin-ink-muted mb-2">CRM Comercial</p>
+        <div className="grid grid-cols-12 gap-4">
+          <MetricCard label="Leads criados" value={number(c.leadsCreated.current)} deltaPct={c.leadsCreated.deltaPct} icon={Sparkles} tone="blue" />
+          <MetricCard label="Leads ganhos" value={number(c.won.current)} deltaPct={c.won.deltaPct} icon={TrendingUp} tone="green" />
+          <MetricCard label="Leads perdidos" value={number(c.lost.current)} deltaPct={c.lost.deltaPct} icon={TrendingDown} tone="red" />
+          <MetricCard label="Leads parados (>7d)" value={number(c.stalled.current)} icon={AlertTriangle} tone="amber" />
+          <MetricCard
+            label="Sem responsável"
+            value={number(c.withoutOwner.current)}
+            icon={UserMinus}
+            tone={c.withoutOwner.current > 0 ? "red" : "green"}
+          />
+        </div>
+      </div>
+
+      {/* SLA WhatsApp */}
+      <div>
+        <p className="font-display text-sm uppercase tracking-wide text-admin-ink-muted mb-2">SLA WhatsApp</p>
+        <div className="grid grid-cols-12 gap-4">
+          <MetricCard
+            label="Tempo médio 1ª resposta"
+            value={
+              c.avgResponseMin.current >= 60
+                ? `${(c.avgResponseMin.current / 60).toFixed(1)}h`
+                : `${c.avgResponseMin.current.toFixed(1)}min`
+            }
+            icon={Clock}
+            tone="blue"
+          />
+          <MetricCard label="Respondido ≤ 5min" value={`${c.pctWithin5.current.toFixed(0)}%`} icon={Activity} tone="green" />
+          <MetricCard label="Respondido ≤ 30min" value={`${c.pctWithin30.current.toFixed(0)}%`} icon={Activity} tone="green" />
+          <MetricCard label="Inbound" value={number(c.inboundMessages.current)} icon={MessageSquare} tone="neutral" />
+          <MetricCard
+            label="Sem resposta"
+            value={number(c.unrepliedInbox.current)}
+            icon={MessageSquare}
+            tone={c.unrepliedInbox.current > 0 ? "red" : "green"}
+          />
+          <MetricCard label="Convertidas em lead" value={number(c.convertedToLead.current)} icon={Sparkles} tone="green" />
+          <MetricCard label="Leads via WhatsApp" value={number(c.leadsViaWhatsapp.current)} icon={MessageSquare} tone="blue" />
+        </div>
+      </div>
+
+      {/* Follow-ups */}
+      <div>
+        <p className="font-display text-sm uppercase tracking-wide text-admin-ink-muted mb-2">Follow-ups</p>
+        <div className="grid grid-cols-12 gap-4">
+          <MetricCard label="Pendentes" value={number(c.followupsPending.current)} icon={CalendarCheck} tone="amber" />
+          <MetricCard
+            label="Atrasados"
+            value={number(c.followupsOverdue.current)}
+            icon={AlertTriangle}
+            tone={c.followupsOverdue.current > 0 ? "red" : "green"}
+          />
+          <MetricCard label="Concluídos no período" value={number(c.followupsDone.current)} icon={UserCheck} tone="green" />
+          <MetricCard label="SLA cumprido" value={`${c.slaPct.current.toFixed(0)}%`} icon={Activity} tone="blue" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <BentoCard title="Funil de leads" className="col-span-12 lg:col-span-6">
+          {d.totalInFunnel === 0 ? (
+            <EmptyState label="Nenhum lead ativo no funil." />
+          ) : (
+            <ul className="space-y-3">
+              {d.funnel.map((stage) => {
+                const pct = d.totalInFunnel > 0 ? (stage.count / d.totalInFunnel) * 100 : 0;
+                return (
+                  <li key={stage.key} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-admin-ink">{stage.label}</span>
+                      <span className="font-display tabular-nums text-admin-ink">
+                        {number(stage.count)} ({pct.toFixed(0)}%)
+                      </span>
+                    </div>
+                    <div className="h-2 w-full bg-admin-bg rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-admin-accent rounded-full"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </BentoCard>
+        <BentoCard title="Leads por origem" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.leadsBySource.map((s) => ({
+              label: s.label,
+              value: `${number(s.count)}`,
+              raw: s.count,
+            }))}
+            empty="Sem leads no período."
+          />
+        </BentoCard>
+        <BentoCard title="Ranking por responsável" className="col-span-12">
+          {d.ownerRanking.length === 0 ? (
+            <EmptyState label="Nenhum responsável com leads atribuídos no período." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-admin-ink-muted border-b border-admin-border">
+                    <th className="py-2 pr-4">Responsável</th>
+                    <th className="py-2 pr-4 text-right">Leads recebidos</th>
+                    <th className="py-2 pr-4 text-right">Fechados</th>
+                    <th className="py-2 pr-4 text-right">Follow-ups feitos</th>
+                    <th className="py-2 pr-4 text-right">Leads parados</th>
+                    <th className="py-2 pr-4 text-right">Conversão</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.ownerRanking.map(
+                    (r: {
+                      id: string;
+                      label: string;
+                      received: number;
+                      closed: number;
+                      stalled: number;
+                      followupsDone: number;
+                    }) => {
+                      const conv = r.received > 0 ? (r.closed / r.received) * 100 : 0;
+                      return (
+                        <tr key={r.id} className="border-b border-admin-border/60">
+                          <td className="py-2 pr-4 text-admin-ink">{r.label}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums">{number(r.received)}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums text-emerald-700">{number(r.closed)}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums">{number(r.followupsDone)}</td>
+                          <td
+                            className={`py-2 pr-4 text-right tabular-nums ${
+                              r.stalled > 0 ? "text-amber-700" : ""
+                            }`}
+                          >
+                            {number(r.stalled)}
+                          </td>
+                          <td className="py-2 pr-4 text-right tabular-nums">{conv.toFixed(0)}%</td>
+                        </tr>
+                      );
+                    },
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </BentoCard>
+      </div>
+    </div>
+  );
+}
