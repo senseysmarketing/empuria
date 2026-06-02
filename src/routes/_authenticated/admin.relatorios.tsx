@@ -802,3 +802,263 @@ function RankingList({
     </ul>
   );
 }
+
+// ---------- PDV & Estoque ----------
+
+function PdvTab({ filters }: { filters: ReportFilters }) {
+  const fetchFn = useServerFn(getReportsPdv);
+  const q = useQuery({
+    queryKey: ["reports-pdv", filters],
+    queryFn: () => fetchFn({ data: filters }),
+  });
+
+  if (q.isLoading) return <LoadingBlock />;
+  if (q.error) return <ErrorBlock error={q.error} />;
+  if (!q.data) return null;
+  const d = q.data;
+  const c = d.cards;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-12 gap-4">
+        <MetricCard
+          label="Faturamento PDV"
+          value={money(c.revenue.current, "EUR")}
+          deltaPct={c.revenue.deltaPct}
+          icon={TrendingUp}
+          tone="green"
+        />
+        <MetricCard
+          label="Vendas concluídas"
+          value={number(c.salesCount.current)}
+          deltaPct={c.salesCount.deltaPct}
+          icon={ShoppingCart}
+          tone="blue"
+        />
+        <MetricCard
+          label="Ticket médio"
+          value={money(c.ticket.current, "EUR")}
+          deltaPct={c.ticket.deltaPct}
+          icon={BarChart3}
+          tone="neutral"
+        />
+        <MetricCard
+          label="Itens vendidos"
+          value={number(c.itemsSold.current)}
+          icon={Package}
+          tone="amber"
+        />
+        <MetricCard
+          label="Vendas anuladas"
+          value={number(c.voided.current)}
+          deltaPct={c.voided.deltaPct}
+          icon={AlertTriangle}
+          tone="red"
+        />
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <BentoCard title="Top 10 produtos mais vendidos" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.topProducts.map((p) => ({
+              label: `${p.name} · ${number(p.qty)}un`,
+              value: money(p.revenue, "EUR"),
+              raw: p.qty,
+            }))}
+            empty="Sem vendas no período."
+          />
+        </BentoCard>
+        <BentoCard title="Top operadores" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.topCashiers.map((c) => ({
+              label: `${c.label} · ${number(c.count)} vendas`,
+              value: money(c.revenue, "EUR"),
+              raw: c.revenue,
+            }))}
+            empty="Sem operadores no período."
+          />
+        </BentoCard>
+        <BentoCard title="Formas de pagamento" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.paymentMethods.map((p) => ({
+              label: `${p.label} · ${number(p.count)}x`,
+              value: money(p.revenue, "EUR"),
+              raw: p.revenue,
+            }))}
+            empty="Sem pagamentos registrados."
+          />
+        </BentoCard>
+        <BentoCard title="Estoque baixo (≤ 5)" className="col-span-12 lg:col-span-6">
+          {d.lowStock.length === 0 ? (
+            <EmptyState label="Nenhum produto com estoque baixo." />
+          ) : (
+            <ul className="space-y-2">
+              {d.lowStock.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between rounded-lg bg-admin-bg px-3 py-2 text-sm"
+                >
+                  <span className="flex items-center gap-2 text-admin-ink truncate">
+                    <Boxes className="h-4 w-4 text-amber-600" />
+                    {p.name}
+                  </span>
+                  <span
+                    className={`font-display tabular-nums ${
+                      p.stock_quantity === 0 ? "text-red-700" : "text-amber-700"
+                    }`}
+                  >
+                    {p.stock_quantity}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </BentoCard>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Serviços & Agenda ----------
+
+function ServicosTab({ filters }: { filters: ReportFilters }) {
+  const fetchFn = useServerFn(getReportsServicos);
+  const q = useQuery({
+    queryKey: ["reports-servicos", filters],
+    queryFn: () => fetchFn({ data: filters }),
+  });
+
+  if (q.isLoading) return <LoadingBlock />;
+  if (q.error) return <ErrorBlock error={q.error} />;
+  if (!q.data) return null;
+  const d = q.data;
+  const c = d.cards;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-12 gap-4">
+        <MetricCard
+          label="Agendamentos"
+          value={number(c.total.current)}
+          deltaPct={c.total.deltaPct}
+          icon={CalendarCheck}
+          tone="blue"
+        />
+        <MetricCard
+          label="Confirmados"
+          value={number(c.confirmed.current)}
+          deltaPct={c.confirmed.deltaPct}
+          icon={UserCheck}
+          tone="green"
+        />
+        <MetricCard
+          label="Concluídos"
+          value={number(c.completed.current)}
+          deltaPct={c.completed.deltaPct}
+          icon={UserCheck}
+          tone="green"
+        />
+        <MetricCard
+          label="Cancelados"
+          value={number(c.canceled.current)}
+          deltaPct={c.canceled.deltaPct}
+          icon={CalendarX}
+          tone="red"
+        />
+        <MetricCard
+          label="Não compareceu"
+          value={number(c.noShow.current)}
+          deltaPct={c.noShow.deltaPct}
+          icon={AlertTriangle}
+          tone="amber"
+        />
+        <MetricCard
+          label="Taxa de no-show"
+          value={`${c.noShowRate.current.toFixed(1)}%`}
+          icon={TrendingDown}
+          tone="amber"
+        />
+        <MetricCard
+          label="Taxa de cancelamento"
+          value={`${c.cancelRate.current.toFixed(1)}%`}
+          icon={TrendingDown}
+          tone="red"
+        />
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <BentoCard title="Serviços mais agendados" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.topServices.map((s) => ({
+              label: s.label,
+              value: `${number(s.count)}`,
+              raw: s.count,
+            }))}
+            empty="Sem agendamentos no período."
+          />
+        </BentoCard>
+        <BentoCard title="Por categoria" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.byCategory.map((s) => ({
+              label: s.label,
+              value: `${number(s.count)}`,
+              raw: s.count,
+            }))}
+            empty="Sem dados."
+          />
+        </BentoCard>
+        <BentoCard title="Ocupação por dia da semana" className="col-span-12 lg:col-span-8">
+          <WeekdayBarChart data={d.byWeekday} />
+        </BentoCard>
+        <BentoCard title="Status dos agendamentos" className="col-span-12 lg:col-span-4">
+          <RankingList
+            rows={d.byStatus.map((s) => ({
+              label: s.label,
+              value: `${number(s.count)}`,
+              raw: s.count,
+            }))}
+            empty="Sem dados."
+          />
+        </BentoCard>
+      </div>
+    </div>
+  );
+}
+
+function WeekdayBarChart({ data }: { data: { label: string; count: number }[] }) {
+  if (!data.some((d) => d.count > 0)) return <EmptyState label="Sem agendamentos no período." />;
+  return (
+    <div className="h-64 w-full">
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.008 70)" vertical={false} />
+          <XAxis
+            dataKey="label"
+            fontSize={11}
+            stroke="oklch(0.62 0.025 50)"
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            fontSize={10}
+            stroke="oklch(0.62 0.025 50)"
+            tickLine={false}
+            axisLine={false}
+            width={40}
+            allowDecimals={false}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "white",
+              border: "1px solid oklch(0.91 0.008 70)",
+              borderRadius: 12,
+              fontSize: 12,
+            }}
+            formatter={(v) => [`${v}`, "Agendamentos"]}
+          />
+          <Bar dataKey="count" fill="oklch(0.58 0.18 45)" radius={[6, 6, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
