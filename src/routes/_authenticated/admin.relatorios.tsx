@@ -1023,11 +1023,6 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
             </ul>
           )}
         </BentoCard>
-      </div>
-    </div>
-  );
-}
-
         <BentoCard title="Horários de maior venda" className="col-span-12">
           <HourlySalesChart data={d.hourly} />
         </BentoCard>
