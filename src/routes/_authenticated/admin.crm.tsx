@@ -323,9 +323,9 @@ function CrmPage() {
 
       <Tabs defaultValue="funil" className="space-y-4">
         <TabsList className="bg-admin-surface border border-admin-border">
-          <TabsTrigger value="funil">Funil</TabsTrigger>
-          <TabsTrigger value="inbox">Inbox WhatsApp</TabsTrigger>
-          <TabsTrigger value="followups">Follow-ups</TabsTrigger>
+          <TabsTrigger value="funil" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Funil</TabsTrigger>
+          <TabsTrigger value="inbox" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Inbox WhatsApp</TabsTrigger>
+          <TabsTrigger value="followups" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Follow-ups</TabsTrigger>
         </TabsList>
 
         <TabsContent value="funil" className="mt-0">

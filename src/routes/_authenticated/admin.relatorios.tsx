@@ -193,7 +193,7 @@ function RelatoriosPage() {
         }
         className="space-y-4"
       >
-        <TabsList className="bg-admin-surface border border-admin-border flex flex-wrap h-auto">
+        <TabsList className="bg-admin-surface border border-admin-border">
           {[
             { v: "visao", l: "Visão Geral" },
             { v: "vendas", l: "Vendas & Financeiro" },
