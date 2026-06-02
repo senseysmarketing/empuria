@@ -893,7 +893,7 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
             <EmptyState label="Nenhum produto com estoque baixo." />
           ) : (
             <ul className="space-y-2">
-              {d.lowStock.map((p) => (
+              {d.lowStock.map((p: { id: string; name: string; stock_quantity: number }) => (
                 <li
                   key={p.id}
                   className="flex items-center justify-between rounded-lg bg-admin-bg px-3 py-2 text-sm"
