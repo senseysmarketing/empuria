@@ -615,11 +615,21 @@ function VisaoGeralTab({ filters }: { filters: ReportFilters }) {
         <BentoCard title="Receita por origem" className="col-span-12 lg:col-span-6">
           <OriginBarChart data={d.byOrigin} />
         </BentoCard>
-        <BentoCard title="Alertas" className="col-span-12 lg:col-span-6">
+        <BentoCard title="Funil de leads" className="col-span-12 lg:col-span-6">
+          <RankingList
+            rows={d.leadsFunnel.map((s: { label: string; count: number }) => ({
+              label: s.label,
+              value: `${number(s.count)}`,
+              raw: s.count,
+            }))}
+            empty="Sem leads ativos no funil."
+          />
+        </BentoCard>
+        <BentoCard title="Alertas" className="col-span-12">
           {d.alerts.length === 0 ? (
             <EmptyState label="Tudo certo — nenhum alerta no período." />
           ) : (
-            <ul className="space-y-2">
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {d.alerts.map((a, i) => (
                 <li
                   key={i}
