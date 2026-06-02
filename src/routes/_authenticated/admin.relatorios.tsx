@@ -956,7 +956,15 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           icon={AlertTriangle}
           tone="red"
         />
+        <MetricCard
+          label="Descontos concedidos"
+          value={money(c.discounts.current, "EUR")}
+          deltaPct={c.discounts.deltaPct}
+          icon={TrendingDown}
+          tone="amber"
+        />
       </div>
+
 
       <div className="grid grid-cols-12 gap-4">
         <BentoCard title="Top 10 produtos mais vendidos" className="col-span-12 lg:col-span-6">
