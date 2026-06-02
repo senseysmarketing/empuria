@@ -285,6 +285,44 @@ export const getReportsOverview = createServerFn({ method: "POST" })
     const series = dailySeries(currentTxs, range);
     const byOrigin = groupByOrigin(currentTxs);
 
+    // Extras: leads funnel + low stock + unreplied + inactive subs
+    const [funnelRows, lowStockRows, unrepliedRows, inactiveSubsCount] = await Promise.all([
+      db.from("leads").select("pipeline_stage,status").limit(5000),
+      db
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("track_stock", true)
+        .lte("stock_quantity", 5),
+      db
+        .from("crm_inbox_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "received"),
+      db
+        .from("club_subscriptions")
+        .select("id", { count: "exact", head: true })
+        .eq("access_status", "inactive"),
+    ]);
+    const STAGES = ["novo", "qualificado", "analise", "fechado", "perdido"];
+    const STAGE_LBL: Record<string, string> = {
+      novo: "Novo",
+      qualificado: "Qualificado",
+      analise: "Em análise",
+      fechado: "Fechado",
+      perdido: "Perdido",
+    };
+    const funnelAgg = new Map<string, number>();
+    for (const r of (funnelRows.data ?? []) as { pipeline_stage: string; status: string }[]) {
+      if (r.status === "won" || r.status === "lost") continue;
+      funnelAgg.set(r.pipeline_stage, (funnelAgg.get(r.pipeline_stage) ?? 0) + 1);
+    }
+    const leadsFunnel = STAGES.map((s) => ({
+      label: STAGE_LBL[s] ?? s,
+      count: funnelAgg.get(s) ?? 0,
+    }));
+    const lowStockCount = lowStockRows.count ?? 0;
+    const unrepliedCount = unrepliedRows.count ?? 0;
+    const inactiveSubs = inactiveSubsCount.count ?? 0;
+
     // Alerts
     const alerts: { type: string; message: string; severity: "warn" | "danger" }[] = [];
     const deltaReceived = pctDelta(current.received, previous.received);
@@ -309,11 +347,36 @@ export const getReportsOverview = createServerFn({ method: "POST" })
         severity: "warn",
       });
     }
+    if (lowStockCount > 0) {
+      alerts.push({
+        type: "low_stock",
+        message: `${lowStockCount} produto(s) com estoque ≤ 5 unidades.`,
+        severity: "warn",
+      });
+    }
+    if (unrepliedCount > 0) {
+      alerts.push({
+        type: "unreplied_leads",
+        message: `${unrepliedCount} mensagem(ns) de WhatsApp sem resposta no inbox CRM.`,
+        severity: "warn",
+      });
+    }
+    if (inactiveSubs > 0) {
+      alerts.push({
+        type: "inactive_subs",
+        message: `${inactiveSubs} assinatura(s) do Clube inativas/inadimplentes.`,
+        severity: "warn",
+      });
+    }
+
+    const totalRevenue = current.received + current.receivable;
+    const totalRevenuePrev = previous.received + previous.receivable;
 
     return {
       range,
       compareRange,
       cards: {
+        totalRevenue: { current: totalRevenue, previous: totalRevenuePrev, deltaPct: pctDelta(totalRevenue, totalRevenuePrev) },
         received: { current: current.received, previous: previous.received, deltaPct: deltaReceived },
         receivable: { current: current.receivable, previous: previous.receivable, deltaPct: pctDelta(current.receivable, previous.receivable) },
         expenses: { current: current.expensesPaid, previous: previous.expensesPaid, deltaPct: pctDelta(current.expensesPaid, previous.expensesPaid) },
@@ -324,12 +387,14 @@ export const getReportsOverview = createServerFn({ method: "POST" })
         newClubMembers: { current: clubCurr, previous: 0, deltaPct: null },
         eventTickets: { current: eventsCurr, previous: 0, deltaPct: null },
       },
-      series, // [{date, value}]
-      byOrigin, // [{label, amount_cents}]
+      series,
+      byOrigin,
       topSources: byOrigin.slice(0, 5),
+      leadsFunnel,
       alerts,
     };
   });
+
 
 // ---------- VENDAS & FINANCEIRO ----------
 
