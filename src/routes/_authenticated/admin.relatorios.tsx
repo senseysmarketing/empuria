@@ -225,8 +225,12 @@ function GlobalFiltersBar({
   search: z.infer<typeof searchSchema>;
   navigate: ReturnType<typeof useNavigate>;
 }) {
-  const upd = (patch: Partial<z.infer<typeof searchSchema>>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+  const upd = (patch: Partial<SearchSchema>) =>
+    navigate({
+      to: "/admin/relatorios",
+      search: (prev: SearchSchema) => ({ ...prev, ...patch }),
+      replace: true,
+    });
 
   return (
     <BentoCard padded>
