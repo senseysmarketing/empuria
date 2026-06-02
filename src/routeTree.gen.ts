@@ -28,6 +28,7 @@ import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
 import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
 import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
+import { Route as AuthenticatedAdminRelatoriosRouteImport } from './routes/_authenticated/admin.relatorios'
 import { Route as AuthenticatedAdminPdvRouteImport } from './routes/_authenticated/admin.pdv'
 import { Route as AuthenticatedAdminFinanceiroRouteImport } from './routes/_authenticated/admin.financeiro'
 import { Route as AuthenticatedAdminEventosRouteImport } from './routes/_authenticated/admin.eventos'
@@ -139,6 +140,12 @@ const AuthenticatedAdminSlotsRoute = AuthenticatedAdminSlotsRouteImport.update({
   path: '/slots',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminRelatoriosRoute =
+  AuthenticatedAdminRelatoriosRouteImport.update({
+    id: '/relatorios',
+    path: '/relatorios',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminPdvRoute = AuthenticatedAdminPdvRouteImport.update({
   id: '/pdv',
   path: '/pdv',
@@ -216,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/admin/financeiro': typeof AuthenticatedAdminFinanceiroRoute
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
+  '/admin/relatorios': typeof AuthenticatedAdminRelatoriosRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
@@ -244,6 +252,7 @@ export interface FileRoutesByTo {
   '/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/admin/financeiro': typeof AuthenticatedAdminFinanceiroRoute
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
+  '/admin/relatorios': typeof AuthenticatedAdminRelatoriosRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
@@ -276,6 +285,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/eventos': typeof AuthenticatedAdminEventosRoute
   '/_authenticated/admin/financeiro': typeof AuthenticatedAdminFinanceiroRoute
   '/_authenticated/admin/pdv': typeof AuthenticatedAdminPdvRoute
+  '/_authenticated/admin/relatorios': typeof AuthenticatedAdminRelatoriosRoute
   '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/admin/eventos'
     | '/admin/financeiro'
     | '/admin/pdv'
+    | '/admin/relatorios'
     | '/admin/slots'
     | '/admin/triagem'
     | '/admin/usuarios'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/admin/eventos'
     | '/admin/financeiro'
     | '/admin/pdv'
+    | '/admin/relatorios'
     | '/admin/slots'
     | '/admin/triagem'
     | '/admin/usuarios'
@@ -367,6 +379,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/eventos'
     | '/_authenticated/admin/financeiro'
     | '/_authenticated/admin/pdv'
+    | '/_authenticated/admin/relatorios'
     | '/_authenticated/admin/slots'
     | '/_authenticated/admin/triagem'
     | '/_authenticated/admin/usuarios'
@@ -524,6 +537,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSlotsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/relatorios': {
+      id: '/_authenticated/admin/relatorios'
+      path: '/relatorios'
+      fullPath: '/admin/relatorios'
+      preLoaderRoute: typeof AuthenticatedAdminRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/pdv': {
       id: '/_authenticated/admin/pdv'
       path: '/pdv'
@@ -608,6 +628,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminEventosRoute: typeof AuthenticatedAdminEventosRoute
   AuthenticatedAdminFinanceiroRoute: typeof AuthenticatedAdminFinanceiroRoute
   AuthenticatedAdminPdvRoute: typeof AuthenticatedAdminPdvRoute
+  AuthenticatedAdminRelatoriosRoute: typeof AuthenticatedAdminRelatoriosRoute
   AuthenticatedAdminSlotsRoute: typeof AuthenticatedAdminSlotsRoute
   AuthenticatedAdminTriagemRoute: typeof AuthenticatedAdminTriagemRoute
   AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
@@ -625,6 +646,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminEventosRoute: AuthenticatedAdminEventosRoute,
   AuthenticatedAdminFinanceiroRoute: AuthenticatedAdminFinanceiroRoute,
   AuthenticatedAdminPdvRoute: AuthenticatedAdminPdvRoute,
+  AuthenticatedAdminRelatoriosRoute: AuthenticatedAdminRelatoriosRoute,
   AuthenticatedAdminSlotsRoute: AuthenticatedAdminSlotsRoute,
   AuthenticatedAdminTriagemRoute: AuthenticatedAdminTriagemRoute,
   AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,
@@ -691,13 +713,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
