@@ -530,12 +530,20 @@ function VisaoGeralTab({ filters }: { filters: ReportFilters }) {
     <div className="space-y-4">
       <div className="grid grid-cols-12 gap-4">
         <MetricCard
+          label="Receita total"
+          value={money(c.totalRevenue.current)}
+          deltaPct={c.totalRevenue.deltaPct}
+          icon={TrendingUp}
+          tone="green"
+        />
+        <MetricCard
           label="Receita recebida"
           value={money(c.received.current)}
           deltaPct={c.received.deltaPct}
           icon={TrendingUp}
           tone="green"
         />
+
         <MetricCard
           label="Receita prevista"
           value={money(c.receivable.current)}
