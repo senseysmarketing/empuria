@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireStaff, requireAdmin } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createOrReuseManualCustomer } from "./manual-users";
+
 
 export const ALL_MODULES = [
   "cockpit",
