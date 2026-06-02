@@ -61,7 +61,7 @@ import {
 } from "@/lib/admin/reports.functions";
 import { exportReportXlsx } from "@/lib/admin/reports.export.functions";
 import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, Printer } from "lucide-react";
+import { FileSpreadsheet, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 
