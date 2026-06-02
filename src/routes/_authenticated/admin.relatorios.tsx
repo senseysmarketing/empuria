@@ -48,6 +48,9 @@ import {
   getReportsVendas,
   getReportsPdv,
   getReportsServicos,
+  getReportsEventos,
+  getReportsClube,
+  getReportsCrm,
   type ReportFilters,
 } from "@/lib/admin/reports.functions";
 
