@@ -46,16 +46,20 @@ export function CustomerSearchPanel({ onSelect }: { onSelect: (c: PdvCustomer) =
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar cliente por nome ou telefone…"
+          placeholder="Buscar cliente por nome, e-mail ou telefone..."
           className="pl-12 h-14 text-base bg-admin-surface-2 border-admin-border"
         />
       </div>
 
       <div className="bg-admin-surface border border-admin-border rounded-xl divide-y divide-admin-border min-h-[120px]">
         {debounced.length < 2 ? (
-          <div className="p-6 text-center text-sm text-admin-ink-muted">Digite ao menos 2 caracteres…</div>
+          <div className="p-6 text-center text-sm text-admin-ink-muted">
+            Digite ao menos 2 caracteres…
+          </div>
         ) : isFetching ? (
-          <div className="p-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-admin-accent" /></div>
+          <div className="p-6 flex justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-admin-accent" />
+          </div>
         ) : results.length === 0 ? (
           <div className="p-6 text-center space-y-3">
             <p className="text-sm text-admin-ink-muted">Nenhum cliente encontrado.</p>
@@ -73,17 +77,25 @@ export function CustomerSearchPanel({ onSelect }: { onSelect: (c: PdvCustomer) =
             >
               <Avatar className="h-10 w-10">
                 <AvatarImage src={c.avatar_url ?? undefined} />
-                <AvatarFallback className="bg-admin-surface-2 text-xs">{c.full_name?.slice(0, 2).toUpperCase() ?? "—"}</AvatarFallback>
+                <AvatarFallback className="bg-admin-surface-2 text-xs">
+                  {c.full_name?.slice(0, 2).toUpperCase() ?? "—"}
+                </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-admin-ink truncate">{c.full_name ?? "Sem nome"}</div>
+                <div className="font-medium text-admin-ink truncate">
+                  {c.full_name ?? "Sem nome"}
+                </div>
                 <div className="text-xs text-admin-ink-muted truncate">{c.phone ?? "—"}</div>
               </div>
               {c.is_club_member && (
-                <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-brand text-brown-deep font-display">Clube</span>
+                <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-brand text-brown-deep font-display">
+                  Clube
+                </span>
               )}
               {c.is_blocked && (
-                <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-display">Bloqueado</span>
+                <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-display">
+                  Bloqueado
+                </span>
               )}
             </button>
           ))
@@ -91,7 +103,11 @@ export function CustomerSearchPanel({ onSelect }: { onSelect: (c: PdvCustomer) =
       </div>
 
       <div className="text-center">
-        <Button variant="outline" onClick={() => setOpenCreate(true)} className="border-admin-border">
+        <Button
+          variant="outline"
+          onClick={() => setOpenCreate(true)}
+          className="border-admin-border"
+        >
           <UserPlus className="h-4 w-4" /> Cadastrar novo cliente
         </Button>
       </div>
