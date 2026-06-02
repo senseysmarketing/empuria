@@ -21,6 +21,12 @@ import {
   CalendarX,
   UserCheck,
   Boxes,
+  Activity,
+  Crown,
+  MessageSquare,
+  Clock,
+  Megaphone,
+  UserMinus,
 } from "lucide-react";
 import {
   Area,
