@@ -411,6 +411,7 @@ type PdvSaleLite = {
   cashier_id: string;
   payment_method: string;
   total_eur_cents: number;
+  discount_eur_cents: number;
   status: string;
   closed_at: string;
 };
