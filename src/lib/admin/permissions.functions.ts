@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireStaff, requireAdmin } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createOrReuseManualCustomer } from "./manual-users";
+
 
 export const ALL_MODULES = [
   "cockpit",
@@ -125,3 +127,55 @@ export const setStaffPermission = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+export const createStaffMember = createServerFn({ method: "POST" })
+  .middleware([requireAdmin()])
+  .inputValidator((d) =>
+    z
+      .object({
+        full_name: z.string().trim().min(2).max(160),
+        email: z.string().trim().email().max(255),
+        phone: z.string().trim().max(40).optional().or(z.literal("")),
+        role: z.enum(["staff", "admin"]),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const customer = await createOrReuseManualCustomer({
+      fullName: data.full_name,
+      email: data.email,
+      phone: data.phone ? data.phone : null,
+      origin: "admin_created",
+      actorId: context.userId,
+    });
+
+    const { error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .upsert(
+        { user_id: customer.user_id, role: data.role },
+        { onConflict: "user_id,role" },
+      );
+    if (roleError) throw new Error(roleError.message);
+
+    await supabaseAdmin.from("audit_logs").insert({
+      actor_id: context.userId,
+      action: customer.created ? "staff.created" : "staff.role_granted",
+      module: "configuracoes",
+      entity_type: "user_role",
+      entity_id: customer.user_id,
+      new_data: {
+        email: customer.email,
+        full_name: customer.full_name,
+        role: data.role,
+        password_setup_required: customer.password_setup_required,
+      },
+    });
+
+    return {
+      user_id: customer.user_id,
+      created: customer.created,
+      role: data.role,
+      password_setup_required: customer.password_setup_required,
+    };
+  });
+
