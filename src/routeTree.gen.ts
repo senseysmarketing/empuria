@@ -15,10 +15,12 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServicosSlugRouteImport } from './routes/servicos.$slug'
 import { Route as EventoSlugRouteImport } from './routes/evento.$slug'
+import { Route as ClubeSucessoRouteImport } from './routes/clube.sucesso'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiWebhooksHublaRouteImport } from './routes/api.webhooks.hubla'
 import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
 import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
 import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_authenticated/portal.ingressos'
@@ -66,6 +68,11 @@ const EventoSlugRoute = EventoSlugRouteImport.update({
   path: '/evento/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClubeSucessoRoute = ClubeSucessoRouteImport.update({
+  id: '/clube/sucesso',
+  path: '/clube/sucesso',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedPortalRoute = AuthenticatedPortalRouteImport.update({
   id: '/portal',
   path: '/portal',
@@ -86,6 +93,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const ApiWebhooksHublaRoute = ApiWebhooksHublaRouteImport.update({
+  id: '/api/webhooks/hubla',
+  path: '/api/webhooks/hubla',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedPortalServicosRoute =
   AuthenticatedPortalServicosRouteImport.update({
@@ -191,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/servicos': typeof ServicosRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/portal': typeof AuthenticatedPortalRouteWithChildren
+  '/clube/sucesso': typeof ClubeSucessoRoute
   '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
@@ -210,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
+  '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
 }
@@ -217,6 +231,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/servicos': typeof ServicosRouteWithChildren
+  '/clube/sucesso': typeof ClubeSucessoRoute
   '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
@@ -236,6 +251,7 @@ export interface FileRoutesByTo {
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
+  '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
 }
@@ -247,6 +263,7 @@ export interface FileRoutesById {
   '/servicos': typeof ServicosRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/portal': typeof AuthenticatedPortalRouteWithChildren
+  '/clube/sucesso': typeof ClubeSucessoRoute
   '/evento/$slug': typeof EventoSlugRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/_authenticated/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
@@ -266,6 +283,7 @@ export interface FileRoutesById {
   '/_authenticated/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/_authenticated/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/_authenticated/portal/servicos': typeof AuthenticatedPortalServicosRoute
+  '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
 }
@@ -277,6 +295,7 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/admin'
     | '/portal'
+    | '/clube/sucesso'
     | '/evento/$slug'
     | '/servicos/$slug'
     | '/admin/acesso-negado'
@@ -296,6 +315,7 @@ export interface FileRouteTypes {
     | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
+    | '/api/webhooks/hubla'
     | '/admin/'
     | '/portal/'
   fileRoutesByTo: FileRoutesByTo
@@ -303,6 +323,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/servicos'
+    | '/clube/sucesso'
     | '/evento/$slug'
     | '/servicos/$slug'
     | '/admin/acesso-negado'
@@ -322,6 +343,7 @@ export interface FileRouteTypes {
     | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
+    | '/api/webhooks/hubla'
     | '/admin'
     | '/portal'
   id:
@@ -332,6 +354,7 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/_authenticated/admin'
     | '/_authenticated/portal'
+    | '/clube/sucesso'
     | '/evento/$slug'
     | '/servicos/$slug'
     | '/_authenticated/admin/acesso-negado'
@@ -351,6 +374,7 @@ export interface FileRouteTypes {
     | '/_authenticated/portal/ingressos'
     | '/_authenticated/portal/loja'
     | '/_authenticated/portal/servicos'
+    | '/api/webhooks/hubla'
     | '/_authenticated/admin/'
     | '/_authenticated/portal/'
   fileRoutesById: FileRoutesById
@@ -360,7 +384,9 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ServicosRoute: typeof ServicosRouteWithChildren
+  ClubeSucessoRoute: typeof ClubeSucessoRoute
   EventoSlugRoute: typeof EventoSlugRoute
+  ApiWebhooksHublaRoute: typeof ApiWebhooksHublaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -407,6 +433,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventoSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clube/sucesso': {
+      id: '/clube/sucesso'
+      path: '/clube/sucesso'
+      fullPath: '/clube/sucesso'
+      preLoaderRoute: typeof ClubeSucessoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/portal': {
       id: '/_authenticated/portal'
       path: '/portal'
@@ -434,6 +467,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/webhooks/hubla': {
+      id: '/api/webhooks/hubla'
+      path: '/api/webhooks/hubla'
+      fullPath: '/api/webhooks/hubla'
+      preLoaderRoute: typeof ApiWebhooksHublaRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/portal/servicos': {
       id: '/_authenticated/portal/servicos'
@@ -644,7 +684,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   ServicosRoute: ServicosRouteWithChildren,
+  ClubeSucessoRoute: ClubeSucessoRoute,
   EventoSlugRoute: EventoSlugRoute,
+  ApiWebhooksHublaRoute: ApiWebhooksHublaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
