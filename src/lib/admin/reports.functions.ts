@@ -581,11 +581,13 @@ export const getReportsPdv = createServerFn({ method: "POST" })
         ticket: { current: curr.ticket, previous: prev.ticket, deltaPct: pctDelta(curr.ticket, prev.ticket) },
         itemsSold: { current: totalItemsSold, previous: 0, deltaPct: null },
         voided: { current: curr.voided, previous: prev.voided, deltaPct: pctDelta(curr.voided, prev.voided) },
+        discounts: { current: curr.discounts, previous: prev.discounts, deltaPct: pctDelta(curr.discounts, prev.discounts) },
       },
       topProducts,
       topCashiers,
       paymentMethods,
       lowStock,
+      hourly,
     };
   });
 
