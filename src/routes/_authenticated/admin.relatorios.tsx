@@ -219,13 +219,13 @@ function RelatoriosPage() {
           <ServicosTab filters={filters} />
         </TabsContent>
         <TabsContent value="eventos" className="mt-0">
-          <ComingSoon label="Eventos" />
+          <EventosTab filters={filters} />
         </TabsContent>
         <TabsContent value="clube" className="mt-0">
-          <ComingSoon label="Clube do Imigrante" />
+          <ClubeTab filters={filters} />
         </TabsContent>
         <TabsContent value="crm" className="mt-0">
-          <ComingSoon label="CRM & SLA" />
+          <CrmTab filters={filters} />
         </TabsContent>
       </Tabs>
     </div>
