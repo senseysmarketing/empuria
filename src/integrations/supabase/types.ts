@@ -926,12 +926,16 @@ export type Database = {
           id: string
           notes: string | null
           payment_method: string
+          sale_code: string
           status: string
           subtotal_brl_cents: number
           subtotal_eur_cents: number
           total_brl_cents: number
           total_eur_cents: number
           updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
         }
         Insert: {
           cashier_id: string
@@ -945,12 +949,16 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method: string
+          sale_code?: string
           status?: string
           subtotal_brl_cents?: number
           subtotal_eur_cents?: number
           total_brl_cents?: number
           total_eur_cents?: number
           updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Update: {
           cashier_id?: string
@@ -964,12 +972,16 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          sale_code?: string
           status?: string
           subtotal_brl_cents?: number
           subtotal_eur_cents?: number
           total_brl_cents?: number
           total_eur_cents?: number
           updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Relationships: []
       }
@@ -1475,6 +1487,14 @@ export type Database = {
           p_payment_method: string
         }
         Returns: string
+      }
+      pdv_next_sale_code: {
+        Args: { p_closed_at?: string }
+        Returns: string
+      }
+      pdv_void_sale: {
+        Args: { p_admin_id: string; p_reason: string; p_sale_id: string }
+        Returns: undefined
       }
     }
     Enums: {
