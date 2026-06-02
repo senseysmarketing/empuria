@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ShieldCheck, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import {
   ALL_MODULES,
@@ -12,11 +14,16 @@ import {
   setStaffPermission,
   type ModuleKey,
 } from "@/lib/admin/permissions.functions";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { NewStaffDialog } from "./NewStaffDialog";
 
 export function EquipePermissoesTab() {
   const fetchList = useServerFn(listStaffWithPermissions);
   const setPerm = useServerFn(setStaffPermission);
   const qc = useQueryClient();
+  const { isAdmin } = useCurrentUser();
+  const [openNew, setOpenNew] = useState(false);
+
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["staff-permissions"],
