@@ -125,10 +125,10 @@ function UsuariosPage() {
           navigate({ search: { tab: v as "passaportes" | "clube-conteudo" | "clube-mural" } })
         }
       >
-        <TabsList>
-          <TabsTrigger value="passaportes">Passaportes</TabsTrigger>
-          <TabsTrigger value="clube-conteudo">Clube — Conteúdo</TabsTrigger>
-          <TabsTrigger value="clube-mural">Clube — Mural</TabsTrigger>
+        <TabsList className="bg-admin-surface border border-admin-border">
+          <TabsTrigger value="passaportes" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Passaportes</TabsTrigger>
+          <TabsTrigger value="clube-conteudo" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Clube — Conteúdo</TabsTrigger>
+          <TabsTrigger value="clube-mural" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Clube — Mural</TabsTrigger>
         </TabsList>
 
         <TabsContent value="passaportes" className="mt-4">
