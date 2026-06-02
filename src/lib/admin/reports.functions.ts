@@ -403,3 +403,305 @@ export const getReportsVendas = createServerFn({ method: "POST" })
       expenseByCategory,
     };
   });
+
+// ---------- PDV & ESTOQUE ----------
+
+type PdvSaleLite = {
+  id: string;
+  cashier_id: string;
+  payment_method: string;
+  total_eur_cents: number;
+  status: string;
+  closed_at: string;
+};
+
+type PdvSaleItemLite = {
+  sale_id: string;
+  product_id: string | null;
+  product_name_snapshot: string;
+  qty: number;
+  total_eur_cents: number;
+};
+
+const PAYMENT_LABEL: Record<string, string> = {
+  dinheiro: "Dinheiro",
+  cartao: "Cartão",
+  pix: "PIX",
+  mbway: "MB WAY",
+  multibanco: "Multibanco",
+  transferencia: "Transferência",
+  cortesia: "Cortesia",
+};
+
+const VOIDED_STATUSES = ["anulada", "voided", "cancelada"];
+
+export const getReportsPdv = createServerFn({ method: "POST" })
+  .middleware([requireModule("relatorios")])
+  .inputValidator((d) => reportFiltersSchema.parse(d))
+  .handler(async ({ data }) => {
+    const range = resolveRange(data);
+    const compareRange =
+      data.compare === "none" ? null : previousRange(range, data.compare);
+
+    const fetchSales = async (r: Range): Promise<PdvSaleLite[]> => {
+      const { data: rows, error } = await db
+        .from("pdv_sales")
+        .select("id,cashier_id,payment_method,total_eur_cents,status,closed_at")
+        .gte("closed_at", r.start + "T00:00:00")
+        .lte("closed_at", r.end + "T23:59:59")
+        .limit(5000);
+      if (error) throw new Error(error.message);
+      return (rows ?? []) as PdvSaleLite[];
+    };
+
+    const [currentSales, prevSales] = await Promise.all([
+      fetchSales(range),
+      compareRange ? fetchSales(compareRange) : Promise.resolve([] as PdvSaleLite[]),
+    ]);
+
+    const summarize = (sales: PdvSaleLite[]) => {
+      let revenue = 0,
+        voided = 0,
+        completed = 0;
+      for (const s of sales) {
+        if (VOIDED_STATUSES.includes(s.status)) {
+          voided++;
+          continue;
+        }
+        revenue += s.total_eur_cents;
+        completed++;
+      }
+      const ticket = completed > 0 ? Math.round(revenue / completed) : 0;
+      return { revenue, voided, completed, ticket };
+    };
+    const curr = summarize(currentSales);
+    const prev = summarize(prevSales);
+
+    const completedIds = currentSales
+      .filter((s) => !VOIDED_STATUSES.includes(s.status))
+      .map((s) => s.id);
+
+    let items: PdvSaleItemLite[] = [];
+    if (completedIds.length) {
+      const { data: itemRows, error: itemErr } = await db
+        .from("pdv_sale_items")
+        .select("sale_id,product_id,product_name_snapshot,qty,total_eur_cents")
+        .in("sale_id", completedIds)
+        .limit(20000);
+      if (itemErr) throw new Error(itemErr.message);
+      items = (itemRows ?? []) as PdvSaleItemLite[];
+    }
+
+    const productMap = new Map<string, { name: string; qty: number; revenue: number }>();
+    let totalItemsSold = 0;
+    for (const it of items) {
+      totalItemsSold += it.qty;
+      const key = it.product_id ?? it.product_name_snapshot;
+      const e = productMap.get(key) ?? { name: it.product_name_snapshot, qty: 0, revenue: 0 };
+      e.qty += it.qty;
+      e.revenue += it.total_eur_cents;
+      productMap.set(key, e);
+    }
+    const topProducts = Array.from(productMap.values())
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 10);
+
+    const cashierAgg = new Map<string, { revenue: number; count: number }>();
+    for (const s of currentSales) {
+      if (VOIDED_STATUSES.includes(s.status)) continue;
+      const e = cashierAgg.get(s.cashier_id) ?? { revenue: 0, count: 0 };
+      e.revenue += s.total_eur_cents;
+      e.count += 1;
+      cashierAgg.set(s.cashier_id, e);
+    }
+    const cashierIds = Array.from(cashierAgg.keys()).filter(Boolean);
+    const profileMap = new Map<string, string>();
+    if (cashierIds.length) {
+      const { data: profs } = await db
+        .from("profiles")
+        .select("id,full_name")
+        .in("id", cashierIds);
+      for (const p of profs ?? []) profileMap.set(p.id, p.full_name ?? "—");
+    }
+    const topCashiers = Array.from(cashierAgg, ([id, v]) => ({
+      label: profileMap.get(id) ?? "—",
+      revenue: v.revenue,
+      count: v.count,
+    }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    const paymentAgg = new Map<string, { revenue: number; count: number }>();
+    for (const s of currentSales) {
+      if (VOIDED_STATUSES.includes(s.status)) continue;
+      const e = paymentAgg.get(s.payment_method) ?? { revenue: 0, count: 0 };
+      e.revenue += s.total_eur_cents;
+      e.count += 1;
+      paymentAgg.set(s.payment_method, e);
+    }
+    const paymentMethods = Array.from(paymentAgg, ([method, v]) => ({
+      label: PAYMENT_LABEL[method] ?? method,
+      revenue: v.revenue,
+      count: v.count,
+    })).sort((a, b) => b.revenue - a.revenue);
+
+    const { data: lowStockRows } = await db
+      .from("products")
+      .select("id,name,stock_quantity,track_stock")
+      .eq("track_stock", true)
+      .lte("stock_quantity", 5)
+      .order("stock_quantity", { ascending: true })
+      .limit(20);
+    const lowStock = (lowStockRows ?? []).map(
+      (p: { id: string; name: string; stock_quantity: number }) => ({
+        id: p.id,
+        name: p.name,
+        stock_quantity: p.stock_quantity,
+      }),
+    );
+
+    return {
+      range,
+      compareRange,
+      cards: {
+        revenue: { current: curr.revenue, previous: prev.revenue, deltaPct: pctDelta(curr.revenue, prev.revenue) },
+        salesCount: { current: curr.completed, previous: prev.completed, deltaPct: pctDelta(curr.completed, prev.completed) },
+        ticket: { current: curr.ticket, previous: prev.ticket, deltaPct: pctDelta(curr.ticket, prev.ticket) },
+        itemsSold: { current: totalItemsSold, previous: 0, deltaPct: null },
+        voided: { current: curr.voided, previous: prev.voided, deltaPct: pctDelta(curr.voided, prev.voided) },
+      },
+      topProducts,
+      topCashiers,
+      paymentMethods,
+      lowStock,
+    };
+  });
+
+// ---------- SERVIÇOS & AGENDA ----------
+
+type ApptLite = {
+  id: string;
+  service_id: string;
+  status: string;
+  starts_at: string;
+  ends_at: string;
+};
+
+const APPT_STATUS_LABEL: Record<string, string> = {
+  confirmado: "Confirmado",
+  pendente: "Pendente",
+  concluido: "Concluído",
+  cancelado: "Cancelado",
+  no_show: "Não compareceu",
+};
+
+const WEEKDAY = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+export const getReportsServicos = createServerFn({ method: "POST" })
+  .middleware([requireModule("relatorios")])
+  .inputValidator((d) => reportFiltersSchema.parse(d))
+  .handler(async ({ data }) => {
+    const range = resolveRange(data);
+    const compareRange =
+      data.compare === "none" ? null : previousRange(range, data.compare);
+
+    const fetchAppts = async (r: Range): Promise<ApptLite[]> => {
+      const { data: rows, error } = await db
+        .from("appointments")
+        .select("id,service_id,status,starts_at,ends_at")
+        .gte("starts_at", r.start + "T00:00:00")
+        .lte("starts_at", r.end + "T23:59:59")
+        .limit(5000);
+      if (error) throw new Error(error.message);
+      return (rows ?? []) as ApptLite[];
+    };
+
+    const [current, previous] = await Promise.all([
+      fetchAppts(range),
+      compareRange ? fetchAppts(compareRange) : Promise.resolve([] as ApptLite[]),
+    ]);
+
+    const summarize = (appts: ApptLite[]) => {
+      let confirmed = 0,
+        completed = 0,
+        canceled = 0,
+        noShow = 0;
+      for (const a of appts) {
+        if (a.status === "confirmado") confirmed++;
+        else if (a.status === "concluido") completed++;
+        else if (a.status === "cancelado") canceled++;
+        else if (a.status === "no_show") noShow++;
+      }
+      const total = appts.length;
+      const noShowRate = total > 0 ? (noShow / total) * 100 : 0;
+      const cancelRate = total > 0 ? (canceled / total) * 100 : 0;
+      return { total, confirmed, completed, canceled, noShow, noShowRate, cancelRate };
+    };
+    const curr = summarize(current);
+    const prev = summarize(previous);
+
+    const serviceIds = Array.from(new Set(current.map((a) => a.service_id))).filter(Boolean);
+    const serviceMap = new Map<string, { title: string; category: string | null }>();
+    if (serviceIds.length) {
+      const { data: services } = await db
+        .from("services")
+        .select("id,title,category")
+        .in("id", serviceIds);
+      for (const s of services ?? [])
+        serviceMap.set(s.id, { title: s.title, category: s.category });
+    }
+
+    const serviceAgg = new Map<string, number>();
+    const categoryAgg = new Map<string, number>();
+    const weekdayAgg = new Map<number, number>();
+    for (const a of current) {
+      if (a.status === "cancelado") continue;
+      serviceAgg.set(a.service_id, (serviceAgg.get(a.service_id) ?? 0) + 1);
+      const cat = serviceMap.get(a.service_id)?.category ?? "Sem categoria";
+      categoryAgg.set(cat, (categoryAgg.get(cat) ?? 0) + 1);
+      const day = new Date(a.starts_at).getDay();
+      weekdayAgg.set(day, (weekdayAgg.get(day) ?? 0) + 1);
+    }
+    const topServices = Array.from(serviceAgg, ([id, count]) => ({
+      label: serviceMap.get(id)?.title ?? "—",
+      count,
+    }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const byCategory = Array.from(categoryAgg, ([label, count]) => ({ label, count })).sort(
+      (a, b) => b.count - a.count,
+    );
+
+    const byWeekday = WEEKDAY.map((label, idx) => ({
+      label,
+      count: weekdayAgg.get(idx) ?? 0,
+    }));
+
+    const statusAgg = new Map<string, number>();
+    for (const a of current) {
+      statusAgg.set(a.status, (statusAgg.get(a.status) ?? 0) + 1);
+    }
+    const byStatus = Array.from(statusAgg, ([k, count]) => ({
+      label: APPT_STATUS_LABEL[k] ?? k,
+      count,
+    })).sort((a, b) => b.count - a.count);
+
+    return {
+      range,
+      compareRange,
+      cards: {
+        total: { current: curr.total, previous: prev.total, deltaPct: pctDelta(curr.total, prev.total) },
+        confirmed: { current: curr.confirmed, previous: prev.confirmed, deltaPct: pctDelta(curr.confirmed, prev.confirmed) },
+        completed: { current: curr.completed, previous: prev.completed, deltaPct: pctDelta(curr.completed, prev.completed) },
+        canceled: { current: curr.canceled, previous: prev.canceled, deltaPct: pctDelta(curr.canceled, prev.canceled) },
+        noShow: { current: curr.noShow, previous: prev.noShow, deltaPct: pctDelta(curr.noShow, prev.noShow) },
+        noShowRate: { current: curr.noShowRate, previous: prev.noShowRate, deltaPct: null },
+        cancelRate: { current: curr.cancelRate, previous: prev.cancelRate, deltaPct: null },
+      },
+      topServices,
+      byCategory,
+      byWeekday,
+      byStatus,
+    };
+  });
