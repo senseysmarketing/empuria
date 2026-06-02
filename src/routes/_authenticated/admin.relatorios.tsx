@@ -171,7 +171,9 @@ function RelatoriosPage() {
             </p>
           </div>
         </div>
+        <ExportButtons tab={search.tab} filters={filters} />
       </header>
+
 
       <GlobalFiltersBar search={search} navigate={navigate} />
 
