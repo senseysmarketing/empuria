@@ -41,6 +41,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   pdv_itens: "PDV Itens",
   automacoes: "Automações",
   logs: "Logs & Auditoria",
+  relatorios: "Relatórios",
 };
 
 /** Returns the modules the current user can access. Admins get all. */
