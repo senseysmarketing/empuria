@@ -1,14 +1,25 @@
 import { useMemo, useState } from "react";
-import { Trash2, Minus, Plus, X } from "lucide-react";
+import { Trash2, Minus, Plus, X, Banknote, CreditCard, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { PdvCatalogItem } from "./SaleCatalogGrid";
 import type { PdvCustomer } from "./CustomerSearchPanel";
 
 export type CartLine = { item: PdvCatalogItem; qty: number };
 export type Discount = { type: "none" | "amount" | "percent"; value: number };
+export type PaymentMethod = "dinheiro" | "cartao" | "pix";
 
 export function SaleCartPanel({
   customer,
@@ -22,10 +33,11 @@ export function SaleCartPanel({
   cart: CartLine[];
   setCart: (next: CartLine[]) => void;
   onChangeCustomer: () => void;
-  onClose: (method: "dinheiro" | "cartao", discount: Discount) => void;
+  onClose: (method: PaymentMethod, discount: Discount) => void;
   closing: boolean;
 }) {
   const [discount, setDiscount] = useState<Discount>({ type: "none", value: 0 });
+  const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null);
 
   const subtotal = useMemo(
     () => cart.reduce(
@@ -157,24 +169,91 @@ export function SaleCartPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <Button
             variant="outline"
             disabled={cantPay}
-            onClick={() => onClose("dinheiro", discount)}
-            className="h-12 font-display text-base"
+            onClick={() => setPendingMethod("dinheiro")}
+            className="h-12 font-display text-sm flex-col gap-0.5"
           >
+            <Banknote className="h-4 w-4" />
             Dinheiro
           </Button>
           <Button
+            variant="outline"
             disabled={cantPay}
-            onClick={() => onClose("cartao", discount)}
-            className="h-12 font-display text-base bg-admin-accent text-white"
+            onClick={() => setPendingMethod("cartao")}
+            className="h-12 font-display text-sm flex-col gap-0.5"
           >
+            <CreditCard className="h-4 w-4" />
             Cartão
+          </Button>
+          <Button
+            disabled={cantPay}
+            onClick={() => setPendingMethod("pix")}
+            className="h-12 font-display text-sm bg-admin-accent text-white flex-col gap-0.5"
+          >
+            <QrCode className="h-4 w-4" />
+            Pix
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={pendingMethod !== null} onOpenChange={(open) => !open && !closing && setPendingMethod(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar pagamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Confirme os valores antes de fechar a venda. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-2 rounded-lg border border-admin-border bg-admin-bg/40 p-4">
+            <div className="flex justify-between text-xs text-admin-ink-muted">
+              <span>Subtotal</span>
+              <span className="tabular-nums">R$ {(subtotal.brl / 100).toFixed(2)}</span>
+            </div>
+            {discountCents.brl > 0 && (
+              <div className="flex justify-between text-xs text-yellow-brand">
+                <span>Desconto</span>
+                <span className="tabular-nums">− R$ {(discountCents.brl / 100).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-baseline pt-2 border-t border-admin-border">
+              <span className="text-[10px] uppercase tracking-widest font-display text-admin-ink-muted">Total</span>
+              <div className="text-right">
+                <div className="font-display text-2xl font-bold text-admin-accent tabular-nums">R$ {(total.brl / 100).toFixed(2)}</div>
+                {total.eur > 0 && <div className="text-xs text-admin-ink-muted tabular-nums">€ {(total.eur / 100).toFixed(2)}</div>}
+              </div>
+            </div>
+            <div className="flex justify-between items-center pt-2 border-t border-admin-border">
+              <span className="text-[10px] uppercase tracking-widest font-display text-admin-ink-muted">Forma</span>
+              <span className="font-display text-sm text-admin-ink">
+                {pendingMethod === "dinheiro" && "Dinheiro"}
+                {pendingMethod === "cartao" && "Cartão"}
+                {pendingMethod === "pix" && "Pix"}
+              </span>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={closing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={closing}
+              onClick={(e) => {
+                e.preventDefault();
+                if (pendingMethod) {
+                  onClose(pendingMethod, discount);
+                  setPendingMethod(null);
+                }
+              }}
+              className="bg-admin-accent text-white"
+            >
+              {closing ? "Fechando..." : "Confirmar pagamento"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -45,7 +45,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type Period = "hoje" | "ontem" | "7d" | "mes" | "custom" | "todos";
-type Payment = "todos" | "dinheiro" | "cartao";
+type Payment = "todos" | "dinheiro" | "cartao" | "pix";
 type Status = "todos" | "concluida" | "cancelada";
 type PdvSaleDetail = {
   sale: PdvSaleRecord | null;
@@ -75,7 +75,9 @@ function dateTime(value: string | null | undefined) {
 }
 
 function paymentLabel(value: string) {
-  return value === "cartao" ? "Cartao" : "Dinheiro";
+  if (value === "cartao") return "Cartao";
+  if (value === "pix") return "Pix";
+  return "Dinheiro";
 }
 
 function statusBadge(status: string) {
@@ -221,6 +223,7 @@ export function PdvHistoryPanel() {
               <SelectItem value="todos">Pagamento</SelectItem>
               <SelectItem value="dinheiro">Dinheiro</SelectItem>
               <SelectItem value="cartao">Cartao</SelectItem>
+              <SelectItem value="pix">Pix</SelectItem>
             </SelectContent>
           </Select>
 

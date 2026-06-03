@@ -785,7 +785,7 @@ function NewTransactionDialog({
           </Field>
           <CategoryAccountFields categories={categories} accounts={accounts} type={type} />
           <Field label="Metodo">
-            <Input name="paymentMethod" placeholder="dinheiro, cartao, transferencia..." />
+            <Input name="paymentMethod" placeholder="dinheiro, cartao, pix, transferencia..." />
           </Field>
           <Field label="Observacoes">
             <Textarea name="notes" />

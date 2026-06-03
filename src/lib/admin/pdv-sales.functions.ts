@@ -91,7 +91,7 @@ const closeSchema = z.object({
     type: z.enum(["none", "amount", "percent"]),
     value: z.number().min(0).max(100000),
   }),
-  paymentMethod: z.enum(["dinheiro", "cartao"]),
+  paymentMethod: z.enum(["dinheiro", "cartao", "pix"]),
   notes: z.string().trim().max(500).optional(),
 });
 
@@ -186,7 +186,7 @@ const historySchema = z.object({
   period: z.enum(["hoje", "ontem", "7d", "mes", "custom", "todos"]).optional().default("7d"),
   dateFrom: z.string().trim().optional().nullable(),
   dateTo: z.string().trim().optional().nullable(),
-  paymentMethod: z.enum(["todos", "dinheiro", "cartao"]).optional().default("todos"),
+  paymentMethod: z.enum(["todos", "dinheiro", "cartao", "pix"]).optional().default("todos"),
   status: z.enum(["todos", "concluida", "cancelada"]).optional().default("todos"),
   cashierId: z.string().uuid().optional().nullable(),
   minTotalEurCents: currencyCentsSchema,
