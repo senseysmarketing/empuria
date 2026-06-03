@@ -91,7 +91,7 @@ const closeSchema = z.object({
     type: z.enum(["none", "amount", "percent"]),
     value: z.number().min(0).max(100000),
   }),
-  paymentMethod: z.enum(["dinheiro", "cartao"]),
+  paymentMethod: z.enum(["dinheiro", "cartao", "pix"]),
   notes: z.string().trim().max(500).optional(),
 });
 
