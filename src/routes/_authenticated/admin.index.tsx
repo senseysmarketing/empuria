@@ -10,10 +10,23 @@ import { RevenueChart } from "@/components/admin/RevenueChart";
 import { PassportScannerDialog } from "@/components/admin/PassportScannerDialog";
 import { Euro, Crown, CalendarClock, Users } from "lucide-react";
 import { useTopBarActions, useTopBarQuickStat } from "@/components/shared/TopBarActionsContext";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { CockpitStaffView } from "@/components/admin/cockpit/CockpitStaffView";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: CockpitPage,
 });
+
+function CockpitPage() {
+  const { isAdmin } = useCurrentUser();
+  useTopBarActions(
+    <>
+      <PassportScannerDialog />
+      <ArrivalDialog />
+    </>,
+  );
+  return isAdmin ? <CockpitAdminPage /> : <CockpitStaffView />;
+}
 
 function CockpitPage() {
   const fetchMetrics = useServerFn(getCockpitMetrics);
