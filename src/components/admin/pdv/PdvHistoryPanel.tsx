@@ -75,7 +75,9 @@ function dateTime(value: string | null | undefined) {
 }
 
 function paymentLabel(value: string) {
-  return value === "cartao" ? "Cartao" : "Dinheiro";
+  if (value === "cartao") return "Cartao";
+  if (value === "pix") return "Pix";
+  return "Dinheiro";
 }
 
 function statusBadge(status: string) {
