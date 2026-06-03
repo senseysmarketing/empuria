@@ -376,7 +376,7 @@ export function PdvHistoryPanel() {
                       >
                         <Eye className="h-3.5 w-3.5" /> Detalhes
                       </Button>
-                      {isAdmin ? (
+                      {canVoid ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -392,7 +392,7 @@ export function PdvHistoryPanel() {
                           variant="outline"
                           className="h-8 border-admin-border text-admin-ink-muted"
                           disabled
-                          title="Apenas administradores podem anular vendas."
+                          title="Sem permissão para anular vendas."
                         >
                           <Lock className="h-3.5 w-3.5" /> Anular
                         </Button>
