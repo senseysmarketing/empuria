@@ -107,6 +107,7 @@ export function EquipePermissoesTab() {
                 member={u as MemberCardData}
                 canEdit={isAdmin}
                 onEdit={() => setEditing(u as MemberCardData)}
+                onManage={() => setManaging(u as MemberCardData)}
               />
             ))}
           </div>
@@ -119,6 +120,12 @@ export function EquipePermissoesTab() {
         open={!!editing}
         onOpenChange={(v) => !v && setEditing(null)}
       />
+      <ManageMemberDialog
+        member={managing}
+        open={!!managing}
+        onOpenChange={(v) => !v && setManaging(null)}
+      />
+
     </>
   );
 }
