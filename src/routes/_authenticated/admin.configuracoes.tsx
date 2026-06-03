@@ -36,7 +36,7 @@ export const Route = createFileRoute("/_authenticated/admin/configuracoes")({
 function ConfiguracoesPage() {
   const { tab } = useSearch({ from: "/_authenticated/admin/configuracoes" });
   const navigate = useNavigate();
-  const { isAdmin } = useModuleAccess();
+  const { isAdmin, can, isLoading } = useModuleAccess();
 
   const setTab = (t: Tab) =>
     navigate({ to: "/admin/configuracoes", search: { tab: t }, replace: true });
