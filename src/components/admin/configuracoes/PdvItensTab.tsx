@@ -153,7 +153,7 @@ export function PdvItensTab() {
                 <th className="text-left p-3 font-display">Item</th>
                 <th className="text-left p-3 font-display">Tipo</th>
                 <th className="text-left p-3 font-display">Categoria</th>
-                <th className="text-right p-3 font-display">€ / R$</th>
+                <th className="text-right p-3 font-display">R$ / €</th>
                 <th className="text-right p-3 font-display">Estoque</th>
                 <th className="text-center p-3 font-display">Ativo</th>
                 <th className="text-right p-3 font-display">Ações</th>
@@ -191,8 +191,8 @@ export function PdvItensTab() {
                       {cat ? `${cat.emoji ?? ""} ${cat.name}`.trim() : <span className="italic opacity-60">—</span>}
                     </td>
                     <td className="p-3 text-right tabular-nums">
-                      <div>€ {(eur / 100).toFixed(2)}</div>
-                      <div className="text-[11px] text-admin-ink-muted">R$ {(brl / 100).toFixed(2)}</div>
+                      <div>R$ {(brl / 100).toFixed(2)}</div>
+                      <div className="text-[11px] text-admin-ink-muted">€ {(eur / 100).toFixed(2)}</div>
                     </td>
                     <td className="p-3 text-right tabular-nums">
                       {isService || !tracks ? (
@@ -272,22 +272,22 @@ export function PdvItensTab() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Preço em € (Euro)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={(form.price_eur_cents / 100).toFixed(2)}
-                  onChange={(e) => setForm({ ...form, price_eur_cents: Math.round(parseFloat(e.target.value || "0") * 100) })}
-                  className="bg-admin-bg border-admin-border"
-                />
-              </div>
-              <div className="space-y-1.5">
                 <Label>Preço em R$ (Real)</Label>
                 <Input
                   type="number"
                   step="0.01"
                   value={(form.price_brl_cents / 100).toFixed(2)}
                   onChange={(e) => setForm({ ...form, price_brl_cents: Math.round(parseFloat(e.target.value || "0") * 100) })}
+                  className="bg-admin-bg border-admin-border"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Preço em € (Euro)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={(form.price_eur_cents / 100).toFixed(2)}
+                  onChange={(e) => setForm({ ...form, price_eur_cents: Math.round(parseFloat(e.target.value || "0") * 100) })}
                   className="bg-admin-bg border-admin-border"
                 />
               </div>

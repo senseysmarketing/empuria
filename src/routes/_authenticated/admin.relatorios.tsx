@@ -187,8 +187,8 @@ function RelatoriosPage() {
         onValueChange={(v) =>
           navigate({
             to: "/admin/relatorios",
-            search: (prev) => ({
-              ...normalizeSearch(prev as Partial<SearchSchema>),
+            search: (prev: Partial<SearchSchema>) => ({
+              ...normalizeSearch(prev),
               tab: v as SearchSchema["tab"],
             }),
             replace: true,
@@ -254,7 +254,7 @@ function GlobalFiltersBar({
   const upd = (patch: Partial<SearchSchema>) =>
     navigate({
       to: "/admin/relatorios",
-      search: (prev) => ({ ...normalizeSearch(prev as Partial<SearchSchema>), ...patch }),
+      search: (prev: Partial<SearchSchema>) => ({ ...normalizeSearch(prev), ...patch }),
       replace: true,
     });
 
