@@ -929,12 +929,25 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
   const d = q.data;
   const c = d.cards;
 
+  // PDV opera em BRL como moeda principal. EUR é convertido/secundário.
+  const showEur = filters.currency !== "BRL";
+  const showBrl = filters.currency !== "EUR";
+  const primary: "BRL" | "EUR" = showBrl ? "BRL" : "EUR";
+
+  const pickMain = (cents: number, eurCents?: number) =>
+    primary === "BRL" ? cents : (eurCents ?? 0);
+  const pickHint = (cents: number, eurCents?: number) => {
+    if (primary === "BRL" && showEur) return `≈ ${money(eurCents ?? 0, "EUR")}`;
+    return undefined;
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-12 gap-4">
         <MetricCard
           label="Faturamento PDV"
-          value={money(c.revenue.current, "EUR")}
+          value={money(pickMain(c.revenue.current, c.revenue.currentEur), primary)}
+          hint={pickHint(c.revenue.current, c.revenue.currentEur)}
           deltaPct={c.revenue.deltaPct}
           icon={TrendingUp}
           tone="green"
@@ -948,7 +961,8 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
         />
         <MetricCard
           label="Ticket médio"
-          value={money(c.ticket.current, "EUR")}
+          value={money(pickMain(c.ticket.current, c.ticket.currentEur), primary)}
+          hint={pickHint(c.ticket.current, c.ticket.currentEur)}
           deltaPct={c.ticket.deltaPct}
           icon={BarChart3}
           tone="neutral"
@@ -968,7 +982,8 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
         />
         <MetricCard
           label="Descontos concedidos"
-          value={money(c.discounts.current, "EUR")}
+          value={money(pickMain(c.discounts.current, c.discounts.currentEur), primary)}
+          hint={pickHint(c.discounts.current, c.discounts.currentEur)}
           deltaPct={c.discounts.deltaPct}
           icon={TrendingDown}
           tone="amber"
@@ -980,7 +995,9 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.topProducts.map((p) => ({
               label: `${p.name} · ${number(p.qty)}un`,
-              value: money(p.revenue, "EUR"),
+              value: money(primary === "BRL" ? p.revenueBrl : p.revenue, primary),
+              subValue:
+                primary === "BRL" && showEur ? `≈ ${money(p.revenue, "EUR")}` : undefined,
               raw: p.qty,
             }))}
             empty="Sem vendas no período."
@@ -990,8 +1007,10 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.topCashiers.map((c) => ({
               label: `${c.label} · ${number(c.count)} vendas`,
-              value: money(c.revenue, "EUR"),
-              raw: c.revenue,
+              value: money(primary === "BRL" ? c.revenueBrl : c.revenue, primary),
+              subValue:
+                primary === "BRL" && showEur ? `≈ ${money(c.revenue, "EUR")}` : undefined,
+              raw: primary === "BRL" ? c.revenueBrl : c.revenue,
             }))}
             empty="Sem operadores no período."
           />
@@ -1000,8 +1019,10 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.paymentMethods.map((p) => ({
               label: `${p.label} · ${number(p.count)}x`,
-              value: money(p.revenue, "EUR"),
-              raw: p.revenue,
+              value: money(primary === "BRL" ? p.revenueBrl : p.revenue, primary),
+              subValue:
+                primary === "BRL" && showEur ? `≈ ${money(p.revenue, "EUR")}` : undefined,
+              raw: primary === "BRL" ? p.revenueBrl : p.revenue,
             }))}
             empty="Sem pagamentos registrados."
           />
@@ -1033,18 +1054,28 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           )}
         </BentoCard>
         <BentoCard title="Horários de maior venda" className="col-span-12">
-          <HourlySalesChart data={d.hourly} />
+          <HourlySalesChart data={d.hourly} currency={primary} showEur={primary === "BRL" && showEur} />
         </BentoCard>
       </div>
     </div>
   );
 }
 
-function HourlySalesChart({ data }: { data: { hour: number; revenue: number; sales: number }[] }) {
+function HourlySalesChart({
+  data,
+  currency = "EUR",
+  showEur = false,
+}: {
+  data: { hour: number; revenue: number; revenueBrl?: number; sales: number }[];
+  currency?: "BRL" | "EUR";
+  showEur?: boolean;
+}) {
   if (!data.some((d) => d.sales > 0)) return <EmptyState label="Sem vendas no período." />;
+  const symbol = currency === "BRL" ? "R$" : "€";
   const chart = data.map((d) => ({
     label: `${String(d.hour).padStart(2, "0")}h`,
-    value: d.revenue / 100,
+    value: ((currency === "BRL" ? (d.revenueBrl ?? 0) : d.revenue) ?? 0) / 100,
+    valueEur: d.revenue / 100,
     sales: d.sales,
   }));
   return (
@@ -1065,8 +1096,8 @@ function HourlySalesChart({ data }: { data: { hour: number; revenue: number; sal
             stroke="oklch(0.62 0.025 50)"
             tickLine={false}
             axisLine={false}
-            width={50}
-            tickFormatter={(v) => `€${Number(v).toFixed(0)}`}
+            width={60}
+            tickFormatter={(v) => `${symbol}${Number(v).toFixed(0)}`}
           />
           <Tooltip
             contentStyle={{
@@ -1075,9 +1106,13 @@ function HourlySalesChart({ data }: { data: { hour: number; revenue: number; sal
               borderRadius: 12,
               fontSize: 12,
             }}
-            formatter={(v: unknown, n: unknown) => {
+            formatter={(v: unknown, n: unknown, item: { payload?: { valueEur?: number } }) => {
               if (n === "sales") return [`${v}`, "Vendas"];
-              return [`€ ${Number(v).toFixed(2)}`, "Receita"];
+              const main = `${symbol} ${Number(v).toFixed(2)}`;
+              if (showEur && item?.payload?.valueEur !== undefined) {
+                return [`${main}  (≈ € ${item.payload.valueEur.toFixed(2)})`, "Receita"];
+              }
+              return [main, "Receita"];
             }}
           />
           <Bar dataKey="value" name="Receita" fill="oklch(0.58 0.18 45)" radius={[4, 4, 0, 0]} />
