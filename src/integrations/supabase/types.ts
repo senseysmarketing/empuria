@@ -2296,6 +2296,33 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_action_permissions: {
+        Row: {
+          action_key: string
+          created_at: string
+          id: string
+          is_allowed: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_key: string
+          created_at?: string
+          id?: string
+          is_allowed?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_key?: string
+          created_at?: string
+          id?: string
+          is_allowed?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       staff_assignments: {
         Row: {
           appointment_id: string
@@ -2510,6 +2537,10 @@ export type Database = {
       }
       finance_sync_order: { Args: { p_order_id: string }; Returns: undefined }
       finance_sync_pdv_sale: { Args: { p_sale_id: string }; Returns: undefined }
+      has_action: {
+        Args: { _action: string; _user_id: string }
+        Returns: boolean
+      }
       has_module_access: {
         Args: { _module: string; _user_id: string }
         Returns: boolean
