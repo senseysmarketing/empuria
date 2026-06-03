@@ -223,6 +223,7 @@ export function PdvHistoryPanel() {
               <SelectItem value="todos">Pagamento</SelectItem>
               <SelectItem value="dinheiro">Dinheiro</SelectItem>
               <SelectItem value="cartao">Cartao</SelectItem>
+              <SelectItem value="pix">Pix</SelectItem>
             </SelectContent>
           </Select>
 
