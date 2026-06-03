@@ -254,7 +254,7 @@ function GlobalFiltersBar({
   const upd = (patch: Partial<SearchSchema>) =>
     navigate({
       to: "/admin/relatorios",
-      search: (prev) => ({ ...normalizeSearch(prev as Partial<SearchSchema>), ...patch }),
+      search: (prev: Partial<SearchSchema>) => ({ ...normalizeSearch(prev as Partial<SearchSchema>), ...patch }),
       replace: true,
     });
 
