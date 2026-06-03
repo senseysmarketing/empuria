@@ -146,13 +146,6 @@ function ConfiguracoesPage() {
             <RestrictedAreaCard message="Apenas administradores podem visualizar os logs de auditoria." />
           )}
         </TabsContent>
-        <TabsContent value="logs" className="mt-6">
-          {isAdmin ? (
-            <LogsAuditoriaTab />
-          ) : (
-            <RestrictedAreaCard message="Apenas administradores podem visualizar os logs de auditoria." />
-          )}
-        </TabsContent>
       </Tabs>
     </div>
   );
