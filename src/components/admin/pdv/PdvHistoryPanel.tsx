@@ -45,7 +45,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type Period = "hoje" | "ontem" | "7d" | "mes" | "custom" | "todos";
-type Payment = "todos" | "dinheiro" | "cartao";
+type Payment = "todos" | "dinheiro" | "cartao" | "pix";
 type Status = "todos" | "concluida" | "cancelada";
 type PdvSaleDetail = {
   sale: PdvSaleRecord | null;
