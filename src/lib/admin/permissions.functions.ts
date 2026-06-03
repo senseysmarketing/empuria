@@ -94,7 +94,10 @@ export const listStaffWithPermissions = createServerFn({ method: "GET" })
 
     const userIds = Array.from(new Set((roles ?? []).map((r) => r.user_id)));
     const [{ data: profiles }, { data: perms }, { data: actions }] = await Promise.all([
-      supabaseAdmin.from("profiles").select("id, full_name, avatar_url").in("id", userIds),
+      supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, avatar_url, phone, is_blocked")
+        .in("id", userIds),
       supabaseAdmin
         .from("staff_module_permissions")
         .select("user_id, module_key, is_allowed")
@@ -104,6 +107,21 @@ export const listStaffWithPermissions = createServerFn({ method: "GET" })
         .select("user_id, action_key, is_allowed")
         .in("user_id", userIds),
     ]);
+
+    // Pull emails from auth.admin (paginated, up to ~1000 users)
+    const emails = new Map<string, string | null>();
+    let page = 1;
+    const perPage = 200;
+    for (let i = 0; i < 5; i++) {
+      const { data: authPage, error: authErr } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+      if (authErr) break;
+      authPage.users.forEach((u) => emails.set(u.id, u.email ?? null));
+      if (authPage.users.length < perPage) break;
+      page++;
+    }
 
     const roleByUser = new Map<string, "admin" | "staff">();
     for (const r of roles ?? []) {
@@ -129,11 +147,15 @@ export const listStaffWithPermissions = createServerFn({ method: "GET" })
       id: p.id,
       full_name: p.full_name,
       avatar_url: p.avatar_url,
+      phone: p.phone ?? null,
+      email: emails.get(p.id) ?? null,
+      is_blocked: Boolean(p.is_blocked),
       role: roleByUser.get(p.id) ?? "staff",
       allowed_modules: Array.from(permByUser.get(p.id) ?? []),
       allowed_actions: Array.from(actionByUser.get(p.id) ?? []),
     }));
   });
+
 
 export const setStaffPermission = createServerFn({ method: "POST" })
   .middleware([requireAdmin()])

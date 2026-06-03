@@ -9,7 +9,9 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { NewStaffDialog } from "./NewStaffDialog";
 import { MemberCard, type MemberCardData } from "./MemberCard";
 import { EditMemberPermissionsDialog } from "./EditMemberPermissionsDialog";
+import { ManageMemberDialog } from "./ManageMemberDialog";
 import { cn } from "@/lib/utils";
+
 
 type Filter = "todos" | "admin" | "staff";
 
@@ -19,6 +21,8 @@ export function EquipePermissoesTab() {
 
   const [openNew, setOpenNew] = useState(false);
   const [editing, setEditing] = useState<MemberCardData | null>(null);
+  const [managing, setManaging] = useState<MemberCardData | null>(null);
+
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
 
@@ -103,6 +107,7 @@ export function EquipePermissoesTab() {
                 member={u as MemberCardData}
                 canEdit={isAdmin}
                 onEdit={() => setEditing(u as MemberCardData)}
+                onManage={() => setManaging(u as MemberCardData)}
               />
             ))}
           </div>
@@ -115,6 +120,12 @@ export function EquipePermissoesTab() {
         open={!!editing}
         onOpenChange={(v) => !v && setEditing(null)}
       />
+      <ManageMemberDialog
+        member={managing}
+        open={!!managing}
+        onOpenChange={(v) => !v && setManaging(null)}
+      />
+
     </>
   );
 }

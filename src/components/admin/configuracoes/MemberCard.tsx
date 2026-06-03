@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, Settings2, Eye } from "lucide-react";
+import { ShieldCheck, Settings2, Eye, UserCog } from "lucide-react";
 import { detectProfile, PROFILE_LABELS } from "@/lib/admin/permission-profiles";
 
 export type MemberCardData = {
@@ -11,15 +11,20 @@ export type MemberCardData = {
   role: "admin" | "staff";
   allowed_modules: string[];
   allowed_actions?: string[];
+  email?: string | null;
+  phone?: string | null;
+  is_blocked?: boolean;
 };
 
 export function MemberCard({
   member,
   onEdit,
+  onManage,
   canEdit,
 }: {
   member: MemberCardData;
   onEdit: () => void;
+  onManage: () => void;
   canEdit: boolean;
 }) {
   const isAdmin = member.role === "admin";
@@ -58,12 +63,20 @@ export function MemberCard({
                 Staff
               </Badge>
             )}
+            {member.is_blocked && (
+              <Badge variant="destructive" className="text-[10px]">
+                Inativo
+              </Badge>
+            )}
             {profile && (
               <span className="text-xs text-admin-ink-muted">
                 Perfil: <span className="text-admin-ink">{PROFILE_LABELS[profile]}</span>
               </span>
             )}
           </div>
+          {member.email && (
+            <div className="text-xs text-admin-ink-muted truncate mt-1">{member.email}</div>
+          )}
         </div>
       </div>
 
@@ -75,7 +88,16 @@ export function MemberCard({
             } liberado${member.allowed_modules.length === 1 ? "" : "s"}.`}
       </div>
 
-      <div className="mt-auto pt-2 flex justify-end">
+      <div className="mt-auto pt-2 flex flex-wrap justify-end gap-2">
+        {canEdit && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onManage}
+          >
+            <UserCog className="h-4 w-4 mr-1.5" /> Gerenciar usuário
+          </Button>
+        )}
         <Button
           variant={isAdmin ? "outline" : "default"}
           size="sm"
