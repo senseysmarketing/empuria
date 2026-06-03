@@ -52,7 +52,7 @@ function PdvPage() {
     });
   };
 
-  const handleClose = async (method: "dinheiro" | "cartao", discount: Discount) => {
+  const handleClose = async (method: "dinheiro" | "cartao" | "pix", discount: Discount) => {
     if (!customer || cart.length === 0) return;
     setClosing(true);
     try {
