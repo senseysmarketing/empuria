@@ -476,7 +476,9 @@ type PdvSaleLite = {
   cashier_id: string;
   payment_method: string;
   total_eur_cents: number;
+  total_brl_cents: number;
   discount_eur_cents: number;
+  discount_brl_cents: number;
   status: string;
   closed_at: string;
 };
@@ -487,6 +489,7 @@ type PdvSaleItemLite = {
   product_name_snapshot: string;
   qty: number;
   total_eur_cents: number;
+  total_brl_cents: number;
 };
 
 const PAYMENT_LABEL: Record<string, string> = {
