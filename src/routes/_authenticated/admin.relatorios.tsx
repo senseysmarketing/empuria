@@ -882,7 +882,7 @@ function RankingList({
   rows,
   empty = "Sem dados no período.",
 }: {
-  rows: { label: string; value: string; raw: number }[];
+  rows: { label: string; value: string; subValue?: string; raw: number }[];
   empty?: string;
 }) {
   if (!rows.length) return <EmptyState label={empty} />;
@@ -895,7 +895,14 @@ function RankingList({
           <li key={i} className="space-y-1">
             <div className="flex items-center justify-between text-sm">
               <span className="text-admin-ink truncate pr-2">{r.label}</span>
-              <span className="font-display tabular-nums text-admin-ink">{r.value}</span>
+              <span className="font-display tabular-nums text-admin-ink text-right">
+                {r.value}
+                {r.subValue && (
+                  <span className="block text-[11px] text-admin-ink-muted font-normal">
+                    {r.subValue}
+                  </span>
+                )}
+              </span>
             </div>
             <div className="h-1.5 w-full bg-admin-bg rounded-full overflow-hidden">
               <div className="h-full bg-admin-accent rounded-full" style={{ width: `${pct}%` }} />
