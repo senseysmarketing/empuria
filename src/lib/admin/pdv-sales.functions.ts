@@ -322,6 +322,15 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
       counts.set(item.sale_id, current);
     }
 
+    let canVoid = Boolean(context.isAdmin);
+    if (!canVoid) {
+      const { data: allowed } = await context.supabase.rpc("has_action", {
+        _user_id: context.userId,
+        _action: "pdv.void_sale",
+      });
+      canVoid = Boolean(allowed);
+    }
+
     return {
       items: sales.map((sale) => ({
         ...sale,
@@ -335,6 +344,7 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
       page: data.page,
       pageSize: data.pageSize,
       isAdmin: Boolean(context.isAdmin),
+      canVoid,
     };
   });
 
