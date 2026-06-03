@@ -452,7 +452,7 @@ export function PdvHistoryPanel() {
           ) : detail?.sale ? (
             <SaleDetailsContent
               detail={detail}
-              isAdmin={isAdmin}
+              isAdmin={canVoid}
               onVoid={() => setVoidTargetId(detail.sale!.id)}
             />
           ) : (
