@@ -1,4 +1,4 @@
-import type { ModuleKey } from "./permissions.functions";
+import type { ModuleKey, ActionKey } from "./permissions.functions";
 
 export type ProfileKey =
   | "recepcao_pdv"
@@ -59,7 +59,7 @@ export type PermissionGroup = {
   label: string;
   description: string;
   modules: ModuleKey[];
-  comingSoon?: { key: string; label: string }[];
+  actions?: { key: ActionKey; label: string; description?: string }[];
   tone?: "default" | "sensitive";
 };
 
@@ -75,17 +75,26 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     label: "Operação",
     description: "Caixa, atendimento físico e fluxo do dia.",
     modules: ["pdv", "eventos", "esteira"],
-    comingSoon: [
-      { key: "pdv.manage_items", label: "Gerenciar itens e estoque" },
-      { key: "pdv.void_sale", label: "Anular venda" },
+    actions: [
+      {
+        key: "pdv.void_sale",
+        label: "Anular venda",
+        description: "Permite cancelar vendas do PDV e reverter estoque.",
+      },
     ],
   },
   {
     key: "comercial",
     label: "Comercial",
     description: "CRM, follow-ups e relacionamento.",
-    modules: ["crm", "triagem", "clube"],
-    comingSoon: [{ key: "crm.view_all_leads", label: "Ver todos os leads (gestor)" }],
+    modules: ["crm", "clube"],
+    actions: [
+      {
+        key: "crm.view_all_leads",
+        label: "Ver todos os leads",
+        description: "Acesso aos leads de toda equipe (visão de gestor).",
+      },
+    ],
   },
   {
     key: "gestao",
@@ -93,10 +102,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     description: "Financeiro, relatórios e usuários.",
     modules: ["financeiro", "relatorios", "usuarios", "slots"],
     tone: "sensitive",
-    comingSoon: [
-      { key: "reports.export", label: "Exportar relatórios" },
-      { key: "financeiro.create_entry", label: "Criar lançamento financeiro" },
-    ],
   },
   {
     key: "configuracoes_avancadas",
