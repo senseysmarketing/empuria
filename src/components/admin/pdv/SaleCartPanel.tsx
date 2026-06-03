@@ -33,10 +33,11 @@ export function SaleCartPanel({
   cart: CartLine[];
   setCart: (next: CartLine[]) => void;
   onChangeCustomer: () => void;
-  onClose: (method: "dinheiro" | "cartao", discount: Discount) => void;
+  onClose: (method: PaymentMethod, discount: Discount) => void;
   closing: boolean;
 }) {
   const [discount, setDiscount] = useState<Discount>({ type: "none", value: 0 });
+  const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null);
 
   const subtotal = useMemo(
     () => cart.reduce(
