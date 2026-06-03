@@ -35,13 +35,6 @@ function CockpitAdminPage() {
   const metricsQ = useQuery({ queryKey: ["cockpit"], queryFn: () => fetchMetrics(), retry: false });
   const feedQ = useQuery({ queryKey: ["activity"], queryFn: () => fetchFeed(), retry: false });
 
-  useTopBarActions(
-    <>
-      <PassportScannerDialog />
-      <ArrivalDialog />
-    </>,
-  );
-
   const m = metricsQ.data;
   useTopBarQuickStat(
     m?.canViewFinancials ? { label: "Vendas hoje", value: `€ ${m.salesToday.toFixed(2)}` } : null,
