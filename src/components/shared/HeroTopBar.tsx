@@ -104,7 +104,7 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
 
         {actions && <div className="flex items-center gap-3">{actions}</div>}
 
-        {isAdmin && can("configuracoes") && (
+        {(variant === "admin" || (isAdmin && can("configuracoes"))) && (
           <Link
             to="/admin/configuracoes"
             search={{ tab: "perfil" }}
