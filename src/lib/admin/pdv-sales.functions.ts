@@ -419,7 +419,14 @@ export const voidPdvSale = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    if (!context.isAdmin) throw new Error("Apenas administradores podem anular vendas.");
+    if (!context.isAdmin) {
+      const { data: allowed, error: aerr } = await context.supabase.rpc("has_action", {
+        _user_id: context.userId,
+        _action: "pdv.void_sale",
+      });
+      if (aerr) throw new Error(aerr.message);
+      if (!allowed) throw new Error("Sem permissão para anular vendas.");
+    }
     const { error } = await supabaseAdmin.rpc("pdv_void_sale", {
       p_sale_id: data.saleId,
       p_admin_id: context.userId,
