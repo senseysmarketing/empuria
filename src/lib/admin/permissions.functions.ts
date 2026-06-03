@@ -161,6 +161,17 @@ export const createStaffMember = createServerFn({ method: "POST" })
       );
     if (roleError) throw new Error(roleError.message);
 
+    // Auto-grant the base "cockpit" module so every new staff lands on /admin
+    // with the staff cockpit visible by default. Admins ignore this row.
+    if (data.role === "staff") {
+      await supabaseAdmin
+        .from("staff_module_permissions")
+        .upsert(
+          { user_id: customer.user_id, module_key: "cockpit", is_allowed: true },
+          { onConflict: "user_id,module_key" },
+        );
+    }
+
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
       action: customer.created ? "staff.created" : "staff.role_granted",

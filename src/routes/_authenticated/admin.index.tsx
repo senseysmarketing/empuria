@@ -10,24 +10,30 @@ import { RevenueChart } from "@/components/admin/RevenueChart";
 import { PassportScannerDialog } from "@/components/admin/PassportScannerDialog";
 import { Euro, Crown, CalendarClock, Users } from "lucide-react";
 import { useTopBarActions, useTopBarQuickStat } from "@/components/shared/TopBarActionsContext";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { CockpitStaffView } from "@/components/admin/cockpit/CockpitStaffView";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: CockpitPage,
 });
 
 function CockpitPage() {
-  const fetchMetrics = useServerFn(getCockpitMetrics);
-  const fetchFeed = useServerFn(getActivityFeed);
-
-  const metricsQ = useQuery({ queryKey: ["cockpit"], queryFn: () => fetchMetrics(), retry: false });
-  const feedQ = useQuery({ queryKey: ["activity"], queryFn: () => fetchFeed(), retry: false });
-
+  const { isAdmin } = useCurrentUser();
   useTopBarActions(
     <>
       <PassportScannerDialog />
       <ArrivalDialog />
     </>,
   );
+  return isAdmin ? <CockpitAdminPage /> : <CockpitStaffView />;
+}
+
+function CockpitAdminPage() {
+  const fetchMetrics = useServerFn(getCockpitMetrics);
+  const fetchFeed = useServerFn(getActivityFeed);
+
+  const metricsQ = useQuery({ queryKey: ["cockpit"], queryFn: () => fetchMetrics(), retry: false });
+  const feedQ = useQuery({ queryKey: ["activity"], queryFn: () => fetchFeed(), retry: false });
 
   const m = metricsQ.data;
   useTopBarQuickStat(
