@@ -21,6 +21,8 @@ export function EquipePermissoesTab() {
 
   const [openNew, setOpenNew] = useState(false);
   const [editing, setEditing] = useState<MemberCardData | null>(null);
+  const [managing, setManaging] = useState<MemberCardData | null>(null);
+
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
 
