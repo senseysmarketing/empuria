@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Settings, User, Plug, Users, ShoppingCart, Zap, FileText, Tags } from "lucide-react";
+import { Settings, User, Plug, Users, ShoppingCart, Zap, FileText, Tags, Crown } from "lucide-react";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import { PerfilContaTab } from "@/components/admin/configuracoes/PerfilContaTab";
 import { IntegracoesTab } from "@/components/admin/configuracoes/IntegracoesTab";
@@ -11,17 +11,20 @@ import { PdvItensTab } from "@/components/admin/configuracoes/PdvItensTab";
 import { ServicosPrecosTab } from "@/components/admin/configuracoes/ServicosPrecosTab";
 import { AutomacoesPanel } from "@/components/admin/AutomacoesPanel";
 import { LogsAuditoriaTab } from "@/components/admin/configuracoes/LogsAuditoriaTab";
+import { ClubeAdminTab } from "@/components/admin/configuracoes/ClubeAdminTab";
 import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
 
 const TABS = [
   "perfil",
   "integracoes",
   "equipe",
+  "clube",
   "servicos-precos",
   "pdv-itens",
   "automacoes",
   "logs",
 ] as const;
+
 type Tab = (typeof TABS)[number];
 
 const searchSchema = z.object({
@@ -76,6 +79,13 @@ function ConfiguracoesPage() {
             <Users className="h-4 w-4" /> Equipe &amp; Permissões
           </TabsTrigger>
           <TabsTrigger
+            value="clube"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <Crown className="h-4 w-4" /> Clube do Imigrante
+          </TabsTrigger>
+
+          <TabsTrigger
             value="servicos-precos"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
@@ -118,6 +128,14 @@ function ConfiguracoesPage() {
             <RestrictedAreaCard message="Apenas administradores podem gerenciar a equipe e permissões." />
           )}
         </TabsContent>
+        <TabsContent value="clube" className="mt-6">
+          {isLoading ? null : can("clube") ? (
+            <ClubeAdminTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso ao módulo Clube podem gerenciar conteúdos e comunicados." />
+          )}
+        </TabsContent>
+
         <TabsContent value="servicos-precos" className="mt-6">
           {isLoading ? null : can("configuracoes") ? (
             <ServicosPrecosTab />

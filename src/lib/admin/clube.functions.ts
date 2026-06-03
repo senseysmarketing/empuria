@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireStaff } from "./auth";
+import { requireModule } from "./auth";
+const requireClube = requireModule("clube");
 
 export const getClubData = createServerFn({ method: "GET" })
-  .middleware([requireStaff])
+  .middleware([requireClube])
   .handler(async ({ context }) => {
     const [members, content, posts] = await Promise.all([
       context.supabase.from("profiles").select("id,full_name,is_club_member,created_at,phone").order("created_at", { ascending: false }).limit(300),
@@ -18,7 +19,7 @@ export const getClubData = createServerFn({ method: "GET" })
   });
 
 export const toggleMembership = createServerFn({ method: "POST" })
-  .middleware([requireStaff])
+  .middleware([requireClube])
   .inputValidator((d) => z.object({ id: z.string().uuid(), is_member: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
@@ -30,7 +31,7 @@ export const toggleMembership = createServerFn({ method: "POST" })
   });
 
 export const upsertContent = createServerFn({ method: "POST" })
-  .middleware([requireStaff])
+  .middleware([requireClube])
   .inputValidator((d) =>
     z.object({
       id: z.string().uuid().optional(),
@@ -62,7 +63,7 @@ export const upsertContent = createServerFn({ method: "POST" })
   });
 
 export const deleteContent = createServerFn({ method: "POST" })
-  .middleware([requireStaff])
+  .middleware([requireClube])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("club_content").delete().eq("id", data.id);
@@ -71,7 +72,7 @@ export const deleteContent = createServerFn({ method: "POST" })
   });
 
 export const createPost = createServerFn({ method: "POST" })
-  .middleware([requireStaff])
+  .middleware([requireClube])
   .inputValidator((d) =>
     z.object({
       body: z.string().trim().min(2).max(4000),
@@ -91,7 +92,7 @@ export const createPost = createServerFn({ method: "POST" })
   });
 
 export const togglePinPost = createServerFn({ method: "POST" })
-  .middleware([requireStaff])
+  .middleware([requireClube])
   .inputValidator((d) => z.object({ id: z.string().uuid(), pin: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("community_posts").update({ is_pinned: data.pin }).eq("id", data.id);
@@ -100,7 +101,7 @@ export const togglePinPost = createServerFn({ method: "POST" })
   });
 
 export const deletePost = createServerFn({ method: "POST" })
-  .middleware([requireStaff])
+  .middleware([requireClube])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("community_posts").delete().eq("id", data.id);
