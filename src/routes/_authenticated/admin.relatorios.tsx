@@ -361,12 +361,14 @@ function DeltaBadge({ pct }: { pct: number | null }) {
 function MetricCard({
   label,
   value,
+  hint,
   deltaPct,
   icon: Icon,
   tone = "neutral",
 }: {
   label: string;
   value: string;
+  hint?: string;
   deltaPct?: number | null;
   icon?: typeof BarChart3;
   tone?: "neutral" | "green" | "red" | "blue" | "amber";
@@ -384,6 +386,9 @@ function MetricCard({
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-admin-ink-muted">{label}</p>
           <p className="mt-2 font-display text-2xl font-bold text-admin-ink truncate">{value}</p>
+          {hint && (
+            <p className="mt-0.5 text-xs text-admin-ink-muted tabular-nums truncate">{hint}</p>
+          )}
           {deltaPct !== undefined && (
             <div className="mt-1">
               <DeltaBadge pct={deltaPct ?? null} />
