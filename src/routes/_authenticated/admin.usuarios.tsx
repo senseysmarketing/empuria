@@ -2,8 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
-import { z } from "zod";
+
 import {
   Search,
   MoreVertical,
@@ -26,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,22 +65,11 @@ import {
   type UserRow,
 } from "@/lib/admin/usuarios.functions";
 import { UsuarioEditSheet } from "@/components/admin/UsuarioEditSheet";
-import {
-  ClubeContentManager,
-  ClubeWallManager,
-  useClubData,
-} from "@/components/admin/ClubeManagers";
-
-const searchSchema = z.object({
-  tab: fallback(z.enum(["passaportes", "clube-conteudo", "clube-mural"]), "passaportes").default(
-    "passaportes",
-  ),
-});
 
 export const Route = createFileRoute("/_authenticated/admin/usuarios")({
-  validateSearch: zodValidator(searchSchema),
   component: UsuariosPage,
 });
+
 
 function passportCode(id: string, createdAt: string) {
   const year = new Date(createdAt).getFullYear();
@@ -102,10 +90,6 @@ function relativeTime(iso: string | null) {
 }
 
 function UsuariosPage() {
-  const { tab } = Route.useSearch();
-  const navigate = useNavigate({ from: Route.fullPath });
-  const club = useClubData();
-
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
@@ -114,38 +98,16 @@ function UsuariosPage() {
             <Users className="h-7 w-7 text-admin-accent" /> Passaportes Empuria
           </h1>
           <p className="text-sm text-admin-ink-muted">
-            Gestão de clientes, membros do clube e impersonação segura.
+            Gestão de clientes, primeiro acesso e impersonação segura.
           </p>
         </div>
       </header>
 
-      <Tabs
-        value={tab}
-        onValueChange={(v) =>
-          navigate({ search: { tab: v as "passaportes" | "clube-conteudo" | "clube-mural" } })
-        }
-      >
-        <TabsList className="bg-admin-surface border border-admin-border">
-          <TabsTrigger value="passaportes" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Passaportes</TabsTrigger>
-          <TabsTrigger value="clube-conteudo" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Clube — Conteúdo</TabsTrigger>
-          <TabsTrigger value="clube-mural" className="data-[state=active]:bg-admin-accent data-[state=active]:text-white">Clube — Mural</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="passaportes" className="mt-4">
-          <PassaportesPanel />
-        </TabsContent>
-
-        <TabsContent value="clube-conteudo" className="mt-4">
-          <ClubeContentManager items={club.data?.content ?? []} />
-        </TabsContent>
-
-        <TabsContent value="clube-mural" className="mt-4">
-          <ClubeWallManager posts={club.data?.posts ?? []} />
-        </TabsContent>
-      </Tabs>
+      <PassaportesPanel />
     </div>
   );
 }
+
 
 function PassaportesPanel() {
   const list = useServerFn(listUsers);
