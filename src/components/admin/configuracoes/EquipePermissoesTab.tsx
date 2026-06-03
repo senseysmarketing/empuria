@@ -9,7 +9,9 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { NewStaffDialog } from "./NewStaffDialog";
 import { MemberCard, type MemberCardData } from "./MemberCard";
 import { EditMemberPermissionsDialog } from "./EditMemberPermissionsDialog";
+import { ManageMemberDialog } from "./ManageMemberDialog";
 import { cn } from "@/lib/utils";
+
 
 type Filter = "todos" | "admin" | "staff";
 
