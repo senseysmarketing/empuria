@@ -105,7 +105,11 @@ function ConfiguracoesPage() {
           <PerfilContaTab />
         </TabsContent>
         <TabsContent value="integracoes" className="mt-6">
-          <IntegracoesTab />
+          {isLoading ? null : can("configuracoes") ? (
+            <IntegracoesTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso a Configurações podem ver as integrações." />
+          )}
         </TabsContent>
         <TabsContent value="equipe" className="mt-6">
           {isAdmin ? (
@@ -115,13 +119,32 @@ function ConfiguracoesPage() {
           )}
         </TabsContent>
         <TabsContent value="servicos-precos" className="mt-6">
-          <ServicosPrecosTab />
+          {isLoading ? null : can("configuracoes") ? (
+            <ServicosPrecosTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso a Configurações podem gerenciar serviços e preços." />
+          )}
         </TabsContent>
         <TabsContent value="pdv-itens" className="mt-6">
-          <PdvItensTab />
+          {isLoading ? null : can("pdv_itens") ? (
+            <PdvItensTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso ao módulo PDV Itens podem gerenciar este catálogo." />
+          )}
         </TabsContent>
         <TabsContent value="automacoes" className="mt-6">
-          <AutomacoesPanel />
+          {isLoading ? null : can("automacoes") ? (
+            <AutomacoesPanel />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso ao módulo Automações podem configurar gatilhos." />
+          )}
+        </TabsContent>
+        <TabsContent value="logs" className="mt-6">
+          {isAdmin ? (
+            <LogsAuditoriaTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas administradores podem visualizar os logs de auditoria." />
+          )}
         </TabsContent>
         <TabsContent value="logs" className="mt-6">
           {isAdmin ? (
