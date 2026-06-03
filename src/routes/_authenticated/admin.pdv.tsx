@@ -23,7 +23,7 @@ function PdvPage() {
   const [customer, setCustomer] = useState<PdvCustomer | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [closing, setClosing] = useState(false);
-  const [success, setSuccess] = useState<number | null>(null);
+  const [success, setSuccess] = useState<{ brl: number; eur: number } | null>(null);
   const [tab, setTab] = useState("venda");
 
   const catalogQ = useQuery({
@@ -57,11 +57,19 @@ function PdvPage() {
     setClosing(true);
     try {
       const totalEur = cart.reduce((acc, l) => acc + l.qty * l.item.price_eur_cents, 0);
+      const totalBrl = cart.reduce((acc, l) => acc + l.qty * l.item.price_brl_cents, 0);
+      const pct = Math.max(0, Math.min(discount.value, 100));
       const discountEur =
         discount.type === "amount"
           ? Math.min(Math.round(discount.value * 100), totalEur)
           : discount.type === "percent"
-            ? Math.floor((totalEur * Math.max(0, Math.min(discount.value, 100))) / 100)
+            ? Math.floor((totalEur * pct) / 100)
+            : 0;
+      const discountBrl =
+        discount.type === "amount"
+          ? Math.min(Math.round(discount.value * 100), totalBrl)
+          : discount.type === "percent"
+            ? Math.floor((totalBrl * pct) / 100)
             : 0;
       await closeFn({
         data: {
@@ -71,7 +79,10 @@ function PdvPage() {
           paymentMethod: method,
         },
       });
-      setSuccess(Math.max(0, totalEur - discountEur));
+      setSuccess({
+        brl: Math.max(0, totalBrl - discountBrl),
+        eur: Math.max(0, totalEur - discountEur),
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao fechar venda");
     } finally {
@@ -147,7 +158,7 @@ function PdvPage() {
         </TabsContent>
       </Tabs>
 
-      {success !== null && <SaleSuccessOverlay totalEurCents={success} onReset={reset} />}
+      {success !== null && <SaleSuccessOverlay totalBrlCents={success.brl} totalEurCents={success.eur} onReset={reset} />}
     </div>
   );
 }
