@@ -164,7 +164,7 @@ export function PdvHistoryPanel() {
   const rows = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const isAdmin = Boolean(data?.isAdmin);
+  const canVoid = Boolean(data?.canVoid ?? data?.isAdmin);
   const fromLabel = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const toLabel = Math.min(page * PAGE_SIZE, total);
   const selectedSale = rows.find((sale) => sale.id === selectedSaleId);
@@ -375,7 +375,7 @@ export function PdvHistoryPanel() {
                       >
                         <Eye className="h-3.5 w-3.5" /> Detalhes
                       </Button>
-                      {isAdmin ? (
+                      {canVoid ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -391,7 +391,7 @@ export function PdvHistoryPanel() {
                           variant="outline"
                           className="h-8 border-admin-border text-admin-ink-muted"
                           disabled
-                          title="Apenas administradores podem anular vendas."
+                          title="Sem permissão para anular vendas."
                         >
                           <Lock className="h-3.5 w-3.5" /> Anular
                         </Button>
@@ -451,7 +451,7 @@ export function PdvHistoryPanel() {
           ) : detail?.sale ? (
             <SaleDetailsContent
               detail={detail}
-              isAdmin={isAdmin}
+              isAdmin={canVoid}
               onVoid={() => setVoidTargetId(detail.sale!.id)}
             />
           ) : (

@@ -12,7 +12,6 @@ export const ALL_MODULES = [
   "esteira",
   "crm",
   "financeiro",
-  "triagem",
   "agenda",
   "usuarios",
   "clube",
@@ -32,7 +31,6 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   esteira: "Esteira",
   crm: "CRM",
   financeiro: "Financeiro",
-  triagem: "Triagem",
   agenda: "Agenda",
   usuarios: "Usuários",
   clube: "Clube",
@@ -42,6 +40,14 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   automacoes: "Automações",
   logs: "Logs & Auditoria",
   relatorios: "Relatórios",
+};
+
+export const ALL_ACTIONS = ["pdv.void_sale", "crm.view_all_leads"] as const;
+export type ActionKey = (typeof ALL_ACTIONS)[number];
+
+export const ACTION_LABELS: Record<ActionKey, string> = {
+  "pdv.void_sale": "Anular venda",
+  "crm.view_all_leads": "Ver todos os leads",
 };
 
 /** Returns the modules the current user can access. Admins get all. */
@@ -60,7 +66,23 @@ export const getMyModuleAccess = createServerFn({ method: "GET" })
     return { isAdmin: false, modules: (data ?? []).map((r) => r.module_key) };
   });
 
-/** Admin-only: list staff users + their per-module permission matrix. */
+/** Returns the action subpermissions for the current user. Admins implicitly have all. */
+export const getMyActionAccess = createServerFn({ method: "GET" })
+  .middleware([requireStaff])
+  .handler(async ({ context }) => {
+    if (context.isAdmin) {
+      return { isAdmin: true, actions: [...ALL_ACTIONS] as string[] };
+    }
+    const { data, error } = await supabaseAdmin
+      .from("staff_action_permissions")
+      .select("action_key")
+      .eq("user_id", context.userId)
+      .eq("is_allowed", true);
+    if (error) throw new Error(error.message);
+    return { isAdmin: false, actions: (data ?? []).map((r) => r.action_key) };
+  });
+
+/** Admin-only: list staff users + their per-module + per-action permission matrix. */
 export const listStaffWithPermissions = createServerFn({ method: "GET" })
   .middleware([requireAdmin()])
   .handler(async () => {
@@ -71,11 +93,15 @@ export const listStaffWithPermissions = createServerFn({ method: "GET" })
     if (rolesErr) throw new Error(rolesErr.message);
 
     const userIds = Array.from(new Set((roles ?? []).map((r) => r.user_id)));
-    const [{ data: profiles }, { data: perms }] = await Promise.all([
+    const [{ data: profiles }, { data: perms }, { data: actions }] = await Promise.all([
       supabaseAdmin.from("profiles").select("id, full_name, avatar_url").in("id", userIds),
       supabaseAdmin
         .from("staff_module_permissions")
         .select("user_id, module_key, is_allowed")
+        .in("user_id", userIds),
+      supabaseAdmin
+        .from("staff_action_permissions")
+        .select("user_id, action_key, is_allowed")
         .in("user_id", userIds),
     ]);
 
@@ -92,12 +118,20 @@ export const listStaffWithPermissions = createServerFn({ method: "GET" })
       permByUser.get(p.user_id)!.add(p.module_key);
     }
 
+    const actionByUser = new Map<string, Set<string>>();
+    for (const a of actions ?? []) {
+      if (!a.is_allowed) continue;
+      if (!actionByUser.has(a.user_id)) actionByUser.set(a.user_id, new Set());
+      actionByUser.get(a.user_id)!.add(a.action_key);
+    }
+
     return (profiles ?? []).map((p) => ({
       id: p.id,
       full_name: p.full_name,
       avatar_url: p.avatar_url,
       role: roleByUser.get(p.id) ?? "staff",
       allowed_modules: Array.from(permByUser.get(p.id) ?? []),
+      allowed_actions: Array.from(actionByUser.get(p.id) ?? []),
     }));
   });
 
@@ -128,6 +162,37 @@ export const setStaffPermission = createServerFn({ method: "POST" })
       entity_type: "staff_module_permission",
       entity_id: null,
       new_data: { user_id: data.user_id, module_key: data.module_key, is_allowed: data.is_allowed },
+    });
+    return { ok: true };
+  });
+
+export const setStaffActionPermission = createServerFn({ method: "POST" })
+  .middleware([requireAdmin()])
+  .inputValidator((d) =>
+    z
+      .object({
+        user_id: z.string().uuid(),
+        action_key: z.enum(ALL_ACTIONS),
+        is_allowed: z.boolean(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await supabaseAdmin
+      .from("staff_action_permissions")
+      .upsert(
+        { user_id: data.user_id, action_key: data.action_key, is_allowed: data.is_allowed },
+        { onConflict: "user_id,action_key" },
+      );
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin.from("audit_logs").insert({
+      actor_id: context.userId,
+      action: data.is_allowed ? "action_permission.grant" : "action_permission.revoke",
+      module: "configuracoes",
+      entity_type: "staff_action_permission",
+      entity_id: null,
+      new_data: { user_id: data.user_id, action_key: data.action_key, is_allowed: data.is_allowed },
     });
     return { ok: true };
   });
@@ -193,4 +258,3 @@ export const createStaffMember = createServerFn({ method: "POST" })
       password_setup_required: customer.password_setup_required,
     };
   });
-

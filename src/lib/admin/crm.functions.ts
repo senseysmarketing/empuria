@@ -262,6 +262,18 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const db = context.supabase as any;
 
+    let canSeeAll = Boolean(context.isAdmin);
+    if (!canSeeAll) {
+      const { data: allowed } = await db.rpc("has_action", {
+        _user_id: context.userId,
+        _action: "crm.view_all_leads",
+      });
+      canSeeAll = Boolean(allowed);
+    }
+
+    const leadsQuery = db.from("leads").select("*").order("created_at", { ascending: false }).limit(400);
+    if (!canSeeAll) leadsQuery.eq("assigned_to", context.userId);
+
     const [columnsRes, leadsRes, inboxRes, distributionRes, membersRes, activityRes, users] =
       await Promise.all([
         db
@@ -269,7 +281,7 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
           .select("*")
           .eq("is_active", true)
           .order("position", { ascending: true }),
-        db.from("leads").select("*").order("created_at", { ascending: false }).limit(400),
+        leadsQuery,
         db
           .from("crm_inbox_messages")
           .select("*")
@@ -320,11 +332,13 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
       await createSuggestedFollowupForLead(db, lead, context.userId);
     }
 
-    const { data: followupRows, error: followupsError } = await db
+    const followupsQuery = db
       .from("crm_followups")
       .select("*")
       .order("due_at", { ascending: true })
       .limit(250);
+    if (!canSeeAll) followupsQuery.eq("assigned_to", context.userId);
+    const { data: followupRows, error: followupsError } = await followupsQuery;
     if (followupsError) throw new Error(followupsError.message);
 
     const followups = ((followupRows ?? []) as CrmFollowupRow[]).map(
@@ -348,6 +362,7 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
       users,
       currentUserId: context.userId,
       isAdmin: Boolean(context.isAdmin),
+      canSeeAllLeads: canSeeAll,
       whatsappMode: "sugestao" as const,
     };
   });

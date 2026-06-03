@@ -10,6 +10,7 @@ export type MemberCardData = {
   avatar_url: string | null;
   role: "admin" | "staff";
   allowed_modules: string[];
+  allowed_actions?: string[];
 };
 
 export function MemberCard({
