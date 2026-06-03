@@ -128,6 +128,14 @@ function ConfiguracoesPage() {
             <RestrictedAreaCard message="Apenas administradores podem gerenciar a equipe e permissões." />
           )}
         </TabsContent>
+        <TabsContent value="clube" className="mt-6">
+          {isLoading ? null : can("clube") ? (
+            <ClubeAdminTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso ao módulo Clube podem gerenciar conteúdos e comunicados." />
+          )}
+        </TabsContent>
+
         <TabsContent value="servicos-precos" className="mt-6">
           {isLoading ? null : can("configuracoes") ? (
             <ServicosPrecosTab />
