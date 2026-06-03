@@ -165,6 +165,7 @@ export function PdvHistoryPanel() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const isAdmin = Boolean(data?.isAdmin);
+  const canVoid = Boolean(data?.canVoid ?? data?.isAdmin);
   const fromLabel = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const toLabel = Math.min(page * PAGE_SIZE, total);
   const selectedSale = rows.find((sale) => sale.id === selectedSaleId);
