@@ -75,7 +75,7 @@ export function ManageMemberDialog({
 
   if (!member) return null;
 
-  const isSelf = user?.id === member.id;
+  const isSelf = me?.userId === member.id;
   const isBlocked = Boolean(member.is_blocked);
 
   const invalidate = () =>
