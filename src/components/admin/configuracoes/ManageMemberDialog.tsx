@@ -52,7 +52,7 @@ export function ManageMemberDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const qc = useQueryClient();
-  const { user } = useCurrentUser();
+  const { data: me } = useCurrentUser();
   const updateFn = useServerFn(updateUserProfile);
   const blockFn = useServerFn(setUserBlocked);
   const resetFn = useServerFn(forcePasswordReset);
