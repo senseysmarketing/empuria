@@ -11,6 +11,7 @@ import {
   Users,
   WalletCards,
   BarChart3,
+  Settings,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useModuleAccess } from "@/hooks/use-module-access";
@@ -26,6 +27,7 @@ const items = [
   { to: "/admin/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
   { to: "/admin/usuarios", label: "Usuários", icon: Users, module: "usuarios" },
+  { to: "/admin/configuracoes", label: "Config", icon: Settings, module: "__always__" },
 ] as const;
 
 export function AdminDock() {
@@ -36,7 +38,7 @@ export function AdminDock() {
   const isActive = (to: string, exact?: boolean) =>
     exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
 
-  const visibleItems = items.filter((it) => can(it.module));
+  const visibleItems = items.filter((it) => it.module === "__always__" || can(it.module));
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 px-4 pb-4">

@@ -11,6 +11,7 @@ import { PdvItensTab } from "@/components/admin/configuracoes/PdvItensTab";
 import { ServicosPrecosTab } from "@/components/admin/configuracoes/ServicosPrecosTab";
 import { AutomacoesPanel } from "@/components/admin/AutomacoesPanel";
 import { LogsAuditoriaTab } from "@/components/admin/configuracoes/LogsAuditoriaTab";
+import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
 
 const TABS = [
   "perfil",
@@ -68,14 +69,12 @@ function ConfiguracoesPage() {
           >
             <Plug className="h-4 w-4" /> Integrações
           </TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger
-              value="equipe"
-              className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
-            >
-              <Users className="h-4 w-4" /> Equipe &amp; Permissões
-            </TabsTrigger>
-          )}
+          <TabsTrigger
+            value="equipe"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <Users className="h-4 w-4" /> Equipe &amp; Permissões
+          </TabsTrigger>
           <TabsTrigger
             value="servicos-precos"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
@@ -94,14 +93,12 @@ function ConfiguracoesPage() {
           >
             <Zap className="h-4 w-4" /> Automações
           </TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger
-              value="logs"
-              className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
-            >
-              <FileText className="h-4 w-4" /> Logs &amp; Auditoria
-            </TabsTrigger>
-          )}
+          <TabsTrigger
+            value="logs"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <FileText className="h-4 w-4" /> Logs &amp; Auditoria
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="perfil" className="mt-6">
@@ -110,11 +107,13 @@ function ConfiguracoesPage() {
         <TabsContent value="integracoes" className="mt-6">
           <IntegracoesTab />
         </TabsContent>
-        {isAdmin && (
-          <TabsContent value="equipe" className="mt-6">
+        <TabsContent value="equipe" className="mt-6">
+          {isAdmin ? (
             <EquipePermissoesTab />
-          </TabsContent>
-        )}
+          ) : (
+            <RestrictedAreaCard message="Apenas administradores podem gerenciar a equipe e permissões." />
+          )}
+        </TabsContent>
         <TabsContent value="servicos-precos" className="mt-6">
           <ServicosPrecosTab />
         </TabsContent>
@@ -124,11 +123,13 @@ function ConfiguracoesPage() {
         <TabsContent value="automacoes" className="mt-6">
           <AutomacoesPanel />
         </TabsContent>
-        {isAdmin && (
-          <TabsContent value="logs" className="mt-6">
+        <TabsContent value="logs" className="mt-6">
+          {isAdmin ? (
             <LogsAuditoriaTab />
-          </TabsContent>
-        )}
+          ) : (
+            <RestrictedAreaCard message="Apenas administradores podem visualizar os logs de auditoria." />
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   );
