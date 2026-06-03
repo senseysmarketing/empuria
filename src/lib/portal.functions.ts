@@ -72,7 +72,7 @@ export const submitLead = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     // Use admin import lazily to bypass RLS for anon lead capture
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("leads").insert(data);
+    const { error } = await supabaseAdmin.from("leads").insert(data as never);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
