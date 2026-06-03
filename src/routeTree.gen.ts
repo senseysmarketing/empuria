@@ -20,6 +20,7 @@ import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiWebhooksUazapiRouteImport } from './routes/api.webhooks.uazapi'
 import { Route as ApiWebhooksMercadopagoRouteImport } from './routes/api.webhooks.mercadopago'
 import { Route as ApiWebhooksHublaRouteImport } from './routes/api.webhooks.hubla'
 import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
@@ -95,6 +96,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const ApiWebhooksUazapiRoute = ApiWebhooksUazapiRouteImport.update({
+  id: '/api/webhooks/uazapi',
+  path: '/api/webhooks/uazapi',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWebhooksMercadopagoRoute = ApiWebhooksMercadopagoRouteImport.update({
   id: '/api/webhooks/mercadopago',
@@ -239,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
+  '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
 }
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
+  '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
 }
@@ -303,6 +311,7 @@ export interface FileRoutesById {
   '/_authenticated/portal/servicos': typeof AuthenticatedPortalServicosRoute
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
+  '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
 }
@@ -337,6 +346,7 @@ export interface FileRouteTypes {
     | '/portal/servicos'
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
+    | '/api/webhooks/uazapi'
     | '/admin/'
     | '/portal/'
   fileRoutesByTo: FileRoutesByTo
@@ -367,6 +377,7 @@ export interface FileRouteTypes {
     | '/portal/servicos'
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
+    | '/api/webhooks/uazapi'
     | '/admin'
     | '/portal'
   id:
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/_authenticated/portal/servicos'
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
+    | '/api/webhooks/uazapi'
     | '/_authenticated/admin/'
     | '/_authenticated/portal/'
   fileRoutesById: FileRoutesById
@@ -413,6 +425,7 @@ export interface RootRouteChildren {
   EventoSlugRoute: typeof EventoSlugRoute
   ApiWebhooksHublaRoute: typeof ApiWebhooksHublaRoute
   ApiWebhooksMercadopagoRoute: typeof ApiWebhooksMercadopagoRoute
+  ApiWebhooksUazapiRoute: typeof ApiWebhooksUazapiRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -493,6 +506,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/webhooks/uazapi': {
+      id: '/api/webhooks/uazapi'
+      path: '/api/webhooks/uazapi'
+      fullPath: '/api/webhooks/uazapi'
+      preLoaderRoute: typeof ApiWebhooksUazapiRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/webhooks/mercadopago': {
       id: '/api/webhooks/mercadopago'
@@ -730,7 +750,18 @@ const rootRouteChildren: RootRouteChildren = {
   EventoSlugRoute: EventoSlugRoute,
   ApiWebhooksHublaRoute: ApiWebhooksHublaRoute,
   ApiWebhooksMercadopagoRoute: ApiWebhooksMercadopagoRoute,
+  ApiWebhooksUazapiRoute: ApiWebhooksUazapiRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

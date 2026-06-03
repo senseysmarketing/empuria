@@ -2,6 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin, requireModule } from "./auth";
+import { sendUazapiTextInternal } from "@/lib/uazapi/uazapi.functions";
 
 const systemStageKeys = new Set(["novo", "em_contato", "reuniao", "fechado", "descartado"]);
 
@@ -127,6 +128,15 @@ function addHours(value: string, hours: number) {
 function whatsappUrl(phone: string, message: string) {
   const digits = phone.replace(/\D/g, "");
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
+function shouldFallbackToWaMe(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("desativado") ||
+    error.message.includes("nao esta conectado") ||
+    error.message.includes("nao configurado")
+  );
 }
 
 function isFinalStage(stage: string | null | undefined) {
@@ -697,6 +707,23 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
       .single();
     if (conversationError) throw new Error(conversationError.message);
 
+    let delivery: "uazapi" | "wa_me" = "uazapi";
+    let providerMessageId: string | null = null;
+    let providerStatus = "sent";
+    try {
+      const sent = await sendUazapiTextInternal({
+        number: phoneDigits,
+        text: data.message,
+        trackId: `followup:${data.followupId}`,
+      });
+      providerMessageId = sent.providerMessageId;
+      providerStatus = sent.status;
+    } catch (error) {
+      if (!shouldFallbackToWaMe(error)) throw error;
+      delivery = "wa_me";
+      providerStatus = "manual_pending";
+    }
+
     const sentAt = new Date().toISOString();
     const { data: message, error: messageError } = await db
       .from("crm_messages")
@@ -705,9 +732,10 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
         conversation_id: conversation.id,
         direction: "outbound",
         provider: "whatsapp",
+        provider_message_id: providerMessageId,
         body: data.message,
         message_type: "text",
-        status: "manual_sent",
+        status: providerStatus,
         sent_by: context.userId,
         created_at: sentAt,
       })
@@ -744,7 +772,7 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
         {
           lead_id: leadRow.id,
           kind: "message_outbound",
-          payload: { message_id: message.id, provider: "whatsapp" },
+          payload: { message_id: message.id, provider: "whatsapp", delivery },
           actor_id: context.userId,
         },
       ]),
@@ -752,7 +780,11 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
 
     await refreshLeadNextFollowup(db, leadRow.id);
 
-    return { ok: true, whatsappUrl: whatsappUrl(leadRow.phone, data.message) };
+    return {
+      ok: true,
+      delivery,
+      whatsappUrl: delivery === "wa_me" ? whatsappUrl(leadRow.phone, data.message) : null,
+    };
   });
 
 export const saveCrmColumn = createServerFn({ method: "POST" })
