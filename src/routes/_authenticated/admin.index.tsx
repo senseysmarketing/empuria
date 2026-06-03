@@ -28,7 +28,7 @@ function CockpitPage() {
   return isAdmin ? <CockpitAdminPage /> : <CockpitStaffView />;
 }
 
-function CockpitPage() {
+function CockpitAdminPage() {
   const fetchMetrics = useServerFn(getCockpitMetrics);
   const fetchFeed = useServerFn(getActivityFeed);
 
