@@ -4,9 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const checkEmail = createServerFn({ method: "POST" })
-  .inputValidator((d) =>
-    z.object({ email: z.string().trim().email().max(255) }).parse(d),
-  )
+  .inputValidator((d) => z.object({ email: z.string().trim().email().max(255) }).parse(d))
   .handler(async ({ data }) => {
     const { data: exists, error } = await supabaseAdmin.rpc("email_exists", {
       p_email: data.email,
@@ -17,17 +15,17 @@ export const checkEmail = createServerFn({ method: "POST" })
 
 export const getSlotsForService = createServerFn({ method: "POST" })
   .inputValidator((d) =>
-    z.object({
-      serviceId: z.string().uuid(),
-      from: z.string().optional(),
-      to: z.string().optional(),
-    }).parse(d),
+    z
+      .object({
+        serviceId: z.string().uuid(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ data }) => {
     const from = data.from ?? new Date().toISOString();
-    const to =
-      data.to ??
-      new Date(Date.now() + 1000 * 60 * 60 * 24 * 60).toISOString();
+    const to = data.to ?? new Date(Date.now() + 1000 * 60 * 60 * 24 * 60).toISOString();
     const { data: slots } = await supabaseAdmin
       .from("availability_slots")
       .select("id,starts_at,ends_at,capacity,booked")
@@ -103,8 +101,14 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
       slotId = slot.id;
     }
 
-    const customerEmail =
-      typeof claims.email === "string" ? claims.email : null;
+    const customerEmail = typeof claims.email === "string" ? claims.email : null;
+
+    const serviceRow = service as typeof service & {
+      online_price_cents?: number | null;
+      online_currency?: string | null;
+    };
+    const paymentAmountCents = serviceRow.online_price_cents ?? service.price_cents;
+    const paymentCurrency = serviceRow.online_currency ?? service.currency ?? "BRL";
 
     const { data: order, error: orderErr } = await supabase
       .from("orders")
@@ -114,30 +118,36 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
         customer_email: customerEmail,
         service_id: service.id,
         service_title: service.title,
-        amount_cents: service.price_cents,
+        amount_cents: paymentAmountCents,
+        currency: paymentCurrency,
         slot_id: slotId,
         service_metadata: {
           ...data.serviceData,
           whatsapp: data.contact.whatsapp,
+          original_price_cents: service.price_cents,
+          original_currency: service.currency,
         },
         payment_status: "pendente",
-      })
+        payment_provider: "mercadopago",
+        payment_amount_cents: paymentAmountCents,
+        payment_currency: paymentCurrency,
+        external_reference: "pending",
+      } as never)
       .select()
       .single();
     if (orderErr || !order) throw new Error(orderErr?.message ?? "Erro ao criar pedido");
 
-    const reference = `EMPURIA-${order.id.slice(0, 8).toUpperCase()}`;
-    const amountStr = (service.price_cents / 100).toFixed(2);
-    const pixPayload = `00020126580014BR.GOV.BCB.PIX0114+551199999999952040000530398654${amountStr.length.toString().padStart(2, "0")}${amountStr}5802BR5910EMPURIA6009SAO PAULO62${(reference.length + 4).toString().padStart(2, "0")}05${reference.length.toString().padStart(2, "0")}${reference}6304MOCK`;
+    const reference = `EMP-${order.id}`;
+    await supabaseAdmin
+      .from("orders")
+      .update({ external_reference: reference, payment_provider_reference: reference } as never)
+      .eq("id", order.id);
 
     return {
       orderId: order.id,
       reference,
-      amountCents: service.price_cents,
-      currency: service.currency,
-      mockPix: {
-        copyPaste: pixPayload,
-      },
+      amountCents: paymentAmountCents,
+      currency: paymentCurrency,
     };
   });
 

@@ -344,13 +344,27 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    // Stub: real Mercado Pago integration will land when MP_ACCESS_TOKEN is configured.
-    const reference = `EMP-${data.id.slice(0, 8).toUpperCase()}`;
+    const reference = `EMP-${data.id}`;
+    const { data: order, error: orderErr } = await context.supabase
+      .from("orders")
+      .select("amount_cents,currency,payment_amount_cents,payment_currency")
+      .eq("id", data.id)
+      .single();
+    if (orderErr || !order) throw new Error(orderErr?.message ?? "Pedido nao encontrado");
+    const orderRow = order as unknown as {
+      amount_cents: number;
+      currency: "EUR" | "BRL" | "USD";
+      payment_amount_cents: number | null;
+      payment_currency: "EUR" | "BRL" | "USD" | null;
+    };
     const { error } = await context.supabase
       .from("orders")
       .update({
         payment_provider: "mercadopago",
         payment_provider_reference: reference,
+        external_reference: reference,
+        payment_amount_cents: orderRow.payment_amount_cents ?? orderRow.amount_cents,
+        payment_currency: orderRow.payment_currency ?? orderRow.currency,
         payment_status: "pendente",
       } as never)
       .eq("id", data.id);
@@ -361,14 +375,14 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
       module: "esteira",
       entity_type: "order",
       entity_id: data.id,
-      action: "order.payment.link.stub",
-      new_data: { reference, note: "Mercado Pago não conectado" },
+      action: "order.payment.mercadopago.prepare",
+      new_data: { reference, provider: "mercadopago" },
     });
     return {
       ok: true,
       pending: true,
       reference,
-      message: "Mercado Pago — em breve. Configure as credenciais para gerar o link real.",
+      message: "Pedido preparado para pagamento Mercado Pago no checkout interno.",
     };
   });
 

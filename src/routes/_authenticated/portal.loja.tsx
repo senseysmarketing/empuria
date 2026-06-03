@@ -16,6 +16,10 @@ const KIND_ICON: Record<string, typeof Plane> = {
   meeting: Users,
 };
 
+function money(cents: number, currency = "BRL") {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(cents / 100);
+}
+
 export const Route = createFileRoute("/_authenticated/portal/loja")({
   component: LojaPage,
 });
@@ -50,6 +54,10 @@ function LojaPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.map((s) => {
             const Icon = KIND_ICON[s.kind ?? ""] ?? ShoppingBag;
+            const price = money(
+              s.online_price_cents ?? s.price_cents,
+              s.online_currency ?? s.currency,
+            );
             return (
               <button
                 key={s.id}
@@ -68,12 +76,16 @@ function LojaPage() {
                   </div>
                 </div>
                 <div className="p-5">
-                  <h3 className="font-display text-base font-bold text-admin-ink line-clamp-1">{s.title}</h3>
+                  <h3 className="font-display text-base font-bold text-admin-ink line-clamp-1">
+                    {s.title}
+                  </h3>
                   {s.short_description && (
-                    <p className="text-xs text-admin-ink-muted line-clamp-2 mt-1 font-body">{s.short_description}</p>
+                    <p className="text-xs text-admin-ink-muted line-clamp-2 mt-1 font-body">
+                      {s.short_description}
+                    </p>
                   )}
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="font-display text-lg text-admin-accent">€ {(s.price_cents / 100).toFixed(2)}</span>
+                    <span className="font-display text-lg text-admin-accent">{price}</span>
                     <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-display text-admin-ink-muted group-hover:text-admin-accent transition-colors">
                       Ver detalhes <ArrowRight className="h-3 w-3" />
                     </span>
@@ -85,7 +97,11 @@ function LojaPage() {
         </div>
       )}
 
-      <UpsellSheet service={selected} open={!!selected} onOpenChange={(o) => !o && setSelected(null)} />
+      <UpsellSheet
+        service={selected}
+        open={!!selected}
+        onOpenChange={(o) => !o && setSelected(null)}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ElementType, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -14,6 +14,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   CalendarDays,
@@ -29,15 +36,38 @@ import {
   saveHublaSettings,
   testHublaConfiguration,
 } from "@/lib/hubla/hubla.functions";
+import {
+  getMercadoPagoAdminOverview,
+  saveMercadoPagoSettings,
+  testMercadoPagoConfiguration,
+} from "@/lib/mercadopago/mercadopago.functions";
+
+type IntegrationEvent = {
+  id: string;
+  event_type: string;
+  buyer_email: string | null;
+  status: string;
+  created_at: string;
+  error_message: string | null;
+};
+
+type MercadoPagoSetting = {
+  is_enabled: boolean;
+  environment: "test" | "production";
+  public_key: string | null;
+  access_token: string | null;
+  webhook_secret: string | null;
+  default_currency: "BRL" | "EUR" | "USD";
+  statement_descriptor: string;
+  pix_enabled: boolean;
+  boleto_enabled: boolean;
+  card_enabled: boolean;
+  pix_expiration_minutes: number;
+  boleto_expiration_days: number;
+  last_event_at: string | null;
+};
 
 const PLANNED_INTEGRATIONS = [
-  {
-    key: "mercadopago",
-    name: "Mercado Pago",
-    icon: CreditCard,
-    accent: "text-sky-600",
-    description: "Pagamentos, Pix, checkout e confirmacao automatica de pedidos.",
-  },
   {
     key: "whatsapp",
     name: "WhatsApp / Uazapi",
@@ -59,34 +89,67 @@ function emptyToNull(value: FormDataEntryValue | null) {
   return text ? text : null;
 }
 
+function numberFromForm(value: FormDataEntryValue | null, fallback: number) {
+  const parsed = Number(String(value ?? "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export function IntegracoesTab() {
-  const fetchOverview = useServerFn(getHublaAdminOverview);
+  const fetchHublaOverview = useServerFn(getHublaAdminOverview);
   const saveHubla = useServerFn(saveHublaSettings);
   const testHubla = useServerFn(testHublaConfiguration);
-  const [enabled, setEnabled] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
-  const [eventsOpen, setEventsOpen] = useState(false);
+  const fetchMpOverview = useServerFn(getMercadoPagoAdminOverview);
+  const saveMp = useServerFn(saveMercadoPagoSettings);
+  const testMp = useServerFn(testMercadoPagoConfiguration);
 
-  const overviewQ = useQuery({
+  const [hublaEnabled, setHublaEnabled] = useState(false);
+  const [hublaConfigOpen, setHublaConfigOpen] = useState(false);
+  const [hublaEventsOpen, setHublaEventsOpen] = useState(false);
+  const [mpEnabled, setMpEnabled] = useState(false);
+  const [mpConfigOpen, setMpConfigOpen] = useState(false);
+  const [mpEventsOpen, setMpEventsOpen] = useState(false);
+  const [mpEnvironment, setMpEnvironment] = useState<"test" | "production">("test");
+  const [mpPixEnabled, setMpPixEnabled] = useState(true);
+  const [mpBoletoEnabled, setMpBoletoEnabled] = useState(true);
+  const [mpCardEnabled, setMpCardEnabled] = useState(false);
+
+  const hublaQ = useQuery({
     queryKey: ["hubla-admin-overview"],
     queryFn: async () => {
-      const data = await fetchOverview();
-      setEnabled(!!data.setting.is_enabled);
+      const data = await fetchHublaOverview();
+      setHublaEnabled(!!data.setting.is_enabled);
+      return data;
+    },
+  });
+
+  const mpQ = useQuery({
+    queryKey: ["mercadopago-admin-overview"],
+    queryFn: async () => {
+      const data = await fetchMpOverview();
+      setMpEnabled(!!data.setting.is_enabled);
+      setMpEnvironment(data.setting.environment);
+      setMpPixEnabled(!!data.setting.pix_enabled);
+      setMpBoletoEnabled(!!data.setting.boleto_enabled);
+      setMpCardEnabled(!!data.setting.card_enabled);
       return data;
     },
   });
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const webhookUrl = useMemo(
-    () => `${origin}${overviewQ.data?.webhookUrl ?? "/api/webhooks/hubla"}`,
-    [origin, overviewQ.data?.webhookUrl],
+  const hublaWebhookUrl = useMemo(
+    () => `${origin}${hublaQ.data?.webhookUrl ?? "/api/webhooks/hubla"}`,
+    [origin, hublaQ.data?.webhookUrl],
+  );
+  const mpWebhookUrl = useMemo(
+    () => `${origin}${mpQ.data?.webhookUrl ?? "/api/webhooks/mercadopago"}`,
+    [origin, mpQ.data?.webhookUrl],
   );
 
-  const saveMutation = useMutation({
+  const saveHublaMutation = useMutation({
     mutationFn: (form: FormData) =>
       saveHubla({
         data: {
-          is_enabled: enabled,
+          is_enabled: hublaEnabled,
           checkout_url: emptyToNull(form.get("checkout_url")),
           post_purchase_url: emptyToNull(form.get("post_purchase_url")),
           webhook_secret: emptyToNull(form.get("webhook_secret")),
@@ -97,13 +160,42 @@ export function IntegracoesTab() {
       }),
     onSuccess: () => {
       toast.success("Configuracao Hubla salva");
-      setConfigOpen(false);
-      overviewQ.refetch();
+      setHublaConfigOpen(false);
+      hublaQ.refetch();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar Hubla"),
   });
 
-  const testMutation = useMutation({
+  const saveMpMutation = useMutation({
+    mutationFn: (form: FormData) =>
+      saveMp({
+        data: {
+          is_enabled: mpEnabled,
+          environment: mpEnvironment,
+          public_key: emptyToNull(form.get("public_key")),
+          access_token: emptyToNull(form.get("access_token")),
+          webhook_secret: emptyToNull(form.get("webhook_secret")),
+          default_currency: "BRL",
+          statement_descriptor:
+            String(form.get("statement_descriptor") ?? "")
+              .trim()
+              .toUpperCase() || "EMPURIA",
+          pix_enabled: mpPixEnabled,
+          boleto_enabled: mpBoletoEnabled,
+          card_enabled: mpCardEnabled,
+          pix_expiration_minutes: numberFromForm(form.get("pix_expiration_minutes"), 30),
+          boleto_expiration_days: numberFromForm(form.get("boleto_expiration_days"), 3),
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Configuracao Mercado Pago salva");
+      setMpConfigOpen(false);
+      mpQ.refetch();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar Mercado Pago"),
+  });
+
+  const testHublaMutation = useMutation({
     mutationFn: () => testHubla(),
     onSuccess: (result) => {
       if (result.ok) toast.success("Configuracao minima da Hubla esta pronta");
@@ -112,26 +204,39 @@ export function IntegracoesTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar Hubla"),
   });
 
-  const setting = overviewQ.data?.setting;
-  const events = overviewQ.data?.events ?? [];
-  const errorCount = overviewQ.data?.errorCount ?? 0;
-  const hasCheckout = Boolean(setting?.checkout_url);
-  const hasSecret = Boolean(setting?.webhook_secret);
-  const statusLabel = errorCount > 0 ? "Erro" : enabled ? "Ativa" : "Inativa";
-  const statusClass =
-    errorCount > 0
-      ? "bg-red-100 text-red-800"
-      : enabled
-        ? "bg-emerald-100 text-emerald-800"
-        : "bg-slate-200 text-slate-700";
-  const webhookLabel =
-    errorCount > 0
-      ? "erro"
-      : enabled && hasSecret && setting?.last_event_at
-        ? "funcionando"
-        : hasSecret
-          ? "aguardando evento"
-          : "aguardando configuracao";
+  const testMpMutation = useMutation({
+    mutationFn: () => testMp(),
+    onSuccess: (result) => {
+      if (result.ok) toast.success(result.message);
+      else
+        toast.error(
+          result.missing.length ? `Faltando: ${result.missing.join(", ")}` : result.message,
+        );
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar Mercado Pago"),
+  });
+
+  const hublaSetting = hublaQ.data?.setting;
+  const hublaEvents = (hublaQ.data?.events ?? []) as IntegrationEvent[];
+  const hublaErrorCount = hublaQ.data?.errorCount ?? 0;
+  const hublaStatus = cardStatus(hublaEnabled, hublaErrorCount);
+  const hublaWebhook = webhookStatus({
+    enabled: hublaEnabled,
+    hasSecret: Boolean(hublaSetting?.webhook_secret),
+    lastEventAt: hublaSetting?.last_event_at,
+    errorCount: hublaErrorCount,
+  });
+
+  const mpSetting = mpQ.data?.setting as MercadoPagoSetting | undefined;
+  const mpEvents = (mpQ.data?.events ?? []) as IntegrationEvent[];
+  const mpErrorCount = mpQ.data?.errorCount ?? 0;
+  const mpStatus = cardStatus(mpEnabled, mpErrorCount);
+  const mpWebhook = webhookStatus({
+    enabled: mpEnabled,
+    hasSecret: Boolean(mpSetting?.webhook_secret),
+    lastEventAt: mpSetting?.last_event_at,
+    errorCount: mpErrorCount,
+  });
 
   return (
     <div className="space-y-5">
@@ -141,24 +246,62 @@ export function IntegracoesTab() {
           iconClassName="text-amber-500"
           name="Hubla"
           description="Assinaturas do Clube do Imigrante"
-          badge={<Badge className={statusClass}>{statusLabel}</Badge>}
+          badge={<Badge className={hublaStatus.className}>{hublaStatus.label}</Badge>}
           details={[
-            ["Status", statusLabel],
-            ["Checkout", hasCheckout ? "configurado" : "nao configurado"],
-            ["Webhook", webhookLabel],
-            ["Ultimo evento", formatRelativeDate(setting?.last_event_at)],
+            ["Status", hublaStatus.label],
+            ["Checkout", hublaSetting?.checkout_url ? "configurado" : "nao configurado"],
+            ["Webhook", hublaWebhook],
+            ["Ultimo evento", formatRelativeDate(hublaSetting?.last_event_at)],
           ]}
           actions={
             <>
-              <Button type="button" size="sm" onClick={() => setConfigOpen(true)}>
+              <Button type="button" size="sm" onClick={() => setHublaConfigOpen(true)}>
                 Configurar
               </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setEventsOpen(true)}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setHublaEventsOpen(true)}
+              >
                 Ver eventos
               </Button>
             </>
           }
-          loading={overviewQ.isLoading}
+          loading={hublaQ.isLoading}
+        />
+
+        <IntegrationCard
+          icon={CreditCard}
+          iconClassName="text-sky-600"
+          name="Mercado Pago"
+          description="Pix, boleto e cartao no checkout interno"
+          badge={<Badge className={mpStatus.className}>{mpStatus.label}</Badge>}
+          details={[
+            ["Status", mpStatus.label],
+            [
+              "Checkout",
+              mpSetting?.public_key && mpSetting?.access_token ? "configurado" : "nao configurado",
+            ],
+            ["Webhook", mpWebhook],
+            ["Ultimo evento", formatRelativeDate(mpSetting?.last_event_at)],
+          ]}
+          actions={
+            <>
+              <Button type="button" size="sm" onClick={() => setMpConfigOpen(true)}>
+                Configurar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setMpEventsOpen(true)}
+              >
+                Ver eventos
+              </Button>
+            </>
+          }
+          loading={mpQ.isLoading}
         />
 
         {PLANNED_INTEGRATIONS.map((integration) => (
@@ -185,17 +328,50 @@ export function IntegracoesTab() {
       </div>
 
       <HublaConfigDialog
-        open={configOpen}
-        onOpenChange={setConfigOpen}
-        enabled={enabled}
-        setEnabled={setEnabled}
-        webhookUrl={webhookUrl}
-        setting={setting}
-        saveMutation={saveMutation}
-        testMutation={testMutation}
+        open={hublaConfigOpen}
+        onOpenChange={setHublaConfigOpen}
+        enabled={hublaEnabled}
+        setEnabled={setHublaEnabled}
+        webhookUrl={hublaWebhookUrl}
+        setting={hublaSetting}
+        saveMutation={saveHublaMutation}
+        testMutation={testHublaMutation}
       />
 
-      <HublaEventsDialog open={eventsOpen} onOpenChange={setEventsOpen} events={events} />
+      <EventsDialog
+        open={hublaEventsOpen}
+        onOpenChange={setHublaEventsOpen}
+        title="Eventos Hubla"
+        description="Ultimos webhooks recebidos e status de conciliacao."
+        events={hublaEvents}
+      />
+
+      <MercadoPagoConfigDialog
+        open={mpConfigOpen}
+        onOpenChange={setMpConfigOpen}
+        enabled={mpEnabled}
+        setEnabled={setMpEnabled}
+        environment={mpEnvironment}
+        setEnvironment={setMpEnvironment}
+        pixEnabled={mpPixEnabled}
+        setPixEnabled={setMpPixEnabled}
+        boletoEnabled={mpBoletoEnabled}
+        setBoletoEnabled={setMpBoletoEnabled}
+        cardEnabled={mpCardEnabled}
+        setCardEnabled={setMpCardEnabled}
+        webhookUrl={mpWebhookUrl}
+        setting={mpSetting}
+        saveMutation={saveMpMutation}
+        testMutation={testMpMutation}
+      />
+
+      <EventsDialog
+        open={mpEventsOpen}
+        onOpenChange={setMpEventsOpen}
+        title="Eventos Mercado Pago"
+        description="Ultimos webhooks recebidos, reconsultas e erros de conciliacao."
+        events={mpEvents}
+      />
     </div>
   );
 }
@@ -210,13 +386,13 @@ function IntegrationCard({
   actions,
   loading,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   iconClassName: string;
   name: string;
   description: string;
-  badge: React.ReactNode;
+  badge: ReactNode;
   details: Array<[string, string]>;
-  actions: React.ReactNode;
+  actions: ReactNode;
   loading?: boolean;
 }) {
   return (
@@ -281,14 +457,8 @@ function HublaConfigDialog({
         whatsapp_group_url: string | null;
       }
     | undefined;
-  saveMutation: {
-    mutate: (form: FormData) => void;
-    isPending: boolean;
-  };
-  testMutation: {
-    mutate: () => void;
-    isPending: boolean;
-  };
+  saveMutation: { mutate: (form: FormData) => void; isPending: boolean };
+  testMutation: { mutate: () => void; isPending: boolean };
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -307,17 +477,12 @@ function HublaConfigDialog({
             saveMutation.mutate(new FormData(e.currentTarget));
           }}
         >
-          <div className="flex items-center justify-between rounded-xl border border-admin-border bg-admin-surface-2 p-4 lg:col-span-2">
-            <div>
-              <Label className="font-display text-sm uppercase tracking-wide">
-                Ativar integracao
-              </Label>
-              <p className="mt-1 text-xs text-admin-ink-muted">
-                Webhooks so serao aceitos quando a integracao estiver ativa e com segredo.
-              </p>
-            </div>
-            <Switch checked={enabled} onCheckedChange={setEnabled} />
-          </div>
+          <SwitchPanel
+            title="Ativar integracao"
+            description="Webhooks so serao aceitos quando a integracao estiver ativa e com segredo."
+            checked={enabled}
+            onCheckedChange={setEnabled}
+          />
 
           <Field label="Checkout fixo Hubla">
             <Input
@@ -345,23 +510,7 @@ function HublaConfigDialog({
               }
             />
           </Field>
-          <Field label="URL do webhook">
-            <div className="flex gap-2">
-              <Input value={webhookUrl} readOnly />
-              <Button
-                type="button"
-                variant="outline"
-                className="shrink-0 gap-2"
-                onClick={() => {
-                  navigator.clipboard.writeText(webhookUrl);
-                  toast.success("URL do webhook copiada");
-                }}
-              >
-                <Copy className="h-4 w-4" />
-                Copiar
-              </Button>
-            </div>
-          </Field>
+          <ReadonlyWebhookField webhookUrl={webhookUrl} />
           <Field label="ID do produto Hubla">
             <Input name="product_id" defaultValue={setting?.product_id ?? ""} />
           </Field>
@@ -377,55 +526,179 @@ function HublaConfigDialog({
             />
           </Field>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => testMutation.mutate()}
-              disabled={testMutation.isPending}
-              className="gap-2"
-            >
-              {testMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RotateCw className="h-4 w-4" />
-              )}
-              Testar
-            </Button>
-            <Button type="submit" disabled={saveMutation.isPending} className="min-w-44">
-              {saveMutation.isPending ? "Salvando..." : "Salvar configuracoes"}
-            </Button>
-          </div>
+          <DialogActions saveMutation={saveMutation} testMutation={testMutation} />
         </form>
       </DialogContent>
     </Dialog>
   );
 }
 
-function HublaEventsDialog({
+function MercadoPagoConfigDialog({
   open,
   onOpenChange,
-  events,
+  enabled,
+  setEnabled,
+  environment,
+  setEnvironment,
+  pixEnabled,
+  setPixEnabled,
+  boletoEnabled,
+  setBoletoEnabled,
+  cardEnabled,
+  setCardEnabled,
+  webhookUrl,
+  setting,
+  saveMutation,
+  testMutation,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  events: Array<{
-    id: string;
-    event_type: string;
-    buyer_email: string | null;
-    status: string;
-    created_at: string;
-    error_message: string | null;
-  }>;
+  enabled: boolean;
+  setEnabled: (enabled: boolean) => void;
+  environment: "test" | "production";
+  setEnvironment: (value: "test" | "production") => void;
+  pixEnabled: boolean;
+  setPixEnabled: (value: boolean) => void;
+  boletoEnabled: boolean;
+  setBoletoEnabled: (value: boolean) => void;
+  cardEnabled: boolean;
+  setCardEnabled: (value: boolean) => void;
+  webhookUrl: string;
+  setting: MercadoPagoSetting | undefined;
+  saveMutation: { mutate: (form: FormData) => void; isPending: boolean };
+  testMutation: { mutate: () => void; isPending: boolean };
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto border-admin-border bg-admin-surface text-admin-ink sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Eventos Hubla</DialogTitle>
+          <DialogTitle className="font-display text-2xl">Configurar Mercado Pago</DialogTitle>
           <DialogDescription className="text-admin-ink-muted">
-            Ultimos webhooks recebidos e status de conciliacao.
+            Credenciais do checkout transparente, webhook e metodos de pagamento.
           </DialogDescription>
+        </DialogHeader>
+
+        <form
+          className="grid gap-4 lg:grid-cols-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveMutation.mutate(new FormData(e.currentTarget));
+          }}
+        >
+          <SwitchPanel
+            title="Ativar Mercado Pago"
+            description="Pix, boleto e cartao ficam disponiveis no checkout somente quando a integracao estiver ativa."
+            checked={enabled}
+            onCheckedChange={setEnabled}
+          />
+
+          <Field label="Ambiente">
+            <Select
+              value={environment}
+              onValueChange={(value) => setEnvironment(value as "test" | "production")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="test">Teste</SelectItem>
+                <SelectItem value="production">Producao</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Public Key">
+            <Input
+              name="public_key"
+              placeholder="APP_USR-..."
+              defaultValue={setting?.public_key ?? ""}
+            />
+          </Field>
+          <Field label="Access Token">
+            <Input
+              name="access_token"
+              type="password"
+              placeholder={
+                setting?.access_token ? "Preenchido - deixe em branco para manter" : "APP_USR-..."
+              }
+            />
+          </Field>
+          <Field label="Segredo do webhook">
+            <Input
+              name="webhook_secret"
+              type="password"
+              placeholder={
+                setting?.webhook_secret
+                  ? "Preenchido - deixe em branco para manter"
+                  : "Secret signature"
+              }
+            />
+          </Field>
+          <ReadonlyWebhookField webhookUrl={webhookUrl} />
+          <Field label="Descriptor da fatura">
+            <Input
+              name="statement_descriptor"
+              maxLength={22}
+              defaultValue={setting?.statement_descriptor ?? "EMPURIA"}
+            />
+          </Field>
+          <Field label="Moeda padrao">
+            <Input value="BRL" readOnly />
+          </Field>
+          <Field label="Expiracao Pix (minutos)">
+            <Input
+              name="pix_expiration_minutes"
+              type="number"
+              min={5}
+              max={1440}
+              defaultValue={setting?.pix_expiration_minutes ?? 30}
+            />
+          </Field>
+          <Field label="Expiracao boleto (dias)">
+            <Input
+              name="boleto_expiration_days"
+              type="number"
+              min={1}
+              max={30}
+              defaultValue={setting?.boleto_expiration_days ?? 3}
+            />
+          </Field>
+
+          <div className="grid gap-3 lg:col-span-2 md:grid-cols-3">
+            <InlineSwitch title="Pix" checked={pixEnabled} onCheckedChange={setPixEnabled} />
+            <InlineSwitch
+              title="Boleto"
+              checked={boletoEnabled}
+              onCheckedChange={setBoletoEnabled}
+            />
+            <InlineSwitch title="Cartao" checked={cardEnabled} onCheckedChange={setCardEnabled} />
+          </div>
+
+          <DialogActions saveMutation={saveMutation} testMutation={testMutation} />
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EventsDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  events,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  events: IntegrationEvent[];
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-admin-border bg-admin-surface text-admin-ink sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl">{title}</DialogTitle>
+          <DialogDescription className="text-admin-ink-muted">{description}</DialogDescription>
         </DialogHeader>
 
         <div className="overflow-x-auto rounded-xl border border-admin-border bg-admin-surface-2">
@@ -471,13 +744,127 @@ function HublaEventsDialog({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
       {children}
     </div>
   );
+}
+
+function SwitchPanel({
+  title,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  title: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-admin-border bg-admin-surface-2 p-4 lg:col-span-2">
+      <div>
+        <Label className="font-display text-sm uppercase tracking-wide">{title}</Label>
+        <p className="mt-1 text-xs text-admin-ink-muted">{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+}
+
+function InlineSwitch({
+  title,
+  checked,
+  onCheckedChange,
+}: {
+  title: string;
+  checked: boolean;
+  onCheckedChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-admin-border bg-admin-surface-2 p-4">
+      <Label className="font-display text-sm uppercase tracking-wide">{title}</Label>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+}
+
+function ReadonlyWebhookField({ webhookUrl }: { webhookUrl: string }) {
+  return (
+    <Field label="URL do webhook">
+      <div className="flex gap-2">
+        <Input value={webhookUrl} readOnly />
+        <Button
+          type="button"
+          variant="outline"
+          className="shrink-0 gap-2"
+          onClick={() => {
+            navigator.clipboard.writeText(webhookUrl);
+            toast.success("URL do webhook copiada");
+          }}
+        >
+          <Copy className="h-4 w-4" />
+          Copiar
+        </Button>
+      </div>
+    </Field>
+  );
+}
+
+function DialogActions({
+  saveMutation,
+  testMutation,
+}: {
+  saveMutation: { isPending: boolean };
+  testMutation: { mutate: () => void; isPending: boolean };
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-2">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => testMutation.mutate()}
+        disabled={testMutation.isPending}
+        className="gap-2"
+      >
+        {testMutation.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <RotateCw className="h-4 w-4" />
+        )}
+        Testar
+      </Button>
+      <Button type="submit" disabled={saveMutation.isPending} className="min-w-44">
+        {saveMutation.isPending ? "Salvando..." : "Salvar configuracoes"}
+      </Button>
+    </div>
+  );
+}
+
+function cardStatus(enabled: boolean, errorCount: number) {
+  if (errorCount > 0) return { label: "Erro", className: "bg-red-100 text-red-800" };
+  if (enabled) return { label: "Ativa", className: "bg-emerald-100 text-emerald-800" };
+  return { label: "Inativa", className: "bg-slate-200 text-slate-700" };
+}
+
+function webhookStatus({
+  enabled,
+  hasSecret,
+  lastEventAt,
+  errorCount,
+}: {
+  enabled: boolean;
+  hasSecret: boolean;
+  lastEventAt?: string | null;
+  errorCount: number;
+}) {
+  if (errorCount > 0) return "erro";
+  if (enabled && hasSecret && lastEventAt) return "funcionando";
+  if (hasSecret) return "aguardando evento";
+  return "aguardando configuracao";
 }
 
 function formatRelativeDate(value: string | null | undefined) {

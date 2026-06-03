@@ -1,5 +1,14 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plane, MapPin, CreditCard, Landmark, Users, Check, ShoppingBag, Clock } from "lucide-react";
+import {
+  Plane,
+  MapPin,
+  CreditCard,
+  Landmark,
+  Users,
+  Check,
+  ShoppingBag,
+  Clock,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getServiceImage } from "@/lib/service-images";
 
@@ -20,6 +29,9 @@ export type DetailedService = {
   kind: string;
   price_cents: number;
   currency: string;
+  online_price_cents?: number | null;
+  online_currency?: string | null;
+  display_price_note?: string | null;
   requires_slot?: boolean;
   document_checklist?: string[] | null;
   meeting_address?: string | null;
@@ -39,7 +51,10 @@ export function ServiceDetailsModal<T extends DetailedService>({
 }) {
   if (!service) return null;
   const Icon = ICONS[service.kind] ?? MapPin;
-  const price = (service.price_cents / 100).toFixed(2);
+  const price = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: service.online_currency ?? service.currency,
+  }).format((service.online_price_cents ?? service.price_cents) / 100);
   const checklist = Array.isArray(service.document_checklist) ? service.document_checklist : [];
   const image = getServiceImage(service);
 
@@ -51,7 +66,9 @@ export function ServiceDetailsModal<T extends DetailedService>({
           <div className="absolute inset-0 bg-gradient-to-t from-brown-deep/85 via-brown-deep/20 to-transparent" />
           <div className="absolute top-4 left-4 inline-flex items-center gap-2 bg-offwhite/95 backdrop-blur px-3 py-1.5 rounded-full">
             <Icon className="w-3.5 h-3.5 text-orange-brand" strokeWidth={2} />
-            <span className="font-display text-[10px] uppercase tracking-widest text-brown-deep">Esteira 1</span>
+            <span className="font-display text-[10px] uppercase tracking-widest text-brown-deep">
+              Esteira 1
+            </span>
           </div>
           <div className="absolute bottom-4 left-5 right-5 flex items-end justify-between gap-4">
             <DialogHeader className="text-left space-y-0">
@@ -60,15 +77,21 @@ export function ServiceDetailsModal<T extends DetailedService>({
               </DialogTitle>
             </DialogHeader>
             <div className="text-right shrink-0">
-              <div className="font-display font-extrabold text-3xl text-yellow-brand leading-none">€{price}</div>
-              <div className="text-[10px] uppercase tracking-widest text-offwhite/70 font-display mt-1">único</div>
+              <div className="font-display font-extrabold text-3xl text-yellow-brand leading-none">
+                {price}
+              </div>
+              <div className="text-[10px] uppercase tracking-widest text-offwhite/70 font-display mt-1">
+                único
+              </div>
             </div>
           </div>
         </div>
 
         <div className="p-6 space-y-5">
           {service.short_description && (
-            <p className="font-body text-base text-brown-deep/85 leading-relaxed">{service.short_description}</p>
+            <p className="font-body text-base text-brown-deep/85 leading-relaxed">
+              {service.short_description}
+            </p>
           )}
           {service.description && (
             <div className="font-body text-sm text-brown-deep/75 whitespace-pre-line leading-relaxed">
@@ -99,7 +122,9 @@ export function ServiceDetailsModal<T extends DetailedService>({
                   <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-display text-brown-deep/60 mb-1">
                     <MapPin className="w-3 h-3" /> Local
                   </div>
-                  <div className="text-xs font-body text-brown-deep/80">{service.meeting_address}</div>
+                  <div className="text-xs font-body text-brown-deep/80">
+                    {service.meeting_address}
+                  </div>
                 </div>
               )}
               {service.requires_slot && (
@@ -123,7 +148,7 @@ export function ServiceDetailsModal<T extends DetailedService>({
               }}
               className="flex-1 inline-flex items-center justify-center gap-2 bg-orange-brand text-offwhite px-5 py-3 rounded-md font-display font-bold text-xs uppercase tracking-widest hover:bg-red-brand transition-all"
             >
-              <ShoppingBag className="w-4 h-4" /> Comprar por €{price}
+              <ShoppingBag className="w-4 h-4" /> Comprar por {price}
             </button>
             <button
               onClick={() => onOpenChange(false)}
