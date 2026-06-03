@@ -9,14 +9,16 @@ export function ClubCarousel({
   onSelect,
   locked,
 }: {
-  title: string;
+  title?: string;
   items: Item[];
   onSelect: (v: ClubVideo) => void;
   locked?: boolean;
 }) {
   return (
     <section>
-      <h2 className="font-display text-sm uppercase tracking-[0.25em] text-admin-ink-soft mb-3 px-1">{title}</h2>
+      {title ? (
+        <h2 className="font-display text-sm uppercase tracking-[0.25em] text-admin-ink-soft mb-3 px-1">{title}</h2>
+      ) : null}
       <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-2 px-2 scrollbar-thin">
         {items.map((item) => (
           <button
