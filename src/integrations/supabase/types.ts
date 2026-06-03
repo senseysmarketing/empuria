@@ -411,6 +411,193 @@ export type Database = {
         }
         Relationships: []
       }
+      club_lesson_files: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          file_type: string
+          file_url: string
+          id: string
+          label: string
+          lesson_id: string
+          position: number
+          size_bytes: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          file_type?: string
+          file_url: string
+          id?: string
+          label: string
+          lesson_id: string
+          position?: number
+          size_bytes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          file_type?: string
+          file_url?: string
+          id?: string
+          label?: string
+          lesson_id?: string
+          position?: number
+          size_bytes?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_lesson_files_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "club_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_lessons: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          is_featured: boolean
+          is_published: boolean
+          legacy_content_id: string | null
+          module_id: string
+          position: number
+          published_at: string | null
+          slug: string | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          video_provider: string | null
+          video_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_featured?: boolean
+          is_published?: boolean
+          legacy_content_id?: string | null
+          module_id: string
+          position?: number
+          published_at?: string | null
+          slug?: string | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          video_provider?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_featured?: boolean
+          is_published?: boolean
+          legacy_content_id?: string | null
+          module_id?: string
+          position?: number
+          published_at?: string | null
+          slug?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          video_provider?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_lessons_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "club_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_modules: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_published: boolean
+          position: number
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean
+          position?: number
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean
+          position?: number
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      club_settings: {
+        Row: {
+          benefits: Json
+          cover_url: string | null
+          cta_text: string
+          id: number
+          locked_screen_text: string
+          public_description: string
+          public_title: string
+          updated_at: string
+        }
+        Insert: {
+          benefits?: Json
+          cover_url?: string | null
+          cta_text?: string
+          id?: number
+          locked_screen_text?: string
+          public_description?: string
+          public_title?: string
+          updated_at?: string
+        }
+        Update: {
+          benefits?: Json
+          cover_url?: string | null
+          cta_text?: string
+          id?: number
+          locked_screen_text?: string
+          public_description?: string
+          public_title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       club_subscriptions: {
         Row: {
           access_status: string
