@@ -87,9 +87,11 @@ export async function createOrReuseManualCustomer(input: {
   const current = profile as ProfileAccessState | null;
   const shouldMarkManual = created || !current || current.created_by_admin === true;
   const passwordSetupRequired = shouldMarkManual
-    ? current?.first_access_completed_at
-      ? false
-      : (current?.password_setup_required ?? true)
+    ? created
+      ? true
+      : current?.first_access_completed_at
+        ? false
+        : (current?.password_setup_required ?? true)
     : false;
 
   const profilePatch: ProfileInsert = {
