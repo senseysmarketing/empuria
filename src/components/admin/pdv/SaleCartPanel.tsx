@@ -1,14 +1,25 @@
 import { useMemo, useState } from "react";
-import { Trash2, Minus, Plus, X } from "lucide-react";
+import { Trash2, Minus, Plus, X, Banknote, CreditCard, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { PdvCatalogItem } from "./SaleCatalogGrid";
 import type { PdvCustomer } from "./CustomerSearchPanel";
 
 export type CartLine = { item: PdvCatalogItem; qty: number };
 export type Discount = { type: "none" | "amount" | "percent"; value: number };
+export type PaymentMethod = "dinheiro" | "cartao" | "pix";
 
 export function SaleCartPanel({
   customer,
