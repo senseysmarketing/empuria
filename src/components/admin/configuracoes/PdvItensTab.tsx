@@ -182,18 +182,59 @@ export function PdvItensTab() {
 
   return (
     <BentoCard padded={false}>
-      <div className="p-5 border-b border-admin-border flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h3 className="font-display text-lg text-admin-ink">Itens do PDV</h3>
-          <p className="text-xs text-admin-ink-muted mt-1">{items.length} itens cadastrados</p>
+      <div className="p-5 border-b border-admin-border space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="font-display text-lg text-admin-ink">Itens do PDV</h3>
+            <p className="text-xs text-admin-ink-muted mt-1">{items.length} itens cadastrados</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setCategoriesOpen(true)} className="border-admin-border">
+              <Tags className="h-4 w-4" /> Gerenciar Categorias
+            </Button>
+            <Button onClick={openCreate} className="bg-admin-accent text-white">
+              <Plus className="h-4 w-4" /> Novo item
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setCategoriesOpen(true)} className="border-admin-border">
-            <Tags className="h-4 w-4" /> Gerenciar Categorias
-          </Button>
-          <Button onClick={openCreate} className="bg-admin-accent text-white">
-            <Plus className="h-4 w-4" /> Novo item
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-admin-ink-muted" />
+            <Input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Buscar por nome ou slug…"
+              className="pl-8 bg-admin-bg border-admin-border h-9"
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={onFilterChange(setCategoryFilter)}>
+            <SelectTrigger className="w-[170px] h-9 bg-admin-bg border-admin-border"><SelectValue placeholder="Categoria" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all">Todas as categorias</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.emoji ? `${c.emoji} ` : ""}{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={onFilterChange((v: string) => setTypeFilter(v as "all" | "produto" | "servico"))}>
+            <SelectTrigger className="w-[130px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="produto">Produto</SelectItem>
+              <SelectItem value="servico">Serviço</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={onFilterChange((v: string) => setStatusFilter(v as "all" | "active" | "inactive"))}>
+            <SelectTrigger className="w-[130px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos status</SelectItem>
+              <SelectItem value="active">Ativos</SelectItem>
+              <SelectItem value="inactive">Inativos</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="ml-auto text-xs text-admin-ink-muted tabular-nums">
+            {filtered.length} de {items.length} {items.length === 1 ? "item" : "itens"}
+          </span>
         </div>
       </div>
 
@@ -215,7 +256,7 @@ export function PdvItensTab() {
               </tr>
             </thead>
             <tbody>
-              {items.map((raw) => {
+              {paged.map((raw) => {
                 const it = raw as Item & { item_type?: string; price_eur_cents?: number; price_brl_cents?: number; track_stock?: boolean; stock_quantity?: number; stock_min_quantity?: number };
                 const cat = (raw as Item & { product_categories?: { name: string; emoji: string | null } | null }).product_categories;
                 const eur = it.price_eur_cents ?? it.price_cents;
@@ -273,13 +314,50 @@ export function PdvItensTab() {
                   </tr>
                 );
               })}
-              {items.length === 0 && (
-                <tr><td colSpan={8} className="p-8 text-center text-admin-ink-muted text-sm">Nenhum item ainda</td></tr>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-admin-ink-muted text-sm">
+                    {items.length === 0 ? (
+                      "Nenhum item ainda"
+                    ) : (
+                      <>
+                        Nenhum item corresponde aos filtros.{" "}
+                        <button onClick={resetFilters} className="text-admin-accent underline">Limpar filtros</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
+
+          {filtered.length > 0 && (
+            <div className="flex items-center justify-between gap-3 p-3 border-t border-admin-border flex-wrap">
+              <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
+                <span>Por página:</span>
+                <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(parseInt(v, 10)); setPage(1); }}>
+                  <SelectTrigger className="h-8 w-[80px] bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
+                <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-8">
+                  <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                </Button>
+                <span className="tabular-nums">Página {safePage} de {totalPages}</span>
+                <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="h-8">
+                  Próximo <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
+
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-admin-surface border-admin-border text-admin-ink">
