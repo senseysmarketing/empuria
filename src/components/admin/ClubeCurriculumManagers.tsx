@@ -45,6 +45,7 @@ import {
   X,
 } from "lucide-react";
 import { VideoPlayerModal } from "@/components/portal/VideoPlayerModal";
+import { VideoSourceField } from "@/components/admin/clube/VideoSourceField";
 
 type Curriculum = Awaited<ReturnType<typeof getCurriculum>>;
 type Module = Curriculum["modules"][number];
@@ -728,10 +729,8 @@ function LessonDialog({
               <Label>Descrição</Label>
               <Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
-            <div>
-              <Label>URL do vídeo (YouTube/Vimeo)</Label>
-              <Input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://..." />
-            </div>
+            <VideoSourceField value={videoUrl} onChange={setVideoUrl} />
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Duração (min)</Label>
