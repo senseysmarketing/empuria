@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Check, Copy, CreditCard, FileText, Loader2, QrCode } from "lucide-react";
+import { ArrowRight, Check, Copy, CreditCard, FileText, Loader2, QrCode, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 
@@ -107,6 +107,45 @@ async function loadMercadoPagoSdk() {
   });
 }
 
+type PendingPix = {
+  intent: { orderId: string; reference: string; amountCents: number; currency: string };
+  payment: MpPayment;
+  savedAt: number;
+};
+
+const PENDING_PIX_KEY = (slug: string) => `empuria:pending-pix:${slug}`;
+
+function loadPendingPix(slug: string): PendingPix | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PENDING_PIX_KEY(slug));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingPix;
+    if (!parsed?.payment?.expiresAt) return null;
+    if (new Date(parsed.payment.expiresAt).getTime() <= Date.now()) return null;
+    if (parsed.payment.orderPaymentStatus !== "pendente") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingPix(slug: string, data: PendingPix) {
+  try {
+    window.localStorage.setItem(PENDING_PIX_KEY(slug), JSON.stringify(data));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function clearPendingPix(slug: string) {
+  try {
+    window.localStorage.removeItem(PENDING_PIX_KEY(slug));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function CheckoutModal({
   service,
   open,
@@ -170,6 +209,7 @@ export function CheckoutModal({
   const [cardExpiration, setCardExpiration] = useState("");
   const [securityCode, setSecurityCode] = useState("");
   const [installments, setInstallments] = useState(1);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!open) {
@@ -202,8 +242,38 @@ export function CheckoutModal({
       setCardExpiration("");
       setSecurityCode("");
       setInstallments(1);
+      return;
     }
-  }, [open]);
+    // Quando o modal abre, tenta retomar um PIX pendente do mesmo serviço.
+    if (service) {
+      const pending = loadPendingPix(service.slug);
+      if (pending) {
+        setIntent(pending.intent);
+        setPayment(pending.payment);
+        setTab("pix");
+        setStep("payment");
+        // mpConfig será recarregado em background (apenas para `publicKey` do cartão).
+        fetchMpConfig()
+          .then(setMpConfig)
+          .catch(() => undefined);
+      }
+    }
+  }, [open, service, fetchMpConfig]);
+
+  // Tick de 1s para o contador regressivo do PIX.
+  useEffect(() => {
+    if (!open || step !== "payment" || !payment?.expiresAt) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [open, step, payment?.expiresAt]);
+
+  const pixMsLeft = payment?.method === "pix" && payment.expiresAt
+    ? Math.max(0, new Date(payment.expiresAt).getTime() - now)
+    : null;
+  const pixExpired = pixMsLeft !== null && pixMsLeft === 0;
+  const pixCountdown = pixMsLeft !== null
+    ? `${String(Math.floor(pixMsLeft / 60000)).padStart(2, "0")}:${String(Math.floor((pixMsLeft % 60000) / 1000)).padStart(2, "0")}`
+    : null;
 
   useEffect(() => {
     const pix = payment?.method === "pix" ? payment.qrCode : null;
@@ -221,6 +291,7 @@ export function CheckoutModal({
         const result = await checkPayment({ data: { orderId: intent.orderId } });
         if (result.payment) setPayment(result.payment);
         if (result.orderPaymentStatus === "aprovado") {
+          if (service) clearPendingPix(service.slug);
           toast.success("Pagamento aprovado!");
           setStep("done");
           window.clearInterval(timer);
@@ -343,6 +414,13 @@ export function CheckoutModal({
         },
       });
       setPayment(result.payment);
+      if (method === "pix" && service && result.payment.expiresAt) {
+        savePendingPix(service.slug, {
+          intent,
+          payment: result.payment,
+          savedAt: Date.now(),
+        });
+      }
       toast.success(method === "pix" ? "Pix gerado" : "Boleto gerado");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao gerar pagamento");
@@ -393,7 +471,9 @@ export function CheckoutModal({
         },
       });
       setPayment(result.payment);
+      setPayment(result.payment);
       if (result.payment.orderPaymentStatus === "aprovado") {
+        if (service) clearPendingPix(service.slug);
         toast.success("Pagamento aprovado!");
         setStep("done");
       } else if (result.payment.orderPaymentStatus === "recusado") {
@@ -415,6 +495,7 @@ export function CheckoutModal({
       const result = await checkPayment({ data: { orderId: intent.orderId } });
       if (result.payment) setPayment(result.payment);
       if (result.orderPaymentStatus === "aprovado") {
+        if (service) clearPendingPix(service.slug);
         toast.success("Pagamento aprovado!");
         setStep("done");
         setTimeout(() => {
@@ -604,6 +685,20 @@ export function CheckoutModal({
                 <span>Total</span>
                 <strong>{money(intent.amountCents, intent.currency)}</strong>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (service) clearPendingPix(service.slug);
+                  setPayment(null);
+                  setIntent(null);
+                  setQrUrl(null);
+                  setStep("data");
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-brown-deep/50 hover:text-orange-brand transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Iniciar novo pedido
+              </button>
             </div>
 
             <div className="flex gap-1 rounded-md bg-muted/50 p-1">
@@ -639,13 +734,13 @@ export function CheckoutModal({
                         <img
                           src={`data:image/png;base64,${payment.qrCodeBase64}`}
                           alt="QR Pix"
-                          className="h-auto w-full max-w-[220px] rounded-lg border border-border bg-white p-2"
+                          className={`h-auto w-full max-w-[220px] rounded-lg border border-border bg-white p-2 ${pixExpired ? "opacity-40 grayscale" : ""}`}
                         />
                       ) : qrUrl ? (
                         <img
                           src={qrUrl}
                           alt="QR Pix"
-                          className="h-auto w-full max-w-[220px] rounded-lg border border-border bg-white p-2"
+                          className={`h-auto w-full max-w-[220px] rounded-lg border border-border bg-white p-2 ${pixExpired ? "opacity-40 grayscale" : ""}`}
                         />
                       ) : (
                         <div className="flex h-[220px] w-[220px] items-center justify-center">
@@ -654,6 +749,32 @@ export function CheckoutModal({
                       )}
                     </div>
                     <CopyBlock label="Pix copia e cola" value={payment.qrCode} />
+                    {pixCountdown !== null && !pixExpired && (
+                      <p className="text-xs text-brown-deep/60">
+                        PIX válido por 30 minutos · expira em{" "}
+                        <strong className="font-mono tabular-nums text-orange-brand">
+                          {pixCountdown}
+                        </strong>
+                      </p>
+                    )}
+                    {pixExpired && (
+                      <div className="space-y-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-brand/10 px-3 py-1 text-[11px] font-display uppercase tracking-wider text-red-brand">
+                          Pix expirado
+                        </span>
+                        <Button
+                          onClick={() => generatePayment("pix")}
+                          disabled={paymentLoading === "pix" || !mpConfig?.enabled}
+                          className="w-full bg-orange-brand text-offwhite hover:bg-red-brand"
+                        >
+                          {paymentLoading === "pix" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Gerar novo PIX"
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <Button
