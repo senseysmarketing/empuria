@@ -386,6 +386,11 @@ export function NewOrderWizard({
                     <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
+                {method === "mercadopago" && payCurrency !== "BRL" && !isFree && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Mercado Pago só processa em Reais (BRL). Selecione BRL para gerar o link.
+                  </p>
+                )}
               </div>
               {currency !== payCurrency && (
                 <div className="col-span-2">
