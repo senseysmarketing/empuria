@@ -470,6 +470,38 @@ export type Database = {
           },
         ]
       }
+      club_lesson_progress: {
+        Row: {
+          completed_at: string | null
+          lesson_id: string
+          opened_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          lesson_id: string
+          opened_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          lesson_id?: string
+          opened_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_lesson_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "club_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_lessons: {
         Row: {
           created_at: string
@@ -477,6 +509,7 @@ export type Database = {
           description: string | null
           duration_minutes: number | null
           id: string
+          is_coming_soon: boolean
           is_featured: boolean
           is_published: boolean
           legacy_content_id: string | null
@@ -499,6 +532,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           id?: string
+          is_coming_soon?: boolean
           is_featured?: boolean
           is_published?: boolean
           legacy_content_id?: string | null
@@ -521,6 +555,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           id?: string
+          is_coming_soon?: boolean
           is_featured?: boolean
           is_published?: boolean
           legacy_content_id?: string | null

@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useRef } from "react";
 import { z } from "zod";
 import { getClubContent } from "@/lib/portal/clube.functions";
+import { markLessonOpened, toggleLessonCompleted } from "@/lib/portal/clube-progress.functions";
 import { ClubHero } from "@/components/portal/ClubHero";
 import { ClubPlayer, type PlayerLesson } from "@/components/portal/ClubPlayer";
 import { LessonCard } from "@/components/portal/LessonCard";
@@ -26,21 +27,30 @@ export const Route = createFileRoute("/_authenticated/portal/clube")({
   component: ClubePage,
 });
 
-const LS_LAST = "clube:last-lesson";
-const LS_COMPLETED = "clube:completed";
-
-function readCompleted(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(LS_COMPLETED);
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
+type RouteLesson = {
+  id: string;
+  module_id: string;
+  title: string;
+  description: string | null;
+  thumbnail_url: string | null;
+  duration_minutes: number | null;
+  position: number;
+  is_featured: boolean;
+  is_coming_soon: boolean;
+  published_at: string | null;
+  opened_at: string | null;
+  completed_at: string | null;
+  video_url: string | null;
+  video_provider: string | null;
+  video_file_id: string | null;
+  video_embed_url: string | null;
+  video_source_url: string | null;
+  files: { id: string; label: string; file_url: string; file_type: string }[];
+};
 
 function ClubePage() {
   const fetchContent = useServerFn(getClubContent);
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["club-content"],
     queryFn: () => fetchContent(),
@@ -48,34 +58,40 @@ function ClubePage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const [completed, setCompleted] = useState<Set<string>>(() => new Set());
-  useEffect(() => {
-    setCompleted(readCompleted());
-  }, []);
+  const markOpened = useServerFn(markLessonOpened);
+  const toggleCompleted = useServerFn(toggleLessonCompleted);
+
+  const openMutation = useMutation({
+    mutationFn: (lessonId: string) => markOpened({ data: { lessonId } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["club-content"] }),
+  });
+  const completeMutation = useMutation({
+    mutationFn: (lessonId: string) => toggleCompleted({ data: { lessonId } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["club-content"] }),
+  });
 
   const playerRef = useRef<HTMLDivElement | null>(null);
   const modulesRef = useRef<HTMLDivElement | null>(null);
 
-  // Flat ordered list (módulo.position, aula.position) — used for "próxima aula" and lookups
+  // Lista plana ordenada
   const orderedLessons = useMemo(() => {
-    if (!data) return [] as { lesson: PlayerLesson & { duration_minutes: number | null; is_featured: boolean; published_at: string | null; thumbnail_url: string | null }; moduleId: string; moduleTitle: string }[];
-    const out: { lesson: PlayerLesson & { duration_minutes: number | null; is_featured: boolean; published_at: string | null; thumbnail_url: string | null }; moduleId: string; moduleTitle: string }[] = [];
+    if (!data) return [] as { lesson: RouteLesson; moduleId: string; moduleTitle: string }[];
+    const out: { lesson: RouteLesson; moduleId: string; moduleTitle: string }[] = [];
     for (const m of data.modules) {
       for (const l of m.lessons) {
-        out.push({ lesson: l as never, moduleId: m.id, moduleTitle: m.title });
+        out.push({ lesson: l as unknown as RouteLesson, moduleId: m.id, moduleTitle: m.title });
       }
     }
     return out;
   }, [data]);
 
-  // Selected lesson from URL, falling back to localStorage last, featured, or first
-  const lastFromLs =
-    typeof window !== "undefined" ? window.localStorage.getItem(LS_LAST) : null;
-  const featured = orderedLessons.find((o) => o.lesson.is_featured);
+  const featured = orderedLessons.find((o) => o.lesson.is_featured && !o.lesson.is_coming_soon);
+  const firstPlayable = orderedLessons.find((o) => !o.lesson.is_coming_soon);
+  const lastOpenedId = data?.lastOpenedLessonId ?? null;
   const fallbackId =
-    (lastFromLs && orderedLessons.find((o) => o.lesson.id === lastFromLs)?.lesson.id) ||
+    (lastOpenedId && orderedLessons.find((o) => o.lesson.id === lastOpenedId)?.lesson.id) ||
     featured?.lesson.id ||
-    orderedLessons[0]?.lesson.id ||
+    firstPlayable?.lesson.id ||
     null;
 
   const selectedId = search.aula ?? null;
@@ -98,38 +114,24 @@ function ClubePage() {
   const coverUrl = settings?.cover_url ?? null;
 
   const selectLesson = (id: string) => {
+    const entry = orderedLessons.find((o) => o.lesson.id === id);
+    if (!entry || entry.lesson.is_coming_soon) return;
     navigate({ search: { aula: id }, replace: true });
-    try {
-      window.localStorage.setItem(LS_LAST, id);
-    } catch {
-      /* ignore */
-    }
+    openMutation.mutate(id);
     requestAnimationFrame(() => {
       playerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
 
-  const toggleCompleted = (id: string) => {
-    setCompleted((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      try {
-        window.localStorage.setItem(LS_COMPLETED, JSON.stringify([...next]));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  };
-
-  // Próxima aula (linear, na ordem)
+  // Próxima aula (pula coming_soon)
   const currentIndex = selectedEntry
     ? orderedLessons.findIndex((o) => o.lesson.id === selectedEntry.lesson.id)
     : -1;
   const nextEntry =
-    currentIndex >= 0 && currentIndex < orderedLessons.length - 1
-      ? orderedLessons[currentIndex + 1]
+    currentIndex >= 0
+      ? orderedLessons
+          .slice(currentIndex + 1)
+          .find((o) => !o.lesson.is_coming_soon) ?? null
       : null;
 
   const continueId = selectedId ?? fallbackId;
@@ -145,6 +147,13 @@ function ClubePage() {
     modulesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const playerLesson =
+    (selectedEntry?.lesson as PlayerLesson | undefined) ??
+    (continueEntry?.lesson as PlayerLesson | undefined) ??
+    null;
+  const playerLessonRaw = selectedEntry?.lesson ?? continueEntry?.lesson ?? null;
+  const playerCompleted = !!playerLessonRaw?.completed_at;
+
   return (
     <div className="space-y-10">
       <ClubHero
@@ -152,7 +161,7 @@ function ClubePage() {
         subtitle={subtitle}
         coverUrl={coverUrl}
         isMember={!!data?.isMember}
-        hasSelected={!!selectedEntry || !!lastFromLs}
+        hasSelected={!!selectedEntry || !!lastOpenedId}
         onContinue={continueEntry ? onContinue : undefined}
         onBrowseModules={onBrowseModules}
         whatsappUrl={data?.hubla.whatsappGroupUrl ?? null}
@@ -207,27 +216,19 @@ function ClubePage() {
         />
       )}
 
-      {/* PLAYER INLINE — só para membros */}
+      {/* PLAYER INLINE */}
       {data?.isMember && (
         <section ref={playerRef} className="scroll-mt-24">
           <ClubPlayer
-            lesson={(selectedEntry?.lesson as PlayerLesson) ?? (continueEntry?.lesson as PlayerLesson) ?? null}
+            lesson={playerLesson}
             moduleTitle={
               selectedEntry?.moduleTitle ?? continueEntry?.moduleTitle ?? null
             }
             watermark={data?.memberName ?? null}
-            isCompleted={
-              !!(selectedEntry?.lesson.id ?? continueEntry?.lesson.id) &&
-              completed.has(
-                (selectedEntry?.lesson.id ?? continueEntry?.lesson.id) as string,
-              )
-            }
+            isCompleted={playerCompleted}
             onMarkComplete={
-              selectedEntry || continueEntry
-                ? () =>
-                    toggleCompleted(
-                      (selectedEntry?.lesson.id ?? continueEntry?.lesson.id) as string,
-                    )
+              playerLessonRaw
+                ? () => completeMutation.mutate(playerLessonRaw.id)
                 : undefined
             }
             onNext={nextEntry ? () => selectLesson(nextEntry.lesson.id) : undefined}
@@ -253,7 +254,7 @@ function ClubePage() {
               <div className="mb-4 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-yellow-brand" />
                 <h2 className="font-display text-sm uppercase tracking-[0.25em] text-admin-ink-soft">
-                  {lastFromLs && lastFromLs === continueEntry.lesson.id
+                  {lastOpenedId && lastOpenedId === continueEntry.lesson.id
                     ? "Continue assistindo"
                     : "Comece por aqui"}
                 </h2>
@@ -264,7 +265,7 @@ function ClubePage() {
                   lesson={continueEntry.lesson as never}
                   moduleTitle={continueEntry.moduleTitle}
                   active={selectedEntry?.lesson.id === continueEntry.lesson.id}
-                  completed={completed.has(continueEntry.lesson.id)}
+                  completed={!!continueEntry.lesson.completed_at}
                   onSelect={() => selectLesson(continueEntry.lesson.id)}
                 />
               </div>
@@ -289,17 +290,21 @@ function ClubePage() {
                 </span>
               </div>
               <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-2 px-2">
-                {m.lessons.map((l) => (
-                  <LessonCard
-                    key={l.id}
-                    lesson={l as never}
-                    moduleTitle={m.title}
-                    locked={!data.isMember}
-                    active={selectedEntry?.lesson.id === l.id}
-                    completed={completed.has(l.id)}
-                    onSelect={() => selectLesson(l.id)}
-                  />
-                ))}
+                {m.lessons.map((l) => {
+                  const lesson = l as unknown as RouteLesson;
+                  return (
+                    <LessonCard
+                      key={lesson.id}
+                      lesson={lesson as never}
+                      moduleTitle={m.title}
+                      locked={!data.isMember}
+                      comingSoon={lesson.is_coming_soon}
+                      active={selectedEntry?.lesson.id === lesson.id}
+                      completed={!!lesson.completed_at}
+                      onSelect={() => selectLesson(lesson.id)}
+                    />
+                  );
+                })}
               </div>
             </section>
           ))}

@@ -13,7 +13,7 @@ export const getClubContent = createServerFn({ method: "GET" })
     const { supabase } = context;
     const userId = context.effectiveUserId ?? context.userId;
 
-    const [profileRes, modulesRes, lessonsRes, filesRes, settingsRes, postsRes] = await Promise.all([
+    const [profileRes, modulesRes, lessonsRes, filesRes, settingsRes, postsRes, progressRes] = await Promise.all([
       supabase.from("profiles").select("is_club_member, full_name").eq("id", userId).maybeSingle(),
       supabase
         .from("club_modules")
@@ -22,7 +22,7 @@ export const getClubContent = createServerFn({ method: "GET" })
         .order("position", { ascending: true }),
       supabase
         .from("club_lessons")
-        .select("id, module_id, title, description, video_url, video_provider, video_file_id, video_embed_url, video_source_url, thumbnail_url, duration_minutes, position, is_featured, published_at")
+        .select("id, module_id, title, description, video_url, video_provider, video_file_id, video_embed_url, video_source_url, thumbnail_url, duration_minutes, position, is_featured, is_coming_soon, published_at")
         .eq("is_published", true)
         .order("position", { ascending: true }),
       supabase
@@ -36,6 +36,11 @@ export const getClubContent = createServerFn({ method: "GET" })
         .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(5),
+      supabase
+        .from("club_lesson_progress")
+        .select("lesson_id, opened_at, completed_at")
+        .eq("user_id", userId)
+        .order("opened_at", { ascending: false }),
     ]);
 
     const isMember = !!profileRes.data?.is_club_member;
@@ -71,34 +76,48 @@ export const getClubContent = createServerFn({ method: "GET" })
       duration_minutes: number | null;
       position: number;
       is_featured: boolean;
+      is_coming_soon: boolean | null;
       published_at: string | null;
     };
     const allLessons = (lessonsRes.data ?? []) as LessonRow[];
     const allFiles = (filesRes.data ?? []) as Array<{ id: string; lesson_id: string; label: string; file_url: string; file_type: string; size_bytes: number | null; position: number }>;
+    const progressRows = (progressRes.data ?? []) as Array<{ lesson_id: string; opened_at: string; completed_at: string | null }>;
+    const progressByLesson = new Map(progressRows.map((p) => [p.lesson_id, p]));
 
     const modules = (modulesRes.data ?? []).map((m: { id: string; title: string; slug: string; description: string | null; cover_url: string | null; position: number }) => {
       const lessons = allLessons
         .filter((l) => l.module_id === m.id)
-        .map((l) => ({
-          id: l.id,
-          module_id: l.module_id,
-          title: l.title,
-          description: l.description,
-          thumbnail_url: l.thumbnail_url,
-          duration_minutes: l.duration_minutes,
-          position: l.position,
-          is_featured: l.is_featured,
-          published_at: l.published_at,
-          // Para não-membros, removemos os campos que permitiriam reproduzir o vídeo
-          video_url: isMember ? l.video_url : null,
-          video_provider: l.video_provider, // o tipo pode ser exposto, ajuda UI a mostrar badges
-          video_file_id: isMember ? l.video_file_id : null,
-          video_embed_url: isMember ? l.video_embed_url : null,
-          video_source_url: isMember ? l.video_source_url : null,
-          files: isMember ? allFiles.filter((f) => f.lesson_id === l.id) : [],
-        }));
+        .map((l) => {
+          const prog = progressByLesson.get(l.id) ?? null;
+          return {
+            id: l.id,
+            module_id: l.module_id,
+            title: l.title,
+            description: l.description,
+            thumbnail_url: l.thumbnail_url,
+            duration_minutes: l.duration_minutes,
+            position: l.position,
+            is_featured: l.is_featured,
+            is_coming_soon: !!l.is_coming_soon,
+            published_at: l.published_at,
+            opened_at: prog?.opened_at ?? null,
+            completed_at: prog?.completed_at ?? null,
+            // Para não-membros, removemos os campos que permitiriam reproduzir o vídeo
+            video_url: isMember ? l.video_url : null,
+            video_provider: l.video_provider, // o tipo pode ser exposto, ajuda UI a mostrar badges
+            video_file_id: isMember ? l.video_file_id : null,
+            video_embed_url: isMember ? l.video_embed_url : null,
+            video_source_url: isMember ? l.video_source_url : null,
+            files: isMember ? allFiles.filter((f) => f.lesson_id === l.id) : [],
+          };
+        });
       return { ...m, lessons };
     });
+
+    // Última aula aberta que ainda existe e está publicada
+    const publishedIds = new Set(allLessons.map((l) => l.id));
+    const lastOpenedLessonId =
+      progressRows.find((p) => publishedIds.has(p.lesson_id))?.lesson_id ?? null;
 
     return {
       isMember,
@@ -107,6 +126,7 @@ export const getClubContent = createServerFn({ method: "GET" })
       modules,
       posts: postsRes.data ?? [],
       subscription: subscription ?? null,
+      lastOpenedLessonId,
       hubla: {
         isEnabled: !!setting?.is_enabled,
         checkoutUrl: setting?.checkout_url ?? null,
