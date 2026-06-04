@@ -102,6 +102,9 @@ export function ClubeAdminTab() {
             <ClubeWallManager posts={posts} />
           )}
         </TabsContent>
+        <TabsContent value="moderacao" className="mt-6">
+          <ClubeModerationManager />
+        </TabsContent>
         <TabsContent value="config" className="mt-6">
           {curriculum.isLoading ? (
             <p className="text-sm text-admin-ink-muted">Carregando…</p>
