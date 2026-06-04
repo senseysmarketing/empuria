@@ -108,7 +108,16 @@ export function ManageMemberDialog({
   });
 
   const resetPassword = useMutation({
-    mutationFn: () => resetFn({ data: { id: memberId } }),
+    mutationFn: () =>
+      resetFn({
+        data: {
+          id: memberId,
+          redirect_to:
+            typeof window !== "undefined"
+              ? `${window.location.origin}/redefinir-senha`
+              : undefined,
+        },
+      }),
     onSuccess: (res) => {
       if (res?.url) {
         navigator.clipboard?.writeText(res.url).catch(() => {});
