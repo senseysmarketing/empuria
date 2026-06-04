@@ -730,10 +730,10 @@ export const checkMercadoPagoPayment = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!latest) return { payment: null, orderPaymentStatus: order.payment_status };
     const row = latest as MercadoPagoPaymentRow;
-    if (!row.provider_order_id)
+    if (!row.provider_payment_id)
       return { payment: publicPayment(row), orderPaymentStatus: order.payment_status };
     const response = await mpFetch<Record<string, unknown>>(
-      `/v1/orders/${row.provider_order_id}`,
+      `/v1/payments/${row.provider_payment_id}`,
       setting,
     );
     const updated = await persistPayment({
