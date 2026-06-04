@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
+import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
 export type ManualUserOrigin = "admin_created" | "pdv" | "esteira" | "checkout" | "future_crm";
 
@@ -56,7 +57,9 @@ export async function createOrReuseManualCustomer(input: {
   adminNotes?: string | null;
 }): Promise<ManualCustomerResult> {
   const email = normalizeEmail(input.email);
-  const phone = input.phone?.trim() || null;
+  const rawPhone = input.phone?.trim() || null;
+  const phone = rawPhone ? (normalizePhone(rawPhone) ?? rawPhone) : null;
+  const phoneCountry = phone ? getCountryFromPhone(phone) : null;
   let user = await findAuthUserByEmail(email);
   let created = false;
 
@@ -98,6 +101,7 @@ export async function createOrReuseManualCustomer(input: {
     id: user.id,
     full_name: input.fullName,
     phone,
+    phone_country_iso: phoneCountry,
     ...(input.isClubMember !== undefined ? { is_club_member: input.isClubMember } : {}),
     ...(input.adminNotes !== undefined ? { admin_notes: input.adminNotes || null } : {}),
     created_by_admin: shouldMarkManual,

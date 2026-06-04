@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireStaff } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Database } from "@/integrations/supabase/types";
 import { createOrReuseManualCustomer } from "./manual-users";
+import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
 export type UserRow = {
   id: string;
@@ -171,7 +173,13 @@ export const updateUserProfile = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    const { id, ...patch } = data;
+    const { id, phone, ...rest } = data;
+    const patch: Database["public"]["Tables"]["profiles"]["Update"] = { ...rest };
+    if (phone !== undefined) {
+      const norm = phone ? (normalizePhone(phone) ?? phone) : null;
+      patch.phone = norm;
+      patch.phone_country_iso = norm ? getCountryFromPhone(norm) : null;
+    }
     const { error } = await supabaseAdmin.from("profiles").update(patch).eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };

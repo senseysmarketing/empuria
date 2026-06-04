@@ -24,6 +24,7 @@ import {
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -395,10 +396,10 @@ function CreateManualUserDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Telefone</Label>
-            <Input
+            <PhoneInput
+              variant="admin"
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="bg-admin-bg border-admin-border"
+              onChange={(e164) => setForm({ ...form, phone: e164 ?? "" })}
             />
           </div>
           <label className="flex items-center gap-3 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">

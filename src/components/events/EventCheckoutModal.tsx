@@ -6,6 +6,7 @@ import { checkEmail } from "@/lib/checkout/checkout.functions";
 import { confirmTicketPurchase } from "@/lib/events/tickets.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowRight, Check, Copy, QrCode } from "lucide-react";
@@ -127,7 +128,7 @@ export function EventCheckoutModal({
           <div className="space-y-3">
             <div><Label>Nome completo</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>WhatsApp</Label><Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+34..." /></div>
+              <div><Label>WhatsApp</Label><PhoneInput value={whatsapp} onChange={(e164) => setWhatsapp(e164 ?? "")} /></div>
               <div><Label>E-mail</Label><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setEmailExists(null); }} onBlur={onEmailBlur} /></div>
             </div>
             {checkingEmail && <p className="text-xs"><Loader2 className="inline h-3 w-3 animate-spin" /> Verificando...</p>}

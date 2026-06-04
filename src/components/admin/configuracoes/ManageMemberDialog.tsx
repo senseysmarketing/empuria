@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -181,11 +182,10 @@ export function ManageMemberDialog({
               </div>
               <div className="space-y-1.5">
                 <Label>Telefone</Label>
-                <Input
+                <PhoneInput
+                  variant="admin"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="bg-admin-bg border-admin-border"
-                  placeholder="(11) 99999-9999"
+                  onChange={(e164) => setPhone(e164 ?? "")}
                 />
               </div>
               <div className="flex items-end justify-between gap-3">

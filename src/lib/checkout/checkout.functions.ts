@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
 export const checkEmail = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ email: z.string().trim().email().max(255) }).parse(d))
@@ -72,11 +73,13 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
     if (svcErr || !service) throw new Error("Serviço indisponível");
 
     // Update profile basic info
+    const normalizedPhone = normalizePhone(data.contact.whatsapp) ?? data.contact.whatsapp;
     await supabase
       .from("profiles")
       .update({
         full_name: data.contact.name,
-        phone: data.contact.whatsapp,
+        phone: normalizedPhone,
+        phone_country_iso: getCountryFromPhone(normalizedPhone),
       })
       .eq("id", userId);
 

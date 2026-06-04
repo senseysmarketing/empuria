@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -80,7 +81,7 @@ export function PerfilContaTab() {
           </div>
           <div className="space-y-1.5">
             <Label>Telefone</Label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-admin-bg border-admin-border" />
+            <PhoneInput variant="admin" value={phone} onChange={(e164) => setPhone(e164 ?? "")} />
           </div>
           <div className="space-y-1.5">
             <Label>Avatar (URL)</Label>

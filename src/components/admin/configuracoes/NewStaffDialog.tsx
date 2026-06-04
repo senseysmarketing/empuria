@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -91,10 +92,10 @@ export function NewStaffDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Telefone (opcional)</Label>
-            <Input
+            <PhoneInput
+              variant="admin"
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="bg-admin-bg border-admin-border"
+              onChange={(e164) => setForm({ ...form, phone: e164 ?? "" })}
             />
           </div>
           <div className="space-y-2">

@@ -1867,6 +1867,7 @@ export type Database = {
           next_followup_at: string | null
           notes: string | null
           phone: string
+          phone_country_iso: string | null
           pipeline_stage: Database["public"]["Enums"]["lead_pipeline_stage"]
           qualification_answers: Json
           qualification_score: number | null
@@ -1899,6 +1900,7 @@ export type Database = {
           next_followup_at?: string | null
           notes?: string | null
           phone: string
+          phone_country_iso?: string | null
           pipeline_stage?: Database["public"]["Enums"]["lead_pipeline_stage"]
           qualification_answers?: Json
           qualification_score?: number | null
@@ -1931,6 +1933,7 @@ export type Database = {
           next_followup_at?: string | null
           notes?: string | null
           phone?: string
+          phone_country_iso?: string | null
           pipeline_stage?: Database["public"]["Enums"]["lead_pipeline_stage"]
           qualification_answers?: Json
           qualification_score?: number | null
@@ -2600,6 +2603,7 @@ export type Database = {
           is_club_member: boolean
           password_setup_required: boolean
           phone: string | null
+          phone_country_iso: string | null
           profile_origin: string
           updated_at: string
         }
@@ -2617,6 +2621,7 @@ export type Database = {
           is_club_member?: boolean
           password_setup_required?: boolean
           phone?: string | null
+          phone_country_iso?: string | null
           profile_origin?: string
           updated_at?: string
         }
@@ -2634,6 +2639,7 @@ export type Database = {
           is_club_member?: boolean
           password_setup_required?: boolean
           phone?: string | null
+          phone_country_iso?: string | null
           profile_origin?: string
           updated_at?: string
         }

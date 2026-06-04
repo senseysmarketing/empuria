@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
 export const getPublishedEvent = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ slug: z.string().trim().min(1).max(120) }).parse(d))
@@ -78,9 +79,11 @@ export const confirmTicketPurchase = createServerFn({ method: "POST" })
     }
 
     // Update profile
+    const normalizedPhone = normalizePhone(data.contact.whatsapp) ?? data.contact.whatsapp;
     await supabaseAdmin.from("profiles").update({
       full_name: data.contact.name,
-      phone: data.contact.whatsapp,
+      phone: normalizedPhone,
+      phone_country_iso: getCountryFromPhone(normalizedPhone),
     }).eq("id", userId);
 
     // Create one order (free or paid auto-approved for mock)

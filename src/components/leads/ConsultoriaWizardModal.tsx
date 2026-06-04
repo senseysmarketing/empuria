@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AnimatePresence, motion } from "motion/react";
@@ -247,12 +248,10 @@ export function ConsultoriaWizardModal({
                         </div>
                         <div>
                           <Label className="text-xs uppercase tracking-wider text-brown/60">WhatsApp</Label>
-                          <Input
+                          <PhoneInput
                             value={answers.phone}
-                            onChange={(e) => setAnswers({ ...answers, phone: e.target.value })}
-                            placeholder="+55 11 99999-9999"
-                            maxLength={30}
-                            className="mt-1 bg-offwhite border-brown/20"
+                            onChange={(e164) => setAnswers({ ...answers, phone: e164 ?? "" })}
+                            className="mt-1"
                           />
                         </div>
                       </div>

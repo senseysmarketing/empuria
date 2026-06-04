@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -290,10 +291,9 @@ export function NewOrderWizard({
                   value={newCust.email}
                   onChange={(e) => setNewCust({ ...newCust, email: e.target.value })}
                 />
-                <Input
-                  placeholder="Telefone"
+                <PhoneInput
                   value={newCust.phone}
-                  onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })}
+                  onChange={(e164) => setNewCust({ ...newCust, phone: e164 ?? "" })}
                 />
                 <Button variant="outline" onClick={createCust}>
                   Criar e vincular
