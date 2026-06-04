@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { VideoPlayerModal } from "@/components/portal/VideoPlayerModal";
+import { VideoSourceField } from "@/components/admin/clube/VideoSourceField";
 
 type Content = Awaited<ReturnType<typeof getClubData>>["content"][number];
 type Post = Awaited<ReturnType<typeof getClubData>>["posts"][number];
