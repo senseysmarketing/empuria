@@ -503,6 +503,15 @@ async function syncOrderFromPayment(row: MercadoPagoPaymentRow) {
 
   const { error } = await db.from("orders").update(patch).eq("id", row.order_id);
   if (error) throw new Error(error.message);
+
+  // Mark any active public payment link for this order as paid.
+  if (status === "aprovado") {
+    await db
+      .from("order_payment_links")
+      .update({ status: "paid", used_at: nowIso() })
+      .eq("order_id", row.order_id)
+      .eq("status", "active");
+  }
 }
 
 async function persistPayment(args: {
