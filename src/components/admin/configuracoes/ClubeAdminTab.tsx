@@ -73,6 +73,9 @@ export function ClubeAdminTab() {
           <TabsTrigger value="comunicados" className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white">
             <Megaphone className="h-4 w-4" /> Comunicados
           </TabsTrigger>
+          <TabsTrigger value="moderacao" className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white">
+            <ShieldCheck className="h-4 w-4" /> Moderação
+          </TabsTrigger>
           <TabsTrigger value="config" className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white">
             <SettingsIcon className="h-4 w-4" /> Configurações
           </TabsTrigger>
