@@ -445,6 +445,16 @@ export function NewOrderWizard({
                 </SelectContent>
               </Select>
             </div>
+            {mpNeedsBrl && (
+              <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
+                <div>
+                  <strong>Cobrança precisa estar em BRL.</strong> Mercado Pago só processa em Reais.
+                  Volte para a etapa 3 e ajuste a moeda de cobrança para <strong>BRL</strong>, ou
+                  troque a forma de pagamento.
+                </div>
+              </div>
+            )}
             {method === "manual" && (
               <div>
                 <Label>Motivo do pagamento manual *</Label>
