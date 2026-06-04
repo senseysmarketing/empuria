@@ -23,7 +23,7 @@ function slugify(s: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-const emptyForm = { name: "", slug: "", emoji: "", position: 0, is_active: true };
+const emptyForm = { name: "", emoji: "", position: 0, is_active: true };
 
 export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const fetchList = useServerFn(listCategories);
@@ -50,12 +50,19 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
   };
 
   const handleCreate = async () => {
+    const name = newForm.name.trim();
+    if (!name) return;
+    const slug = slugify(name);
+    if (categories.some((c) => c.slug === slug)) {
+      toast.error("Já existe uma categoria com este nome.");
+      return;
+    }
     setSaving(true);
     try {
       await create({
         data: {
-          name: newForm.name.trim(),
-          slug: (newForm.slug.trim() || slugify(newForm.name)).toLowerCase(),
+          name,
+          slug,
           emoji: newForm.emoji.trim() || null,
           position: newForm.position,
           is_active: newForm.is_active,
@@ -70,18 +77,25 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
 
   const startEdit = (c: Category) => {
     setEditingId(c.id);
-    setEditForm({ name: c.name, slug: c.slug, emoji: c.emoji ?? "", position: c.position, is_active: c.is_active });
+    setEditForm({ name: c.name, emoji: c.emoji ?? "", position: c.position, is_active: c.is_active });
   };
 
   const saveEdit = async () => {
     if (!editingId) return;
+    const name = editForm.name.trim();
+    if (!name) return;
+    const slug = slugify(name);
+    if (categories.some((c) => c.slug === slug && c.id !== editingId)) {
+      toast.error("Já existe uma categoria com este nome.");
+      return;
+    }
     setSaving(true);
     try {
       await update({
         data: {
           id: editingId,
-          name: editForm.name.trim(),
-          slug: editForm.slug.trim().toLowerCase(),
+          name,
+          slug,
           emoji: editForm.emoji.trim() || null,
           position: editForm.position,
           is_active: editForm.is_active,
@@ -125,18 +139,14 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
           {/* Create */}
           <div className="rounded-xl border border-admin-border bg-admin-bg/50 p-4 space-y-3">
             <h4 className="text-sm font-display text-admin-ink-muted">Nova categoria</h4>
-            <div className="grid grid-cols-[60px_1fr_1fr_80px_auto] gap-2 items-end">
+            <div className="grid grid-cols-[60px_1fr_80px_auto] gap-2 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">Emoji</Label>
                 <Input value={newForm.emoji} onChange={(e) => setNewForm({ ...newForm, emoji: e.target.value })} className="bg-admin-surface border-admin-border text-center" maxLength={4} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Nome</Label>
-                <Input value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value, slug: newForm.slug || slugify(e.target.value) })} className="bg-admin-surface border-admin-border" placeholder="Ex: Sobremesas" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Slug</Label>
-                <Input value={newForm.slug} onChange={(e) => setNewForm({ ...newForm, slug: e.target.value })} className="bg-admin-surface border-admin-border" placeholder="sobremesas" />
+                <Input value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value })} className="bg-admin-surface border-admin-border" placeholder="Ex: Sobremesas" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Ordem</Label>
@@ -157,10 +167,9 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
             ) : (
               categories.map((c) =>
                 editingId === c.id ? (
-                  <div key={c.id} className="grid grid-cols-[60px_1fr_1fr_80px_auto] gap-2 items-end p-3 rounded-lg border border-admin-accent bg-admin-bg/50">
+                  <div key={c.id} className="grid grid-cols-[60px_1fr_80px_auto] gap-2 items-end p-3 rounded-lg border border-admin-accent bg-admin-bg/50">
                     <Input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} className="bg-admin-surface border-admin-border text-center" maxLength={4} />
                     <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="bg-admin-surface border-admin-border" />
-                    <Input value={editForm.slug} onChange={(e) => setEditForm({ ...editForm, slug: e.target.value })} className="bg-admin-surface border-admin-border" />
                     <Input type="number" value={editForm.position} onChange={(e) => setEditForm({ ...editForm, position: parseInt(e.target.value || "0", 10) })} className="bg-admin-surface border-admin-border" />
                     <div className="flex gap-1">
                       <Button size="sm" onClick={saveEdit} disabled={saving} className="bg-admin-accent text-white"><Check className="h-4 w-4" /></Button>
