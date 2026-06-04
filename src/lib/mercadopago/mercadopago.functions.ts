@@ -805,7 +805,7 @@ export const createMercadoPagoPayment = createServerFn({ method: "POST" })
     const idempotencyKey = randomId();
     const fallbackExpiresAt =
       data.method === "pix"
-        ? new Date(Date.now() + setting.pix_expiration_minutes * 60000).toISOString()
+        ? new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60000).toISOString()
         : data.method === "boleto"
           ? new Date(Date.now() + setting.boleto_expiration_days * 86400000).toISOString()
           : null;
