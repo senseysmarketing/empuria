@@ -1152,6 +1152,9 @@ function PayerFields({
   stateUf,
   setStateUf,
   compact,
+  cepLoading,
+  onCepLookup,
+  showFullAddress,
 }: {
   cpf: string;
   setCpf: (v: string) => void;
@@ -1168,33 +1171,65 @@ function PayerFields({
   stateUf: string;
   setStateUf: (v: string) => void;
   compact?: boolean;
+  cepLoading?: boolean;
+  onCepLookup?: (cep: string) => void | Promise<void>;
+  showFullAddress?: boolean;
 }) {
+  const cpfInvalid = cpf.length > 0 && !isValidCpf(cpf);
+  const cepInvalid = zipCode.length > 0 && onlyDigits(zipCode).length !== 8;
+  const handleCepChange = (raw: string) => {
+    const formatted = formatCep(raw);
+    setZipCode(formatted);
+    if (onlyDigits(formatted).length === 8) {
+      void onCepLookup?.(formatted);
+    }
+  };
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <Field label="CPF">
           <Input
             value={cpf}
-            onChange={(e) => setCpf(e.target.value)}
+            onChange={(e) => setCpf(formatCpf(e.target.value))}
             placeholder="123.456.789-09"
+            inputMode="numeric"
           />
+          {cpfInvalid && (
+            <span className="mt-1 block text-[11px] text-red-brand">CPF inválido.</span>
+          )}
         </Field>
         <Field label="CEP">
-          <Input
-            value={zipCode}
-            onChange={(e) => setZipCode(e.target.value)}
-            placeholder="06233-903"
-          />
+          <div className="relative">
+            <Input
+              value={zipCode}
+              onChange={(e) => handleCepChange(e.target.value)}
+              onBlur={(e) => {
+                if (onlyDigits(e.target.value).length === 8) void onCepLookup?.(e.target.value);
+              }}
+              placeholder="06233-903"
+              inputMode="numeric"
+            />
+            {cepLoading && (
+              <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-admin-ink-muted" />
+            )}
+          </div>
+          {cepInvalid && !cepLoading && (
+            <span className="mt-1 block text-[11px] text-red-brand">CEP deve ter 8 dígitos.</span>
+          )}
         </Field>
       </div>
-      {!compact && (
+      {(!compact || showFullAddress) && (
         <>
           <div className="grid grid-cols-[1fr_96px] gap-3">
             <Field label="Rua">
               <Input value={streetName} onChange={(e) => setStreetName(e.target.value)} />
             </Field>
             <Field label="Numero">
-              <Input value={streetNumber} onChange={(e) => setStreetNumber(e.target.value)} />
+              <Input
+                id="boleto-street-number"
+                value={streetNumber}
+                onChange={(e) => setStreetNumber(e.target.value)}
+              />
             </Field>
           </div>
           <div className="grid grid-cols-3 gap-3">
