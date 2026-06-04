@@ -75,7 +75,6 @@ export function PdvItensTab() {
     setEditing(item);
     setForm({
       name: item.name,
-      slug: item.slug,
       price_cents: it.price_eur_cents ?? item.price_cents,
       price_eur_cents: it.price_eur_cents ?? item.price_cents,
       price_brl_cents: it.price_brl_cents ?? 0,
