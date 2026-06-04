@@ -73,10 +73,9 @@ export function ManageMemberDialog({
     }
   }, [open, member]);
 
-  if (!member) return null;
-
-  const isSelf = me?.userId === member.id;
-  const isBlocked = Boolean(member.is_blocked);
+  const memberId = member?.id ?? "";
+  const isSelf = !!member && me?.userId === member.id;
+  const isBlocked = Boolean(member?.is_blocked);
 
   const invalidate = () =>
     qc.invalidateQueries({ queryKey: ["staff-permissions"] });
@@ -85,7 +84,7 @@ export function ManageMemberDialog({
     mutationFn: () =>
       updateFn({
         data: {
-          id: member.id,
+          id: memberId,
           full_name: fullName.trim() || undefined,
           phone: phone.trim() || null,
         },
@@ -99,7 +98,7 @@ export function ManageMemberDialog({
 
   const changeEmail = useMutation({
     mutationFn: () =>
-      emailFn({ data: { id: member.id, new_email: newEmail.trim() } }),
+      emailFn({ data: { id: memberId, new_email: newEmail.trim() } }),
     onSuccess: () => {
       toast.success("E-mail alterado");
       setEmailEditing(false);
@@ -109,7 +108,7 @@ export function ManageMemberDialog({
   });
 
   const resetPassword = useMutation({
-    mutationFn: () => resetFn({ data: { id: member.id } }),
+    mutationFn: () => resetFn({ data: { id: memberId } }),
     onSuccess: (res) => {
       if (res?.url) {
         navigator.clipboard?.writeText(res.url).catch(() => {});
@@ -129,7 +128,7 @@ export function ManageMemberDialog({
 
   const toggleBlocked = useMutation({
     mutationFn: () =>
-      blockFn({ data: { id: member.id, blocked: !isBlocked } }),
+      blockFn({ data: { id: memberId, blocked: !isBlocked } }),
     onSuccess: () => {
       toast.success(isBlocked ? "Usuário reativado" : "Usuário inativado");
       setConfirmBlock(false);
@@ -138,6 +137,9 @@ export function ManageMemberDialog({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  if (!member) return null;
+
 
   return (
     <>
