@@ -429,12 +429,15 @@ function HomePage() {
               <div className="relative bg-brown text-offwhite rounded-2xl p-8 shadow-warm border border-yellow-brand/20">
                 <div className="flex items-center justify-between mb-6">
                   <div className="font-display font-extrabold text-yellow-brand uppercase tracking-widest text-xs">
-                    Clube Empuria
+                    Clube do Imigrante
                   </div>
                   <Sparkles className="w-5 h-5 text-yellow-brand" />
                 </div>
                 <div className="font-display font-extrabold text-5xl">
-                  €19<span className="text-lg text-offwhite/60">/mês</span>
+                  R$ 199<span className="text-lg text-offwhite/60">/mês</span>
+                </div>
+                <div className="mt-2 font-body text-sm text-offwhite/70">
+                  ou 6x de R$ 133,17 <span className="text-offwhite/50">(semestral)</span>
                 </div>
                 <ul className="mt-6 space-y-3 font-body text-sm text-offwhite/85">
                   {[
