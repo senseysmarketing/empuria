@@ -17,6 +17,15 @@ export const Route = createFileRoute("/_authenticated/admin/")({
   component: CockpitPage,
 });
 
+const brlFmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const eurFmt = new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" });
+function formatSales(b: { BRL: number; EUR: number }) {
+  const parts: string[] = [];
+  if (b.BRL > 0 || (b.BRL === 0 && b.EUR === 0)) parts.push(brlFmt.format(b.BRL));
+  if (b.EUR > 0) parts.push(eurFmt.format(b.EUR));
+  return parts.join(" · ");
+}
+
 function CockpitPage() {
   const { isAdmin } = useCurrentUser();
   useTopBarActions(
