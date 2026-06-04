@@ -412,7 +412,7 @@ function EsteiraPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => doGenLink(o.id)}>
+                          <DropdownMenuItem onClick={() => doGenLink(o)}>
                             <Link2 className="h-4 w-4 mr-2" /> Gerar link de pagamento
                           </DropdownMenuItem>
                           {o.payment_provider_reference && (
