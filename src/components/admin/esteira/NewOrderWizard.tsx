@@ -60,6 +60,7 @@ export function NewOrderWizard({
   const createCustomer = useServerFn(createCustomerLite);
   const fetchServices = useServerFn(listServicesAdmin);
   const createOrder = useServerFn(createOrderFull);
+  const genLink = useServerFn(generatePaymentLink);
 
   const [step, setStep] = useState(1);
   const [customer, setCustomer] = useState<Customer | null>(null);
