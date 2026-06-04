@@ -495,6 +495,7 @@ export function CheckoutModal({
       const result = await checkPayment({ data: { orderId: intent.orderId } });
       if (result.payment) setPayment(result.payment);
       if (result.orderPaymentStatus === "aprovado") {
+        if (service) clearPendingPix(service.slug);
         toast.success("Pagamento aprovado!");
         setStep("done");
         setTimeout(() => {
