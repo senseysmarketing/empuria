@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getCockpitMetrics, getActivityFeed } from "@/lib/admin/cockpit.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
-import { MetricTile } from "@/components/admin/MetricTile";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { ActivityFeed } from "@/components/admin/ActivityFeed";
 import { ArrivalDialog } from "@/components/admin/ArrivalDialog";
 import { RevenueChart } from "@/components/admin/RevenueChart";
