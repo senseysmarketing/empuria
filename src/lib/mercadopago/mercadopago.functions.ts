@@ -9,6 +9,10 @@ import type { Json } from "@/integrations/supabase/types";
 type PaymentMethod = "pix" | "boleto" | "credit_card";
 type OrderPaymentStatus = "pendente" | "aprovado" | "recusado" | "estornado";
 
+// Mercado Pago exige no mínimo ~30 min para `date_of_expiration` de PIX dinâmico em produção;
+// valores menores fazem o pagamento ser marcado como `cancelled/expired` em segundos.
+const PIX_EXPIRATION_MINUTES = 30;
+
 type MercadoPagoSetting = {
   provider: "mercadopago";
   is_enabled: boolean;
