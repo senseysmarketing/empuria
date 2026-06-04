@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaff } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
+import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
 export type UserRow = {
   id: string;
