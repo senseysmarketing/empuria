@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { listPdvItems, createPdvItem, updatePdvItem, deletePdvItem } from "@/lib/admin/pdv-itens.functions";
 import { listCategories } from "@/lib/admin/categories.functions";
 import { CategoriesManagerModal } from "./CategoriesManagerModal";
+import { EmojiPickerField } from "@/components/admin/EmojiPickerField";
 import { StockMovementsDialog } from "./StockMovementsDialog";
 
 type Item = Awaited<ReturnType<typeof listPdvItems>>[number];
@@ -366,10 +367,10 @@ export function PdvItensTab() {
             <DialogDescription>Preencha os dados do item do PDV.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-[60px_1fr] gap-3">
+            <div className="grid grid-cols-[auto_1fr] gap-3 items-end">
               <div className="space-y-1.5">
                 <Label>Emoji</Label>
-                <Input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="bg-admin-bg border-admin-border text-center" maxLength={4} />
+                <EmojiPickerField value={form.emoji} onChange={(v) => setForm({ ...form, emoji: v })} />
               </div>
               <div className="space-y-1.5">
                 <Label>Nome</Label>
