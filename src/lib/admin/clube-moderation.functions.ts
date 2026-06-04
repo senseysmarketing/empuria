@@ -39,23 +39,22 @@ export const listAllComments = createServerFn({ method: "GET" })
     const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
     const lessonIds = Array.from(new Set(rows.map((r) => r.lesson_id)));
 
-    const [{ data: profs }, { data: lessons }, { data: favCount }, { data: certCount }] =
-      await Promise.all([
-        userIds.length
-          ? sb.from("profiles").select("id, full_name").in("id", userIds)
-          : Promise.resolve({ data: [] }),
-        lessonIds.length
-          ? sb.from("club_lessons").select("id, title").in("id", lessonIds)
-          : Promise.resolve({ data: [] }),
-        sb.from("club_lesson_favorites").select("id", { count: "exact", head: true }),
-        sb.from("club_certificates").select("id", { count: "exact", head: true }),
-      ]);
+    const [profRes, lessonRes, favRes, certRes] = await Promise.all([
+      userIds.length
+        ? sb.from("profiles").select("id, full_name").in("id", userIds)
+        : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+      lessonIds.length
+        ? sb.from("club_lessons").select("id, title").in("id", lessonIds)
+        : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+      sb.from("club_lesson_favorites").select("id", { count: "exact", head: true }),
+      sb.from("club_certificates").select("id", { count: "exact", head: true }),
+    ]);
 
     const nameMap = new Map(
-      (profs ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name])
+      ((profRes.data ?? []) as Array<{ id: string; full_name: string | null }>).map((p) => [p.id, p.full_name])
     );
     const lessonMap = new Map(
-      (lessons ?? []).map((l: { id: string; title: string }) => [l.id, l.title])
+      ((lessonRes.data ?? []) as Array<{ id: string; title: string }>).map((l) => [l.id, l.title])
     );
 
     return {
@@ -67,8 +66,8 @@ export const listAllComments = createServerFn({ method: "GET" })
       stats: {
         totalComments: rows.length,
         hiddenComments: rows.filter((r) => r.is_hidden).length,
-        totalFavorites: (favCount as number | null) ?? 0,
-        totalCertificates: (certCount as number | null) ?? 0,
+        totalFavorites: ((favRes as { count: number | null }).count ?? 0) as number,
+        totalCertificates: ((certRes as { count: number | null }).count ?? 0) as number,
       },
     };
   });
