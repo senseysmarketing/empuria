@@ -83,6 +83,13 @@ export function NewOrderWizard({
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [confirmFree, setConfirmFree] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<{
+    id: string;
+    reference: string | null;
+    paymentUrl: string | null;
+    method: PaymentMethod;
+  } | null>(null);
 
   const { data: services = [] } = useQuery({
     queryKey: ["admin-services-wizard"],
