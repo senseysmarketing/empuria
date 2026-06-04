@@ -1,17 +1,23 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { getClubContent } from "@/lib/portal/clube.functions";
 import { markLessonOpened, toggleLessonCompleted } from "@/lib/portal/clube-progress.functions";
+import { toggleLessonFavorite } from "@/lib/portal/clube-social.functions";
+import { claimCertificate, listMyCertificates } from "@/lib/portal/clube-certificates.functions";
 import { ClubHero } from "@/components/portal/ClubHero";
-import { ClubPlayer, type PlayerLesson } from "@/components/portal/ClubPlayer";
+import { ClubPlayer, type PlayerLesson, type SidebarLesson } from "@/components/portal/ClubPlayer";
 import { LessonCard } from "@/components/portal/LessonCard";
+import { LessonComments } from "@/components/portal/LessonComments";
 import { GridSkeleton } from "@/components/portal/PortalSkeleton";
 import {
   ArrowRight,
+  Award,
   Clock,
+  ExternalLink,
+  Heart,
   Lock,
   Megaphone,
   ShieldAlert,
@@ -55,11 +61,20 @@ function ClubePage() {
     queryKey: ["club-content"],
     queryFn: () => fetchContent(),
   });
+  const fetchCerts = useServerFn(listMyCertificates);
+  const { data: certsData } = useQuery({
+    queryKey: ["club-certificates"],
+    queryFn: () => fetchCerts(),
+    enabled: !!data?.isMember,
+  });
+
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
   const markOpened = useServerFn(markLessonOpened);
   const toggleCompleted = useServerFn(toggleLessonCompleted);
+  const toggleFav = useServerFn(toggleLessonFavorite);
+  const claimCert = useServerFn(claimCertificate);
 
   const openMutation = useMutation({
     mutationFn: (lessonId: string) => markOpened({ data: { lessonId } }),
@@ -69,11 +84,23 @@ function ClubePage() {
     mutationFn: (lessonId: string) => toggleCompleted({ data: { lessonId } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["club-content"] }),
   });
+  const favMutation = useMutation({
+    mutationFn: (lessonId: string) => toggleFav({ data: { lessonId } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["club-content"] }),
+  });
+  const claimMutation = useMutation({
+    mutationFn: (vars: { scope: "module" | "club"; moduleId: string | null }) =>
+      claimCert({ data: vars }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["club-certificates"] });
+      qc.invalidateQueries({ queryKey: ["club-content"] });
+    },
+  });
 
   const playerRef = useRef<HTMLDivElement | null>(null);
   const modulesRef = useRef<HTMLDivElement | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Lista plana ordenada
   const orderedLessons = useMemo(() => {
     if (!data) return [] as { lesson: RouteLesson; moduleId: string; moduleTitle: string }[];
     const out: { lesson: RouteLesson; moduleId: string; moduleTitle: string }[] = [];
@@ -84,6 +111,11 @@ function ClubePage() {
     }
     return out;
   }, [data]);
+
+  const favoriteIds = useMemo(
+    () => new Set(data?.favoriteLessonIds ?? []),
+    [data]
+  );
 
   const featured = orderedLessons.find((o) => o.lesson.is_featured && !o.lesson.is_coming_soon);
   const firstPlayable = orderedLessons.find((o) => !o.lesson.is_coming_soon);
@@ -123,7 +155,6 @@ function ClubePage() {
     });
   };
 
-  // Próxima aula (pula coming_soon)
   const currentIndex = selectedEntry
     ? orderedLessons.findIndex((o) => o.lesson.id === selectedEntry.lesson.id)
     : -1;
@@ -154,6 +185,65 @@ function ClubePage() {
   const playerLessonRaw = selectedEntry?.lesson ?? continueEntry?.lesson ?? null;
   const playerCompleted = !!playerLessonRaw?.completed_at;
 
+  // Sidebar do player: aulas do módulo atual
+  const playerModuleId = selectedEntry?.moduleId ?? continueEntry?.moduleId ?? null;
+  const sidebarLessons: SidebarLesson[] = useMemo(() => {
+    if (!playerModuleId || !data) return [];
+    const m = data.modules.find((mm) => mm.id === playerModuleId);
+    if (!m) return [];
+    return m.lessons.map((l) => {
+      const lesson = l as unknown as RouteLesson;
+      return {
+        id: lesson.id,
+        title: lesson.title,
+        duration_minutes: lesson.duration_minutes,
+        is_coming_soon: lesson.is_coming_soon,
+        completed: !!lesson.completed_at,
+      };
+    });
+  }, [playerModuleId, data]);
+
+  // Busca: aplaina e filtra
+  const searchActive = searchTerm.trim().length > 0;
+  const searchResults = useMemo(() => {
+    if (!searchActive) return [];
+    const t = searchTerm.trim().toLowerCase();
+    return orderedLessons.filter((o) =>
+      `${o.lesson.title} ${o.lesson.description ?? ""}`.toLowerCase().includes(t)
+    );
+  }, [searchActive, searchTerm, orderedLessons]);
+
+  // Favoritos
+  const favoriteEntries = useMemo(
+    () => orderedLessons.filter((o) => favoriteIds.has(o.lesson.id)),
+    [orderedLessons, favoriteIds]
+  );
+
+  // Progresso por módulo (para botão de emitir certificado)
+  const moduleProgress = useMemo(() => {
+    if (!data) return new Map<string, { total: number; done: number }>();
+    const map = new Map<string, { total: number; done: number }>();
+    for (const m of data.modules) {
+      const lessons = m.lessons.filter((l) => !(l as unknown as RouteLesson).is_coming_soon);
+      const done = lessons.filter(
+        (l) => !!(l as unknown as RouteLesson).completed_at
+      ).length;
+      map.set(m.id, { total: lessons.length, done });
+    }
+    return map;
+  }, [data]);
+
+  const allDone = useMemo(() => {
+    const playable = orderedLessons.filter((o) => !o.lesson.is_coming_soon);
+    return playable.length > 0 && playable.every((o) => !!o.lesson.completed_at);
+  }, [orderedLessons]);
+
+  const certificates = certsData?.certificates ?? [];
+  const hasClubCert = certificates.some((c) => c.scope === "club");
+  const moduleCertIds = new Set(
+    certificates.filter((c) => c.scope === "module").map((c) => c.module_id)
+  );
+
   return (
     <div className="space-y-10">
       <ClubHero
@@ -165,10 +255,12 @@ function ClubePage() {
         onContinue={continueEntry ? onContinue : undefined}
         onBrowseModules={onBrowseModules}
         whatsappUrl={data?.hubla.whatsappGroupUrl ?? null}
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
       />
 
       {/* COMUNICADOS */}
-      {data?.isMember && data.posts.length > 0 && (
+      {data?.isMember && data.posts.length > 0 && !searchActive && (
         <section>
           <div className="flex items-center gap-2 mb-3">
             <Megaphone className="h-4 w-4 text-admin-accent" />
@@ -216,9 +308,38 @@ function ClubePage() {
         />
       )}
 
+      {/* RESULTADOS DA BUSCA */}
+      {data?.isMember && searchActive && (
+        <section>
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-admin-ink-soft mb-3">
+            Resultados para "{searchTerm}" ({searchResults.length})
+          </h2>
+          {searchResults.length === 0 ? (
+            <p className="text-sm text-admin-ink-muted">Nenhuma aula encontrada.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {searchResults.map((o) => (
+                <div key={o.lesson.id} className="contents">
+                  <LessonCard
+                    lesson={o.lesson as never}
+                    moduleTitle={o.moduleTitle}
+                    comingSoon={o.lesson.is_coming_soon}
+                    active={selectedEntry?.lesson.id === o.lesson.id}
+                    completed={!!o.lesson.completed_at}
+                    favorited={favoriteIds.has(o.lesson.id)}
+                    onToggleFavorite={() => favMutation.mutate(o.lesson.id)}
+                    onSelect={() => selectLesson(o.lesson.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* PLAYER INLINE */}
-      {data?.isMember && (
-        <section ref={playerRef} className="scroll-mt-24">
+      {data?.isMember && !searchActive && (
+        <section ref={playerRef} className="scroll-mt-24 space-y-6">
           <ClubPlayer
             lesson={playerLesson}
             moduleTitle={
@@ -233,7 +354,10 @@ function ClubePage() {
             }
             onNext={nextEntry ? () => selectLesson(nextEntry.lesson.id) : undefined}
             nextTitle={nextEntry?.lesson.title ?? null}
+            sidebarLessons={sidebarLessons}
+            onSelectSidebar={selectLesson}
           />
+          {playerLessonRaw && <LessonComments lessonId={playerLessonRaw.id} />}
         </section>
       )}
 
@@ -247,68 +371,188 @@ function ClubePage() {
           </p>
         </div>
       ) : (
-        <div ref={modulesRef} className="space-y-12 scroll-mt-24">
-          {/* CONTINUE / COMECE POR AQUI */}
-          {data.isMember && continueEntry && (
-            <section>
-              <div className="mb-4 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-yellow-brand" />
-                <h2 className="font-display text-sm uppercase tracking-[0.25em] text-admin-ink-soft">
-                  {lastOpenedId && lastOpenedId === continueEntry.lesson.id
-                    ? "Continue assistindo"
-                    : "Comece por aqui"}
-                </h2>
-              </div>
-              <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-2 px-2">
-                <LessonCard
-                  size="lg"
-                  lesson={continueEntry.lesson as never}
-                  moduleTitle={continueEntry.moduleTitle}
-                  active={selectedEntry?.lesson.id === continueEntry.lesson.id}
-                  completed={!!continueEntry.lesson.completed_at}
-                  onSelect={() => selectLesson(continueEntry.lesson.id)}
-                />
-              </div>
-            </section>
-          )}
-
-          {data.modules.map((m) => (
-            <section key={m.id}>
-              <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-                <div>
-                  <h2 className="font-display text-2xl font-bold text-admin-ink">
-                    {m.title}
+        !searchActive && (
+          <div ref={modulesRef} className="space-y-12 scroll-mt-24">
+            {/* CONTINUE / COMECE POR AQUI */}
+            {data.isMember && continueEntry && (
+              <section>
+                <div className="mb-4 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-yellow-brand" />
+                  <h2 className="font-display text-sm uppercase tracking-[0.25em] text-admin-ink-soft">
+                    {lastOpenedId && lastOpenedId === continueEntry.lesson.id
+                      ? "Continue assistindo"
+                      : "Comece por aqui"}
                   </h2>
-                  {m.description && (
-                    <p className="mt-1 text-sm text-admin-ink-muted max-w-2xl font-body">
-                      {m.description}
-                    </p>
-                  )}
                 </div>
-                <span className="text-[11px] uppercase tracking-widest font-display text-admin-ink-muted">
-                  {m.lessons.length} aula{m.lessons.length === 1 ? "" : "s"}
-                </span>
-              </div>
-              <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-2 px-2">
-                {m.lessons.map((l) => {
-                  const lesson = l as unknown as RouteLesson;
-                  return (
+                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-2 px-2">
+                  <LessonCard
+                    size="lg"
+                    lesson={continueEntry.lesson as never}
+                    moduleTitle={continueEntry.moduleTitle}
+                    active={selectedEntry?.lesson.id === continueEntry.lesson.id}
+                    completed={!!continueEntry.lesson.completed_at}
+                    favorited={favoriteIds.has(continueEntry.lesson.id)}
+                    onToggleFavorite={() => favMutation.mutate(continueEntry.lesson.id)}
+                    onSelect={() => selectLesson(continueEntry.lesson.id)}
+                  />
+                </div>
+              </section>
+            )}
+
+            {/* MEUS FAVORITOS */}
+            {data.isMember && favoriteEntries.length > 0 && (
+              <section>
+                <div className="mb-4 flex items-center gap-2">
+                  <Heart className="h-4 w-4 text-orange-brand fill-orange-brand" />
+                  <h2 className="font-display text-sm uppercase tracking-[0.25em] text-admin-ink-soft">
+                    Meus favoritos
+                  </h2>
+                </div>
+                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-2 px-2">
+                  {favoriteEntries.map((o) => (
                     <LessonCard
-                      key={lesson.id}
-                      lesson={lesson as never}
-                      moduleTitle={m.title}
-                      locked={!data.isMember}
-                      comingSoon={lesson.is_coming_soon}
-                      active={selectedEntry?.lesson.id === lesson.id}
-                      completed={!!lesson.completed_at}
-                      onSelect={() => selectLesson(lesson.id)}
+                      key={o.lesson.id}
+                      lesson={o.lesson as never}
+                      moduleTitle={o.moduleTitle}
+                      comingSoon={o.lesson.is_coming_soon}
+                      active={selectedEntry?.lesson.id === o.lesson.id}
+                      completed={!!o.lesson.completed_at}
+                      favorited
+                      onToggleFavorite={() => favMutation.mutate(o.lesson.id)}
+                      onSelect={() => selectLesson(o.lesson.id)}
                     />
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {data.modules.map((m) => {
+              const prog = moduleProgress.get(m.id);
+              const moduleDone = prog && prog.total > 0 && prog.done === prog.total;
+              const hasCert = moduleCertIds.has(m.id);
+              return (
+                <section key={m.id}>
+                  <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                      <h2 className="font-display text-2xl font-bold text-admin-ink">
+                        {m.title}
+                      </h2>
+                      {m.description && (
+                        <p className="mt-1 text-sm text-admin-ink-muted max-w-2xl font-body">
+                          {m.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] uppercase tracking-widest font-display text-admin-ink-muted">
+                        {m.lessons.length} aula{m.lessons.length === 1 ? "" : "s"}
+                        {prog && prog.total > 0 ? ` · ${prog.done}/${prog.total}` : ""}
+                      </span>
+                      {data.isMember && moduleDone && !hasCert && (
+                        <button
+                          onClick={() =>
+                            claimMutation.mutate({ scope: "module", moduleId: m.id })
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-brand/40 bg-yellow-brand/10 px-3 py-1.5 text-[11px] font-display uppercase tracking-wider text-yellow-brand hover:bg-yellow-brand/20"
+                        >
+                          <Award className="h-3.5 w-3.5" /> Emitir certificado
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-2 px-2">
+                    {m.lessons.map((l) => {
+                      const lesson = l as unknown as RouteLesson;
+                      return (
+                        <LessonCard
+                          key={lesson.id}
+                          lesson={lesson as never}
+                          moduleTitle={m.title}
+                          locked={!data.isMember}
+                          comingSoon={lesson.is_coming_soon}
+                          active={selectedEntry?.lesson.id === lesson.id}
+                          completed={!!lesson.completed_at}
+                          favorited={favoriteIds.has(lesson.id)}
+                          onToggleFavorite={
+                            data.isMember
+                              ? () => favMutation.mutate(lesson.id)
+                              : undefined
+                          }
+                          onSelect={() => selectLesson(lesson.id)}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+
+            {/* MINHAS CONQUISTAS */}
+            {data.isMember && (
+              <section className="rounded-3xl border border-admin-border bg-admin-surface p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Award className="h-4 w-4 text-yellow-brand" />
+                  <h2 className="font-display text-sm uppercase tracking-[0.25em] text-admin-ink-soft">
+                    Minhas conquistas
+                  </h2>
+                </div>
+                {certificates.length === 0 ? (
+                  <p className="text-sm text-admin-ink-muted">
+                    Conclua todas as aulas de um módulo ou do Clube inteiro para emitir
+                    seu certificado.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {certificates.map((c) => {
+                      const moduleTitle =
+                        c.scope === "module"
+                          ? data.modules.find((m) => m.id === c.module_id)?.title ?? "Módulo"
+                          : "Clube do Imigrante";
+                      return (
+                        <Link
+                          key={c.id}
+                          to="/portal/clube/certificado/$code"
+                          params={{ code: c.code }}
+                          target="_blank"
+                          className="rounded-xl border border-yellow-brand/40 bg-yellow-brand/5 p-4 hover:bg-yellow-brand/10 transition"
+                        >
+                          <div className="flex items-center gap-2 text-yellow-brand">
+                            <Award className="h-4 w-4" />
+                            <span className="text-[10px] uppercase tracking-widest font-display">
+                              {c.scope === "club" ? "Clube completo" : "Módulo"}
+                            </span>
+                          </div>
+                          <p className="mt-2 font-display text-sm font-bold text-admin-ink">
+                            {moduleTitle}
+                          </p>
+                          <p className="text-[11px] text-admin-ink-muted mt-1">
+                            {new Date(c.issued_at).toLocaleDateString("pt-BR")} · {c.code}
+                          </p>
+                          <span className="mt-3 inline-flex items-center gap-1 text-[11px] text-admin-accent">
+                            Ver certificado <ExternalLink className="h-3 w-3" />
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {allDone && !hasClubCert && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() =>
+                        claimMutation.mutate({ scope: "club", moduleId: null })
+                      }
+                      className="inline-flex items-center gap-2 rounded-xl bg-orange-brand px-5 py-2.5 text-xs font-display uppercase tracking-wider text-white hover:bg-orange-brand/90 shadow-lg"
+                    >
+                      <Award className="h-4 w-4" /> Emitir certificado do Clube
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
+        )
       )}
     </div>
   );
