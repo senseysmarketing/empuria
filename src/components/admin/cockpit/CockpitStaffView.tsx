@@ -1,7 +1,7 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { BentoCard } from "@/components/admin/BentoCard";
-import { MetricTile } from "@/components/admin/MetricTile";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { getCockpitMetrics } from "@/lib/admin/cockpit.functions";
 import { listCalendarTasks } from "@/lib/admin/calendar-tasks.functions";
 import { CalendarClock, ListTodo, Users, Bell } from "lucide-react";
