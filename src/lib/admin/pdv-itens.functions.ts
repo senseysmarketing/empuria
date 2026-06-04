@@ -44,6 +44,11 @@ const itemSchema = z.object({
   stock_min_quantity: z.number().int().min(0).max(1_000_000).default(0),
 });
 
+function friendlyItemError(error: { code?: string; message: string }): Error {
+  if (error.code === "23505") return new Error("Já existe um item com este nome.");
+  return new Error(error.message);
+}
+
 export const createPdvItem = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv_itens")])
   .inputValidator((d) => itemSchema.parse(d))
@@ -54,7 +59,7 @@ export const createPdvItem = createServerFn({ method: "POST" })
       .insert({ ...data, category: legacy })
       .select("id")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw friendlyItemError(error);
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
       action: "pdv_item.created",
@@ -77,7 +82,7 @@ export const updatePdvItem = createServerFn({ method: "POST" })
       finalPatch.category = await resolveLegacyEnum(patch.category_id);
     }
     const { error } = await supabaseAdmin.from("products").update(finalPatch).eq("id", id);
-    if (error) throw new Error(error.message);
+    if (error) throw friendlyItemError(error);
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
       action: "pdv_item.updated",
