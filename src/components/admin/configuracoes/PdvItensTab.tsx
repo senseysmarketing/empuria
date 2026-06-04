@@ -183,22 +183,17 @@ export function PdvItensTab() {
   return (
     <BentoCard padded={false}>
       <div className="p-5 border-b border-admin-border space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h3 className="font-display text-lg text-admin-ink">Itens do PDV</h3>
             <p className="text-xs text-admin-ink-muted mt-1">{items.length} itens cadastrados</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setCategoriesOpen(true)} className="border-admin-border">
-              <Tags className="h-4 w-4" /> Gerenciar Categorias
-            </Button>
-            <Button onClick={openCreate} className="bg-admin-accent text-white">
-              <Plus className="h-4 w-4" /> Novo item
-            </Button>
-          </div>
+          <span className="text-xs text-admin-ink-muted tabular-nums mt-1">
+            {filtered.length} de {items.length} {items.length === 1 ? "item" : "itens"}
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <div className="relative flex-1 min-w-[220px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-admin-ink-muted" />
             <Input
               value={search}
@@ -232,9 +227,14 @@ export function PdvItensTab() {
               <SelectItem value="inactive">Inativos</SelectItem>
             </SelectContent>
           </Select>
-          <span className="ml-auto text-xs text-admin-ink-muted tabular-nums">
-            {filtered.length} de {items.length} {items.length === 1 ? "item" : "itens"}
-          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" onClick={() => setCategoriesOpen(true)} className="border-admin-border h-9">
+              <Tags className="h-4 w-4" /> Gerenciar Categorias
+            </Button>
+            <Button onClick={openCreate} className="bg-admin-accent text-white h-9">
+              <Plus className="h-4 w-4" /> Novo item
+            </Button>
+          </div>
         </div>
       </div>
 
