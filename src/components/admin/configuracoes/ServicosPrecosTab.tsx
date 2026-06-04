@@ -128,7 +128,7 @@ export function ServicosPrecosTab() {
       <EditServicePriceDialog
         service={editing}
         open={!!editing}
-        onOpenChange={(o) => !o && setEditing(null)}
+        onOpenChange={(o: boolean) => !o && setEditing(null)}
         onSaved={async () => {
           setEditing(null);
           await servicesQ.refetch();
