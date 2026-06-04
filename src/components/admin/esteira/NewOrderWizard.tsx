@@ -194,13 +194,13 @@ export function NewOrderWizard({
       let paymentUrl: string | null = null;
       if (effectiveMethod === "mercadopago") {
         try {
-          const link = await genLink({ data: { id: created.id } });
+          const baseUrl =
+            typeof window !== "undefined" ? window.location.origin : undefined;
+          const link = await genLink({ data: { id: created.id, baseUrl } });
           reference = link.reference ?? `EMP-${created.id}`;
+          paymentUrl = link.url ?? null;
         } catch (e) {
           toast.error(e instanceof Error ? e.message : "Não foi possível preparar o link MP");
-        }
-        if (typeof window !== "undefined") {
-          paymentUrl = `${window.location.origin}/portal/servicos?order=${created.id}`;
         }
       }
       setCreatedOrder({ id: created.id, reference, paymentUrl, method: effectiveMethod });
