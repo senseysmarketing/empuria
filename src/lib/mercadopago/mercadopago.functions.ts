@@ -243,6 +243,27 @@ function maskedSetting(setting: MercadoPagoSetting): MercadoPagoSetting {
     ...setting,
     access_token: setting.access_token ? "********" : null,
     webhook_secret: setting.webhook_secret ? "********" : null,
+    test_access_token: setting.test_access_token ? "********" : null,
+    test_webhook_secret: setting.test_webhook_secret ? "********" : null,
+    prod_access_token: setting.prod_access_token ? "********" : null,
+    prod_webhook_secret: setting.prod_webhook_secret ? "********" : null,
+  };
+}
+
+function applyEnvironmentCredentials(row: MercadoPagoSetting): MercadoPagoSetting {
+  if (row.environment === "production") {
+    return {
+      ...row,
+      public_key: row.prod_public_key ?? null,
+      access_token: row.prod_access_token ?? null,
+      webhook_secret: row.prod_webhook_secret ?? null,
+    };
+  }
+  return {
+    ...row,
+    public_key: row.test_public_key ?? null,
+    access_token: row.test_access_token ?? null,
+    webhook_secret: row.test_webhook_secret ?? null,
   };
 }
 
@@ -253,13 +274,19 @@ async function getMercadoPagoSetting(includeSecrets = false): Promise<MercadoPag
     .eq("provider", "mercadopago")
     .maybeSingle();
   if (error) throw new Error(error.message);
-  const row = (data as MercadoPagoSetting | null) ?? {
+  const base: MercadoPagoSetting = (data as MercadoPagoSetting | null) ?? {
     provider: "mercadopago",
     is_enabled: false,
     environment: "test",
     public_key: null,
     access_token: null,
     webhook_secret: null,
+    test_public_key: null,
+    test_access_token: null,
+    test_webhook_secret: null,
+    prod_public_key: null,
+    prod_access_token: null,
+    prod_webhook_secret: null,
     default_currency: "BRL",
     statement_descriptor: "EMPURIA",
     pix_enabled: true,
@@ -269,7 +296,8 @@ async function getMercadoPagoSetting(includeSecrets = false): Promise<MercadoPag
     boleto_expiration_days: 3,
     last_event_at: null,
   };
-  return includeSecrets ? row : maskedSetting(row);
+  const withActive = applyEnvironmentCredentials(base);
+  return includeSecrets ? withActive : maskedSetting(withActive);
 }
 
 async function mpFetch<T>(
