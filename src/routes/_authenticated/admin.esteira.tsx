@@ -645,14 +645,6 @@ function EsteiraPage() {
   );
 }
 
-function Tile({ label, value }: { label: string; value: number | string }) {
-  return (
-    <BentoCard padded>
-      <div className="text-[10px] uppercase tracking-wider text-admin-ink-muted">{label}</div>
-      <div className="font-display text-2xl text-admin-ink mt-1 tabular-nums">{value}</div>
-    </BentoCard>
-  );
-}
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
