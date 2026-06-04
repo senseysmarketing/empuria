@@ -153,10 +153,17 @@ export function NewOrderWizard({
   };
 
   const onSelectService = (id: string) => {
-    const s = services.find((x) => x.id === id);
+    const s = services.find((x) => x.id === id) as Service | undefined;
     if (s) {
-      setService(s as Service);
-      setAmount(((s.price_cents ?? 0) / 100).toFixed(2));
+      setService(s);
+      const brl = s.online_price_cents ?? 0;
+      if (brl > 0) {
+        setAmount((brl / 100).toFixed(2));
+        setCurrency("BRL");
+      } else {
+        setAmount(((s.price_cents ?? 0) / 100).toFixed(2));
+        setCurrency("EUR");
+      }
     }
   };
 
