@@ -102,10 +102,11 @@ export function ClubPlayer({
                 />
                 {isDrive && (
                   <div
-                    className="absolute top-2 right-2 h-12 w-12 rounded-2xl bg-[oklch(0.22_0.07_38)] ring-1 ring-yellow-brand/30 flex items-center justify-center shadow-lg pointer-events-none"
+                    className="absolute top-1.5 right-1.5 h-14 w-14 rounded-2xl bg-[oklch(0.22_0.07_38)] ring-1 ring-yellow-brand/30 flex items-center justify-center shadow-lg z-10 cursor-default"
                     aria-hidden="true"
+                    onClick={(e) => e.preventDefault()}
                   >
-                    <img src={logoIcone} alt="" className="h-7 w-7 object-contain opacity-90" />
+                    <img src={logoIcone} alt="" className="h-8 w-8 object-contain opacity-90" />
                   </div>
                 )}
               </>
