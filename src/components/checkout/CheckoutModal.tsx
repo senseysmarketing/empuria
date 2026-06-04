@@ -734,13 +734,13 @@ export function CheckoutModal({
                         <img
                           src={`data:image/png;base64,${payment.qrCodeBase64}`}
                           alt="QR Pix"
-                          className="h-auto w-full max-w-[220px] rounded-lg border border-border bg-white p-2"
+                          className={`h-auto w-full max-w-[220px] rounded-lg border border-border bg-white p-2 ${pixExpired ? "opacity-40 grayscale" : ""}`}
                         />
                       ) : qrUrl ? (
                         <img
                           src={qrUrl}
                           alt="QR Pix"
-                          className="h-auto w-full max-w-[220px] rounded-lg border border-border bg-white p-2"
+                          className={`h-auto w-full max-w-[220px] rounded-lg border border-border bg-white p-2 ${pixExpired ? "opacity-40 grayscale" : ""}`}
                         />
                       ) : (
                         <div className="flex h-[220px] w-[220px] items-center justify-center">
@@ -749,6 +749,32 @@ export function CheckoutModal({
                       )}
                     </div>
                     <CopyBlock label="Pix copia e cola" value={payment.qrCode} />
+                    {pixCountdown !== null && !pixExpired && (
+                      <p className="text-xs text-brown-deep/60">
+                        PIX válido por 30 minutos · expira em{" "}
+                        <strong className="font-mono tabular-nums text-orange-brand">
+                          {pixCountdown}
+                        </strong>
+                      </p>
+                    )}
+                    {pixExpired && (
+                      <div className="space-y-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-brand/10 px-3 py-1 text-[11px] font-display uppercase tracking-wider text-red-brand">
+                          Pix expirado
+                        </span>
+                        <Button
+                          onClick={() => generatePayment("pix")}
+                          disabled={paymentLoading === "pix" || !mpConfig?.enabled}
+                          className="w-full bg-orange-brand text-offwhite hover:bg-red-brand"
+                        >
+                          {paymentLoading === "pix" ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Gerar novo PIX"
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <Button
