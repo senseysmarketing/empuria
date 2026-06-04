@@ -271,7 +271,7 @@ function ContentDialog({
   const submit = async () => {
     if (!canSave) return;
     try {
-      await upsert({ data: { id: editing?.id, ...form } });
+      await upsert({ data: { id: editing?.id, ...form, video_source_url: form.video_url } });
       toast.success("Salvo");
       onOpenChange(false);
       onSaved();
