@@ -9,6 +9,10 @@ import type { Json } from "@/integrations/supabase/types";
 type PaymentMethod = "pix" | "boleto" | "credit_card";
 type OrderPaymentStatus = "pendente" | "aprovado" | "recusado" | "estornado";
 
+// Mercado Pago exige no mínimo ~30 min para `date_of_expiration` de PIX dinâmico em produção;
+// valores menores fazem o pagamento ser marcado como `cancelled/expired` em segundos.
+const PIX_EXPIRATION_MINUTES = 30;
+
 type MercadoPagoSetting = {
   provider: "mercadopago";
   is_enabled: boolean;
@@ -583,7 +587,7 @@ export const saveMercadoPagoSettings = createServerFn({ method: "POST" })
         pix_enabled: z.boolean(),
         boleto_enabled: z.boolean(),
         card_enabled: z.boolean(),
-        pix_expiration_minutes: z.number().int().min(5).max(1440),
+        pix_expiration_minutes: z.number().int().min(5).max(1440).optional(),
         boleto_expiration_days: z.number().int().min(1).max(30),
       })
       .parse(d),
@@ -598,7 +602,7 @@ export const saveMercadoPagoSettings = createServerFn({ method: "POST" })
       pix_enabled: data.pix_enabled,
       boleto_enabled: data.boleto_enabled,
       card_enabled: data.card_enabled,
-      pix_expiration_minutes: data.pix_expiration_minutes,
+      pix_expiration_minutes: PIX_EXPIRATION_MINUTES,
       boleto_expiration_days: data.boleto_expiration_days,
     };
     // Persist explicit nulls when the user clears a field; only "undefined" means "keep".
@@ -801,7 +805,7 @@ export const createMercadoPagoPayment = createServerFn({ method: "POST" })
     const idempotencyKey = randomId();
     const fallbackExpiresAt =
       data.method === "pix"
-        ? new Date(Date.now() + setting.pix_expiration_minutes * 60000).toISOString()
+        ? new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60000).toISOString()
         : data.method === "boleto"
           ? new Date(Date.now() + setting.boleto_expiration_days * 86400000).toISOString()
           : null;
