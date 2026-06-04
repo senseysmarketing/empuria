@@ -59,7 +59,7 @@ function CockpitAdminPage() {
           <MetricTile
             className="col-span-12 sm:col-span-6 lg:col-span-3"
             label="Vendas hoje"
-            value={`€ ${m.salesToday.toFixed(2)}`}
+            value={salesLabel}
             hint="Esteira 1 (pagas)"
             icon={Euro}
             accent="success"
