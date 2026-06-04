@@ -19,12 +19,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Search, UserPlus, AlertTriangle } from "lucide-react";
+import { Search, UserPlus, AlertTriangle, CheckCircle2, Copy, Link2 } from "lucide-react";
 import { listServicesAdmin } from "@/lib/admin/slots.functions";
 import {
   searchCustomers,
   createCustomerLite,
   createOrderFull,
+  generatePaymentLink,
 } from "@/lib/admin/esteira.functions";
 import { useQuery } from "@tanstack/react-query";
 
@@ -59,6 +60,7 @@ export function NewOrderWizard({
   const createCustomer = useServerFn(createCustomerLite);
   const fetchServices = useServerFn(listServicesAdmin);
   const createOrder = useServerFn(createOrderFull);
+  const genLink = useServerFn(generatePaymentLink);
 
   const [step, setStep] = useState(1);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -81,6 +83,13 @@ export function NewOrderWizard({
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [confirmFree, setConfirmFree] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<{
+    id: string;
+    reference: string | null;
+    paymentUrl: string | null;
+    method: PaymentMethod;
+  } | null>(null);
 
   const { data: services = [] } = useQuery({
     queryKey: ["admin-services-wizard"],
@@ -105,6 +114,8 @@ export function NewOrderWizard({
       setReason("");
       setNotes("");
       setConfirmFree(false);
+      setSubmitting(false);
+      setCreatedOrder(null);
     }
   }, [open]);
 
@@ -147,17 +158,21 @@ export function NewOrderWizard({
   const payCents = payAmount ? Math.round(parseFloat(payAmount) * 100) : amountCents;
   const isFree = amountCents === 0;
 
+  const mpNeedsBrl = !isFree && method === "mercadopago" && payCurrency !== "BRL";
+
   const canSubmit =
     customer &&
     (serviceMode === "cadastrado" ? !!service : customTitle.length >= 2) &&
     amount !== "" &&
     (!isFree || confirmFree) &&
-    (method !== "manual" || reason.length >= 3);
+    (method !== "manual" || reason.length >= 3) &&
+    !mpNeedsBrl;
 
   const submit = async () => {
-    if (!canSubmit || !customer) return;
+    if (!canSubmit || !customer || submitting) return;
+    setSubmitting(true);
     try {
-      await createOrder({
+      const created = await createOrder({
         data: {
           user_id: customer.id,
           customer_name: customer.full_name ?? "Sem nome",
@@ -174,12 +189,34 @@ export function NewOrderWizard({
           notes: notes || undefined,
         },
       });
+      const effectiveMethod: PaymentMethod = isFree ? "gratuito" : method;
+      let reference: string | null = null;
+      let paymentUrl: string | null = null;
+      if (effectiveMethod === "mercadopago") {
+        try {
+          const link = await genLink({ data: { id: created.id } });
+          reference = link.reference ?? `EMP-${created.id}`;
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Não foi possível preparar o link MP");
+        }
+        if (typeof window !== "undefined") {
+          paymentUrl = `${window.location.origin}/portal/servicos?order=${created.id}`;
+        }
+      }
+      setCreatedOrder({ id: created.id, reference, paymentUrl, method: effectiveMethod });
+      setStep(5);
       toast.success("Pedido criado");
       onCreated();
-      onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado`);
   };
 
   return (
@@ -188,7 +225,7 @@ export function NewOrderWizard({
         <DialogHeader>
           <DialogTitle>Novo pedido</DialogTitle>
           <DialogDescription>
-            Etapa {step} de 4 · {stepLabel(step)}
+            {step === 5 ? "Conclusão" : `Etapa ${step} de 4 · ${stepLabel(step)}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -349,6 +386,11 @@ export function NewOrderWizard({
                     <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
+                {method === "mercadopago" && payCurrency !== "BRL" && !isFree && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Mercado Pago só processa em Reais (BRL). Selecione BRL para gerar o link.
+                  </p>
+                )}
               </div>
               {currency !== payCurrency && (
                 <div className="col-span-2">
@@ -403,6 +445,16 @@ export function NewOrderWizard({
                 </SelectContent>
               </Select>
             </div>
+            {mpNeedsBrl && (
+              <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
+                <div>
+                  <strong>Cobrança precisa estar em BRL.</strong> Mercado Pago só processa em Reais.
+                  Volte para a etapa 3 e ajuste a moeda de cobrança para <strong>BRL</strong>, ou
+                  troque a forma de pagamento.
+                </div>
+              </div>
+            )}
             {method === "manual" && (
               <div>
                 <Label>Motivo do pagamento manual *</Label>
@@ -424,34 +476,116 @@ export function NewOrderWizard({
           </div>
         )}
 
+        {step === 5 && createdOrder && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 rounded border border-emerald-200 bg-emerald-50">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
+              <div>
+                <div className="font-medium text-emerald-900">Pedido criado com sucesso</div>
+                <div className="text-xs text-emerald-800/80">
+                  {customer?.full_name} ·{" "}
+                  {serviceMode === "cadastrado" ? service?.title : customTitle}
+                </div>
+              </div>
+            </div>
+
+            {createdOrder.method === "mercadopago" && (
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  Aguardando confirmação do Mercado Pago. O pedido será atualizado automaticamente
+                  quando o pagamento for concluído.
+                </div>
+                {createdOrder.paymentUrl && (
+                  <div>
+                    <Label>Link de pagamento</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input readOnly value={createdOrder.paymentUrl} className="font-mono text-xs" />
+                      <Button
+                        variant="outline"
+                        onClick={() => copy(createdOrder.paymentUrl!, "Link")}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button asChild variant="outline">
+                        <a href={createdOrder.paymentUrl} target="_blank" rel="noreferrer">
+                          <Link2 className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Envie este link ao cliente. Ele conclui o pagamento (Pix/Boleto) pelo portal.
+                    </p>
+                  </div>
+                )}
+                {createdOrder.reference && (
+                  <div>
+                    <Label>Referência Mercado Pago</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input readOnly value={createdOrder.reference} className="font-mono text-xs" />
+                      <Button
+                        variant="outline"
+                        onClick={() => copy(createdOrder.reference!, "Referência")}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {createdOrder.method !== "mercadopago" && (
+              <div className="text-sm text-muted-foreground">
+                {createdOrder.method === "gratuito"
+                  ? "Pedido registrado como gratuito."
+                  : "Pagamento marcado como recebido manualmente."}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex justify-between pt-4 border-t">
-          <Button
-            variant="ghost"
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
-            disabled={step === 1}
-          >
-            Voltar
-          </Button>
-          {step < 4 ? (
-            <Button
-              onClick={() => setStep((s) => s + 1)}
-              disabled={
-                (step === 1 && !customer) ||
-                (step === 2 &&
-                  (serviceMode === "cadastrado" ? !service : customTitle.length < 2)) ||
-                (step === 3 && (amount === "" || (isFree && !confirmFree)))
-              }
-            >
-              Próximo
-            </Button>
+          {step === 5 ? (
+            <>
+              <span />
+              <Button
+                onClick={() => onOpenChange(false)}
+                className="bg-admin-accent hover:bg-admin-accent/90"
+              >
+                Fechar
+              </Button>
+            </>
           ) : (
-            <Button
-              onClick={submit}
-              disabled={!canSubmit}
-              className="bg-admin-accent hover:bg-admin-accent/90"
-            >
-              Criar pedido
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => setStep((s) => Math.max(1, s - 1))}
+                disabled={step === 1}
+              >
+                Voltar
+              </Button>
+              {step < 4 ? (
+                <Button
+                  onClick={() => setStep((s) => s + 1)}
+                  disabled={
+                    (step === 1 && !customer) ||
+                    (step === 2 &&
+                      (serviceMode === "cadastrado" ? !service : customTitle.length < 2)) ||
+                    (step === 3 && (amount === "" || (isFree && !confirmFree)))
+                  }
+                >
+                  Próximo
+                </Button>
+              ) : (
+                <Button
+                  onClick={submit}
+                  disabled={!canSubmit || submitting}
+                  className="bg-admin-accent hover:bg-admin-accent/90"
+                >
+                  {submitting ? "Criando..." : "Criar pedido"}
+                </Button>
+              )}
+            </>
           )}
         </div>
       </DialogContent>

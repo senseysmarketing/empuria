@@ -13,6 +13,8 @@ import {
 } from "@/lib/admin/esteira.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,7 @@ import {
   Copy,
   Ban,
   RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -111,6 +114,13 @@ function EsteiraPage() {
     order: Order;
   } | null>(null);
   const [reasonInput, setReasonInput] = useState("");
+  const [linkModal, setLinkModal] = useState<{
+    order: Order;
+    loading: boolean;
+    reference: string | null;
+    paymentUrl: string | null;
+    error: string | null;
+  } | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
@@ -180,14 +190,48 @@ function EsteiraPage() {
     refresh();
   };
 
-  const doGenLink = async (id: string) => {
+  const doGenLink = async (o: Order) => {
+    const cur = (o.payment_currency ?? o.currency ?? "EUR").toUpperCase();
+    if (cur !== "BRL") {
+      setLinkModal({
+        order: o,
+        loading: false,
+        reference: null,
+        paymentUrl: null,
+        error:
+          "Mercado Pago só processa em Reais (BRL). Edite o pedido para usar moeda BRL antes de gerar o link.",
+      });
+      return;
+    }
+    setLinkModal({ order: o, loading: true, reference: null, paymentUrl: null, error: null });
     try {
-      const r = await genLink({ data: { id } });
-      toast.info(r.message ?? "Link gerado");
+      const r = await genLink({ data: { id: o.id } });
+      const url =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/portal/servicos?order=${o.id}`
+          : null;
+      setLinkModal({
+        order: o,
+        loading: false,
+        reference: r.reference ?? `EMP-${o.id}`,
+        paymentUrl: url,
+        error: null,
+      });
       refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro");
+      setLinkModal({
+        order: o,
+        loading: false,
+        reference: null,
+        paymentUrl: null,
+        error: e instanceof Error ? e.message : "Erro ao gerar link",
+      });
     }
+  };
+
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado`);
   };
 
   const runPrompt = async () => {
@@ -297,8 +341,32 @@ function EsteiraPage() {
                     <td className="px-4 py-3 text-admin-ink-soft">{o.service_title}</td>
                     {canViewFinancials && (
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {o.currency === "BRL" ? "R$" : "€"}{" "}
-                        {(((o.amount_cents ?? 0)) / 100).toFixed(2)}
+                        {(() => {
+                          const cur = o.currency ?? "EUR";
+                          const payCur = o.payment_currency ?? cur;
+                          const payCents = o.payment_amount_cents ?? o.amount_cents ?? 0;
+                          if (cur === "BRL") {
+                            return <div>R$ {((o.amount_cents ?? 0) / 100).toFixed(2)}</div>;
+                          }
+                          if (payCur === "BRL") {
+                            return (
+                              <div>
+                                <div>R$ {(payCents / 100).toFixed(2)}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  ({cur === "EUR" ? "€" : cur} {((o.amount_cents ?? 0) / 100).toFixed(2)})
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div>
+                              <div className="text-admin-ink-muted">R$ —</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {cur === "EUR" ? "€" : cur} {((o.amount_cents ?? 0) / 100).toFixed(2)}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                     )}
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -347,7 +415,7 @@ function EsteiraPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => doGenLink(o.id)}>
+                          <DropdownMenuItem onClick={() => doGenLink(o)}>
                             <Link2 className="h-4 w-4 mr-2" /> Gerar link de pagamento
                           </DropdownMenuItem>
                           {o.payment_provider_reference && (
@@ -432,6 +500,66 @@ function EsteiraPage() {
               >
                 Baixar PNG
               </a>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!linkModal} onOpenChange={(o) => !o && setLinkModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link de pagamento Mercado Pago</DialogTitle>
+          </DialogHeader>
+          {linkModal && (
+            <div className="space-y-3 text-sm">
+              <div className="text-xs text-muted-foreground">
+                Pedido · {linkModal.order.customer_name} · {linkModal.order.service_title}
+              </div>
+              {linkModal.error && (
+                <div className="border border-amber-300 bg-amber-50 rounded p-3 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
+                  <div>{linkModal.error}</div>
+                </div>
+              )}
+              {linkModal.loading && (
+                <div className="text-muted-foreground">Preparando link...</div>
+              )}
+              {linkModal.paymentUrl && (
+                <div>
+                  <Label>Link de pagamento</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input readOnly value={linkModal.paymentUrl} className="font-mono text-xs" />
+                    <Button variant="outline" onClick={() => copy(linkModal.paymentUrl!, "Link")}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button asChild variant="outline">
+                      <a href={linkModal.paymentUrl} target="_blank" rel="noreferrer">
+                        <Link2 className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Envie ao cliente. Ele conclui o pagamento (Pix/Boleto) pelo portal.
+                  </p>
+                </div>
+              )}
+              {linkModal.reference && (
+                <div>
+                  <Label>Referência</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input readOnly value={linkModal.reference} className="font-mono text-xs" />
+                    <Button
+                      variant="outline"
+                      onClick={() => copy(linkModal.reference!, "Referência")}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setLinkModal(null)}>Fechar</Button>
+              </div>
             </div>
           )}
         </DialogContent>
