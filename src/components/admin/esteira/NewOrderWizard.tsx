@@ -513,7 +513,7 @@ export function NewOrderWizard({
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Envie este link ao cliente. Ele conclui o pagamento (Pix/Boleto) pelo portal.
+                      Envie este link ao cliente. Ele concluiu o pagamento (Pix ou cartão) sem precisar fazer login.
                     </p>
                   </div>
                 )}
