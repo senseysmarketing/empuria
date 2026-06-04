@@ -272,6 +272,8 @@ export function CheckoutModal({
   const [securityCode, setSecurityCode] = useState("");
   const [installments, setInstallments] = useState(1);
   const [now, setNow] = useState(() => Date.now());
+  const [cepLoading, setCepLoading] = useState(false);
+  const [boletoError, setBoletoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
