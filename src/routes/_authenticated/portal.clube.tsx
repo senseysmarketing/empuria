@@ -29,6 +29,10 @@ type LessonWithFiles = {
   title: string;
   description: string | null;
   video_url: string | null;
+  video_provider: string | null;
+  video_file_id: string | null;
+  video_embed_url: string | null;
+  video_source_url: string | null;
   thumbnail_url: string | null;
   duration_minutes: number | null;
   position: number;
@@ -184,18 +188,27 @@ function ClubePage() {
         </div>
       )}
 
-      <LessonModal lesson={selected} onClose={() => setSelected(null)} />
+      <LessonModal lesson={selected} watermark={data?.memberName ?? null} onClose={() => setSelected(null)} />
     </div>
   );
 }
 
-function LessonModal({ lesson, onClose }: { lesson: LessonWithFiles | null; onClose: () => void }) {
+function LessonModal({ lesson, watermark, onClose }: { lesson: LessonWithFiles | null; watermark: string | null; onClose: () => void }) {
   const video: ClubVideo | null = lesson
-    ? { id: lesson.id, title: lesson.title, description: null, video_url: lesson.video_url }
+    ? {
+        id: lesson.id,
+        title: lesson.title,
+        description: null,
+        video_url: lesson.video_url,
+        video_provider: lesson.video_provider,
+        video_file_id: lesson.video_file_id,
+        video_embed_url: lesson.video_embed_url,
+        video_source_url: lesson.video_source_url,
+      }
     : null;
   return (
     <>
-      <VideoPlayerModal video={video} open={!!lesson} onOpenChange={(o) => !o && onClose()} />
+      <VideoPlayerModal video={video} watermark={watermark} open={!!lesson} onOpenChange={(o) => !o && onClose()} />
       {/* Materials overlay rendered inside the modal via custom dialog isn't trivial; instead show them as a panel below the video by enhancing description. Simpler: nothing here — files live in description block of next iteration. */}
       {lesson && lesson.files && lesson.files.length > 0 && (
         <div className="fixed bottom-6 right-6 z-[60] w-80 rounded-xl border border-admin-border bg-admin-surface shadow-[var(--shadow-admin-hover)] p-4">
