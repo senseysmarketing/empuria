@@ -1,4 +1,4 @@
-import { CheckCircle2, Crown, MessageCircle, Play, Sparkles } from "lucide-react";
+import { CheckCircle2, Crown, MessageCircle, Play, Search, Sparkles, X } from "lucide-react";
 
 // SVG de textura igual ao do PassportCard (círculos concêntricos + ondas em dourado)
 const PASSPORT_TEXTURE =
@@ -13,6 +13,8 @@ export function ClubHero({
   onContinue,
   onBrowseModules,
   whatsappUrl,
+  searchValue,
+  onSearchChange,
 }: {
   title: string;
   subtitle: string;
@@ -22,6 +24,8 @@ export function ClubHero({
   onContinue?: () => void;
   onBrowseModules?: () => void;
   whatsappUrl?: string | null;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }) {
   return (
     <header className="relative overflow-hidden rounded-3xl border border-white/10 isolate">
@@ -87,6 +91,27 @@ export function ClubHero({
                     className="inline-flex items-center gap-2 rounded-xl border border-offwhite/20 bg-white/5 backdrop-blur px-5 py-3 font-display text-xs uppercase tracking-wider text-offwhite/90 hover:bg-white/10 transition"
                   >
                     <Sparkles className="h-4 w-4" /> Ver todos os módulos
+                  </button>
+                )}
+              </div>
+            )}
+
+            {isMember && onSearchChange && (
+              <div className="mt-6 relative max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-offwhite/50" />
+                <input
+                  value={searchValue ?? ""}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  placeholder="Buscar aula por título…"
+                  className="w-full rounded-xl border border-offwhite/15 bg-black/30 backdrop-blur pl-9 pr-9 py-2.5 text-sm font-body text-offwhite placeholder:text-offwhite/40 focus:outline-none focus:border-yellow-brand/40"
+                />
+                {searchValue && (
+                  <button
+                    onClick={() => onSearchChange("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-offwhite/60 hover:text-offwhite"
+                    aria-label="Limpar"
+                  >
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>

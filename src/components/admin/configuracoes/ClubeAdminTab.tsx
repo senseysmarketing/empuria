@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Crown, BookOpen, Megaphone, ExternalLink, Users, FolderTree, FileVideo, Settings as SettingsIcon } from "lucide-react";
+import { Crown, BookOpen, Megaphone, ExternalLink, Users, FolderTree, FileVideo, Settings as SettingsIcon, ShieldCheck } from "lucide-react";
 import { ClubeWallManager, useClubData } from "@/components/admin/ClubeManagers";
 import {
   useCurriculum,
@@ -8,11 +8,12 @@ import {
   LessonsManager,
   ClubSettingsManager,
 } from "@/components/admin/ClubeCurriculumManagers";
+import { ClubeModerationManager } from "@/components/admin/ClubeModerationManager";
 
 export function ClubeAdminTab() {
   const club = useClubData();
   const curriculum = useCurriculum();
-  const [tab, setTab] = useState<"modulos" | "aulas" | "comunicados" | "config">("modulos");
+  const [tab, setTab] = useState<"modulos" | "aulas" | "comunicados" | "moderacao" | "config">("modulos");
 
   const posts = club.data?.posts ?? [];
   const members = club.data?.members ?? [];
@@ -72,6 +73,9 @@ export function ClubeAdminTab() {
           <TabsTrigger value="comunicados" className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white">
             <Megaphone className="h-4 w-4" /> Comunicados
           </TabsTrigger>
+          <TabsTrigger value="moderacao" className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white">
+            <ShieldCheck className="h-4 w-4" /> Moderação
+          </TabsTrigger>
           <TabsTrigger value="config" className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white">
             <SettingsIcon className="h-4 w-4" /> Configurações
           </TabsTrigger>
@@ -97,6 +101,9 @@ export function ClubeAdminTab() {
           ) : (
             <ClubeWallManager posts={posts} />
           )}
+        </TabsContent>
+        <TabsContent value="moderacao" className="mt-6">
+          <ClubeModerationManager />
         </TabsContent>
         <TabsContent value="config" className="mt-6">
           {curriculum.isLoading ? (

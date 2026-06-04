@@ -13,7 +13,7 @@ export const getClubContent = createServerFn({ method: "GET" })
     const { supabase } = context;
     const userId = context.effectiveUserId ?? context.userId;
 
-    const [profileRes, modulesRes, lessonsRes, filesRes, settingsRes, postsRes, progressRes] = await Promise.all([
+    const [profileRes, modulesRes, lessonsRes, filesRes, settingsRes, postsRes, progressRes, favoritesRes, certificatesRes] = await Promise.all([
       supabase.from("profiles").select("is_club_member, full_name").eq("id", userId).maybeSingle(),
       supabase
         .from("club_modules")
@@ -41,6 +41,15 @@ export const getClubContent = createServerFn({ method: "GET" })
         .select("lesson_id, opened_at, completed_at")
         .eq("user_id", userId)
         .order("opened_at", { ascending: false }),
+      supabase
+        .from("club_lesson_favorites")
+        .select("lesson_id")
+        .eq("user_id", userId),
+      supabase
+        .from("club_certificates")
+        .select("id, code, scope, module_id, issued_at")
+        .eq("user_id", userId)
+        .order("issued_at", { ascending: false }),
     ]);
 
     const isMember = !!profileRes.data?.is_club_member;
@@ -119,6 +128,10 @@ export const getClubContent = createServerFn({ method: "GET" })
     const lastOpenedLessonId =
       progressRows.find((p) => publishedIds.has(p.lesson_id))?.lesson_id ?? null;
 
+    const favoriteIds = ((favoritesRes.data ?? []) as Array<{ lesson_id: string }>).map(
+      (r) => r.lesson_id
+    );
+
     return {
       isMember,
       memberName,
@@ -127,6 +140,14 @@ export const getClubContent = createServerFn({ method: "GET" })
       posts: postsRes.data ?? [],
       subscription: subscription ?? null,
       lastOpenedLessonId,
+      favoriteLessonIds: favoriteIds,
+      certificates: (certificatesRes.data ?? []) as Array<{
+        id: string;
+        code: string;
+        scope: "module" | "club";
+        module_id: string | null;
+        issued_at: string;
+      }>,
       hubla: {
         isEnabled: !!setting?.is_enabled,
         checkoutUrl: setting?.checkout_url ?? null,
