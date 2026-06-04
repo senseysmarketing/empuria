@@ -209,6 +209,7 @@ export function CheckoutModal({
   const [cardExpiration, setCardExpiration] = useState("");
   const [securityCode, setSecurityCode] = useState("");
   const [installments, setInstallments] = useState(1);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!open) {
@@ -241,8 +242,38 @@ export function CheckoutModal({
       setCardExpiration("");
       setSecurityCode("");
       setInstallments(1);
+      return;
     }
-  }, [open]);
+    // Quando o modal abre, tenta retomar um PIX pendente do mesmo serviço.
+    if (service) {
+      const pending = loadPendingPix(service.slug);
+      if (pending) {
+        setIntent(pending.intent);
+        setPayment(pending.payment);
+        setTab("pix");
+        setStep("payment");
+        // mpConfig será recarregado em background (apenas para `publicKey` do cartão).
+        fetchMpConfig()
+          .then(setMpConfig)
+          .catch(() => undefined);
+      }
+    }
+  }, [open, service, fetchMpConfig]);
+
+  // Tick de 1s para o contador regressivo do PIX.
+  useEffect(() => {
+    if (!open || step !== "payment" || !payment?.expiresAt) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [open, step, payment?.expiresAt]);
+
+  const pixMsLeft = payment?.method === "pix" && payment.expiresAt
+    ? Math.max(0, new Date(payment.expiresAt).getTime() - now)
+    : null;
+  const pixExpired = pixMsLeft !== null && pixMsLeft === 0;
+  const pixCountdown = pixMsLeft !== null
+    ? `${String(Math.floor(pixMsLeft / 60000)).padStart(2, "0")}:${String(Math.floor((pixMsLeft % 60000) / 1000)).padStart(2, "0")}`
+    : null;
 
   useEffect(() => {
     const pix = payment?.method === "pix" ? payment.qrCode : null;
