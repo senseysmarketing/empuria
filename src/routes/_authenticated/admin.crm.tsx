@@ -1700,22 +1700,17 @@ function FollowupDialog({
 }
 
 function Metric({
-  icon: Icon,
+  icon,
   label,
   value,
+  tone = "neutral",
 }: {
-  icon: typeof UserRound;
+  icon: LucideIcon;
   label: string;
   value: number;
+  tone?: AdminStatCardTone;
 }) {
-  return (
-    <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-admin-ink-muted">
-        <Icon className="h-4 w-4" /> {label}
-      </div>
-      <div className="mt-2 text-2xl font-bold tabular-nums text-admin-ink">{value}</div>
-    </div>
-  );
+  return <AdminStatCard icon={icon} label={label} value={value} tone={tone} />;
 }
 
 function EmptyState({ title, body }: { title: string; body: string }) {
