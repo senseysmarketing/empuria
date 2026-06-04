@@ -685,15 +685,16 @@ export const createMercadoPagoPayment = createServerFn({ method: "POST" })
         : data.method === "boleto"
           ? new Date(Date.now() + setting.boleto_expiration_days * 86400000).toISOString()
           : null;
-    const payload = buildOrderPayload({
+    const payload = buildPaymentPayload({
       order,
       method: data.method,
       setting,
       amountCents,
+      fallbackExpiresAt,
       payer: data.payer,
       card: data.card,
     });
-    const response = await mpFetch<Record<string, unknown>>("/v1/orders", setting, {
+    const response = await mpFetch<Record<string, unknown>>("/v1/payments", setting, {
       method: "POST",
       body: payload,
       idempotencyKey,
