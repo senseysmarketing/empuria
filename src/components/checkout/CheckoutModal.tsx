@@ -871,6 +871,9 @@ export function CheckoutModal({
 
             {tab === "boleto" && (
               <div className="space-y-3">
+                <div className="rounded-md border border-admin-border bg-admin-surface-2 px-3 py-2 text-[12px] text-admin-ink-muted">
+                  Para gerar boleto, informe CPF e endereço no Brasil.
+                </div>
                 <PayerFields
                   cpf={cpf}
                   setCpf={setCpf}
@@ -886,7 +889,33 @@ export function CheckoutModal({
                   setCity={setCity}
                   stateUf={stateUf}
                   setStateUf={setStateUf}
+                  cepLoading={cepLoading}
+                  onCepLookup={async (cep) => {
+                    setCepLoading(true);
+                    try {
+                      const r = await fetchViaCep(cep);
+                      if (!r) {
+                        toast.error("CEP não encontrado. Preencha o endereço manualmente.");
+                        return;
+                      }
+                      if (r.logradouro) setStreetName(r.logradouro);
+                      if (r.bairro) setNeighborhood(r.bairro);
+                      if (r.localidade) setCity(r.localidade);
+                      if (r.uf) setStateUf(r.uf.toUpperCase());
+                      setTimeout(() => {
+                        document.getElementById("boleto-street-number")?.focus();
+                      }, 50);
+                    } finally {
+                      setCepLoading(false);
+                    }
+                  }}
+                  showFullAddress
                 />
+                {boletoError && (
+                  <div className="rounded-md border border-red-brand/40 bg-red-brand/10 px-3 py-2 text-[12px] text-red-brand">
+                    {boletoError}
+                  </div>
+                )}
                 {payment?.method === "boleto" ? (
                   <>
                     {payment.digitableLine && (
@@ -909,11 +938,23 @@ export function CheckoutModal({
                 ) : (
                   <Button
                     onClick={() => generatePayment("boleto")}
-                    disabled={paymentLoading === "boleto" || !mpConfig?.enabled}
+                    disabled={
+                      paymentLoading === "boleto" ||
+                      !mpConfig?.enabled ||
+                      !isValidCpf(cpf) ||
+                      onlyDigits(zipCode).length !== 8 ||
+                      !streetName.trim() ||
+                      !streetNumber.trim() ||
+                      !neighborhood.trim() ||
+                      !city.trim() ||
+                      stateUf.trim().length !== 2
+                    }
                     className="w-full bg-orange-brand text-offwhite hover:bg-red-brand"
                   >
                     {paymentLoading === "boleto" ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : boletoError ? (
+                      "Tentar novamente"
                     ) : (
                       "Gerar boleto"
                     )}
@@ -921,6 +962,7 @@ export function CheckoutModal({
                 )}
               </div>
             )}
+
 
             {tab === "card" && (
               <div className="space-y-3">
