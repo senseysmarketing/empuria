@@ -488,8 +488,8 @@ function PaymentBody({
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-offwhite text-brown-deep">
-      <div className="mx-auto max-w-md px-4 py-10">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-offwhite px-4 py-8 text-brown-deep">
+      <div className="w-full max-w-md">
         <header className="mb-6 text-center">
           <div className="font-display text-xs uppercase tracking-[0.3em] text-orange-brand">
             Instituto Empuria

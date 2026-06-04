@@ -40,9 +40,15 @@ type Service = {
   id: string;
   title: string;
   price_cents: number;
+  online_price_cents: number | null;
+  online_currency: string | null;
+  currency?: string | null;
   kind: string | null;
   requires_slot: boolean;
 };
+
+const fmtBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const fmtEUR = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "EUR" });
 
 type PaymentMethod = "mercadopago" | "manual" | "gratuito";
 type Currency = "EUR" | "BRL";
@@ -147,10 +153,17 @@ export function NewOrderWizard({
   };
 
   const onSelectService = (id: string) => {
-    const s = services.find((x) => x.id === id);
+    const s = services.find((x) => x.id === id) as Service | undefined;
     if (s) {
-      setService(s as Service);
-      setAmount(((s.price_cents ?? 0) / 100).toFixed(2));
+      setService(s);
+      const brl = s.online_price_cents ?? 0;
+      if (brl > 0) {
+        setAmount((brl / 100).toFixed(2));
+        setCurrency("BRL");
+      } else {
+        setAmount(((s.price_cents ?? 0) / 100).toFixed(2));
+        setCurrency("EUR");
+      }
     }
   };
 
@@ -324,11 +337,19 @@ export function NewOrderWizard({
                   <SelectValue placeholder="Escolha o serviço" />
                 </SelectTrigger>
                 <SelectContent>
-                  {services.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.title} · € {(s.price_cents / 100).toFixed(2)}
-                    </SelectItem>
-                  ))}
+                  {services.map((s) => {
+                    const brl = (s as Service).online_price_cents ?? 0;
+                    const eur = s.price_cents ?? 0;
+                    const label =
+                      brl > 0
+                        ? `${s.title} · ${fmtBRL.format(brl / 100)}${eur > 0 ? ` (${fmtEUR.format(eur / 100)})` : ""}`
+                        : `${s.title} · ${fmtEUR.format(eur / 100)}`;
+                    return (
+                      <SelectItem key={s.id} value={s.id}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             ) : (
