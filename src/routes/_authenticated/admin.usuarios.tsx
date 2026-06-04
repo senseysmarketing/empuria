@@ -367,18 +367,6 @@ function CreateManualUserDialog({
   );
 }
 
-function MiniTile({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
-  return (
-    <div
-      className={`rounded-xl px-4 py-3 ${accent ? "bg-yellow-brand/15 border border-yellow-brand/40" : "bg-white border border-brown/10"}`}
-    >
-      <div className="text-[10px] uppercase tracking-widest text-brown/60 font-display">
-        {label}
-      </div>
-      <div className="font-display text-2xl font-bold text-brown-deep tabular-nums">{value}</div>
-    </div>
-  );
-}
 
 function UserRowCard({ user }: { user: UserRow }) {
   const navigate = useNavigate();
