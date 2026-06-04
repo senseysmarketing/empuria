@@ -41,6 +41,7 @@ import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
 import { Route as AuthenticatedAdminAgendaRouteImport } from './routes/_authenticated/admin.agenda'
 import { Route as AuthenticatedAdminAcessoNegadoRouteImport } from './routes/_authenticated/admin.acesso-negado'
+import { Route as AuthenticatedPortalClubeCertificadoCodeRouteImport } from './routes/_authenticated/portal.clube.certificado.$code'
 
 const ServicosRoute = ServicosRouteImport.update({
   id: '/servicos',
@@ -215,6 +216,12 @@ const AuthenticatedAdminAcessoNegadoRoute =
     path: '/acesso-negado',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedPortalClubeCertificadoCodeRoute =
+  AuthenticatedPortalClubeCertificadoCodeRouteImport.update({
+    id: '/certificado/$code',
+    path: '/certificado/$code',
+    getParentRoute: () => AuthenticatedPortalClubeRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -239,7 +246,7 @@ export interface FileRoutesByFullPath {
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
-  '/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/portal/clube': typeof AuthenticatedPortalClubeRouteWithChildren
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
@@ -248,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
+  '/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -270,7 +278,7 @@ export interface FileRoutesByTo {
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
-  '/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/portal/clube': typeof AuthenticatedPortalClubeRouteWithChildren
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
@@ -279,6 +287,7 @@ export interface FileRoutesByTo {
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
+  '/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -305,7 +314,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
-  '/_authenticated/portal/clube': typeof AuthenticatedPortalClubeRoute
+  '/_authenticated/portal/clube': typeof AuthenticatedPortalClubeRouteWithChildren
   '/_authenticated/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/_authenticated/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/_authenticated/portal/servicos': typeof AuthenticatedPortalServicosRoute
@@ -314,6 +323,7 @@ export interface FileRoutesById {
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
+  '/_authenticated/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -349,6 +359,7 @@ export interface FileRouteTypes {
     | '/api/webhooks/uazapi'
     | '/admin/'
     | '/portal/'
+    | '/portal/clube/certificado/$code'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -380,6 +391,7 @@ export interface FileRouteTypes {
     | '/api/webhooks/uazapi'
     | '/admin'
     | '/portal'
+    | '/portal/clube/certificado/$code'
   id:
     | '__root__'
     | '/'
@@ -414,6 +426,7 @@ export interface FileRouteTypes {
     | '/api/webhooks/uazapi'
     | '/_authenticated/admin/'
     | '/_authenticated/portal/'
+    | '/_authenticated/portal/clube/certificado/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -654,6 +667,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAcessoNegadoRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/portal/clube/certificado/$code': {
+      id: '/_authenticated/portal/clube/certificado/$code'
+      path: '/certificado/$code'
+      fullPath: '/portal/clube/certificado/$code'
+      preLoaderRoute: typeof AuthenticatedPortalClubeCertificadoCodeRouteImport
+      parentRoute: typeof AuthenticatedPortalClubeRoute
+    }
   }
 }
 
@@ -696,8 +716,23 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
+interface AuthenticatedPortalClubeRouteChildren {
+  AuthenticatedPortalClubeCertificadoCodeRoute: typeof AuthenticatedPortalClubeCertificadoCodeRoute
+}
+
+const AuthenticatedPortalClubeRouteChildren: AuthenticatedPortalClubeRouteChildren =
+  {
+    AuthenticatedPortalClubeCertificadoCodeRoute:
+      AuthenticatedPortalClubeCertificadoCodeRoute,
+  }
+
+const AuthenticatedPortalClubeRouteWithChildren =
+  AuthenticatedPortalClubeRoute._addFileChildren(
+    AuthenticatedPortalClubeRouteChildren,
+  )
+
 interface AuthenticatedPortalRouteChildren {
-  AuthenticatedPortalClubeRoute: typeof AuthenticatedPortalClubeRoute
+  AuthenticatedPortalClubeRoute: typeof AuthenticatedPortalClubeRouteWithChildren
   AuthenticatedPortalIngressosRoute: typeof AuthenticatedPortalIngressosRoute
   AuthenticatedPortalLojaRoute: typeof AuthenticatedPortalLojaRoute
   AuthenticatedPortalServicosRoute: typeof AuthenticatedPortalServicosRoute
@@ -705,7 +740,7 @@ interface AuthenticatedPortalRouteChildren {
 }
 
 const AuthenticatedPortalRouteChildren: AuthenticatedPortalRouteChildren = {
-  AuthenticatedPortalClubeRoute: AuthenticatedPortalClubeRoute,
+  AuthenticatedPortalClubeRoute: AuthenticatedPortalClubeRouteWithChildren,
   AuthenticatedPortalIngressosRoute: AuthenticatedPortalIngressosRoute,
   AuthenticatedPortalLojaRoute: AuthenticatedPortalLojaRoute,
   AuthenticatedPortalServicosRoute: AuthenticatedPortalServicosRoute,
