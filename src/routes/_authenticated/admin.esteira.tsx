@@ -29,6 +29,13 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   CheckCircle2,
   Plus,
   QrCode,
@@ -43,6 +50,9 @@ import {
   Loader2,
   TrendingUp,
   Euro,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
@@ -68,15 +78,21 @@ const DELIVERY_COLOR: Record<string, string> = {
   concluido: "bg-emerald-50 text-emerald-800",
 };
 
-const FILTERS = [
-  { key: "todos", label: "Todos" },
-  { key: "pendente", label: "Pendentes" },
-  { key: "aguardando_pagamento", label: "Aguardando pagamento" },
-  { key: "aprovado", label: "Pagos" },
-  { key: "processando", label: "Em execução" },
-  { key: "concluido", label: "Concluídos" },
-  { key: "recusado", label: "Cancelados" },
-  { key: "estornado", label: "Estornados" },
+const PAYMENT_OPTIONS: { value: string; label: string }[] = [
+  { value: "all", label: "Todos pagamentos" },
+  { value: "pendente", label: "Pendente" },
+  { value: "aprovado", label: "Aprovado" },
+  { value: "recusado", label: "Recusado" },
+  { value: "estornado", label: "Estornado" },
+];
+
+const DELIVERY_OPTIONS: { value: string; label: string }[] = [
+  { value: "all", label: "Todas execuções" },
+  { value: "aguardando_pagamento", label: "Aguardando pagamento" },
+  { value: "aguardando_documentos", label: "Aguardando documentos" },
+  { value: "processando", label: "Processando" },
+  { value: "agendado", label: "Agendado" },
+  { value: "concluido", label: "Concluído" },
 ];
 
 type Order = {
@@ -110,7 +126,11 @@ function EsteiraPage() {
   const refund = useServerFn(refundOrder);
   const genLink = useServerFn(generatePaymentLink);
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<string>("todos");
+  const [search, setSearch] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [deliveryFilter, setDeliveryFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [voucherUrl, setVoucherUrl] = useState<string | null>(null);
   const [voucherCode, setVoucherCode] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -134,12 +154,36 @@ function EsteiraPage() {
   });
 
   const filtered = useMemo(() => {
-    if (filter === "todos") return orders;
-    // status filters
-    if (["pendente", "aprovado", "recusado", "estornado"].includes(filter))
-      return orders.filter((o) => o.payment_status === filter);
-    return orders.filter((o) => o.delivery_status === filter);
-  }, [orders, filter]);
+    const q = search.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (paymentFilter !== "all" && o.payment_status !== paymentFilter) return false;
+      if (deliveryFilter !== "all" && o.delivery_status !== deliveryFilter) return false;
+      if (q) {
+        const hay = `${o.customer_name} ${o.customer_email ?? ""} ${o.service_title} ${o.voucher_code ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [orders, search, paymentFilter, deliveryFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => filtered.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filtered, safePage, pageSize],
+  );
+
+  const resetFilters = () => {
+    setSearch("");
+    setPaymentFilter("all");
+    setDeliveryFilter("all");
+    setPage(1);
+  };
+
+  const onFilterChange = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v);
+    setPage(1);
+  };
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["orders"] });
   const canViewFinancials = isAdmin;
@@ -288,50 +332,71 @@ function EsteiraPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`text-xs uppercase tracking-wider font-display px-3 py-1.5 rounded-full border transition ${
-              filter === f.key
-                ? "bg-admin-accent text-white border-admin-accent"
-                : "bg-admin-surface text-admin-ink-muted border-admin-border hover:border-admin-accent"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
       <BentoCard padded={false}>
+        <div className="p-5 border-b border-admin-border space-y-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="font-display text-lg text-admin-ink">Pedidos</h3>
+              <p className="text-xs text-admin-ink-muted mt-1">{orders.length} pedidos cadastrados</p>
+            </div>
+            <span className="text-xs text-admin-ink-muted tabular-nums mt-1">
+              {filtered.length} de {orders.length} {orders.length === 1 ? "pedido" : "pedidos"}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-admin-ink-muted" />
+              <Input
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Buscar por cliente, e-mail, serviço ou voucher…"
+                className="pl-8 bg-admin-bg border-admin-border h-9"
+              />
+            </div>
+            <Select value={paymentFilter} onValueChange={onFilterChange(setPaymentFilter)}>
+              <SelectTrigger className="w-[180px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAYMENT_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={deliveryFilter} onValueChange={onFilterChange(setDeliveryFilter)}>
+              <SelectTrigger className="w-[200px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DELIVERY_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         {isLoading ? (
-          <p className="p-6 text-admin-ink-muted">Carregando...</p>
-        ) : filtered.length === 0 ? (
-          <p className="p-6 text-admin-ink-muted">Nenhum pedido nesta categoria.</p>
+          <div className="p-8 text-center text-admin-ink-muted text-sm">Carregando…</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-admin-surface-2 text-xs uppercase tracking-wider text-admin-ink-muted">
+            <table className="min-w-full text-sm">
+              <thead className="bg-admin-bg text-[10px] uppercase tracking-wider text-admin-ink-muted">
                 <tr>
-                  <th className="text-left px-4 py-3">Cliente</th>
-                  <th className="text-left px-4 py-3">Serviço</th>
-                  {canViewFinancials && <th className="text-right px-4 py-3">Valor</th>}
-                  <th className="text-left px-4 py-3">Pagamento</th>
-                  <th className="text-left px-4 py-3">Execução</th>
-                  <th className="text-left px-4 py-3">Voucher</th>
-                  <th className="text-left px-4 py-3">Data</th>
-                  <th className="text-right px-4 py-3">Ações</th>
+                  <th className="text-left p-3 font-display">Cliente</th>
+                  <th className="text-left p-3 font-display">Serviço</th>
+                  {canViewFinancials && <th className="text-right p-3 font-display">Valor</th>}
+                  <th className="text-left p-3 font-display">Pagamento</th>
+                  <th className="text-left p-3 font-display">Execução</th>
+                  <th className="text-left p-3 font-display">Voucher</th>
+                  <th className="text-left p-3 font-display">Data</th>
+                  <th className="text-right p-3 font-display">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((o) => (
+                {paged.map((o) => (
                   <tr
                     key={o.id}
-                    className="border-t border-admin-border hover:bg-admin-surface-2/60 cursor-pointer"
+                    className="border-t border-admin-border hover:bg-admin-bg/50 cursor-pointer"
                     onClick={() => setSelected(o)}
                   >
-                    <td className="px-4 py-3">
+                    <td className="p-3">
                       <div className="text-admin-ink flex items-center gap-2">
                         {o.customer_name}
                         {!o.user_id && (
@@ -344,9 +409,9 @@ function EsteiraPage() {
                         <div className="text-xs text-admin-ink-muted">{o.customer_email}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-admin-ink-soft">{o.service_title}</td>
+                    <td className="p-3 text-admin-ink-soft">{o.service_title}</td>
                     {canViewFinancials && (
-                      <td className="px-4 py-3 text-right tabular-nums">
+                      <td className="p-3 text-right tabular-nums">
                         {(() => {
                           const cur = o.currency ?? "EUR";
                           const payCur = o.payment_currency ?? cur;
@@ -375,7 +440,7 @@ function EsteiraPage() {
                         })()}
                       </td>
                     )}
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
                       <span
                         className={`inline-block px-2 py-1 rounded text-xs uppercase tracking-wider ${
                           STATUS_COLOR[o.payment_status]
@@ -384,7 +449,7 @@ function EsteiraPage() {
                         {o.payment_status}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="p-3">
                       {o.delivery_status && (
                         <span
                           className={`inline-block px-2 py-1 rounded text-[10px] uppercase tracking-wider ${
@@ -395,7 +460,7 @@ function EsteiraPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="p-3">
                       {o.voucher_code ? (
                         <button
                           onClick={(e) => {
@@ -410,10 +475,10 @@ function EsteiraPage() {
                         <span className="text-xs text-admin-ink-muted">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-admin-ink-muted">
+                    <td className="p-3 text-xs text-admin-ink-muted">
                       {new Date(o.created_at).toLocaleDateString("pt-BR")}
                     </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button size="sm" variant="ghost">
@@ -483,8 +548,47 @@ function EsteiraPage() {
                     </td>
                   </tr>
                 ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={canViewFinancials ? 8 : 7} className="p-8 text-center text-admin-ink-muted text-sm">
+                      {orders.length === 0 ? (
+                        "Nenhum pedido ainda"
+                      ) : (
+                        <>
+                          Nenhum pedido corresponde aos filtros.{" "}
+                          <button onClick={resetFilters} className="text-admin-accent underline">Limpar filtros</button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+
+            {filtered.length > 0 && (
+              <div className="flex items-center justify-between gap-3 p-3 border-t border-admin-border flex-wrap">
+                <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
+                  <span>Por página:</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(parseInt(v, 10)); setPage(1); }}>
+                    <SelectTrigger className="h-8 w-[80px] bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
+                  <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-8">
+                    <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                  </Button>
+                  <span className="tabular-nums">Página {safePage} de {totalPages}</span>
+                  <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="h-8">
+                    Próximo <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </BentoCard>
