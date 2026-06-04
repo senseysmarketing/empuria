@@ -172,7 +172,13 @@ export const updateUserProfile = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    const { id, ...patch } = data;
+    const { id, phone, ...rest } = data;
+    const patch: Record<string, unknown> = { ...rest };
+    if (phone !== undefined) {
+      const norm = phone ? (normalizePhone(phone) ?? phone) : null;
+      patch.phone = norm;
+      patch.phone_country_iso = norm ? getCountryFromPhone(norm) : null;
+    }
     const { error } = await supabaseAdmin.from("profiles").update(patch).eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };
