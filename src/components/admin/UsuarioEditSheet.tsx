@@ -54,7 +54,7 @@ export function UsuarioEditSheet({ user, open, onClose, onSaved }: {
           </div>
           <div className="space-y-2">
             <Label>Telefone</Label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-admin-bg border-admin-border" />
+            <PhoneInput variant="admin" value={phone} onChange={(e164) => setPhone(e164 ?? "")} />
           </div>
           <div className="flex items-center justify-between rounded-lg border border-admin-border p-3">
             <div>
