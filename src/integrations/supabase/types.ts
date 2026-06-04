@@ -369,6 +369,41 @@ export type Database = {
           },
         ]
       }
+      club_certificates: {
+        Row: {
+          code: string
+          id: string
+          issued_at: string
+          module_id: string | null
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          id?: string
+          issued_at?: string
+          module_id?: string | null
+          scope: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          id?: string
+          issued_at?: string
+          module_id?: string | null
+          scope?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_certificates_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "club_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_content: {
         Row: {
           created_at: string
@@ -422,6 +457,83 @@ export type Database = {
           video_url?: string | null
         }
         Relationships: []
+      }
+      club_lesson_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          is_hidden: boolean
+          lesson_id: string
+          parent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          is_hidden?: boolean
+          lesson_id: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_hidden?: boolean
+          lesson_id?: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_lesson_comments_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "club_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_lesson_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "club_lesson_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_lesson_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          lesson_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lesson_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lesson_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_lesson_favorites_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "club_lessons"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       club_lesson_files: {
         Row: {
