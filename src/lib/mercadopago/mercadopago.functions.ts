@@ -169,13 +169,26 @@ function mapPaymentStatus(status?: string | null, detail?: string | null): Order
   return "pendente";
 }
 
-function firstPayment(response: Record<string, unknown>) {
-  const payments = deepGet(response, ["transactions", "payments"]);
-  return Array.isArray(payments) ? (payments[0] as Record<string, unknown> | undefined) : undefined;
+function formatBrazilExpiration(iso: string) {
+  // Mercado Pago exige offset explicito (-03:00), nao aceita "Z".
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // Convert UTC to Sao Paulo (UTC-3) without DST handling (Brasil nao usa mais DST).
+  const local = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  return (
+    `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}` +
+    `T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}.000-03:00`
+  );
 }
 
-function firstPaymentMethod(response: Record<string, unknown>) {
-  return (firstPayment(response)?.payment_method ?? {}) as Record<string, unknown>;
+function notificationUrl() {
+  try {
+    const host = getRequestHost();
+    if (host) return `https://${host}/api/webhooks/mercadopago`;
+  } catch {
+    /* fora de request context */
+  }
+  return undefined;
 }
 
 function publicPayment(row: MercadoPagoPaymentRow) {
