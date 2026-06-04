@@ -16,6 +16,12 @@ type MercadoPagoSetting = {
   public_key: string | null;
   access_token: string | null;
   webhook_secret: string | null;
+  test_public_key: string | null;
+  test_access_token: string | null;
+  test_webhook_secret: string | null;
+  prod_public_key: string | null;
+  prod_access_token: string | null;
+  prod_webhook_secret: string | null;
   default_currency: "BRL" | "EUR" | "USD";
   statement_descriptor: string;
   pix_enabled: boolean;
