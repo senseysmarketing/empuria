@@ -56,11 +56,11 @@ export function MyServicesPanel() {
         </div>
       )}
       {pending.length > 0 && (
-        <div className="bg-brown-dark/60 border border-yellow-brand/10 rounded-xl p-4">
-          <div className="text-yellow-brand text-[10px] uppercase tracking-widest font-display mb-2">
+        <div className="bg-admin-surface-2 border border-admin-border rounded-xl p-4">
+          <div className="text-admin-accent text-[10px] uppercase tracking-widest font-display mb-2">
             Aguardando pagamento
           </div>
-          <ul className="space-y-1 text-sm text-offwhite/70">
+          <ul className="space-y-1 text-sm text-admin-ink">
             {pending.map((o) => (
               <li key={o.id}>{o.service_title} · € {(o.amount_cents / 100).toFixed(2)}</li>
             ))}
