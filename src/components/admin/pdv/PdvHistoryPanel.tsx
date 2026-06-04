@@ -175,136 +175,100 @@ export function PdvHistoryPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-admin-border bg-admin-surface p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_150px_150px_150px_180px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-ink-muted" />
-            <Input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                resetPage();
-              }}
-              placeholder="Buscar codigo, cliente, telefone, operador..."
-              className="h-11 border-admin-border bg-admin-bg pl-9"
-            />
-          </div>
-
-          <Select
-            value={period}
-            onValueChange={(value: Period) => {
-              setPeriod(value);
-              resetPage();
-            }}
-          >
-            <SelectTrigger className="h-11 border-admin-border bg-admin-bg">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hoje">Hoje</SelectItem>
-              <SelectItem value="ontem">Ontem</SelectItem>
-              <SelectItem value="7d">Ultimos 7 dias</SelectItem>
-              <SelectItem value="mes">Este mes</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
-              <SelectItem value="todos">Todos</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={paymentMethod}
-            onValueChange={(value: Payment) => {
-              setPaymentMethod(value);
-              resetPage();
-            }}
-          >
-            <SelectTrigger className="h-11 border-admin-border bg-admin-bg">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Pagamento</SelectItem>
-              <SelectItem value="dinheiro">Dinheiro</SelectItem>
-              <SelectItem value="cartao">Cartao</SelectItem>
-              <SelectItem value="pix">Pix</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={status}
-            onValueChange={(value: Status) => {
-              setStatus(value);
-              resetPage();
-            }}
-          >
-            <SelectTrigger className="h-11 border-admin-border bg-admin-bg">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Status</SelectItem>
-              <SelectItem value="concluida">Concluida</SelectItem>
-              <SelectItem value="cancelada">Anulada</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={cashierId}
-            onValueChange={(value) => {
-              setCashierId(value);
-              resetPage();
-            }}
-          >
-            <SelectTrigger className="h-11 border-admin-border bg-admin-bg">
-              <SelectValue placeholder="Operador" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos operadores</SelectItem>
-              {(cashiersQ.data ?? []).map((cashier) => (
-                <SelectItem key={cashier.id} value={cashier.id}>
-                  {cashier.full_name ?? "Sem nome"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {period === "custom" && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label className="text-xs text-admin-ink-muted">Data inicial</Label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => {
-                  setDateFrom(event.target.value);
-                  resetPage();
-                }}
-                className="border-admin-border bg-admin-bg"
-              />
+      <BentoCard padded={false}>
+        <div className="p-5 border-b border-admin-border space-y-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-display text-lg text-admin-ink">Histórico de vendas</h2>
+              <p className="text-xs text-admin-ink-muted mt-1">
+                Consulta operacional, conferência de caixa e auditoria de anulações.
+              </p>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-admin-ink-muted">Data final</Label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(event) => {
-                  setDateTo(event.target.value);
-                  resetPage();
-                }}
-                className="border-admin-border bg-admin-bg"
-              />
+            <div className="flex items-center gap-2 mt-1">
+              {historyQ.isFetching && <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />}
+              <span className="text-xs text-admin-ink-muted tabular-nums">
+                {rows.length} de {total} {total === 1 ? "venda" : "vendas"}
+              </span>
             </div>
           </div>
-        )}
-      </div>
 
-      <div className="rounded-2xl border border-admin-border bg-admin-surface shadow-sm">
-        <div className="flex items-center justify-between gap-3 border-b border-admin-border p-4">
-          <div>
-            <h2 className="font-display text-lg text-admin-ink">Historico de vendas</h2>
-            <p className="text-xs text-admin-ink-muted">
-              Consulta operacional, conferencia de caixa e auditoria de anulacoes.
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-admin-ink-muted" />
+              <Input
+                value={search}
+                onChange={(event) => { setSearch(event.target.value); resetPage(); }}
+                placeholder="Buscar código, cliente, telefone, operador…"
+                className="pl-8 h-9 bg-admin-bg border-admin-border"
+              />
+            </div>
+
+            <Select value={period} onValueChange={(value: Period) => { setPeriod(value); resetPage(); }}>
+              <SelectTrigger className="w-[150px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hoje">Hoje</SelectItem>
+                <SelectItem value="ontem">Ontem</SelectItem>
+                <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                <SelectItem value="mes">Este mês</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+                <SelectItem value="todos">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={paymentMethod} onValueChange={(value: Payment) => { setPaymentMethod(value); resetPage(); }}>
+              <SelectTrigger className="w-[150px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Pagamento</SelectItem>
+                <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                <SelectItem value="cartao">Cartão</SelectItem>
+                <SelectItem value="pix">Pix</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={status} onValueChange={(value: Status) => { setStatus(value); resetPage(); }}>
+              <SelectTrigger className="w-[140px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Status</SelectItem>
+                <SelectItem value="concluida">Concluída</SelectItem>
+                <SelectItem value="cancelada">Anulada</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={cashierId} onValueChange={(value) => { setCashierId(value); resetPage(); }}>
+              <SelectTrigger className="w-[170px] h-9 bg-admin-bg border-admin-border"><SelectValue placeholder="Operador" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos operadores</SelectItem>
+                {(cashiersQ.data ?? []).map((cashier) => (
+                  <SelectItem key={cashier.id} value={cashier.id}>
+                    {cashier.full_name ?? "Sem nome"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          {historyQ.isFetching && <Loader2 className="h-5 w-5 animate-spin text-admin-accent" />}
+
+          {period === "custom" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-admin-ink-muted">Data inicial</Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(event) => { setDateFrom(event.target.value); resetPage(); }}
+                  className="h-9 bg-admin-bg border-admin-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-admin-ink-muted">Data final</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(event) => { setDateTo(event.target.value); resetPage(); }}
+                  className="h-9 bg-admin-bg border-admin-border"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {historyQ.isLoading ? (
@@ -313,122 +277,125 @@ export function PdvHistoryPanel() {
               <Skeleton key={index} className="h-12 w-full bg-admin-bg" />
             ))}
           </div>
-        ) : rows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
-            <CalendarClock className="h-10 w-10 text-admin-ink-muted" />
-            <p className="font-medium text-admin-ink">Nenhuma venda encontrada</p>
-            <p className="max-w-md text-sm text-admin-ink-muted">
-              Ajuste os filtros ou volte para a aba Venda para registrar uma nova venda no caixa.
-            </p>
-          </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="border-admin-border hover:bg-transparent">
-                <TableHead>Codigo</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Operador</TableHead>
-                <TableHead className="text-center">Itens</TableHead>
-                <TableHead className="text-right">Total EUR</TableHead>
-                <TableHead className="text-right">Total R$</TableHead>
-                <TableHead>Pagamento</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Acoes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((sale) => (
-                <TableRow key={sale.id} className="border-admin-border">
-                  <TableCell className="font-mono text-xs text-admin-accent">
-                    {sale.sale_code}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs">
-                    {dateTime(sale.closed_at)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="max-w-[180px] truncate font-medium">
-                      {sale.customer?.full_name ?? "Cliente sem nome"}
-                    </div>
-                    <div className="max-w-[180px] truncate text-xs text-admin-ink-muted">
-                      {sale.customer?.phone ?? "-"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-[160px] truncate">
-                    {sale.cashier?.full_name ?? "Operador"}
-                  </TableCell>
-                  <TableCell className="text-center tabular-nums">{sale.item_count}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {money(sale.total_eur_cents, "EUR")}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {money(sale.total_brl_cents, "BRL")}
-                  </TableCell>
-                  <TableCell>{paymentLabel(sale.payment_method)}</TableCell>
-                  <TableCell>{statusBadge(sale.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 border-admin-border"
-                        onClick={() => setSelectedSaleId(sale.id)}
-                      >
-                        <Eye className="h-3.5 w-3.5" /> Detalhes
-                      </Button>
-                      {canVoid ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-admin-bg text-[10px] uppercase tracking-wider text-admin-ink-muted">
+                <tr>
+                  <th className="text-left p-3 font-display">Código</th>
+                  <th className="text-left p-3 font-display">Data</th>
+                  <th className="text-left p-3 font-display">Cliente</th>
+                  <th className="text-left p-3 font-display">Operador</th>
+                  <th className="text-center p-3 font-display">Itens</th>
+                  <th className="text-right p-3 font-display">Total EUR</th>
+                  <th className="text-right p-3 font-display">Total R$</th>
+                  <th className="text-left p-3 font-display">Pagamento</th>
+                  <th className="text-left p-3 font-display">Status</th>
+                  <th className="text-right p-3 font-display">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((sale) => (
+                  <tr key={sale.id} className="border-t border-admin-border hover:bg-admin-bg/50">
+                    <td className="p-3 font-mono text-xs text-admin-accent">{sale.sale_code}</td>
+                    <td className="p-3 whitespace-nowrap text-xs">{dateTime(sale.closed_at)}</td>
+                    <td className="p-3">
+                      <div className="max-w-[180px] truncate font-medium text-admin-ink">
+                        {sale.customer?.full_name ?? "Cliente sem nome"}
+                      </div>
+                      <div className="max-w-[180px] truncate text-xs text-admin-ink-muted">
+                        {sale.customer?.phone ?? "-"}
+                      </div>
+                    </td>
+                    <td className="p-3 max-w-[160px] truncate text-admin-ink-soft">
+                      {sale.cashier?.full_name ?? "Operador"}
+                    </td>
+                    <td className="p-3 text-center tabular-nums">{sale.item_count}</td>
+                    <td className="p-3 text-right tabular-nums">{money(sale.total_eur_cents, "EUR")}</td>
+                    <td className="p-3 text-right tabular-nums">{money(sale.total_brl_cents, "BRL")}</td>
+                    <td className="p-3 text-admin-ink-soft">{paymentLabel(sale.payment_method)}</td>
+                    <td className="p-3">{statusBadge(sale.status)}</td>
+                    <td className="p-3 text-right">
+                      <div className="inline-flex gap-1">
                         <Button
                           size="sm"
-                          variant="outline"
-                          className="h-8 border-red-500/30 text-red-400 hover:bg-red-500/10"
-                          disabled={sale.status === "cancelada"}
-                          onClick={() => setVoidTargetId(sale.id)}
+                          variant="ghost"
+                          title="Detalhes"
+                          onClick={() => setSelectedSaleId(sale.id)}
                         >
-                          <RotateCcw className="h-3.5 w-3.5" /> Anular
+                          <Eye className="h-3.5 w-3.5" />
                         </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 border-admin-border text-admin-ink-muted"
-                          disabled
-                          title="Sem permissão para anular vendas."
-                        >
-                          <Lock className="h-3.5 w-3.5" /> Anular
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+                        {canVoid ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Anular"
+                            disabled={sale.status === "cancelada"}
+                            onClick={() => setVoidTargetId(sale.id)}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Sem permissão para anular vendas."
+                            disabled
+                          >
+                            <Lock className="h-3.5 w-3.5 text-admin-ink-muted" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="p-8 text-center text-admin-ink-muted text-sm">
+                      <div className="flex flex-col items-center gap-2">
+                        <CalendarClock className="h-8 w-8 text-admin-ink-muted" />
+                        <p className="font-medium text-admin-ink">Nenhuma venda encontrada</p>
+                        <p className="max-w-md text-xs">
+                          Ajuste os filtros ou volte para a aba Venda para registrar uma nova venda no caixa.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
 
-        <div className="flex flex-col gap-3 border-t border-admin-border p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-admin-ink-muted">
-            Mostrando {fromLabel}-{toLabel} de {total} vendas
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="border-admin-border"
-              disabled={page <= 1 || historyQ.isFetching}
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              className="border-admin-border"
-              disabled={page >= totalPages || historyQ.isFetching}
-              onClick={() => setPage((current) => current + 1)}
-            >
-              Proxima
-            </Button>
+            {rows.length > 0 && (
+              <div className="flex items-center justify-between gap-3 p-3 border-t border-admin-border flex-wrap">
+                <p className="text-xs text-admin-ink-muted">
+                  Mostrando {fromLabel}-{toLabel} de {total} vendas
+                </p>
+                <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={page <= 1 || historyQ.isFetching}
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                  </Button>
+                  <span className="tabular-nums">Página {page} de {totalPages}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={page >= totalPages || historyQ.isFetching}
+                    onClick={() => setPage((current) => current + 1)}
+                  >
+                    Próxima <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
+        )}
+      </BentoCard>
 
       <Dialog
         open={Boolean(selectedSaleId)}
