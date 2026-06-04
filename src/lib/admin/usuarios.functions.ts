@@ -173,7 +173,7 @@ export const updateUserProfile = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { id, phone, ...rest } = data;
-    const patch: Record<string, unknown> = { ...rest };
+    const patch: Database["public"]["Tables"]["profiles"]["Update"] = { ...rest };
     if (phone !== undefined) {
       const norm = phone ? (normalizePhone(phone) ?? phone) : null;
       patch.phone = norm;
