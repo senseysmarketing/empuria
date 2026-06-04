@@ -29,7 +29,8 @@ export const submitConsultoriaLead = createServerFn({ method: "POST" })
       .insert({
         full_name: data.full_name,
         email: data.email.toLowerCase(),
-        phone: data.phone,
+        phone: normalizePhone(data.phone) ?? data.phone,
+        phone_country_iso: getCountryFromPhone(normalizePhone(data.phone) ?? data.phone),
         current_country: COUNTRY_LABEL[data.current_country] ?? data.current_country,
         target_visa: VISA_LABEL[data.target_visa] ?? data.target_visa,
         timeline: TIMELINE_LABEL[data.timeline] ?? data.timeline,
