@@ -101,6 +101,7 @@ export async function createOrReuseManualCustomer(input: {
     id: user.id,
     full_name: input.fullName,
     phone,
+    phone_country_iso: phoneCountry,
     ...(input.isClubMember !== undefined ? { is_club_member: input.isClubMember } : {}),
     ...(input.adminNotes !== undefined ? { admin_notes: input.adminNotes || null } : {}),
     created_by_admin: shouldMarkManual,
