@@ -98,11 +98,18 @@ export function PdvItensTab() {
 
   const save = async () => {
     if (!form.category_id) { toast.error("Selecione uma categoria"); return; }
+    const name = form.name.trim();
+    const slug = slugify(name);
+    if (!slug) { toast.error("Informe um nome válido"); return; }
+    if (items.some((i) => i.slug === slug && (!editing || i.id !== editing.id))) {
+      toast.error("Já existe um item com este nome.");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
-        name: form.name.trim(),
-        slug: form.slug.trim().toLowerCase(),
+        name,
+        slug,
         price_cents: Math.round(form.price_eur_cents),
         price_eur_cents: Math.round(form.price_eur_cents),
         price_brl_cents: Math.round(form.price_brl_cents),
