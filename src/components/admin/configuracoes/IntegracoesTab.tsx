@@ -223,9 +223,12 @@ export function IntegracoesTab() {
         data: {
           is_enabled: mpEnabled,
           environment: mpEnvironment,
-          public_key: emptyToNull(form.get("public_key")),
-          access_token: emptyToNull(form.get("access_token")),
-          webhook_secret: emptyToNull(form.get("webhook_secret")),
+          test_public_key: emptyToNull(form.get("test_public_key")),
+          test_access_token: emptyToNull(form.get("test_access_token")),
+          test_webhook_secret: emptyToNull(form.get("test_webhook_secret")),
+          prod_public_key: emptyToNull(form.get("prod_public_key")),
+          prod_access_token: emptyToNull(form.get("prod_access_token")),
+          prod_webhook_secret: emptyToNull(form.get("prod_webhook_secret")),
           default_currency: "BRL",
           statement_descriptor:
             String(form.get("statement_descriptor") ?? "")
