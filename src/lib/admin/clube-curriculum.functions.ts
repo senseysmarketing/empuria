@@ -153,6 +153,7 @@ const lessonSchema = z.object({
   position: z.number().int().min(0).default(0),
   is_published: z.boolean().default(false),
   is_featured: z.boolean().default(false),
+  is_coming_soon: z.boolean().default(false),
 });
 
 export const upsertLesson = createServerFn({ method: "POST" })
@@ -175,6 +176,7 @@ export const upsertLesson = createServerFn({ method: "POST" })
       position: data.position,
       is_published: data.is_published,
       is_featured: data.is_featured,
+      is_coming_soon: data.is_coming_soon,
       published_at: data.is_published ? new Date().toISOString() : null,
       created_by: context.userId,
     };

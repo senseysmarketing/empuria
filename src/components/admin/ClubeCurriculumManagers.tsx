@@ -613,6 +613,8 @@ function LessonDialog({
   const [duration, setDuration] = useState<number | "">("");
   const [position, setPosition] = useState(0);
   const [isPublished, setIsPublished] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [isComingSoon, setIsComingSoon] = useState(false);
   const [uploading, setUploading] = useState(false);
   const thumbRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -627,6 +629,8 @@ function LessonDialog({
       setDuration(editing?.duration_minutes ?? "");
       setPosition(editing?.position ?? 0);
       setIsPublished(editing?.is_published ?? false);
+      setIsFeatured((editing as { is_featured?: boolean } | null)?.is_featured ?? false);
+      setIsComingSoon((editing as { is_coming_soon?: boolean } | null)?.is_coming_soon ?? false);
     }
   }, [open, editing, modules]);
 
@@ -691,7 +695,8 @@ function LessonDialog({
         duration_minutes: duration === "" ? undefined : Number(duration),
         position,
         is_published: isPublished,
-        is_featured: false,
+        is_featured: isFeatured,
+        is_coming_soon: isComingSoon,
       },
     });
     toast.success(editing ? "Aula atualizada" : "Aula criada");
@@ -750,6 +755,14 @@ function LessonDialog({
             <div className="flex items-center gap-2">
               <Switch checked={isPublished} onCheckedChange={setIsPublished} />
               <Label>Publicada</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={isFeatured} onCheckedChange={setIsFeatured} />
+              <Label>Aula em destaque</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={isComingSoon} onCheckedChange={setIsComingSoon} />
+              <Label>Em breve (não tocar)</Label>
             </div>
           </div>
 
