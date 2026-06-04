@@ -328,11 +328,11 @@ function ContentDialog({
                 rows={4}
               />
             </div>
-            <div>
-              <Label>URL do vídeo</Label>
-              <Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder="https://youtube.com/..." />
-              {videoErr && <p className="text-xs text-admin-danger mt-1">URL inválida.</p>}
-            </div>
+            <VideoSourceField
+              value={form.video_url}
+              onChange={(v) => setForm({ ...form, video_url: v })}
+              error={videoErr}
+            />
             <div>
               <Label>URL da capa (thumbnail)</Label>
               <Input value={form.thumbnail_url} onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })} placeholder="https://..." />
