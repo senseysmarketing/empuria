@@ -54,17 +54,25 @@ export function VideoPlayerModal({
                 onContextMenu={(e) => e.preventDefault()}
               />
             ) : (
-              <iframe
-                src={
-                  provider === "youtube" || provider === "vimeo"
-                    ? `${embedUrl}${embedUrl!.includes("?") ? "&" : "?"}autoplay=1`
-                    : embedUrl!
-                }
-                className="w-full h-full"
-                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                allowFullScreen
-                title={video.title}
-              />
+              <>
+                <iframe
+                  src={
+                    provider === "youtube" || provider === "vimeo"
+                      ? `${embedUrl}${embedUrl!.includes("?") ? "&" : "?"}autoplay=1`
+                      : embedUrl!
+                  }
+                  className="w-full h-full"
+                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  title={video.title}
+                />
+                {provider === "gdrive" && (
+                  <div
+                    className="absolute top-2 right-2 w-12 h-12 bg-black"
+                    aria-hidden="true"
+                  />
+                )}
+              </>
             )
           ) : (
             <div className="w-full h-full flex items-center justify-center text-offwhite/60 text-sm">
