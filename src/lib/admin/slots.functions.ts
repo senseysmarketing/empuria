@@ -23,7 +23,7 @@ export const listServicesAdmin = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data } = await context.supabase
       .from("services")
-      .select("id,title,kind,requires_slot,price_cents")
+      .select("id,title,kind,requires_slot,price_cents,online_price_cents,online_currency,currency")
       .order("title");
     return data ?? [];
   });
