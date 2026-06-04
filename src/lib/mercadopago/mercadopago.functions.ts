@@ -830,7 +830,7 @@ export async function processMercadoPagoWebhook(
     }
 
     const response = await mpFetch<Record<string, unknown>>(
-      `/v1/orders/${row.provider_order_id}`,
+      `/v1/payments/${row.provider_payment_id}`,
       setting,
     );
     const updated = await persistPayment({
