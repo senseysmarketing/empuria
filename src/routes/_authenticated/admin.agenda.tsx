@@ -438,11 +438,3 @@ function SideList({ title, items, empty }: { title: string; items: CalItem[]; em
   );
 }
 
-function SummaryTile({ label, value }: { label: string; value: number }) {
-  return (
-    <BentoCard padded>
-      <div className="text-[11px] uppercase tracking-wider text-admin-ink-muted">{label}</div>
-      <div className="font-display text-3xl text-admin-ink mt-1">{value}</div>
-    </BentoCard>
-  );
-}
