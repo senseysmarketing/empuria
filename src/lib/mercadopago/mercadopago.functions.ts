@@ -452,7 +452,12 @@ function snapshotFromResponse(response: Record<string, unknown>, fallbackExpires
 }
 
 async function syncOrderFromPayment(row: MercadoPagoPaymentRow) {
-  const status = mapPaymentStatus(row.status, row.status_detail);
+  const mappedStatus = mapPaymentStatus(row.status, row.status_detail);
+  // Boleto recusado pelo banco não deve "matar" o pedido — o usuário pode
+  // corrigir CPF/endereço e tentar gerar outro boleto. Mantemos o pedido
+  // pendente; a tentativa rejeitada fica registrada em mercadopago_payments.
+  const status: OrderPaymentStatus =
+    row.payment_method === "boleto" && mappedStatus === "recusado" ? "pendente" : mappedStatus;
   const patch: Record<string, unknown> = {
     payment_provider: "mercadopago",
     payment_provider_order_id: row.provider_order_id,
