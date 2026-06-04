@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { scoreLead, TIMELINE_LABEL, BUDGET_LABEL, COUNTRY_LABEL, VISA_LABEL } from "./scoring";
+import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
 const schema = z.object({
   full_name: z.string().trim().min(2).max(120),
