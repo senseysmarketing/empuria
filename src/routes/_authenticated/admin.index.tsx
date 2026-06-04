@@ -17,6 +17,15 @@ export const Route = createFileRoute("/_authenticated/admin/")({
   component: CockpitPage,
 });
 
+const brlFmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const eurFmt = new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" });
+function formatSales(b: { BRL: number; EUR: number }) {
+  const parts: string[] = [];
+  if (b.BRL > 0 || (b.BRL === 0 && b.EUR === 0)) parts.push(brlFmt.format(b.BRL));
+  if (b.EUR > 0) parts.push(eurFmt.format(b.EUR));
+  return parts.join(" · ");
+}
+
 function CockpitPage() {
   const { isAdmin } = useCurrentUser();
   useTopBarActions(
@@ -36,8 +45,9 @@ function CockpitAdminPage() {
   const feedQ = useQuery({ queryKey: ["activity"], queryFn: () => fetchFeed(), retry: false });
 
   const m = metricsQ.data;
+  const salesLabel = m?.salesTodayByCurrency ? formatSales(m.salesTodayByCurrency) : "R$ 0,00";
   useTopBarQuickStat(
-    m?.canViewFinancials ? { label: "Vendas hoje", value: `€ ${m.salesToday.toFixed(2)}` } : null,
+    m?.canViewFinancials ? { label: "Vendas hoje", value: salesLabel } : null,
   );
 
   if (metricsQ.error) {
@@ -58,7 +68,7 @@ function CockpitAdminPage() {
           <MetricTile
             className="col-span-12 sm:col-span-6 lg:col-span-3"
             label="Vendas hoje"
-            value={`€ ${m.salesToday.toFixed(2)}`}
+            value={salesLabel}
             hint="Esteira 1 (pagas)"
             icon={Euro}
             accent="success"

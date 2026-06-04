@@ -39,7 +39,11 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
         .gte("arrived_at", isoToday).order("arrived_at", { ascending: false }),
     ]);
 
-    const salesToday = (todayOrders.data ?? []).reduce((s, o) => s + (o.amount_cents ?? 0), 0);
+    const salesTodayByCurrency = { BRL: 0, EUR: 0 };
+    for (const o of todayOrders.data ?? []) {
+      const cur = (o.currency === "EUR" ? "EUR" : "BRL") as "BRL" | "EUR";
+      salesTodayByCurrency[cur] += (o.amount_cents ?? 0) / 100;
+    }
 
     // Bucket by day
     const buckets: Record<string, number> = {};
@@ -55,7 +59,7 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
     const revenueSeries = Object.entries(buckets).map(([date, value]) => ({ date, value }));
 
     return {
-      salesToday: salesToday / 100,
+      salesTodayByCurrency,
       canViewFinancials: isAdmin,
       newMembers: monthlyMembers.count ?? 0,
       appointmentsToday: (todayAppts.data ?? []).length,
