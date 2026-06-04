@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, Lock, Play } from "lucide-react";
+import { CheckCircle2, Clock, Hourglass, Lock, Play } from "lucide-react";
 
 export type LessonCardItem = {
   id: string;
@@ -15,6 +15,7 @@ export function LessonCard({
   moduleTitle,
   active,
   locked,
+  comingSoon,
   completed,
   onSelect,
   size = "md",
@@ -23,21 +24,25 @@ export function LessonCard({
   moduleTitle?: string;
   active?: boolean;
   locked?: boolean;
+  comingSoon?: boolean;
   completed?: boolean;
   onSelect: () => void;
   size?: "md" | "lg";
 }) {
   const isNew =
     !!lesson.published_at &&
+    !comingSoon &&
     Date.now() - new Date(lesson.published_at).getTime() < 14 * 24 * 60 * 60 * 1000;
 
   const width =
     size === "lg" ? "w-[320px] md:w-[440px]" : "w-[260px] md:w-[320px]";
 
+  const disabled = locked || comingSoon;
+
   return (
     <button
       onClick={onSelect}
-      disabled={locked}
+      disabled={disabled}
       className={`group relative shrink-0 ${width} snap-start rounded-xl overflow-hidden text-left transition-all border bg-admin-surface-2 disabled:cursor-not-allowed
         ${active ? "border-orange-brand ring-2 ring-orange-brand/50" : "border-admin-border hover:border-yellow-brand/50"}
       `}
@@ -48,7 +53,7 @@ export function LessonCard({
             src={lesson.thumbnail_url}
             alt={lesson.title}
             className={`w-full h-full object-cover transition-transform duration-500 ${
-              locked ? "blur-sm grayscale opacity-70" : "group-hover:scale-[1.04]"
+              disabled ? "blur-sm grayscale opacity-70" : "group-hover:scale-[1.04]"
             }`}
           />
         ) : (
@@ -79,19 +84,24 @@ export function LessonCard({
 
         {/* Badges */}
         <div className="absolute top-2 left-2 flex gap-1.5">
+          {comingSoon && (
+            <span className="rounded-md bg-yellow-brand/90 px-1.5 py-0.5 text-[9px] uppercase tracking-wider font-display text-brown-deep">
+              Em breve
+            </span>
+          )}
           {isNew && !locked && (
             <span className="rounded-md bg-orange-brand px-1.5 py-0.5 text-[9px] uppercase tracking-wider font-display text-offwhite">
               Novo
             </span>
           )}
-          {lesson.is_featured && !locked && (
+          {lesson.is_featured && !locked && !comingSoon && (
             <span className="rounded-md bg-yellow-brand/90 px-1.5 py-0.5 text-[9px] uppercase tracking-wider font-display text-brown-deep">
               Destaque
             </span>
           )}
         </div>
 
-        {completed && (
+        {completed && !comingSoon && (
           <div className="absolute top-2 right-2 rounded-full bg-emerald-500/90 p-1">
             <CheckCircle2 className="h-3.5 w-3.5 text-white" />
           </div>
@@ -103,8 +113,17 @@ export function LessonCard({
           </div>
         ) : null}
 
-        {/* Center play / locked */}
-        {locked ? (
+        {/* Center: locked / coming soon / play */}
+        {comingSoon ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/40">
+            <div className="h-12 w-12 rounded-full bg-black/60 border border-yellow-brand/40 flex items-center justify-center">
+              <Hourglass className="h-5 w-5 text-yellow-brand" />
+            </div>
+            <span className="text-[10px] uppercase tracking-widest font-display text-yellow-brand">
+              Em breve
+            </span>
+          </div>
+        ) : locked ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/40">
             <div className="h-12 w-12 rounded-full bg-black/60 border border-yellow-brand/40 flex items-center justify-center">
               <Lock className="h-5 w-5 text-yellow-brand" />

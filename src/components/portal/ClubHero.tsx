@@ -1,5 +1,9 @@
 import { CheckCircle2, Crown, MessageCircle, Play, Sparkles } from "lucide-react";
 
+// SVG de textura igual ao do PassportCard (círculos concêntricos + ondas em dourado)
+const PASSPORT_TEXTURE =
+  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><g fill='none' stroke='%23e5a657' stroke-width='1' opacity='0.6'><circle cx='100' cy='200' r='60'/><circle cx='100' cy='200' r='110'/><circle cx='320' cy='100' r='50'/><path d='M0 80 Q100 40 200 80 T400 80'/><path d='M0 320 Q100 280 200 320 T400 320'/></g></svg>\")";
+
 export function ClubHero({
   title,
   subtitle,
@@ -21,34 +25,30 @@ export function ClubHero({
 }) {
   return (
     <header className="relative overflow-hidden rounded-3xl border border-white/10 isolate">
-      {/* Base layer: deep brown gradient */}
+      {/* Base: gradiente marrom Empuria */}
       <div
         className="absolute inset-0 -z-10"
         style={{
           background:
-            "linear-gradient(135deg, oklch(0.22 0.07 38) 0%, oklch(0.16 0.05 32) 60%, oklch(0.12 0.04 30) 100%)",
+            "linear-gradient(135deg, oklch(0.30 0.09 38) 0%, oklch(0.22 0.07 38) 55%, oklch(0.16 0.05 32) 100%)",
         }}
       />
-      {/* Optional cover image with brown overlay */}
+      {/* Cover opcional como camada com overlay */}
       {coverUrl && (
         <div
           className="absolute inset-0 -z-10 opacity-40 mix-blend-overlay"
           style={{ backgroundImage: `url(${coverUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
         />
       )}
-      {/* Radial golden glow */}
+      {/* Glow dourado */}
       <div
         className="absolute -top-32 -right-24 -z-10 h-[420px] w-[420px] rounded-full blur-3xl opacity-30"
         style={{ background: "radial-gradient(circle, oklch(0.78 0.13 75) 0%, transparent 70%)" }}
       />
-      {/* Subtle texture */}
+      {/* Textura passaporte Empuria */}
       <div
-        className="absolute inset-0 -z-10 opacity-[0.06]"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
-          backgroundSize: "22px 22px",
-        }}
+        className="absolute inset-0 -z-10 opacity-25"
+        style={{ backgroundImage: PASSPORT_TEXTURE }}
       />
 
       <div className="p-8 md:p-12 text-offwhite">
