@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { VideoPlayerModal } from "@/components/portal/VideoPlayerModal";
+import { VideoSourceField } from "@/components/admin/clube/VideoSourceField";
 
 type Content = Awaited<ReturnType<typeof getClubData>>["content"][number];
 type Post = Awaited<ReturnType<typeof getClubData>>["posts"][number];
@@ -270,7 +271,7 @@ function ContentDialog({
   const submit = async () => {
     if (!canSave) return;
     try {
-      await upsert({ data: { id: editing?.id, ...form } });
+      await upsert({ data: { id: editing?.id, ...form, video_source_url: form.video_url } });
       toast.success("Salvo");
       onOpenChange(false);
       onSaved();
@@ -328,11 +329,11 @@ function ContentDialog({
                 rows={4}
               />
             </div>
-            <div>
-              <Label>URL do vídeo</Label>
-              <Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder="https://youtube.com/..." />
-              {videoErr && <p className="text-xs text-admin-danger mt-1">URL inválida.</p>}
-            </div>
+            <VideoSourceField
+              value={form.video_url}
+              onChange={(v) => setForm({ ...form, video_url: v })}
+              error={videoErr}
+            />
             <div>
               <Label>URL da capa (thumbnail)</Label>
               <Input value={form.thumbnail_url} onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })} placeholder="https://..." />

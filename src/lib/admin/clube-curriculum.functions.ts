@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { buildVideoFromUrl } from "@/lib/clube/video-provider";
 
 const requireClube = requireModule("clube");
 
@@ -145,6 +146,7 @@ const lessonSchema = z.object({
   title: z.string().trim().min(2).max(160),
   description: z.string().max(4000).optional(),
   video_url: z.string().url().optional().or(z.literal("")),
+  video_source_url: z.string().url().optional().or(z.literal("")),
   video_provider: z.string().max(40).optional(),
   thumbnail_url: z.string().url().optional().or(z.literal("")),
   duration_minutes: z.number().int().min(0).max(600).optional(),
@@ -157,12 +159,17 @@ export const upsertLesson = createServerFn({ method: "POST" })
   .middleware([requireClube])
   .inputValidator((d) => lessonSchema.parse(d))
   .handler(async ({ data, context }) => {
+    const sourceUrl = (data.video_source_url || data.video_url || "").trim();
+    const built = buildVideoFromUrl(sourceUrl);
     const payload = {
       module_id: data.module_id,
       title: data.title,
       description: data.description ?? null,
-      video_url: data.video_url || null,
-      video_provider: data.video_provider ?? null,
+      video_url: built.source_url, // compat
+      video_source_url: built.source_url,
+      video_provider: built.provider ?? data.video_provider ?? null,
+      video_file_id: built.file_id,
+      video_embed_url: built.embed_url,
       thumbnail_url: data.thumbnail_url || null,
       duration_minutes: data.duration_minutes ?? null,
       position: data.position,

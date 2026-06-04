@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { buildVideoFromUrl } from "@/lib/clube/video-provider";
 
 const requireClube = requireModule("clube");
 
@@ -60,17 +61,24 @@ export const upsertContent = createServerFn({ method: "POST" })
       description: z.string().max(2000).optional(),
       module: z.string().trim().min(1).max(80),
       video_url: z.string().url().optional().or(z.literal("")),
+      video_source_url: z.string().url().optional().or(z.literal("")),
       thumbnail_url: z.string().url().optional().or(z.literal("")),
       position: z.number().int().min(0).default(0),
       is_published: z.boolean().default(false),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const sourceUrl = (data.video_source_url || data.video_url || "").trim();
+    const built = buildVideoFromUrl(sourceUrl);
     const payload = {
       title: data.title,
       description: data.description ?? null,
       module: data.module,
-      video_url: data.video_url || null,
+      video_url: built.source_url, // compat
+      video_source_url: built.source_url,
+      video_provider: built.provider,
+      video_file_id: built.file_id,
+      video_embed_url: built.embed_url,
       thumbnail_url: data.thumbnail_url || null,
       position: data.position,
       is_published: data.is_published,

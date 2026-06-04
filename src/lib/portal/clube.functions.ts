@@ -14,7 +14,7 @@ export const getClubContent = createServerFn({ method: "GET" })
     const userId = context.effectiveUserId ?? context.userId;
 
     const [profileRes, modulesRes, lessonsRes, filesRes, settingsRes, postsRes] = await Promise.all([
-      supabase.from("profiles").select("is_club_member").eq("id", userId).maybeSingle(),
+      supabase.from("profiles").select("is_club_member, full_name").eq("id", userId).maybeSingle(),
       supabase
         .from("club_modules")
         .select("id, title, slug, description, cover_url, position")
@@ -22,7 +22,7 @@ export const getClubContent = createServerFn({ method: "GET" })
         .order("position", { ascending: true }),
       supabase
         .from("club_lessons")
-        .select("id, module_id, title, description, video_url, thumbnail_url, duration_minutes, position, is_featured, published_at")
+        .select("id, module_id, title, description, video_url, video_provider, video_file_id, video_embed_url, video_source_url, thumbnail_url, duration_minutes, position, is_featured, published_at")
         .eq("is_published", true)
         .order("position", { ascending: true }),
       supabase
@@ -39,6 +39,7 @@ export const getClubContent = createServerFn({ method: "GET" })
     ]);
 
     const isMember = !!profileRes.data?.is_club_member;
+    const memberName = (profileRes.data as { full_name?: string | null } | null)?.full_name ?? null;
 
     const [{ data: subscription }, { data: setting }] = await Promise.all([
       db
@@ -56,14 +57,44 @@ export const getClubContent = createServerFn({ method: "GET" })
         .maybeSingle(),
     ]);
 
-    const allLessons = lessonsRes.data ?? [];
+    type LessonRow = {
+      id: string;
+      module_id: string;
+      title: string;
+      description: string | null;
+      video_url: string | null;
+      video_provider: string | null;
+      video_file_id: string | null;
+      video_embed_url: string | null;
+      video_source_url: string | null;
+      thumbnail_url: string | null;
+      duration_minutes: number | null;
+      position: number;
+      is_featured: boolean;
+      published_at: string | null;
+    };
+    const allLessons = (lessonsRes.data ?? []) as LessonRow[];
     const allFiles = (filesRes.data ?? []) as Array<{ id: string; lesson_id: string; label: string; file_url: string; file_type: string; size_bytes: number | null; position: number }>;
 
     const modules = (modulesRes.data ?? []).map((m: { id: string; title: string; slug: string; description: string | null; cover_url: string | null; position: number }) => {
       const lessons = allLessons
-        .filter((l: { module_id: string }) => l.module_id === m.id)
-        .map((l: { id: string; title: string; description: string | null; video_url: string | null; thumbnail_url: string | null; duration_minutes: number | null; position: number; is_featured: boolean }) => ({
-          ...l,
+        .filter((l) => l.module_id === m.id)
+        .map((l) => ({
+          id: l.id,
+          module_id: l.module_id,
+          title: l.title,
+          description: l.description,
+          thumbnail_url: l.thumbnail_url,
+          duration_minutes: l.duration_minutes,
+          position: l.position,
+          is_featured: l.is_featured,
+          published_at: l.published_at,
+          // Para não-membros, removemos os campos que permitiriam reproduzir o vídeo
+          video_url: isMember ? l.video_url : null,
+          video_provider: l.video_provider, // o tipo pode ser exposto, ajuda UI a mostrar badges
+          video_file_id: isMember ? l.video_file_id : null,
+          video_embed_url: isMember ? l.video_embed_url : null,
+          video_source_url: isMember ? l.video_source_url : null,
           files: isMember ? allFiles.filter((f) => f.lesson_id === l.id) : [],
         }));
       return { ...m, lessons };
@@ -71,6 +102,7 @@ export const getClubContent = createServerFn({ method: "GET" })
 
     return {
       isMember,
+      memberName,
       settings: settingsRes.data ?? null,
       modules,
       posts: postsRes.data ?? [],
