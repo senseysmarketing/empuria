@@ -471,7 +471,9 @@ export function CheckoutModal({
         },
       });
       setPayment(result.payment);
+      setPayment(result.payment);
       if (result.payment.orderPaymentStatus === "aprovado") {
+        if (service) clearPendingPix(service.slug);
         toast.success("Pagamento aprovado!");
         setStep("done");
       } else if (result.payment.orderPaymentStatus === "recusado") {
