@@ -204,9 +204,9 @@ function PassaportesPanel() {
         </div>
 
         <div className="grid grid-cols-3 gap-3 pt-2">
-          <MiniTile label="Ativos" value={query.data?.totalActive ?? 0} />
-          <MiniTile label="Membros do Clube" value={query.data?.totalClub ?? 0} accent />
-          <MiniTile label="Novos no mês" value={query.data?.newThisMonth ?? 0} />
+          <AdminStatCard label="Ativos" value={query.data?.totalActive ?? 0} icon={Users} tone="green" />
+          <AdminStatCard label="Membros do Clube" value={query.data?.totalClub ?? 0} icon={Crown} tone="amber" />
+          <AdminStatCard label="Novos no mês" value={query.data?.newThisMonth ?? 0} icon={Sparkles} tone="blue" />
         </div>
       </div>
 
