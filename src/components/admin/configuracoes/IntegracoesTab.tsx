@@ -237,7 +237,6 @@ export function IntegracoesTab() {
           pix_enabled: mpPixEnabled,
           boleto_enabled: mpBoletoEnabled,
           card_enabled: mpCardEnabled,
-          pix_expiration_minutes: numberFromForm(form.get("pix_expiration_minutes"), 30),
           boleto_expiration_days: numberFromForm(form.get("boleto_expiration_days"), 3),
         },
       }),
