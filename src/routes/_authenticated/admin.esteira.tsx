@@ -126,7 +126,11 @@ function EsteiraPage() {
   const refund = useServerFn(refundOrder);
   const genLink = useServerFn(generatePaymentLink);
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<string>("todos");
+  const [search, setSearch] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [deliveryFilter, setDeliveryFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [voucherUrl, setVoucherUrl] = useState<string | null>(null);
   const [voucherCode, setVoucherCode] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
