@@ -456,6 +456,7 @@ export function CheckoutModal({
 
   const generatePayment = async (method: PaymentTab) => {
     if (!intent) return;
+    if (method === "boleto") setBoletoError(null);
     setPaymentLoading(method);
     try {
       const result = await createPayment({
@@ -477,6 +478,18 @@ export function CheckoutModal({
           card: undefined,
         },
       });
+      const status = (result.payment.status ?? "").toLowerCase();
+      if (status === "rejected") {
+        const msg =
+          humanizePaymentRejection(result.payment.status, result.payment.statusDetail) ??
+          "Pagamento recusado. Revise os dados e tente novamente.";
+        if (method === "boleto") {
+          setBoletoError(msg);
+        } else {
+          toast.error(msg);
+        }
+        return;
+      }
       setPayment(result.payment);
       if (method === "pix" && service && result.payment.expiresAt) {
         savePendingPix(service.slug, {
