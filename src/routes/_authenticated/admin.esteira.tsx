@@ -111,6 +111,13 @@ function EsteiraPage() {
     order: Order;
   } | null>(null);
   const [reasonInput, setReasonInput] = useState("");
+  const [linkModal, setLinkModal] = useState<{
+    order: Order;
+    loading: boolean;
+    reference: string | null;
+    paymentUrl: string | null;
+    error: string | null;
+  } | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
