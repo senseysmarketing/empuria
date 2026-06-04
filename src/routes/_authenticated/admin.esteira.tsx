@@ -278,13 +278,13 @@ function EsteiraPage() {
 
       {canViewFinancials && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <Tile label="Pedidos hoje" value={summary.todayCount} />
-          <Tile label="Aguardando pagamento" value={summary.waiting} />
-          <Tile label="Pagos hoje" value={summary.paidToday} />
-          <Tile label="Em execução" value={summary.inExec} />
-          <Tile label="Atrasados" value={summary.late} />
-          <Tile label="Receita BRL" value={`R$ ${(summary.brl / 100).toFixed(2)}`} />
-          <Tile label="Receita EUR" value={`€ ${(summary.eur / 100).toFixed(2)}`} />
+          <AdminStatCard label="Pedidos hoje" value={summary.todayCount} icon={ShoppingCart} tone="blue" />
+          <AdminStatCard label="Aguardando pagamento" value={summary.waiting} icon={Clock} tone="amber" />
+          <AdminStatCard label="Pagos hoje" value={summary.paidToday} icon={CheckCircle2} tone="green" />
+          <AdminStatCard label="Em execução" value={summary.inExec} icon={Loader2} tone="blue" />
+          <AdminStatCard label="Atrasados" value={summary.late} icon={AlertTriangle} tone="red" />
+          <AdminStatCard label="Receita BRL" value={`R$ ${(summary.brl / 100).toFixed(2)}`} icon={TrendingUp} tone="green" />
+          <AdminStatCard label="Receita EUR" value={`€ ${(summary.eur / 100).toFixed(2)}`} icon={Euro} tone="neutral" />
         </div>
       )}
 
