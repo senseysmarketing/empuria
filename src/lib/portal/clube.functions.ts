@@ -128,6 +128,10 @@ export const getClubContent = createServerFn({ method: "GET" })
     const lastOpenedLessonId =
       progressRows.find((p) => publishedIds.has(p.lesson_id))?.lesson_id ?? null;
 
+    const favoriteIds = ((favoritesRes.data ?? []) as Array<{ lesson_id: string }>).map(
+      (r) => r.lesson_id
+    );
+
     return {
       isMember,
       memberName,
@@ -136,6 +140,14 @@ export const getClubContent = createServerFn({ method: "GET" })
       posts: postsRes.data ?? [],
       subscription: subscription ?? null,
       lastOpenedLessonId,
+      favoriteLessonIds: favoriteIds,
+      certificates: (certificatesRes.data ?? []) as Array<{
+        id: string;
+        code: string;
+        scope: "module" | "club";
+        module_id: string | null;
+        issued_at: string;
+      }>,
       hubla: {
         isEnabled: !!setting?.is_enabled,
         checkoutUrl: setting?.checkout_url ?? null,
