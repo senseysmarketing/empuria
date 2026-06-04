@@ -476,34 +476,116 @@ export function NewOrderWizard({
           </div>
         )}
 
+        {step === 5 && createdOrder && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 rounded border border-emerald-200 bg-emerald-50">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
+              <div>
+                <div className="font-medium text-emerald-900">Pedido criado com sucesso</div>
+                <div className="text-xs text-emerald-800/80">
+                  {customer?.full_name} ·{" "}
+                  {serviceMode === "cadastrado" ? service?.title : customTitle}
+                </div>
+              </div>
+            </div>
+
+            {createdOrder.method === "mercadopago" && (
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  Aguardando confirmação do Mercado Pago. O pedido será atualizado automaticamente
+                  quando o pagamento for concluído.
+                </div>
+                {createdOrder.paymentUrl && (
+                  <div>
+                    <Label>Link de pagamento</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input readOnly value={createdOrder.paymentUrl} className="font-mono text-xs" />
+                      <Button
+                        variant="outline"
+                        onClick={() => copy(createdOrder.paymentUrl!, "Link")}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button asChild variant="outline">
+                        <a href={createdOrder.paymentUrl} target="_blank" rel="noreferrer">
+                          <Link2 className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Envie este link ao cliente. Ele conclui o pagamento (Pix/Boleto) pelo portal.
+                    </p>
+                  </div>
+                )}
+                {createdOrder.reference && (
+                  <div>
+                    <Label>Referência Mercado Pago</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input readOnly value={createdOrder.reference} className="font-mono text-xs" />
+                      <Button
+                        variant="outline"
+                        onClick={() => copy(createdOrder.reference!, "Referência")}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {createdOrder.method !== "mercadopago" && (
+              <div className="text-sm text-muted-foreground">
+                {createdOrder.method === "gratuito"
+                  ? "Pedido registrado como gratuito."
+                  : "Pagamento marcado como recebido manualmente."}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex justify-between pt-4 border-t">
-          <Button
-            variant="ghost"
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
-            disabled={step === 1}
-          >
-            Voltar
-          </Button>
-          {step < 4 ? (
-            <Button
-              onClick={() => setStep((s) => s + 1)}
-              disabled={
-                (step === 1 && !customer) ||
-                (step === 2 &&
-                  (serviceMode === "cadastrado" ? !service : customTitle.length < 2)) ||
-                (step === 3 && (amount === "" || (isFree && !confirmFree)))
-              }
-            >
-              Próximo
-            </Button>
+          {step === 5 ? (
+            <>
+              <span />
+              <Button
+                onClick={() => onOpenChange(false)}
+                className="bg-admin-accent hover:bg-admin-accent/90"
+              >
+                Fechar
+              </Button>
+            </>
           ) : (
-            <Button
-              onClick={submit}
-              disabled={!canSubmit}
-              className="bg-admin-accent hover:bg-admin-accent/90"
-            >
-              Criar pedido
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => setStep((s) => Math.max(1, s - 1))}
+                disabled={step === 1}
+              >
+                Voltar
+              </Button>
+              {step < 4 ? (
+                <Button
+                  onClick={() => setStep((s) => s + 1)}
+                  disabled={
+                    (step === 1 && !customer) ||
+                    (step === 2 &&
+                      (serviceMode === "cadastrado" ? !service : customTitle.length < 2)) ||
+                    (step === 3 && (amount === "" || (isFree && !confirmFree)))
+                  }
+                >
+                  Próximo
+                </Button>
+              ) : (
+                <Button
+                  onClick={submit}
+                  disabled={!canSubmit || submitting}
+                  className="bg-admin-accent hover:bg-admin-accent/90"
+                >
+                  {submitting ? "Criando..." : "Criar pedido"}
+                </Button>
+              )}
+            </>
           )}
         </div>
       </DialogContent>
