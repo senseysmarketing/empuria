@@ -139,18 +139,14 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
           {/* Create */}
           <div className="rounded-xl border border-admin-border bg-admin-bg/50 p-4 space-y-3">
             <h4 className="text-sm font-display text-admin-ink-muted">Nova categoria</h4>
-            <div className="grid grid-cols-[60px_1fr_1fr_80px_auto] gap-2 items-end">
+            <div className="grid grid-cols-[60px_1fr_80px_auto] gap-2 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">Emoji</Label>
                 <Input value={newForm.emoji} onChange={(e) => setNewForm({ ...newForm, emoji: e.target.value })} className="bg-admin-surface border-admin-border text-center" maxLength={4} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Nome</Label>
-                <Input value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value, slug: newForm.slug || slugify(e.target.value) })} className="bg-admin-surface border-admin-border" placeholder="Ex: Sobremesas" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Slug</Label>
-                <Input value={newForm.slug} onChange={(e) => setNewForm({ ...newForm, slug: e.target.value })} className="bg-admin-surface border-admin-border" placeholder="sobremesas" />
+                <Input value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value })} className="bg-admin-surface border-admin-border" placeholder="Ex: Sobremesas" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Ordem</Label>
