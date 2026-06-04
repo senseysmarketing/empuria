@@ -184,7 +184,21 @@ function formatBrazilExpiration(iso: string) {
 function notificationUrl() {
   try {
     const host = getRequestHost();
-    if (host) return `https://${host}/api/webhooks/mercadopago`;
+    if (!host) return undefined;
+    // Mercado Pago rejects non-public URLs (localhost, IPs, .local, etc.).
+    // Only send notification_url when host is a publicly reachable domain.
+    const hostname = host.split(":")[0].toLowerCase();
+    const isPublic =
+      hostname.includes(".") &&
+      !hostname.endsWith(".local") &&
+      hostname !== "localhost" &&
+      !hostname.startsWith("127.") &&
+      !hostname.startsWith("0.") &&
+      !hostname.startsWith("192.168.") &&
+      !hostname.startsWith("10.") &&
+      !/^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+    if (!isPublic) return undefined;
+    return `https://${host}/api/webhooks/mercadopago`;
   } catch {
     /* fora de request context */
   }
