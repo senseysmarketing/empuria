@@ -809,16 +809,15 @@ export async function processMercadoPagoWebhook(
   const eventId = eventInsert.id as string;
   try {
     const dataId = asString(deepGet(payload, ["data", "id"])) ?? providerEventId;
-    const byColumn = dataId?.startsWith("ORD") ? "provider_order_id" : "provider_payment_id";
     const { data: payment } = await db
       .from("mercadopago_payments")
       .select("*")
-      .eq(byColumn, dataId)
+      .eq("provider_payment_id", dataId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     const row = payment as MercadoPagoPaymentRow | null;
-    if (!row?.provider_order_id) {
+    if (!row?.provider_payment_id) {
       await db
         .from("integration_events")
         .update({
