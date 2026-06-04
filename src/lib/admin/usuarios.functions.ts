@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireStaff } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Database } from "@/integrations/supabase/types";
 import { createOrReuseManualCustomer } from "./manual-users";
 import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
