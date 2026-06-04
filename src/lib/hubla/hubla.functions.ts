@@ -158,9 +158,10 @@ function parseHublaPayload(
   const buyerEmail = normalizeEmail(
     deepFind(payload, ["email", "buyer_email", "buyerEmail", "customer_email", "customerEmail"]),
   );
-  const buyerPhone = asString(
+  const rawBuyerPhone = asString(
     deepFind(payload, ["phone", "buyer_phone", "buyerPhone", "whatsapp"]),
   );
+  const buyerPhone = rawBuyerPhone ? (normalizeE164Phone(rawBuyerPhone) ?? rawBuyerPhone) : null;
   const buyerName = asString(
     deepFind(payload, ["name", "full_name", "fullName", "buyer_name", "buyerName"]),
   );
