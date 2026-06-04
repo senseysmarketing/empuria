@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarClock, Eye, Loader2, Lock, RotateCcw, Search, ShieldAlert } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Eye, Loader2, Lock, RotateCcw, Search, ShieldAlert } from "lucide-react";
+import { BentoCard } from "@/components/admin/BentoCard";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
