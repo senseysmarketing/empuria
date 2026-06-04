@@ -23,7 +23,7 @@ function slugify(s: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-const emptyForm = { name: "", slug: "", emoji: "", position: 0, is_active: true };
+const emptyForm = { name: "", emoji: "", position: 0, is_active: true };
 
 export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const fetchList = useServerFn(listCategories);
