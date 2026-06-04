@@ -343,10 +343,10 @@ function CrmPage() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric icon={UserRound} label="Meus leads" value={metrics.mine} />
-        <Metric icon={CalendarClock} label="Follow-ups pendentes" value={metrics.followups} />
-        <Metric icon={MessageCircle} label="Mensagens novas" value={metrics.inbox} />
-        <Metric icon={Clock} label="Leads atrasados" value={metrics.late} />
+        <Metric icon={UserRound} label="Meus leads" value={metrics.mine} tone="blue" />
+        <Metric icon={CalendarClock} label="Follow-ups pendentes" value={metrics.followups} tone="amber" />
+        <Metric icon={MessageCircle} label="Mensagens novas" value={metrics.inbox} tone="green" />
+        <Metric icon={Clock} label="Leads atrasados" value={metrics.late} tone="red" />
       </section>
 
       <section className="flex flex-col gap-2 rounded-xl border border-admin-border bg-admin-surface p-3 lg:flex-row lg:items-center">
