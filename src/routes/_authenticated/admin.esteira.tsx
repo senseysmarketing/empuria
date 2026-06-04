@@ -187,14 +187,48 @@ function EsteiraPage() {
     refresh();
   };
 
-  const doGenLink = async (id: string) => {
+  const doGenLink = async (o: Order) => {
+    const cur = (o.payment_currency ?? o.currency ?? "EUR").toUpperCase();
+    if (cur !== "BRL") {
+      setLinkModal({
+        order: o,
+        loading: false,
+        reference: null,
+        paymentUrl: null,
+        error:
+          "Mercado Pago só processa em Reais (BRL). Edite o pedido para usar moeda BRL antes de gerar o link.",
+      });
+      return;
+    }
+    setLinkModal({ order: o, loading: true, reference: null, paymentUrl: null, error: null });
     try {
-      const r = await genLink({ data: { id } });
-      toast.info(r.message ?? "Link gerado");
+      const r = await genLink({ data: { id: o.id } });
+      const url =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/portal/servicos?order=${o.id}`
+          : null;
+      setLinkModal({
+        order: o,
+        loading: false,
+        reference: r.reference ?? `EMP-${o.id}`,
+        paymentUrl: url,
+        error: null,
+      });
       refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro");
+      setLinkModal({
+        order: o,
+        loading: false,
+        reference: null,
+        paymentUrl: null,
+        error: e instanceof Error ? e.message : "Erro ao gerar link",
+      });
     }
+  };
+
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado`);
   };
 
   const runPrompt = async () => {
