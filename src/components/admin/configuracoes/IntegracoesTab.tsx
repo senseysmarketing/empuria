@@ -900,14 +900,10 @@ function MercadoPagoConfigDialog({
           <Field label="Moeda padrao">
             <Input value="BRL" readOnly />
           </Field>
-          <Field label="Expiracao Pix (minutos)">
-            <Input
-              name="pix_expiration_minutes"
-              type="number"
-              min={5}
-              max={1440}
-              defaultValue={setting?.pix_expiration_minutes ?? 30}
-            />
+          <Field label="Expiracao Pix">
+            <div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground">
+              PIX válido por 30 minutos
+            </div>
           </Field>
           <Field label="Expiracao boleto (dias)">
             <Input
