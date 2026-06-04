@@ -786,11 +786,11 @@ function FollowupsTab({
   return (
     <div className="space-y-4">
       <section className="grid gap-3 md:grid-cols-5">
-        <Metric icon={Clock} label="Atrasados" value={overdue.length} />
-        <Metric icon={CalendarClock} label="Hoje" value={today.length} />
-        <Metric icon={ArrowRight} label="Proximos" value={upcoming.length} />
-        <Metric icon={MessageCircle} label="Sugeridos" value={suggestions.length} />
-        <Metric icon={CheckCircle2} label="Concluidos" value={done.length} />
+        <Metric icon={Clock} label="Atrasados" value={overdue.length} tone="red" />
+        <Metric icon={CalendarClock} label="Hoje" value={today.length} tone="amber" />
+        <Metric icon={ArrowRight} label="Proximos" value={upcoming.length} tone="blue" />
+        <Metric icon={MessageCircle} label="Sugeridos" value={suggestions.length} tone="neutral" />
+        <Metric icon={CheckCircle2} label="Concluidos" value={done.length} tone="green" />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
