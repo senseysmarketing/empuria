@@ -78,15 +78,21 @@ const DELIVERY_COLOR: Record<string, string> = {
   concluido: "bg-emerald-50 text-emerald-800",
 };
 
-const FILTERS = [
-  { key: "todos", label: "Todos" },
-  { key: "pendente", label: "Pendentes" },
-  { key: "aguardando_pagamento", label: "Aguardando pagamento" },
-  { key: "aprovado", label: "Pagos" },
-  { key: "processando", label: "Em execução" },
-  { key: "concluido", label: "Concluídos" },
-  { key: "recusado", label: "Cancelados" },
-  { key: "estornado", label: "Estornados" },
+const PAYMENT_OPTIONS: { value: string; label: string }[] = [
+  { value: "all", label: "Todos pagamentos" },
+  { value: "pendente", label: "Pendente" },
+  { value: "aprovado", label: "Aprovado" },
+  { value: "recusado", label: "Recusado" },
+  { value: "estornado", label: "Estornado" },
+];
+
+const DELIVERY_OPTIONS: { value: string; label: string }[] = [
+  { value: "all", label: "Todas execuções" },
+  { value: "aguardando_pagamento", label: "Aguardando pagamento" },
+  { value: "aguardando_documentos", label: "Aguardando documentos" },
+  { value: "processando", label: "Processando" },
+  { value: "agendado", label: "Agendado" },
+  { value: "concluido", label: "Concluído" },
 ];
 
 type Order = {
