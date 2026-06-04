@@ -67,10 +67,8 @@ export const listAllComments = createServerFn({ method: "GET" })
       stats: {
         totalComments: rows.length,
         hiddenComments: rows.filter((r) => r.is_hidden).length,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        totalFavorites: ((favCount as any) ?? null) ?? 0,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        totalCertificates: ((certCount as any) ?? null) ?? 0,
+        totalFavorites: (favCount as number | null) ?? 0,
+        totalCertificates: (certCount as number | null) ?? 0,
       },
     };
   });
