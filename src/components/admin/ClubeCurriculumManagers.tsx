@@ -686,6 +686,7 @@ function LessonDialog({
         title: title.trim(),
         description: description.trim() || undefined,
         video_url: videoUrl.trim() || undefined,
+        video_source_url: videoUrl.trim() || undefined,
         thumbnail_url: thumbUrl.trim() || undefined,
         duration_minutes: duration === "" ? undefined : Number(duration),
         position,
