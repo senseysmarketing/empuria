@@ -16,6 +16,12 @@ type MercadoPagoSetting = {
   public_key: string | null;
   access_token: string | null;
   webhook_secret: string | null;
+  test_public_key: string | null;
+  test_access_token: string | null;
+  test_webhook_secret: string | null;
+  prod_public_key: string | null;
+  prod_access_token: string | null;
+  prod_webhook_secret: string | null;
   default_currency: "BRL" | "EUR" | "USD";
   statement_descriptor: string;
   pix_enabled: boolean;
@@ -237,6 +243,27 @@ function maskedSetting(setting: MercadoPagoSetting): MercadoPagoSetting {
     ...setting,
     access_token: setting.access_token ? "********" : null,
     webhook_secret: setting.webhook_secret ? "********" : null,
+    test_access_token: setting.test_access_token ? "********" : null,
+    test_webhook_secret: setting.test_webhook_secret ? "********" : null,
+    prod_access_token: setting.prod_access_token ? "********" : null,
+    prod_webhook_secret: setting.prod_webhook_secret ? "********" : null,
+  };
+}
+
+function applyEnvironmentCredentials(row: MercadoPagoSetting): MercadoPagoSetting {
+  if (row.environment === "production") {
+    return {
+      ...row,
+      public_key: row.prod_public_key ?? null,
+      access_token: row.prod_access_token ?? null,
+      webhook_secret: row.prod_webhook_secret ?? null,
+    };
+  }
+  return {
+    ...row,
+    public_key: row.test_public_key ?? null,
+    access_token: row.test_access_token ?? null,
+    webhook_secret: row.test_webhook_secret ?? null,
   };
 }
 
@@ -247,13 +274,19 @@ async function getMercadoPagoSetting(includeSecrets = false): Promise<MercadoPag
     .eq("provider", "mercadopago")
     .maybeSingle();
   if (error) throw new Error(error.message);
-  const row = (data as MercadoPagoSetting | null) ?? {
+  const base: MercadoPagoSetting = (data as MercadoPagoSetting | null) ?? {
     provider: "mercadopago",
     is_enabled: false,
     environment: "test",
     public_key: null,
     access_token: null,
     webhook_secret: null,
+    test_public_key: null,
+    test_access_token: null,
+    test_webhook_secret: null,
+    prod_public_key: null,
+    prod_access_token: null,
+    prod_webhook_secret: null,
     default_currency: "BRL",
     statement_descriptor: "EMPURIA",
     pix_enabled: true,
@@ -263,7 +296,8 @@ async function getMercadoPagoSetting(includeSecrets = false): Promise<MercadoPag
     boleto_expiration_days: 3,
     last_event_at: null,
   };
-  return includeSecrets ? row : maskedSetting(row);
+  const withActive = applyEnvironmentCredentials(base);
+  return includeSecrets ? withActive : maskedSetting(withActive);
 }
 
 async function mpFetch<T>(
@@ -538,9 +572,12 @@ export const saveMercadoPagoSettings = createServerFn({ method: "POST" })
       .object({
         is_enabled: z.boolean(),
         environment: z.enum(["test", "production"]),
-        public_key: z.string().trim().max(300).nullable().optional(),
-        access_token: z.string().trim().max(500).nullable().optional(),
-        webhook_secret: z.string().trim().max(300).nullable().optional(),
+        test_public_key: z.string().trim().max(300).nullable().optional(),
+        test_access_token: z.string().trim().max(500).nullable().optional(),
+        test_webhook_secret: z.string().trim().max(300).nullable().optional(),
+        prod_public_key: z.string().trim().max(300).nullable().optional(),
+        prod_access_token: z.string().trim().max(500).nullable().optional(),
+        prod_webhook_secret: z.string().trim().max(300).nullable().optional(),
         default_currency: z.enum(["BRL", "EUR", "USD"]).default("BRL"),
         statement_descriptor: z.string().trim().min(3).max(22).default("EMPURIA"),
         pix_enabled: z.boolean(),
@@ -556,7 +593,6 @@ export const saveMercadoPagoSettings = createServerFn({ method: "POST" })
       provider: "mercadopago",
       is_enabled: data.is_enabled,
       environment: data.environment,
-      public_key: emptyToNull(data.public_key),
       default_currency: data.default_currency,
       statement_descriptor: data.statement_descriptor,
       pix_enabled: data.pix_enabled,
@@ -565,8 +601,42 @@ export const saveMercadoPagoSettings = createServerFn({ method: "POST" })
       pix_expiration_minutes: data.pix_expiration_minutes,
       boleto_expiration_days: data.boleto_expiration_days,
     };
-    if (data.access_token) update.access_token = data.access_token;
-    if (data.webhook_secret) update.webhook_secret = data.webhook_secret;
+    // Persist explicit nulls when the user clears a field; only "undefined" means "keep".
+    if (data.test_public_key !== undefined) update.test_public_key = emptyToNull(data.test_public_key);
+    if (data.test_access_token !== undefined && data.test_access_token !== null && data.test_access_token !== "") {
+      update.test_access_token = data.test_access_token;
+    }
+    if (data.test_webhook_secret !== undefined && data.test_webhook_secret !== null && data.test_webhook_secret !== "") {
+      update.test_webhook_secret = data.test_webhook_secret;
+    }
+    if (data.prod_public_key !== undefined) update.prod_public_key = emptyToNull(data.prod_public_key);
+    if (data.prod_access_token !== undefined && data.prod_access_token !== null && data.prod_access_token !== "") {
+      update.prod_access_token = data.prod_access_token;
+    }
+    if (data.prod_webhook_secret !== undefined && data.prod_webhook_secret !== null && data.prod_webhook_secret !== "") {
+      update.prod_webhook_secret = data.prod_webhook_secret;
+    }
+    // Mirror active environment into legacy public_key/access_token/webhook_secret so
+    // callers that still read the flat fields keep working.
+    const activePublic =
+      data.environment === "production"
+        ? data.prod_public_key
+        : data.test_public_key;
+    if (activePublic !== undefined) update.public_key = emptyToNull(activePublic);
+    const activeToken =
+      data.environment === "production"
+        ? data.prod_access_token
+        : data.test_access_token;
+    if (activeToken !== undefined && activeToken !== null && activeToken !== "") {
+      update.access_token = activeToken;
+    }
+    const activeWebhook =
+      data.environment === "production"
+        ? data.prod_webhook_secret
+        : data.test_webhook_secret;
+    if (activeWebhook !== undefined && activeWebhook !== null && activeWebhook !== "") {
+      update.webhook_secret = activeWebhook;
+    }
 
     const { error } = await db
       .from("integration_settings")
@@ -578,9 +648,14 @@ export const saveMercadoPagoSettings = createServerFn({ method: "POST" })
       module: "configuracoes",
       entity_type: "integration_settings",
       new_data: {
-        ...update,
-        access_token: data.access_token ? "[updated]" : "[unchanged]",
-        webhook_secret: data.webhook_secret ? "[updated]" : "[unchanged]",
+        is_enabled: data.is_enabled,
+        environment: data.environment,
+        test_public_key: emptyToNull(data.test_public_key ?? null),
+        prod_public_key: emptyToNull(data.prod_public_key ?? null),
+        test_access_token: data.test_access_token ? "[updated]" : "[unchanged]",
+        test_webhook_secret: data.test_webhook_secret ? "[updated]" : "[unchanged]",
+        prod_access_token: data.prod_access_token ? "[updated]" : "[unchanged]",
+        prod_webhook_secret: data.prod_webhook_secret ? "[updated]" : "[unchanged]",
       } as Json,
     });
     return { ok: true };
@@ -590,15 +665,46 @@ export const testMercadoPagoConfiguration = createServerFn({ method: "GET" })
   .middleware([requireModule("configuracoes")])
   .handler(async () => {
     const setting = await getMercadoPagoSetting(true);
+    const envLabel = setting.environment === "production" ? "Producao" : "Teste";
     const missing = [
       ...(!setting.public_key ? ["public_key"] : []),
       ...(!setting.access_token ? ["access_token"] : []),
       ...(!setting.webhook_secret ? ["webhook_secret"] : []),
     ];
-    if (missing.length) return { ok: false, missing, message: "Configuracao incompleta." };
+    if (missing.length) {
+      return {
+        ok: false,
+        missing,
+        message: `Configuracao incompleta para o ambiente de ${envLabel}. Preencha as credenciais antes de testar.`,
+      };
+    }
     try {
-      await mpFetch("/users/me", setting);
-      return { ok: true, missing: [], message: "Credenciais validadas." };
+      const me = await mpFetch<Record<string, unknown>>("/users/me", setting);
+      const siteId = asString(me.site_id);
+      const liveMode = (me as { live_mode?: boolean }).live_mode;
+      const nickname = asString(me.nickname) ?? asString(me.email) ?? "conta";
+      const issues: string[] = [];
+      if (siteId && siteId !== "MLB") {
+        issues.push(
+          `A conta esta no site ${siteId}. Pix exige conta brasileira (site MLB).`,
+        );
+      }
+      if (setting.environment === "production" && liveMode === false) {
+        issues.push("Credenciais de teste enviadas no ambiente de Producao.");
+      }
+      if (setting.environment === "test" && liveMode === true) {
+        issues.push(
+          "Credenciais de Producao (live) enviadas no ambiente de Teste. Use as credenciais TEST da mesma aplicacao.",
+        );
+      }
+      if (issues.length) {
+        return { ok: false, missing: [], message: issues.join(" ") };
+      }
+      return {
+        ok: true,
+        missing: [],
+        message: `Credenciais ${envLabel} validadas (conta ${nickname}, site ${siteId ?? "?"}, live_mode=${String(liveMode)}).`,
+      };
     } catch (error) {
       return {
         ok: false,
