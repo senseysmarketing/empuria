@@ -398,6 +398,8 @@ function snapshotFromResponse(response: Record<string, unknown>, fallbackExpires
       fallbackExpiresAt,
   };
 }
+
+async function syncOrderFromPayment(row: MercadoPagoPaymentRow) {
   const status = mapPaymentStatus(row.status, row.status_detail);
   const patch: Record<string, unknown> = {
     payment_provider: "mercadopago",
