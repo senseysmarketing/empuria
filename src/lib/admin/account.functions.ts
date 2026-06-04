@@ -27,11 +27,15 @@ export const updateMyProfile = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const rawPhone = data.phone?.trim() || null;
+    const phone = rawPhone ? (normalizePhone(rawPhone) ?? rawPhone) : null;
+    const phoneCountry = phone ? getCountryFromPhone(phone) : null;
     const { error } = await supabaseAdmin
       .from("profiles")
       .update({
         full_name: data.full_name,
-        phone: data.phone ?? null,
+        phone,
+        phone_country_iso: phoneCountry,
         avatar_url: data.avatar_url ?? null,
       })
       .eq("id", context.userId);
