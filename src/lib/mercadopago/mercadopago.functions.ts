@@ -587,7 +587,7 @@ export const saveMercadoPagoSettings = createServerFn({ method: "POST" })
         pix_enabled: z.boolean(),
         boleto_enabled: z.boolean(),
         card_enabled: z.boolean(),
-        pix_expiration_minutes: z.number().int().min(5).max(1440),
+        pix_expiration_minutes: z.number().int().min(5).max(1440).optional(),
         boleto_expiration_days: z.number().int().min(1).max(30),
       })
       .parse(d),
@@ -602,7 +602,7 @@ export const saveMercadoPagoSettings = createServerFn({ method: "POST" })
       pix_enabled: data.pix_enabled,
       boleto_enabled: data.boleto_enabled,
       card_enabled: data.card_enabled,
-      pix_expiration_minutes: data.pix_expiration_minutes,
+      pix_expiration_minutes: PIX_EXPIRATION_MINUTES,
       boleto_expiration_days: data.boleto_expiration_days,
     };
     // Persist explicit nulls when the user clears a field; only "undefined" means "keep".
