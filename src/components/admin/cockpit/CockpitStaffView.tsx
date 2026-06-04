@@ -36,34 +36,37 @@ export function CockpitStaffView() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-12 gap-4">
-        <MetricTile
+        <AdminStatCard
           className="col-span-12 sm:col-span-6 lg:col-span-3"
           label="Minhas tarefas"
           value={myTasksToday.length}
           hint="Pendentes para hoje"
           icon={ListTodo}
-          accent="accent"
+          tone="amber"
         />
-        <MetricTile
+        <AdminStatCard
           className="col-span-12 sm:col-span-6 lg:col-span-3"
           label="Reuniões hoje"
           value={m?.appointmentsToday ?? "—"}
           hint="Agenda do dia"
           icon={CalendarClock}
+          tone="blue"
         />
-        <MetricTile
+        <AdminStatCard
           className="col-span-12 sm:col-span-6 lg:col-span-3"
           label="Chegadas hoje"
           value={m?.todayArrivals.length ?? "—"}
           hint="Recepção física"
           icon={Users}
+          tone="green"
         />
-        <MetricTile
+        <AdminStatCard
           className="col-span-12 sm:col-span-6 lg:col-span-3"
           label="Avisos"
           value={0}
           hint="Avisos operacionais"
           icon={Bell}
+          tone="neutral"
         />
 
         <BentoCard title="Minhas tarefas de hoje" className="col-span-12 lg:col-span-6">
