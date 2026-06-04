@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
+import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
 export type ManualUserOrigin = "admin_created" | "pdv" | "esteira" | "checkout" | "future_crm";
 
