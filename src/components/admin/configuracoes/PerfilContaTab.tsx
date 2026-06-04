@@ -81,7 +81,7 @@ export function PerfilContaTab() {
           </div>
           <div className="space-y-1.5">
             <Label>Telefone</Label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-admin-bg border-admin-border" />
+            <PhoneInput variant="admin" value={phone} onChange={(e164) => setPhone(e164 ?? "")} />
           </div>
           <div className="space-y-1.5">
             <Label>Avatar (URL)</Label>
