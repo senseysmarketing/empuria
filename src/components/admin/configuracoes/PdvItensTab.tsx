@@ -257,10 +257,6 @@ export function PdvItensTab() {
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-admin-bg border-admin-border" />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Slug (identificador)</Label>
-              <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className="bg-admin-bg border-admin-border" placeholder="ex: vinho-tinto" />
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Tipo</Label>
