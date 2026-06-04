@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
 
 export const checkEmail = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ email: z.string().trim().email().max(255) }).parse(d))
