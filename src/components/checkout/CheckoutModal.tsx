@@ -11,6 +11,7 @@ import {
 import { SlotPicker } from "./SlotPicker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, Copy, CreditCard, FileText, Loader2, QrCode, RotateCcw } from "lucide-react";
