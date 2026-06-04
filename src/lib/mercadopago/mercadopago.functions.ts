@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHost } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -168,13 +169,26 @@ function mapPaymentStatus(status?: string | null, detail?: string | null): Order
   return "pendente";
 }
 
-function firstPayment(response: Record<string, unknown>) {
-  const payments = deepGet(response, ["transactions", "payments"]);
-  return Array.isArray(payments) ? (payments[0] as Record<string, unknown> | undefined) : undefined;
+function formatBrazilExpiration(iso: string) {
+  // Mercado Pago exige offset explicito (-03:00), nao aceita "Z".
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // Convert UTC to Sao Paulo (UTC-3) without DST handling (Brasil nao usa mais DST).
+  const local = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  return (
+    `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}` +
+    `T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}.000-03:00`
+  );
 }
 
-function firstPaymentMethod(response: Record<string, unknown>) {
-  return (firstPayment(response)?.payment_method ?? {}) as Record<string, unknown>;
+function notificationUrl() {
+  try {
+    const host = getRequestHost();
+    if (host) return `https://${host}/api/webhooks/mercadopago`;
+  } catch {
+    /* fora de request context */
+  }
+  return undefined;
 }
 
 function publicPayment(row: MercadoPagoPaymentRow) {
@@ -283,11 +297,12 @@ function assertPaymentAllowed(setting: MercadoPagoSetting, method: PaymentMethod
   if (method === "credit_card" && !setting.card_enabled) throw new Error("Cartao esta desativado.");
 }
 
-function buildOrderPayload(args: {
+function buildPaymentPayload(args: {
   order: OrderRow;
   method: PaymentMethod;
   setting: MercadoPagoSetting;
   amountCents: number;
+  fallbackExpiresAt: string | null;
   payer?: {
     cpf?: string;
     zipCode?: string;
@@ -303,7 +318,7 @@ function buildOrderPayload(args: {
     installments: number;
   };
 }) {
-  const amount = centsToAmount(args.amountCents);
+  const transaction_amount = Number(centsToAmount(args.amountCents));
   const { firstName, lastName } = splitName(args.order.customer_name);
   const payer: Record<string, unknown> = {
     email: args.order.customer_email,
@@ -319,53 +334,67 @@ function buildOrderPayload(args: {
       street_number: args.payer?.streetNumber,
       zip_code: onlyDigits(args.payer?.zipCode),
       neighborhood: args.payer?.neighborhood,
-      state: args.payer?.state,
+      federal_unit: args.payer?.state,
       city: args.payer?.city,
     };
   }
 
-  const paymentMethod =
+  const payment_method_id =
     args.method === "pix"
-      ? { id: "pix", type: "bank_transfer" }
+      ? "pix"
       : args.method === "boleto"
-        ? { id: "boleto", type: "ticket" }
-        : {
-            id: args.card?.paymentMethodId,
-            type: "credit_card",
-            token: args.card?.token,
-            installments: args.card?.installments,
-            statement_descriptor: args.setting.statement_descriptor,
-          };
+        ? "bolbradesco"
+        : args.card?.paymentMethodId;
 
-  return {
-    type: "online",
-    external_reference: externalReference(args.order.id),
-    processing_mode: "automatic",
-    total_amount: amount,
+  const payload: Record<string, unknown> = {
+    transaction_amount,
     description: `${args.order.service_title} - Instituto Empuria`.slice(0, 150),
+    external_reference: externalReference(args.order.id),
+    payment_method_id,
+    statement_descriptor: args.setting.statement_descriptor,
     payer,
-    transactions: { payments: [{ amount, payment_method: paymentMethod }] },
   };
+
+  const notif = notificationUrl();
+  if (notif) payload.notification_url = notif;
+
+  if (args.method === "pix" || args.method === "boleto") {
+    if (args.fallbackExpiresAt) {
+      payload.date_of_expiration = formatBrazilExpiration(args.fallbackExpiresAt);
+    }
+  }
+
+  if (args.method === "credit_card" && args.card) {
+    payload.token = args.card.token;
+    payload.installments = args.card.installments;
+  }
+
+  return payload;
 }
 
 function snapshotFromResponse(response: Record<string, unknown>, fallbackExpiresAt: string | null) {
-  const payment = firstPayment(response) ?? {};
-  const method = firstPaymentMethod(response);
+  const poi = (deepGet(response, ["point_of_interaction", "transaction_data"]) ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const txDetails = (response.transaction_details ?? {}) as Record<string, unknown>;
+  const barcode = (txDetails.barcode ?? {}) as Record<string, unknown>;
+  const paymentMethod = (response.payment_method ?? {}) as Record<string, unknown>;
   return {
-    provider_order_id: asString(response.id),
-    provider_payment_id: asString(payment.id),
-    payment_type: asString(method.type),
-    status: asString(payment.status) ?? asString(response.status) ?? "created",
-    status_detail: asString(payment.status_detail) ?? asString(response.status_detail),
-    qr_code: asString(method.qr_code),
-    qr_code_base64: asString(method.qr_code_base64),
-    ticket_url: asString(method.ticket_url),
-    digitable_line: asString(method.digitable_line),
-    barcode_content: asString(method.barcode_content),
+    provider_order_id: null as string | null,
+    provider_payment_id: asString(response.id),
+    payment_type:
+      asString(response.payment_type_id) ?? asString(paymentMethod.type) ?? null,
+    status: asString(response.status) ?? "pending",
+    status_detail: asString(response.status_detail),
+    qr_code: asString(poi.qr_code),
+    qr_code_base64: asString(poi.qr_code_base64),
+    ticket_url: asString(poi.ticket_url) ?? asString(txDetails.external_resource_url),
+    digitable_line: asString(txDetails.digitable_line) ?? asString(txDetails.payment_method_reference_id),
+    barcode_content: asString(barcode.content),
     expires_at:
-      parseDate(method.date_of_expiration) ??
-      parseDate(payment.date_of_expiration) ??
-      parseDate(response.expiration_date_to) ??
+      parseDate(response.date_of_expiration) ??
+      parseDate(deepGet(response, ["point_of_interaction", "transaction_data", "expiration_date"])) ??
       fallbackExpiresAt,
   };
 }
@@ -656,15 +685,16 @@ export const createMercadoPagoPayment = createServerFn({ method: "POST" })
         : data.method === "boleto"
           ? new Date(Date.now() + setting.boleto_expiration_days * 86400000).toISOString()
           : null;
-    const payload = buildOrderPayload({
+    const payload = buildPaymentPayload({
       order,
       method: data.method,
       setting,
       amountCents,
+      fallbackExpiresAt,
       payer: data.payer,
       card: data.card,
     });
-    const response = await mpFetch<Record<string, unknown>>("/v1/orders", setting, {
+    const response = await mpFetch<Record<string, unknown>>("/v1/payments", setting, {
       method: "POST",
       body: payload,
       idempotencyKey,
@@ -700,10 +730,10 @@ export const checkMercadoPagoPayment = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!latest) return { payment: null, orderPaymentStatus: order.payment_status };
     const row = latest as MercadoPagoPaymentRow;
-    if (!row.provider_order_id)
+    if (!row.provider_payment_id)
       return { payment: publicPayment(row), orderPaymentStatus: order.payment_status };
     const response = await mpFetch<Record<string, unknown>>(
-      `/v1/orders/${row.provider_order_id}`,
+      `/v1/payments/${row.provider_payment_id}`,
       setting,
     );
     const updated = await persistPayment({
@@ -779,16 +809,15 @@ export async function processMercadoPagoWebhook(
   const eventId = eventInsert.id as string;
   try {
     const dataId = asString(deepGet(payload, ["data", "id"])) ?? providerEventId;
-    const byColumn = dataId?.startsWith("ORD") ? "provider_order_id" : "provider_payment_id";
     const { data: payment } = await db
       .from("mercadopago_payments")
       .select("*")
-      .eq(byColumn, dataId)
+      .eq("provider_payment_id", dataId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     const row = payment as MercadoPagoPaymentRow | null;
-    if (!row?.provider_order_id) {
+    if (!row?.provider_payment_id) {
       await db
         .from("integration_events")
         .update({
@@ -801,7 +830,7 @@ export async function processMercadoPagoWebhook(
     }
 
     const response = await mpFetch<Record<string, unknown>>(
-      `/v1/orders/${row.provider_order_id}`,
+      `/v1/payments/${row.provider_payment_id}`,
       setting,
     );
     const updated = await persistPayment({
