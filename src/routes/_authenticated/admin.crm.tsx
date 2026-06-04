@@ -66,6 +66,8 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { AdminStatCard, type AdminStatCardTone } from "@/components/admin/AdminStatCard";
 import { scoreLead, temperatureChip, temperatureOf } from "@/lib/leads/scoring";
 
 export const Route = createFileRoute("/_authenticated/admin/crm")({
