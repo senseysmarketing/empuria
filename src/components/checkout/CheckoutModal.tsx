@@ -82,6 +82,68 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function formatCpf(value: string) {
+  const d = onlyDigits(value).slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+}
+
+function formatCep(value: string) {
+  const d = onlyDigits(value).slice(0, 8);
+  return d.replace(/^(\d{5})(\d)/, "$1-$2");
+}
+
+function isValidCpf(value: string) {
+  const cpf = onlyDigits(value);
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+  const calc = (len: number) => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += parseInt(cpf[i], 10) * (len + 1 - i);
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+  return calc(9) === parseInt(cpf[9], 10) && calc(10) === parseInt(cpf[10], 10);
+}
+
+type ViaCepResponse = {
+  erro?: boolean;
+  logradouro?: string;
+  bairro?: string;
+  localidade?: string;
+  uf?: string;
+};
+
+async function fetchViaCep(cep: string): Promise<ViaCepResponse | null> {
+  const digits = onlyDigits(cep);
+  if (digits.length !== 8) return null;
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+    if (!r.ok) return null;
+    const data = (await r.json()) as ViaCepResponse;
+    if (data.erro) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function humanizePaymentRejection(status?: string | null, detail?: string | null) {
+  const d = (detail ?? "").toLowerCase();
+  if (d.includes("rejected_by_bank") || d.includes("cc_rejected_other_reason"))
+    return "O banco recusou os dados informados. Revise CPF, CEP, endereço e número e tente novamente.";
+  if (d.startsWith("cc_rejected_bad_filled") || d.includes("bad_filled"))
+    return "Confira os dados informados (CPF, validade, código de segurança).";
+  if (d.includes("insufficient_amount")) return "Saldo insuficiente.";
+  if (d.includes("call_for_authorize")) return "Autorize a compra com o banco e tente novamente.";
+  if (d.includes("high_risk")) return "Pagamento recusado por análise de risco.";
+  if ((status ?? "").toLowerCase() === "rejected")
+    return "Não foi possível gerar o pagamento. Revise os dados e tente novamente.";
+  return null;
+}
+
 async function loadMercadoPagoSdk() {
   if (window.MercadoPago) return;
   await new Promise<void>((resolve, reject) => {
