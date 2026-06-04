@@ -73,11 +73,13 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
     if (svcErr || !service) throw new Error("Serviço indisponível");
 
     // Update profile basic info
+    const normalizedPhone = normalizePhone(data.contact.whatsapp) ?? data.contact.whatsapp;
     await supabase
       .from("profiles")
       .update({
         full_name: data.contact.name,
-        phone: data.contact.whatsapp,
+        phone: normalizedPhone,
+        phone_country_iso: getCountryFromPhone(normalizedPhone),
       })
       .eq("id", userId);
 
