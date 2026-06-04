@@ -36,6 +36,11 @@ const categorySchema = z.object({
   is_active: z.boolean().default(true),
 });
 
+function friendlyError(error: { code?: string; message: string }, what: string): Error {
+  if (error.code === "23505") return new Error(`Já existe ${what} com este nome.`);
+  return new Error(error.message);
+}
+
 export const createCategory = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv_itens")])
   .inputValidator((d) => categorySchema.parse(d))
@@ -45,7 +50,7 @@ export const createCategory = createServerFn({ method: "POST" })
       .insert(data)
       .select("id")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw friendlyError(error, "uma categoria");
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
       action: "pdv_category.created",
@@ -64,7 +69,7 @@ export const updateCategory = createServerFn({ method: "POST" })
     const { id, ...patch } = data;
     const { data: old } = await supabaseAdmin.from("product_categories").select("*").eq("id", id).maybeSingle();
     const { error } = await supabaseAdmin.from("product_categories").update(patch).eq("id", id);
-    if (error) throw new Error(error.message);
+    if (error) throw friendlyError(error, "uma categoria");
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
       action: "pdv_category.updated",
