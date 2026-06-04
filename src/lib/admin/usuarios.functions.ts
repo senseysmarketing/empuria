@@ -195,7 +195,14 @@ export const setUserBlocked = createServerFn({ method: "POST" })
 
 export const forcePasswordReset = createServerFn({ method: "POST" })
   .middleware([requireStaff])
-  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        redirect_to: z.string().url().optional(),
+      })
+      .parse(d),
+  )
   .handler(async ({ data }) => {
     const { data: prof } = await supabaseAdmin
       .from("profiles")
@@ -209,6 +216,7 @@ export const forcePasswordReset = createServerFn({ method: "POST" })
     const { data: link, error } = await supabaseAdmin.auth.admin.generateLink({
       type: "recovery",
       email,
+      options: data.redirect_to ? { redirectTo: data.redirect_to } : undefined,
     });
     if (error) throw new Error(error.message);
     return { url: link.properties?.action_link ?? "" };

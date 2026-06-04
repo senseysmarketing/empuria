@@ -108,7 +108,16 @@ export function ManageMemberDialog({
   });
 
   const resetPassword = useMutation({
-    mutationFn: () => resetFn({ data: { id: memberId } }),
+    mutationFn: () =>
+      resetFn({
+        data: {
+          id: memberId,
+          redirect_to:
+            typeof window !== "undefined"
+              ? `${window.location.origin}/redefinir-senha`
+              : undefined,
+        },
+      }),
     onSuccess: (res) => {
       if (res?.url) {
         navigator.clipboard?.writeText(res.url).catch(() => {});
@@ -179,15 +188,15 @@ export function ManageMemberDialog({
                   placeholder="(11) 99999-9999"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <div>
-                  <Badge variant="outline" className="text-xs">
-                    {member.role === "admin" ? "Admin" : "Staff"}
-                  </Badge>
+              <div className="flex items-end justify-between gap-3">
+                <div className="space-y-1.5">
+                  <Label>Tipo</Label>
+                  <div>
+                    <Badge variant="outline" className="text-xs">
+                      {member.role === "admin" ? "Admin" : "Staff"}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-              <div className="flex justify-end">
                 <Button
                   size="sm"
                   onClick={() => saveProfile.mutate()}
