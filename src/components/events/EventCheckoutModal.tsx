@@ -6,6 +6,7 @@ import { checkEmail } from "@/lib/checkout/checkout.functions";
 import { confirmTicketPurchase } from "@/lib/events/tickets.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowRight, Check, Copy, QrCode } from "lucide-react";
