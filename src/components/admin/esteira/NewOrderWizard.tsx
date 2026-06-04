@@ -194,13 +194,13 @@ export function NewOrderWizard({
       let paymentUrl: string | null = null;
       if (effectiveMethod === "mercadopago") {
         try {
-          const link = await genLink({ data: { id: created.id } });
+          const baseUrl =
+            typeof window !== "undefined" ? window.location.origin : undefined;
+          const link = await genLink({ data: { id: created.id, baseUrl } });
           reference = link.reference ?? `EMP-${created.id}`;
+          paymentUrl = link.url ?? null;
         } catch (e) {
           toast.error(e instanceof Error ? e.message : "Não foi possível preparar o link MP");
-        }
-        if (typeof window !== "undefined") {
-          paymentUrl = `${window.location.origin}/portal/servicos?order=${created.id}`;
         }
       }
       setCreatedOrder({ id: created.id, reference, paymentUrl, method: effectiveMethod });
@@ -513,7 +513,7 @@ export function NewOrderWizard({
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Envie este link ao cliente. Ele conclui o pagamento (Pix/Boleto) pelo portal.
+                      Envie este link ao cliente. Ele concluiu o pagamento (Pix ou cartão) sem precisar fazer login.
                     </p>
                   </div>
                 )}

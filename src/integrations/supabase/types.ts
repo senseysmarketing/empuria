@@ -2096,6 +2096,59 @@ export type Database = {
           },
         ]
       }
+      order_payment_links: {
+        Row: {
+          access_count: number
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          last_accessed_at: string | null
+          order_id: string
+          revoked_at: string | null
+          status: string
+          token: string
+          updated_at: string
+          used_at: string | null
+        }
+        Insert: {
+          access_count?: number
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          last_accessed_at?: string | null
+          order_id: string
+          revoked_at?: string | null
+          status?: string
+          token: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Update: {
+          access_count?: number
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          last_accessed_at?: string | null
+          order_id?: string
+          revoked_at?: string | null
+          status?: string
+          token?: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_payment_links_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           amount_cents: number

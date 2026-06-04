@@ -503,6 +503,15 @@ async function syncOrderFromPayment(row: MercadoPagoPaymentRow) {
 
   const { error } = await db.from("orders").update(patch).eq("id", row.order_id);
   if (error) throw new Error(error.message);
+
+  // Mark any active public payment link for this order as paid.
+  if (status === "aprovado") {
+    await db
+      .from("order_payment_links")
+      .update({ status: "paid", used_at: nowIso() })
+      .eq("order_id", row.order_id)
+      .eq("status", "active");
+  }
 }
 
 async function persistPayment(args: {
@@ -1001,3 +1010,146 @@ export async function processMercadoPagoWebhook(
     return { ok: false, status: "error", eventId, message };
   }
 }
+
+// ============================================================================
+// Public payment-link flow (used by /pagar/:token, no Supabase auth required).
+// ============================================================================
+
+import { resolvePaymentLinkForCharge } from "@/lib/payments/payment-links.functions";
+
+async function loadOrderForPublicCharge(token: string): Promise<OrderRow> {
+  const { order } = await resolvePaymentLinkForCharge(token);
+  const { data, error } = await db.from("orders").select("*").eq("id", order.id).single();
+  if (error || !data) throw new Error(error?.message ?? "Pedido nao encontrado.");
+  return data as OrderRow;
+}
+
+export const createPublicMercadoPagoPayment = createServerFn({ method: "POST" })
+  .inputValidator((d) =>
+    z
+      .object({
+        token: z.string().min(8).max(120),
+        method: z.enum(["pix", "credit_card"]),
+        payer: z
+          .object({
+            cpf: z.string().trim().max(20).optional(),
+            zipCode: z.string().trim().max(20).optional(),
+            streetName: z.string().trim().max(120).optional(),
+            streetNumber: z.string().trim().max(40).optional(),
+            neighborhood: z.string().trim().max(80).optional(),
+            city: z.string().trim().max(80).optional(),
+            state: z.string().trim().max(2).optional(),
+          })
+          .optional(),
+        card: z
+          .object({
+            token: z.string().trim().min(8).max(300),
+            paymentMethodId: z.string().trim().min(2).max(50),
+            installments: z.number().int().min(1).max(12).default(1),
+          })
+          .optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const setting = await getMercadoPagoSetting(true);
+    assertPaymentAllowed(setting, data.method);
+    const order = await loadOrderForPublicCharge(data.token);
+    if (order.payment_status === "aprovado") throw new Error("Pedido ja esta pago.");
+    if (data.method === "credit_card" && !data.card) throw new Error("Token do cartao ausente.");
+
+    const amountCents = order.payment_amount_cents ?? order.amount_cents;
+    const currency = order.payment_currency ?? order.currency;
+    if (currency !== "BRL") throw new Error("Mercado Pago Brasil exige cobranca em BRL.");
+    if (amountCents <= 0) throw new Error("Pedido sem valor para pagamento.");
+
+    const { data: existing } = await db
+      .from("mercadopago_payments")
+      .select("*")
+      .eq("order_id", order.id)
+      .eq("payment_method", data.method)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existing && isReusablePending(existing as MercadoPagoPaymentRow)) {
+      return {
+        payment: publicPayment(existing as MercadoPagoPaymentRow),
+        publicKey: setting.public_key,
+      };
+    }
+
+    const idempotencyKey = randomId();
+    const fallbackExpiresAt =
+      data.method === "pix"
+        ? new Date(Date.now() + PIX_EXPIRATION_MINUTES * 60000).toISOString()
+        : null;
+    const payload = buildPaymentPayload({
+      order,
+      method: data.method,
+      setting,
+      amountCents,
+      fallbackExpiresAt,
+      payer: data.payer,
+      card: data.card,
+    });
+    const response = await mpFetch<Record<string, unknown>>("/v1/payments", setting, {
+      method: "POST",
+      body: payload,
+      idempotencyKey,
+    });
+    const row = await persistPayment({
+      orderId: order.id,
+      method: data.method,
+      externalRef: externalReference(order.id),
+      amountCents,
+      currency,
+      idempotencyKey,
+      rawRequest: payload,
+      rawResponse: response,
+      fallbackExpiresAt,
+      createdBy: null,
+    });
+    return { payment: publicPayment(row), publicKey: setting.public_key };
+  });
+
+export const checkPublicMercadoPagoPayment = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ token: z.string().min(8).max(120) }).parse(d))
+  .handler(async ({ data }) => {
+    const setting = await getMercadoPagoSetting(true);
+    const { order } = await resolvePaymentLinkForCharge(data.token).catch((err) => {
+      // If link is already paid, surface the order status without throwing
+      throw err;
+    });
+    const { data: latest, error } = await db
+      .from("mercadopago_payments")
+      .select("*")
+      .eq("order_id", order.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!latest) return { payment: null, orderPaymentStatus: order.payment_status };
+    const row = latest as MercadoPagoPaymentRow;
+    if (!row.provider_payment_id)
+      return { payment: publicPayment(row), orderPaymentStatus: order.payment_status };
+    const response = await mpFetch<Record<string, unknown>>(
+      `/v1/payments/${row.provider_payment_id}`,
+      setting,
+    );
+    const updated = await persistPayment({
+      localPaymentId: row.id,
+      orderId: row.order_id,
+      method: row.payment_method,
+      externalRef: row.external_reference,
+      amountCents: row.amount_cents,
+      currency: row.currency,
+      idempotencyKey: row.idempotency_key,
+      rawRequest: row.raw_request,
+      rawResponse: response,
+      fallbackExpiresAt: row.expires_at,
+    });
+    return {
+      payment: publicPayment(updated),
+      orderPaymentStatus: mapPaymentStatus(updated.status, updated.status_detail),
+    };
+  });

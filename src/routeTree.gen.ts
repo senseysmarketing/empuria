@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServicosSlugRouteImport } from './routes/servicos.$slug'
+import { Route as PagarTokenRouteImport } from './routes/pagar.$token'
 import { Route as EventoSlugRouteImport } from './routes/evento.$slug'
 import { Route as ClubeSucessoRouteImport } from './routes/clube.sucesso'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
@@ -66,6 +67,11 @@ const ServicosSlugRoute = ServicosSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => ServicosRoute,
+} as any)
+const PagarTokenRoute = PagarTokenRouteImport.update({
+  id: '/pagar/$token',
+  path: '/pagar/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const EventoSlugRoute = EventoSlugRouteImport.update({
   id: '/evento/$slug',
@@ -231,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/portal': typeof AuthenticatedPortalRouteWithChildren
   '/clube/sucesso': typeof ClubeSucessoRoute
   '/evento/$slug': typeof EventoSlugRoute
+  '/pagar/$token': typeof PagarTokenRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/servicos': typeof ServicosRouteWithChildren
   '/clube/sucesso': typeof ClubeSucessoRoute
   '/evento/$slug': typeof EventoSlugRoute
+  '/pagar/$token': typeof PagarTokenRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
@@ -299,6 +307,7 @@ export interface FileRoutesById {
   '/_authenticated/portal': typeof AuthenticatedPortalRouteWithChildren
   '/clube/sucesso': typeof ClubeSucessoRoute
   '/evento/$slug': typeof EventoSlugRoute
+  '/pagar/$token': typeof PagarTokenRoute
   '/servicos/$slug': typeof ServicosSlugRoute
   '/_authenticated/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/_authenticated/admin/agenda': typeof AuthenticatedAdminAgendaRoute
@@ -335,6 +344,7 @@ export interface FileRouteTypes {
     | '/portal'
     | '/clube/sucesso'
     | '/evento/$slug'
+    | '/pagar/$token'
     | '/servicos/$slug'
     | '/admin/acesso-negado'
     | '/admin/agenda'
@@ -367,6 +377,7 @@ export interface FileRouteTypes {
     | '/servicos'
     | '/clube/sucesso'
     | '/evento/$slug'
+    | '/pagar/$token'
     | '/servicos/$slug'
     | '/admin/acesso-negado'
     | '/admin/agenda'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/_authenticated/portal'
     | '/clube/sucesso'
     | '/evento/$slug'
+    | '/pagar/$token'
     | '/servicos/$slug'
     | '/_authenticated/admin/acesso-negado'
     | '/_authenticated/admin/agenda'
@@ -436,6 +448,7 @@ export interface RootRouteChildren {
   ServicosRoute: typeof ServicosRouteWithChildren
   ClubeSucessoRoute: typeof ClubeSucessoRoute
   EventoSlugRoute: typeof EventoSlugRoute
+  PagarTokenRoute: typeof PagarTokenRoute
   ApiWebhooksHublaRoute: typeof ApiWebhooksHublaRoute
   ApiWebhooksMercadopagoRoute: typeof ApiWebhooksMercadopagoRoute
   ApiWebhooksUazapiRoute: typeof ApiWebhooksUazapiRoute
@@ -477,6 +490,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/servicos/$slug'
       preLoaderRoute: typeof ServicosSlugRouteImport
       parentRoute: typeof ServicosRoute
+    }
+    '/pagar/$token': {
+      id: '/pagar/$token'
+      path: '/pagar/$token'
+      fullPath: '/pagar/$token'
+      preLoaderRoute: typeof PagarTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/evento/$slug': {
       id: '/evento/$slug'
@@ -783,6 +803,7 @@ const rootRouteChildren: RootRouteChildren = {
   ServicosRoute: ServicosRouteWithChildren,
   ClubeSucessoRoute: ClubeSucessoRoute,
   EventoSlugRoute: EventoSlugRoute,
+  PagarTokenRoute: PagarTokenRoute,
   ApiWebhooksHublaRoute: ApiWebhooksHublaRoute,
   ApiWebhooksMercadopagoRoute: ApiWebhooksMercadopagoRoute,
   ApiWebhooksUazapiRoute: ApiWebhooksUazapiRoute,
@@ -790,13 +811,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
