@@ -38,7 +38,13 @@ import {
   Ban,
   RotateCcw,
   AlertTriangle,
+  ShoppingCart,
+  Clock,
+  Loader2,
+  TrendingUp,
+  Euro,
 } from "lucide-react";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
