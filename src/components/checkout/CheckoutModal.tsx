@@ -548,11 +548,14 @@ export function CheckoutModal({
         },
       });
       setPayment(result.payment);
-      setPayment(result.payment);
       if (result.payment.orderPaymentStatus === "aprovado") {
         if (service) clearPendingPix(service.slug);
         toast.success("Pagamento aprovado!");
         setStep("done");
+        setTimeout(() => {
+          onOpenChange(false);
+          navigate({ to: "/portal" });
+        }, 1300);
       } else if (result.payment.orderPaymentStatus === "recusado") {
         toast.error("Pagamento recusado pelo Mercado Pago.");
       } else {
