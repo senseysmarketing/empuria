@@ -1,5 +1,6 @@
 import { CheckCircle2, ChevronRight, Download, FileText, PlayCircle } from "lucide-react";
 import { buildVideoFromUrl } from "@/lib/clube/video-provider";
+import logoIcone from "@/assets/logo-empuria-icone.png";
 
 export type PlayerLesson = {
   id: string;
