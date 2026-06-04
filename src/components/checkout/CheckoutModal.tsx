@@ -692,10 +692,9 @@ export function CheckoutModal({
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="WhatsApp">
-                <Input
+                <PhoneInput
                   value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
-                  placeholder="+55 11 99999-9999"
+                  onChange={(e164) => setWhatsapp(e164 ?? "")}
                 />
               </Field>
               <Field label="E-mail">
