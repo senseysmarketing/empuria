@@ -82,6 +82,68 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function formatCpf(value: string) {
+  const d = onlyDigits(value).slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+}
+
+function formatCep(value: string) {
+  const d = onlyDigits(value).slice(0, 8);
+  return d.replace(/^(\d{5})(\d)/, "$1-$2");
+}
+
+function isValidCpf(value: string) {
+  const cpf = onlyDigits(value);
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+  const calc = (len: number) => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += parseInt(cpf[i], 10) * (len + 1 - i);
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+  return calc(9) === parseInt(cpf[9], 10) && calc(10) === parseInt(cpf[10], 10);
+}
+
+type ViaCepResponse = {
+  erro?: boolean;
+  logradouro?: string;
+  bairro?: string;
+  localidade?: string;
+  uf?: string;
+};
+
+async function fetchViaCep(cep: string): Promise<ViaCepResponse | null> {
+  const digits = onlyDigits(cep);
+  if (digits.length !== 8) return null;
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+    if (!r.ok) return null;
+    const data = (await r.json()) as ViaCepResponse;
+    if (data.erro) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function humanizePaymentRejection(status?: string | null, detail?: string | null) {
+  const d = (detail ?? "").toLowerCase();
+  if (d.includes("rejected_by_bank") || d.includes("cc_rejected_other_reason"))
+    return "O banco recusou os dados informados. Revise CPF, CEP, endereço e número e tente novamente.";
+  if (d.startsWith("cc_rejected_bad_filled") || d.includes("bad_filled"))
+    return "Confira os dados informados (CPF, validade, código de segurança).";
+  if (d.includes("insufficient_amount")) return "Saldo insuficiente.";
+  if (d.includes("call_for_authorize")) return "Autorize a compra com o banco e tente novamente.";
+  if (d.includes("high_risk")) return "Pagamento recusado por análise de risco.";
+  if ((status ?? "").toLowerCase() === "rejected")
+    return "Não foi possível gerar o pagamento. Revise os dados e tente novamente.";
+  return null;
+}
+
 async function loadMercadoPagoSdk() {
   if (window.MercadoPago) return;
   await new Promise<void>((resolve, reject) => {
@@ -210,6 +272,8 @@ export function CheckoutModal({
   const [securityCode, setSecurityCode] = useState("");
   const [installments, setInstallments] = useState(1);
   const [now, setNow] = useState(() => Date.now());
+  const [cepLoading, setCepLoading] = useState(false);
+  const [boletoError, setBoletoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -392,6 +456,7 @@ export function CheckoutModal({
 
   const generatePayment = async (method: PaymentTab) => {
     if (!intent) return;
+    if (method === "boleto") setBoletoError(null);
     setPaymentLoading(method);
     try {
       const result = await createPayment({
@@ -413,6 +478,18 @@ export function CheckoutModal({
           card: undefined,
         },
       });
+      const status = (result.payment.status ?? "").toLowerCase();
+      if (status === "rejected") {
+        const msg =
+          humanizePaymentRejection(result.payment.status, result.payment.statusDetail) ??
+          "Pagamento recusado. Revise os dados e tente novamente.";
+        if (method === "boleto") {
+          setBoletoError(msg);
+        } else {
+          toast.error(msg);
+        }
+        return;
+      }
       setPayment(result.payment);
       if (method === "pix" && service && result.payment.expiresAt) {
         savePendingPix(service.slug, {
@@ -794,6 +871,9 @@ export function CheckoutModal({
 
             {tab === "boleto" && (
               <div className="space-y-3">
+                <div className="rounded-md border border-admin-border bg-admin-surface-2 px-3 py-2 text-[12px] text-admin-ink-muted">
+                  Para gerar boleto, informe CPF e endereço no Brasil.
+                </div>
                 <PayerFields
                   cpf={cpf}
                   setCpf={setCpf}
@@ -809,7 +889,33 @@ export function CheckoutModal({
                   setCity={setCity}
                   stateUf={stateUf}
                   setStateUf={setStateUf}
+                  cepLoading={cepLoading}
+                  onCepLookup={async (cep) => {
+                    setCepLoading(true);
+                    try {
+                      const r = await fetchViaCep(cep);
+                      if (!r) {
+                        toast.error("CEP não encontrado. Preencha o endereço manualmente.");
+                        return;
+                      }
+                      if (r.logradouro) setStreetName(r.logradouro);
+                      if (r.bairro) setNeighborhood(r.bairro);
+                      if (r.localidade) setCity(r.localidade);
+                      if (r.uf) setStateUf(r.uf.toUpperCase());
+                      setTimeout(() => {
+                        document.getElementById("boleto-street-number")?.focus();
+                      }, 50);
+                    } finally {
+                      setCepLoading(false);
+                    }
+                  }}
+                  showFullAddress
                 />
+                {boletoError && (
+                  <div className="rounded-md border border-red-brand/40 bg-red-brand/10 px-3 py-2 text-[12px] text-red-brand">
+                    {boletoError}
+                  </div>
+                )}
                 {payment?.method === "boleto" ? (
                   <>
                     {payment.digitableLine && (
@@ -832,11 +938,23 @@ export function CheckoutModal({
                 ) : (
                   <Button
                     onClick={() => generatePayment("boleto")}
-                    disabled={paymentLoading === "boleto" || !mpConfig?.enabled}
+                    disabled={
+                      paymentLoading === "boleto" ||
+                      !mpConfig?.enabled ||
+                      !isValidCpf(cpf) ||
+                      onlyDigits(zipCode).length !== 8 ||
+                      !streetName.trim() ||
+                      !streetNumber.trim() ||
+                      !neighborhood.trim() ||
+                      !city.trim() ||
+                      stateUf.trim().length !== 2
+                    }
                     className="w-full bg-orange-brand text-offwhite hover:bg-red-brand"
                   >
                     {paymentLoading === "boleto" ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : boletoError ? (
+                      "Tentar novamente"
                     ) : (
                       "Gerar boleto"
                     )}
@@ -844,6 +962,7 @@ export function CheckoutModal({
                 )}
               </div>
             )}
+
 
             {tab === "card" && (
               <div className="space-y-3">
@@ -1033,6 +1152,9 @@ function PayerFields({
   stateUf,
   setStateUf,
   compact,
+  cepLoading,
+  onCepLookup,
+  showFullAddress,
 }: {
   cpf: string;
   setCpf: (v: string) => void;
@@ -1049,33 +1171,65 @@ function PayerFields({
   stateUf: string;
   setStateUf: (v: string) => void;
   compact?: boolean;
+  cepLoading?: boolean;
+  onCepLookup?: (cep: string) => void | Promise<void>;
+  showFullAddress?: boolean;
 }) {
+  const cpfInvalid = cpf.length > 0 && !isValidCpf(cpf);
+  const cepInvalid = zipCode.length > 0 && onlyDigits(zipCode).length !== 8;
+  const handleCepChange = (raw: string) => {
+    const formatted = formatCep(raw);
+    setZipCode(formatted);
+    if (onlyDigits(formatted).length === 8) {
+      void onCepLookup?.(formatted);
+    }
+  };
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <Field label="CPF">
           <Input
             value={cpf}
-            onChange={(e) => setCpf(e.target.value)}
+            onChange={(e) => setCpf(formatCpf(e.target.value))}
             placeholder="123.456.789-09"
+            inputMode="numeric"
           />
+          {cpfInvalid && (
+            <span className="mt-1 block text-[11px] text-red-brand">CPF inválido.</span>
+          )}
         </Field>
         <Field label="CEP">
-          <Input
-            value={zipCode}
-            onChange={(e) => setZipCode(e.target.value)}
-            placeholder="06233-903"
-          />
+          <div className="relative">
+            <Input
+              value={zipCode}
+              onChange={(e) => handleCepChange(e.target.value)}
+              onBlur={(e) => {
+                if (onlyDigits(e.target.value).length === 8) void onCepLookup?.(e.target.value);
+              }}
+              placeholder="06233-903"
+              inputMode="numeric"
+            />
+            {cepLoading && (
+              <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-admin-ink-muted" />
+            )}
+          </div>
+          {cepInvalid && !cepLoading && (
+            <span className="mt-1 block text-[11px] text-red-brand">CEP deve ter 8 dígitos.</span>
+          )}
         </Field>
       </div>
-      {!compact && (
+      {(!compact || showFullAddress) && (
         <>
           <div className="grid grid-cols-[1fr_96px] gap-3">
             <Field label="Rua">
               <Input value={streetName} onChange={(e) => setStreetName(e.target.value)} />
             </Field>
             <Field label="Numero">
-              <Input value={streetNumber} onChange={(e) => setStreetNumber(e.target.value)} />
+              <Input
+                id="boleto-street-number"
+                value={streetNumber}
+                onChange={(e) => setStreetNumber(e.target.value)}
+              />
             </Field>
           </div>
           <div className="grid grid-cols-3 gap-3">
