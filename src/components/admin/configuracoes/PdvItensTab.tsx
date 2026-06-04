@@ -334,7 +334,7 @@ export function PdvItensTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={save} disabled={saving || !form.name.trim() || !form.slug.trim() || !form.category_id} className="bg-admin-accent text-white">Salvar</Button>
+            <Button onClick={save} disabled={saving || !form.name.trim() || !form.category_id} className="bg-admin-accent text-white">Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
