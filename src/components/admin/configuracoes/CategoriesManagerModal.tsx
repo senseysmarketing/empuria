@@ -50,12 +50,19 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
   };
 
   const handleCreate = async () => {
+    const name = newForm.name.trim();
+    if (!name) return;
+    const slug = slugify(name);
+    if (categories.some((c) => c.slug === slug)) {
+      toast.error("Já existe uma categoria com este nome.");
+      return;
+    }
     setSaving(true);
     try {
       await create({
         data: {
-          name: newForm.name.trim(),
-          slug: (newForm.slug.trim() || slugify(newForm.name)).toLowerCase(),
+          name,
+          slug,
           emoji: newForm.emoji.trim() || null,
           position: newForm.position,
           is_active: newForm.is_active,
@@ -70,18 +77,25 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
 
   const startEdit = (c: Category) => {
     setEditingId(c.id);
-    setEditForm({ name: c.name, slug: c.slug, emoji: c.emoji ?? "", position: c.position, is_active: c.is_active });
+    setEditForm({ name: c.name, emoji: c.emoji ?? "", position: c.position, is_active: c.is_active });
   };
 
   const saveEdit = async () => {
     if (!editingId) return;
+    const name = editForm.name.trim();
+    if (!name) return;
+    const slug = slugify(name);
+    if (categories.some((c) => c.slug === slug && c.id !== editingId)) {
+      toast.error("Já existe uma categoria com este nome.");
+      return;
+    }
     setSaving(true);
     try {
       await update({
         data: {
           id: editingId,
-          name: editForm.name.trim(),
-          slug: editForm.slug.trim().toLowerCase(),
+          name,
+          slug,
           emoji: editForm.emoji.trim() || null,
           position: editForm.position,
           is_active: editForm.is_active,
