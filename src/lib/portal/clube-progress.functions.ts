@@ -9,7 +9,7 @@ export const markLessonOpened = createServerFn({ method: "POST" })
   .inputValidator((d) => lessonIdSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const userId = context.userId;
+    const userId = context.effectiveUserId ?? context.userId;
 
     // Gate: precisa ser membro ativo
     const { data: profile } = await supabase
@@ -49,7 +49,7 @@ export const toggleLessonCompleted = createServerFn({ method: "POST" })
   .inputValidator((d) => lessonIdSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const userId = context.userId;
+    const userId = context.effectiveUserId ?? context.userId;
 
     const { data: profile } = await supabase
       .from("profiles")
