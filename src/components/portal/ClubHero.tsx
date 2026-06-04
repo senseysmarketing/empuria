@@ -1,4 +1,4 @@
-import { CheckCircle2, Crown, MessageCircle, Play, Sparkles } from "lucide-react";
+import { CheckCircle2, Crown, MessageCircle, Play, Search, Sparkles, X } from "lucide-react";
 
 // SVG de textura igual ao do PassportCard (círculos concêntricos + ondas em dourado)
 const PASSPORT_TEXTURE =
@@ -13,6 +13,8 @@ export function ClubHero({
   onContinue,
   onBrowseModules,
   whatsappUrl,
+  searchValue,
+  onSearchChange,
 }: {
   title: string;
   subtitle: string;
@@ -22,6 +24,8 @@ export function ClubHero({
   onContinue?: () => void;
   onBrowseModules?: () => void;
   whatsappUrl?: string | null;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }) {
   return (
     <header className="relative overflow-hidden rounded-3xl border border-white/10 isolate">
