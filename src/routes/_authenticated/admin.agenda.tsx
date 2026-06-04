@@ -283,11 +283,11 @@ function AgendaPage() {
 
       {/* Resumo */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <SummaryTile label="Hoje" value={todayAppts.length} />
-        <SummaryTile label="Acontecendo agora" value={happeningNow.length} />
-        <SummaryTile label="Próximos" value={upcoming.length} />
-        <SummaryTile label="Vagas abertas" value={vagasAbertas} />
-        <SummaryTile label="Tarefas pendentes" value={tarefasPendentes} />
+        <AdminStatCard label="Hoje" value={todayAppts.length} icon={CalendarDays} tone="blue" />
+        <AdminStatCard label="Acontecendo agora" value={happeningNow.length} icon={Activity} tone="green" />
+        <AdminStatCard label="Próximos" value={upcoming.length} icon={Clock} tone="amber" />
+        <AdminStatCard label="Vagas abertas" value={vagasAbertas} icon={Ticket} tone="amber" />
+        <AdminStatCard label="Tarefas pendentes" value={tarefasPendentes} icon={ListChecks} tone="red" />
       </div>
 
       {/* Filtros */}
