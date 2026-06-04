@@ -414,6 +414,13 @@ export function CheckoutModal({
         },
       });
       setPayment(result.payment);
+      if (method === "pix" && service && result.payment.expiresAt) {
+        savePendingPix(service.slug, {
+          intent,
+          payment: result.payment,
+          savedAt: Date.now(),
+        });
+      }
       toast.success(method === "pix" ? "Pix gerado" : "Boleto gerado");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao gerar pagamento");
