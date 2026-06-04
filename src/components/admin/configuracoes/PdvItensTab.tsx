@@ -65,6 +65,47 @@ export function PdvItensTab() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("__all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "produto" | "servico">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter((raw) => {
+      const it = raw as Item & { item_type?: string };
+      if (q && !it.name.toLowerCase().includes(q) && !it.slug.toLowerCase().includes(q)) return false;
+      if (categoryFilter !== "__all" && it.category_id !== categoryFilter) return false;
+      if (typeFilter === "produto" && it.item_type === "servico") return false;
+      if (typeFilter === "servico" && it.item_type !== "servico") return false;
+      if (statusFilter === "active" && !it.is_active) return false;
+      if (statusFilter === "inactive" && it.is_active) return false;
+      return true;
+    });
+  }, [items, search, categoryFilter, typeFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => filtered.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filtered, safePage, pageSize],
+  );
+
+  const resetFilters = () => {
+    setSearch("");
+    setCategoryFilter("__all");
+    setTypeFilter("all");
+    setStatusFilter("all");
+    setPage(1);
+  };
+
+  const onFilterChange = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v);
+    setPage(1);
+  };
+
   const openCreate = () => {
     setEditing(null);
     setForm({ ...emptyForm, position: items.length, category_id: categories[0]?.id ?? "" });
