@@ -505,6 +505,66 @@ function EsteiraPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!linkModal} onOpenChange={(o) => !o && setLinkModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link de pagamento Mercado Pago</DialogTitle>
+          </DialogHeader>
+          {linkModal && (
+            <div className="space-y-3 text-sm">
+              <div className="text-xs text-muted-foreground">
+                Pedido · {linkModal.order.customer_name} · {linkModal.order.service_title}
+              </div>
+              {linkModal.error && (
+                <div className="border border-amber-300 bg-amber-50 rounded p-3 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
+                  <div>{linkModal.error}</div>
+                </div>
+              )}
+              {linkModal.loading && (
+                <div className="text-muted-foreground">Preparando link...</div>
+              )}
+              {linkModal.paymentUrl && (
+                <div>
+                  <Label>Link de pagamento</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input readOnly value={linkModal.paymentUrl} className="font-mono text-xs" />
+                    <Button variant="outline" onClick={() => copy(linkModal.paymentUrl!, "Link")}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button asChild variant="outline">
+                      <a href={linkModal.paymentUrl} target="_blank" rel="noreferrer">
+                        <Link2 className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Envie ao cliente. Ele conclui o pagamento (Pix/Boleto) pelo portal.
+                  </p>
+                </div>
+              )}
+              {linkModal.reference && (
+                <div>
+                  <Label>Referência</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input readOnly value={linkModal.reference} className="font-mono text-xs" />
+                    <Button
+                      variant="outline"
+                      onClick={() => copy(linkModal.reference!, "Referência")}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setLinkModal(null)}>Fechar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={!!selected}
         onOpenChange={(o) => !o && setSelected(null)}
