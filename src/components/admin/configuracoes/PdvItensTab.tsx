@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { listPdvItems, createPdvItem, updatePdvItem, deletePdvItem } from "@/lib/admin/pdv-itens.functions";
 import { listCategories } from "@/lib/admin/categories.functions";
 import { CategoriesManagerModal } from "./CategoriesManagerModal";
+import { EmojiPickerField } from "@/components/admin/EmojiPickerField";
 import { StockMovementsDialog } from "./StockMovementsDialog";
 
 type Item = Awaited<ReturnType<typeof listPdvItems>>[number];
