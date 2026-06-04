@@ -40,9 +40,15 @@ type Service = {
   id: string;
   title: string;
   price_cents: number;
+  online_price_cents: number | null;
+  online_currency: string | null;
+  currency?: string | null;
   kind: string | null;
   requires_slot: boolean;
 };
+
+const fmtBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const fmtEUR = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "EUR" });
 
 type PaymentMethod = "mercadopago" | "manual" | "gratuito";
 type Currency = "EUR" | "BRL";
