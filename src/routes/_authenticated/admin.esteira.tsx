@@ -154,12 +154,36 @@ function EsteiraPage() {
   });
 
   const filtered = useMemo(() => {
-    if (filter === "todos") return orders;
-    // status filters
-    if (["pendente", "aprovado", "recusado", "estornado"].includes(filter))
-      return orders.filter((o) => o.payment_status === filter);
-    return orders.filter((o) => o.delivery_status === filter);
-  }, [orders, filter]);
+    const q = search.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (paymentFilter !== "all" && o.payment_status !== paymentFilter) return false;
+      if (deliveryFilter !== "all" && o.delivery_status !== deliveryFilter) return false;
+      if (q) {
+        const hay = `${o.customer_name} ${o.customer_email ?? ""} ${o.service_title} ${o.voucher_code ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [orders, search, paymentFilter, deliveryFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => filtered.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filtered, safePage, pageSize],
+  );
+
+  const resetFilters = () => {
+    setSearch("");
+    setPaymentFilter("all");
+    setDeliveryFilter("all");
+    setPage(1);
+  };
+
+  const onFilterChange = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v);
+    setPage(1);
+  };
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["orders"] });
   const canViewFinancials = isAdmin;
