@@ -13,7 +13,7 @@ export const getClubContent = createServerFn({ method: "GET" })
     const { supabase } = context;
     const userId = context.effectiveUserId ?? context.userId;
 
-    const [profileRes, modulesRes, lessonsRes, filesRes, settingsRes, postsRes, progressRes] = await Promise.all([
+    const [profileRes, modulesRes, lessonsRes, filesRes, settingsRes, postsRes, progressRes, favoritesRes, certificatesRes] = await Promise.all([
       supabase.from("profiles").select("is_club_member, full_name").eq("id", userId).maybeSingle(),
       supabase
         .from("club_modules")
@@ -41,6 +41,15 @@ export const getClubContent = createServerFn({ method: "GET" })
         .select("lesson_id, opened_at, completed_at")
         .eq("user_id", userId)
         .order("opened_at", { ascending: false }),
+      supabase
+        .from("club_lesson_favorites")
+        .select("lesson_id")
+        .eq("user_id", userId),
+      supabase
+        .from("club_certificates")
+        .select("id, code, scope, module_id, issued_at")
+        .eq("user_id", userId)
+        .order("issued_at", { ascending: false }),
     ]);
 
     const isMember = !!profileRes.data?.is_club_member;
