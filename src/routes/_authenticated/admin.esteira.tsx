@@ -29,6 +29,13 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   CheckCircle2,
   Plus,
   QrCode,
@@ -43,6 +50,9 @@ import {
   Loader2,
   TrendingUp,
   Euro,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
