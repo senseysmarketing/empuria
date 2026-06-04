@@ -291,10 +291,9 @@ export function NewOrderWizard({
                   value={newCust.email}
                   onChange={(e) => setNewCust({ ...newCust, email: e.target.value })}
                 />
-                <Input
-                  placeholder="Telefone"
+                <PhoneInput
                   value={newCust.phone}
-                  onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })}
+                  onChange={(e164) => setNewCust({ ...newCust, phone: e164 ?? "" })}
                 />
                 <Button variant="outline" onClick={createCust}>
                   Criar e vincular
