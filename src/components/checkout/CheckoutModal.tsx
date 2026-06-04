@@ -107,6 +107,45 @@ async function loadMercadoPagoSdk() {
   });
 }
 
+type PendingPix = {
+  intent: { orderId: string; reference: string; amountCents: number; currency: string };
+  payment: MpPayment;
+  savedAt: number;
+};
+
+const PENDING_PIX_KEY = (slug: string) => `empuria:pending-pix:${slug}`;
+
+function loadPendingPix(slug: string): PendingPix | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PENDING_PIX_KEY(slug));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingPix;
+    if (!parsed?.payment?.expiresAt) return null;
+    if (new Date(parsed.payment.expiresAt).getTime() <= Date.now()) return null;
+    if (parsed.payment.orderPaymentStatus !== "pendente") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingPix(slug: string, data: PendingPix) {
+  try {
+    window.localStorage.setItem(PENDING_PIX_KEY(slug), JSON.stringify(data));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function clearPendingPix(slug: string) {
+  try {
+    window.localStorage.removeItem(PENDING_PIX_KEY(slug));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function CheckoutModal({
   service,
   open,
