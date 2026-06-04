@@ -685,6 +685,20 @@ export function CheckoutModal({
                 <span>Total</span>
                 <strong>{money(intent.amountCents, intent.currency)}</strong>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (service) clearPendingPix(service.slug);
+                  setPayment(null);
+                  setIntent(null);
+                  setQrUrl(null);
+                  setStep("data");
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-brown-deep/50 hover:text-orange-brand transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Iniciar novo pedido
+              </button>
             </div>
 
             <div className="flex gap-1 rounded-md bg-muted/50 p-1">
