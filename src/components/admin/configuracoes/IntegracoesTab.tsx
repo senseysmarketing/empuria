@@ -796,33 +796,99 @@ function MercadoPagoConfigDialog({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Public Key">
-            <Input
-              name="public_key"
-              placeholder="APP_USR-..."
-              defaultValue={setting?.public_key ?? ""}
-            />
-          </Field>
-          <Field label="Access Token">
-            <Input
-              name="access_token"
-              type="password"
-              placeholder={
-                setting?.access_token ? "Preenchido - deixe em branco para manter" : "APP_USR-..."
-              }
-            />
-          </Field>
-          <Field label="Segredo do webhook">
-            <Input
-              name="webhook_secret"
-              type="password"
-              placeholder={
-                setting?.webhook_secret
-                  ? "Preenchido - deixe em branco para manter"
-                  : "Secret signature"
-              }
-            />
-          </Field>
+          <div className="lg:col-span-2 rounded-lg border border-admin-border bg-admin-surface-muted/40 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="font-display text-sm font-semibold text-admin-ink">
+                Credenciais de Teste (Sandbox)
+              </h4>
+              {environment === "test" ? (
+                <Badge className="bg-amber-100 text-amber-800">Ambiente ativo</Badge>
+              ) : null}
+            </div>
+            <p className="mb-3 text-xs text-admin-ink-muted">
+              Copie do painel Mercado Pago em <strong>Suas integracoes &rarr; sua aplicacao &rarr; Credenciais de teste</strong>.
+              Em contas de produtor, a Public Key e o Access Token de teste tambem comecam com <code>APP_USR-</code> -
+              isso e normal, o que importa e copiar da aba "Credenciais de teste".
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Public Key (teste)">
+                <Input
+                  name="test_public_key"
+                  placeholder="APP_USR-... (teste)"
+                  defaultValue={setting?.test_public_key ?? ""}
+                />
+              </Field>
+              <Field label="Access Token (teste)">
+                <Input
+                  name="test_access_token"
+                  type="password"
+                  placeholder={
+                    setting?.test_access_token
+                      ? "Preenchido - deixe em branco para manter"
+                      : "APP_USR-... (teste)"
+                  }
+                />
+              </Field>
+              <Field label="Segredo do webhook (teste)">
+                <Input
+                  name="test_webhook_secret"
+                  type="password"
+                  placeholder={
+                    setting?.test_webhook_secret
+                      ? "Preenchido - deixe em branco para manter"
+                      : "Secret signature"
+                  }
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 rounded-lg border border-admin-border bg-admin-surface-muted/40 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="font-display text-sm font-semibold text-admin-ink">
+                Credenciais de Producao
+              </h4>
+              {environment === "production" ? (
+                <Badge className="bg-emerald-100 text-emerald-800">Ambiente ativo</Badge>
+              ) : null}
+            </div>
+            <p className="mb-3 text-xs text-admin-ink-muted">
+              Copie do painel Mercado Pago em <strong>Credenciais de producao</strong>. Use apenas
+              depois de validar o fluxo no ambiente de teste.
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Public Key (producao)">
+                <Input
+                  name="prod_public_key"
+                  placeholder="APP_USR-... (producao)"
+                  defaultValue={setting?.prod_public_key ?? ""}
+                />
+              </Field>
+              <Field label="Access Token (producao)">
+                <Input
+                  name="prod_access_token"
+                  type="password"
+                  placeholder={
+                    setting?.prod_access_token
+                      ? "Preenchido - deixe em branco para manter"
+                      : "APP_USR-... (producao)"
+                  }
+                />
+              </Field>
+              <Field label="Segredo do webhook (producao)">
+                <Input
+                  name="prod_webhook_secret"
+                  type="password"
+                  placeholder={
+                    setting?.prod_webhook_secret
+                      ? "Preenchido - deixe em branco para manter"
+                      : "Secret signature"
+                  }
+                />
+              </Field>
+            </div>
+          </div>
+
           <ReadonlyWebhookField webhookUrl={webhookUrl} />
           <Field label="Descriptor da fatura">
             <Input
