@@ -337,11 +337,19 @@ export function NewOrderWizard({
                   <SelectValue placeholder="Escolha o serviço" />
                 </SelectTrigger>
                 <SelectContent>
-                  {services.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.title} · € {(s.price_cents / 100).toFixed(2)}
-                    </SelectItem>
-                  ))}
+                  {services.map((s) => {
+                    const brl = (s as Service).online_price_cents ?? 0;
+                    const eur = s.price_cents ?? 0;
+                    const label =
+                      brl > 0
+                        ? `${s.title} · ${fmtBRL.format(brl / 100)}${eur > 0 ? ` (${fmtEUR.format(eur / 100)})` : ""}`
+                        : `${s.title} · ${fmtEUR.format(eur / 100)}`;
+                    return (
+                      <SelectItem key={s.id} value={s.id}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             ) : (
