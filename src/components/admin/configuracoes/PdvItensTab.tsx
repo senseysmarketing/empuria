@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BentoCard } from "@/components/admin/BentoCard";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Tags, Boxes } from "lucide-react";
+import { Plus, Pencil, Trash2, Tags, Boxes, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { listPdvItems, createPdvItem, updatePdvItem, deletePdvItem } from "@/lib/admin/pdv-itens.functions";
 import { listCategories } from "@/lib/admin/categories.functions";
@@ -17,9 +17,17 @@ import { StockMovementsDialog } from "./StockMovementsDialog";
 
 type Item = Awaited<ReturnType<typeof listPdvItems>>[number];
 
+function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 const emptyForm = {
   name: "",
-  slug: "",
   price_cents: 0,
   price_eur_cents: 0,
   price_brl_cents: 0,
