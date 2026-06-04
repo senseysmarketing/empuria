@@ -89,7 +89,7 @@ function ConfiguracoesPage() {
             value="servicos-precos"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
-            <Tags className="h-4 w-4" /> ServiÃ§os &amp; PreÃ§os
+            <Tags className="h-4 w-4" /> Serviços &amp; Preços
           </TabsTrigger>
           <TabsTrigger
             value="pdv-itens"
