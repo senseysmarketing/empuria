@@ -15,7 +15,10 @@ import {
   Copy,
   Users,
   UserPlus,
+  Crown,
+  Sparkles,
 } from "lucide-react";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
