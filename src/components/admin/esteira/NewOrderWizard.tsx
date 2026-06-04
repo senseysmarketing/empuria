@@ -225,7 +225,7 @@ export function NewOrderWizard({
         <DialogHeader>
           <DialogTitle>Novo pedido</DialogTitle>
           <DialogDescription>
-            Etapa {step} de 4 · {stepLabel(step)}
+            {step === 5 ? "Conclusão" : `Etapa ${step} de 4 · ${stepLabel(step)}`}
           </DialogDescription>
         </DialogHeader>
 
