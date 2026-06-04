@@ -1587,10 +1587,16 @@ export type Database = {
           pix_enabled: boolean
           pix_expiration_minutes: number
           post_purchase_url: string | null
+          prod_access_token: string | null
+          prod_public_key: string | null
+          prod_webhook_secret: string | null
           product_id: string | null
           provider: string
           public_key: string | null
           statement_descriptor: string
+          test_access_token: string | null
+          test_public_key: string | null
+          test_webhook_secret: string | null
           updated_at: string
           webhook_secret: string | null
           whatsapp_group_url: string | null
@@ -1611,10 +1617,16 @@ export type Database = {
           pix_enabled?: boolean
           pix_expiration_minutes?: number
           post_purchase_url?: string | null
+          prod_access_token?: string | null
+          prod_public_key?: string | null
+          prod_webhook_secret?: string | null
           product_id?: string | null
           provider: string
           public_key?: string | null
           statement_descriptor?: string
+          test_access_token?: string | null
+          test_public_key?: string | null
+          test_webhook_secret?: string | null
           updated_at?: string
           webhook_secret?: string | null
           whatsapp_group_url?: string | null
@@ -1635,10 +1647,16 @@ export type Database = {
           pix_enabled?: boolean
           pix_expiration_minutes?: number
           post_purchase_url?: string | null
+          prod_access_token?: string | null
+          prod_public_key?: string | null
+          prod_webhook_secret?: string | null
           product_id?: string | null
           provider?: string
           public_key?: string | null
           statement_descriptor?: string
+          test_access_token?: string | null
+          test_public_key?: string | null
+          test_webhook_secret?: string | null
           updated_at?: string
           webhook_secret?: string | null
           whatsapp_group_url?: string | null
