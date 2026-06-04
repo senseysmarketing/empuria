@@ -8,7 +8,8 @@ import { listWeekEvents } from "@/lib/admin/events.functions";
 import { listWeekCalendarTasks } from "@/lib/admin/calendar-tasks.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, CheckSquare, Ticket, PartyPopper, Link2, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, CheckSquare, Ticket, PartyPopper, Link2, AlertTriangle, CalendarDays, Activity, Clock, ListChecks } from "lucide-react";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -282,11 +283,11 @@ function AgendaPage() {
 
       {/* Resumo */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <SummaryTile label="Hoje" value={todayAppts.length} />
-        <SummaryTile label="Acontecendo agora" value={happeningNow.length} />
-        <SummaryTile label="Próximos" value={upcoming.length} />
-        <SummaryTile label="Vagas abertas" value={vagasAbertas} />
-        <SummaryTile label="Tarefas pendentes" value={tarefasPendentes} />
+        <AdminStatCard label="Hoje" value={todayAppts.length} icon={CalendarDays} tone="blue" />
+        <AdminStatCard label="Acontecendo agora" value={happeningNow.length} icon={Activity} tone="green" />
+        <AdminStatCard label="Próximos" value={upcoming.length} icon={Clock} tone="amber" />
+        <AdminStatCard label="Vagas abertas" value={vagasAbertas} icon={Ticket} tone="amber" />
+        <AdminStatCard label="Tarefas pendentes" value={tarefasPendentes} icon={ListChecks} tone="red" />
       </div>
 
       {/* Filtros */}
@@ -437,11 +438,3 @@ function SideList({ title, items, empty }: { title: string; items: CalItem[]; em
   );
 }
 
-function SummaryTile({ label, value }: { label: string; value: number }) {
-  return (
-    <BentoCard padded>
-      <div className="text-[11px] uppercase tracking-wider text-admin-ink-muted">{label}</div>
-      <div className="font-display text-3xl text-admin-ink mt-1">{value}</div>
-    </BentoCard>
-  );
-}

@@ -66,6 +66,8 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { AdminStatCard, type AdminStatCardTone } from "@/components/admin/AdminStatCard";
 import { scoreLead, temperatureChip, temperatureOf } from "@/lib/leads/scoring";
 
 export const Route = createFileRoute("/_authenticated/admin/crm")({
@@ -341,10 +343,10 @@ function CrmPage() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric icon={UserRound} label="Meus leads" value={metrics.mine} />
-        <Metric icon={CalendarClock} label="Follow-ups pendentes" value={metrics.followups} />
-        <Metric icon={MessageCircle} label="Mensagens novas" value={metrics.inbox} />
-        <Metric icon={Clock} label="Leads atrasados" value={metrics.late} />
+        <Metric icon={UserRound} label="Meus leads" value={metrics.mine} tone="blue" />
+        <Metric icon={CalendarClock} label="Follow-ups pendentes" value={metrics.followups} tone="amber" />
+        <Metric icon={MessageCircle} label="Mensagens novas" value={metrics.inbox} tone="green" />
+        <Metric icon={Clock} label="Leads atrasados" value={metrics.late} tone="red" />
       </section>
 
       <section className="flex flex-col gap-2 rounded-xl border border-admin-border bg-admin-surface p-3 lg:flex-row lg:items-center">
@@ -784,11 +786,11 @@ function FollowupsTab({
   return (
     <div className="space-y-4">
       <section className="grid gap-3 md:grid-cols-5">
-        <Metric icon={Clock} label="Atrasados" value={overdue.length} />
-        <Metric icon={CalendarClock} label="Hoje" value={today.length} />
-        <Metric icon={ArrowRight} label="Proximos" value={upcoming.length} />
-        <Metric icon={MessageCircle} label="Sugeridos" value={suggestions.length} />
-        <Metric icon={CheckCircle2} label="Concluidos" value={done.length} />
+        <Metric icon={Clock} label="Atrasados" value={overdue.length} tone="red" />
+        <Metric icon={CalendarClock} label="Hoje" value={today.length} tone="amber" />
+        <Metric icon={ArrowRight} label="Proximos" value={upcoming.length} tone="blue" />
+        <Metric icon={MessageCircle} label="Sugeridos" value={suggestions.length} tone="neutral" />
+        <Metric icon={CheckCircle2} label="Concluidos" value={done.length} tone="green" />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -1698,22 +1700,17 @@ function FollowupDialog({
 }
 
 function Metric({
-  icon: Icon,
+  icon,
   label,
   value,
+  tone = "neutral",
 }: {
-  icon: typeof UserRound;
+  icon: LucideIcon;
   label: string;
   value: number;
+  tone?: AdminStatCardTone;
 }) {
-  return (
-    <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-admin-ink-muted">
-        <Icon className="h-4 w-4" /> {label}
-      </div>
-      <div className="mt-2 text-2xl font-bold tabular-nums text-admin-ink">{value}</div>
-    </div>
-  );
+  return <AdminStatCard icon={icon} label={label} value={value} tone={tone} />;
 }
 
 function EmptyState({ title, body }: { title: string; body: string }) {

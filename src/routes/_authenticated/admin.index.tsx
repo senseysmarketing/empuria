@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getCockpitMetrics, getActivityFeed } from "@/lib/admin/cockpit.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
-import { MetricTile } from "@/components/admin/MetricTile";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { ActivityFeed } from "@/components/admin/ActivityFeed";
 import { ArrivalDialog } from "@/components/admin/ArrivalDialog";
 import { RevenueChart } from "@/components/admin/RevenueChart";
@@ -65,36 +65,38 @@ function CockpitAdminPage() {
 
       <div className="grid grid-cols-12 gap-4">
         {m?.canViewFinancials && (
-          <MetricTile
+          <AdminStatCard
             className="col-span-12 sm:col-span-6 lg:col-span-3"
             label="Vendas hoje"
             value={salesLabel}
             hint="Esteira 1 (pagas)"
             icon={Euro}
-            accent="success"
+            tone="green"
           />
         )}
-        <MetricTile
+        <AdminStatCard
           className="col-span-12 sm:col-span-6 lg:col-span-3"
           label="Novos membros (30d)"
           value={m?.newMembers ?? "—"}
           hint="Clube do Imigrante"
           icon={Crown}
-          accent="accent"
+          tone="amber"
         />
-        <MetricTile
+        <AdminStatCard
           className="col-span-12 sm:col-span-6 lg:col-span-3"
           label="Reuniões hoje"
           value={m?.appointmentsToday ?? "—"}
           hint="Sala Gran Vía + tours"
           icon={CalendarClock}
+          tone="blue"
         />
-        <MetricTile
+        <AdminStatCard
           className="col-span-12 sm:col-span-6 lg:col-span-3"
           label="Chegadas hoje"
           value={m?.todayArrivals.length ?? "—"}
           hint="Recepção física"
           icon={Users}
+          tone="neutral"
         />
 
         {m?.canViewFinancials && (

@@ -15,7 +15,10 @@ import {
   Copy,
   Users,
   UserPlus,
+  Crown,
+  Sparkles,
 } from "lucide-react";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -201,9 +204,9 @@ function PassaportesPanel() {
         </div>
 
         <div className="grid grid-cols-3 gap-3 pt-2">
-          <MiniTile label="Ativos" value={query.data?.totalActive ?? 0} />
-          <MiniTile label="Membros do Clube" value={query.data?.totalClub ?? 0} accent />
-          <MiniTile label="Novos no mês" value={query.data?.newThisMonth ?? 0} />
+          <AdminStatCard label="Ativos" value={query.data?.totalActive ?? 0} icon={Users} tone="green" />
+          <AdminStatCard label="Membros do Clube" value={query.data?.totalClub ?? 0} icon={Crown} tone="amber" />
+          <AdminStatCard label="Novos no mês" value={query.data?.newThisMonth ?? 0} icon={Sparkles} tone="blue" />
         </div>
       </div>
 
@@ -364,18 +367,6 @@ function CreateManualUserDialog({
   );
 }
 
-function MiniTile({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
-  return (
-    <div
-      className={`rounded-xl px-4 py-3 ${accent ? "bg-yellow-brand/15 border border-yellow-brand/40" : "bg-white border border-brown/10"}`}
-    >
-      <div className="text-[10px] uppercase tracking-widest text-brown/60 font-display">
-        {label}
-      </div>
-      <div className="font-display text-2xl font-bold text-brown-deep tabular-nums">{value}</div>
-    </div>
-  );
-}
 
 function UserRowCard({ user }: { user: UserRow }) {
   const navigate = useNavigate();
