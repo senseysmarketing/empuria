@@ -342,12 +342,19 @@ export const refundOrder = createServerFn({ method: "POST" })
 
 export const generatePaymentLink = createServerFn({ method: "POST" })
   .middleware([requireStaff])
-  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        baseUrl: z.string().url().optional(),
+      })
+      .parse(d),
+  )
   .handler(async ({ data, context }) => {
     const reference = `EMP-${data.id}`;
     const { data: order, error: orderErr } = await context.supabase
       .from("orders")
-      .select("amount_cents,currency,payment_amount_cents,payment_currency")
+      .select("amount_cents,currency,payment_amount_cents,payment_currency,payment_status")
       .eq("id", data.id)
       .single();
     if (orderErr || !order) throw new Error(orderErr?.message ?? "Pedido nao encontrado");
@@ -356,7 +363,19 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
       currency: "EUR" | "BRL" | "USD";
       payment_amount_cents: number | null;
       payment_currency: "EUR" | "BRL" | "USD" | null;
+      payment_status: string;
     };
+    if (orderRow.payment_status === "aprovado") {
+      throw new Error("Pedido ja esta pago.");
+    }
+    if (orderRow.payment_status === "estornado") {
+      throw new Error("Pedido estornado. Crie um novo pedido para cobrar novamente.");
+    }
+    const payCurrency = orderRow.payment_currency ?? orderRow.currency;
+    if (payCurrency !== "BRL") {
+      throw new Error("Mercado Pago Brasil exige cobranca em BRL. Ajuste a moeda do pedido.");
+    }
+
     const { error } = await context.supabase
       .from("orders")
       .update({
@@ -364,25 +383,73 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
         payment_provider_reference: reference,
         external_reference: reference,
         payment_amount_cents: orderRow.payment_amount_cents ?? orderRow.amount_cents,
-        payment_currency: orderRow.payment_currency ?? orderRow.currency,
+        payment_currency: payCurrency,
         payment_status: "pendente",
       } as never)
       .eq("id", data.id);
-
     if (error) throw new Error(error.message);
+
+    // Reuse an active link if one already exists; otherwise create a new token.
+    const { data: existing } = await supabaseAdmin
+      .from("order_payment_links")
+      .select("id,token,status,expires_at")
+      .eq("order_id", data.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let token: string;
+    let linkId: string;
+    const validExisting =
+      existing &&
+      (existing as { expires_at: string }).expires_at &&
+      new Date((existing as { expires_at: string }).expires_at).getTime() > Date.now();
+    if (validExisting) {
+      token = (existing as { token: string }).token;
+      linkId = (existing as { id: string }).id;
+    } else {
+      const rand = new Uint8Array(24);
+      globalThis.crypto.getRandomValues(rand);
+      token =
+        "pay_" +
+        Array.from(rand)
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+      const { data: inserted, error: insErr } = await supabaseAdmin
+        .from("order_payment_links")
+        .insert({
+          order_id: data.id,
+          token,
+          created_by: context.userId,
+        })
+        .select("id")
+        .single();
+      if (insErr || !inserted) throw new Error(insErr?.message ?? "Falha ao criar link.");
+      linkId = (inserted as { id: string }).id;
+    }
+
+    const baseUrl =
+      data.baseUrl?.replace(/\/+$/, "") ?? "https://empuria.lovable.app";
+    const url = `${baseUrl}/pagar/${token}`;
+
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
       module: "esteira",
-      entity_type: "order",
-      entity_id: data.id,
-      action: "order.payment.mercadopago.prepare",
-      new_data: { reference, provider: "mercadopago" },
+      entity_type: "order_payment_link",
+      entity_id: linkId,
+      action: "payment_link.created",
+      new_data: { reference, provider: "mercadopago", order_id: data.id },
     });
+
     return {
       ok: true,
       pending: true,
       reference,
-      message: "Pedido preparado para pagamento Mercado Pago no checkout interno.",
+      token,
+      linkId,
+      url,
+      message: "Link de pagamento publico gerado.",
     };
   });
 
