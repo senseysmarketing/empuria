@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Check, Copy, CreditCard, FileText, Loader2, QrCode } from "lucide-react";
+import { ArrowRight, Check, Copy, CreditCard, FileText, Loader2, QrCode, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 
