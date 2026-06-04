@@ -297,11 +297,12 @@ function assertPaymentAllowed(setting: MercadoPagoSetting, method: PaymentMethod
   if (method === "credit_card" && !setting.card_enabled) throw new Error("Cartao esta desativado.");
 }
 
-function buildOrderPayload(args: {
+function buildPaymentPayload(args: {
   order: OrderRow;
   method: PaymentMethod;
   setting: MercadoPagoSetting;
   amountCents: number;
+  fallbackExpiresAt: string | null;
   payer?: {
     cpf?: string;
     zipCode?: string;
@@ -317,7 +318,7 @@ function buildOrderPayload(args: {
     installments: number;
   };
 }) {
-  const amount = centsToAmount(args.amountCents);
+  const transaction_amount = Number(centsToAmount(args.amountCents));
   const { firstName, lastName } = splitName(args.order.customer_name);
   const payer: Record<string, unknown> = {
     email: args.order.customer_email,
@@ -333,58 +334,70 @@ function buildOrderPayload(args: {
       street_number: args.payer?.streetNumber,
       zip_code: onlyDigits(args.payer?.zipCode),
       neighborhood: args.payer?.neighborhood,
-      state: args.payer?.state,
+      federal_unit: args.payer?.state,
       city: args.payer?.city,
     };
   }
 
-  const paymentMethod =
+  const payment_method_id =
     args.method === "pix"
-      ? { id: "pix", type: "bank_transfer" }
+      ? "pix"
       : args.method === "boleto"
-        ? { id: "boleto", type: "ticket" }
-        : {
-            id: args.card?.paymentMethodId,
-            type: "credit_card",
-            token: args.card?.token,
-            installments: args.card?.installments,
-            statement_descriptor: args.setting.statement_descriptor,
-          };
+        ? "bolbradesco"
+        : args.card?.paymentMethodId;
 
-  return {
-    type: "online",
-    external_reference: externalReference(args.order.id),
-    processing_mode: "automatic",
-    total_amount: amount,
+  const payload: Record<string, unknown> = {
+    transaction_amount,
     description: `${args.order.service_title} - Instituto Empuria`.slice(0, 150),
+    external_reference: externalReference(args.order.id),
+    payment_method_id,
+    statement_descriptor: args.setting.statement_descriptor,
     payer,
-    transactions: { payments: [{ amount, payment_method: paymentMethod }] },
   };
+
+  const notif = notificationUrl();
+  if (notif) payload.notification_url = notif;
+
+  if (args.method === "pix" || args.method === "boleto") {
+    if (args.fallbackExpiresAt) {
+      payload.date_of_expiration = formatBrazilExpiration(args.fallbackExpiresAt);
+    }
+  }
+
+  if (args.method === "credit_card" && args.card) {
+    payload.token = args.card.token;
+    payload.installments = args.card.installments;
+  }
+
+  return payload;
 }
 
 function snapshotFromResponse(response: Record<string, unknown>, fallbackExpiresAt: string | null) {
-  const payment = firstPayment(response) ?? {};
-  const method = firstPaymentMethod(response);
+  const poi = (deepGet(response, ["point_of_interaction", "transaction_data"]) ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const txDetails = (response.transaction_details ?? {}) as Record<string, unknown>;
+  const barcode = (txDetails.barcode ?? {}) as Record<string, unknown>;
+  const paymentMethod = (response.payment_method ?? {}) as Record<string, unknown>;
   return {
-    provider_order_id: asString(response.id),
-    provider_payment_id: asString(payment.id),
-    payment_type: asString(method.type),
-    status: asString(payment.status) ?? asString(response.status) ?? "created",
-    status_detail: asString(payment.status_detail) ?? asString(response.status_detail),
-    qr_code: asString(method.qr_code),
-    qr_code_base64: asString(method.qr_code_base64),
-    ticket_url: asString(method.ticket_url),
-    digitable_line: asString(method.digitable_line),
-    barcode_content: asString(method.barcode_content),
+    provider_order_id: null as string | null,
+    provider_payment_id: asString(response.id),
+    payment_type:
+      asString(response.payment_type_id) ?? asString(paymentMethod.type) ?? null,
+    status: asString(response.status) ?? "pending",
+    status_detail: asString(response.status_detail),
+    qr_code: asString(poi.qr_code),
+    qr_code_base64: asString(poi.qr_code_base64),
+    ticket_url: asString(poi.ticket_url) ?? asString(txDetails.external_resource_url),
+    digitable_line: asString(txDetails.digitable_line) ?? asString(txDetails.payment_method_reference_id),
+    barcode_content: asString(barcode.content),
     expires_at:
-      parseDate(method.date_of_expiration) ??
-      parseDate(payment.date_of_expiration) ??
-      parseDate(response.expiration_date_to) ??
+      parseDate(response.date_of_expiration) ??
+      parseDate(deepGet(response, ["point_of_interaction", "transaction_data", "expiration_date"])) ??
       fallbackExpiresAt,
   };
 }
-
-async function syncOrderFromPayment(row: MercadoPagoPaymentRow) {
   const status = mapPaymentStatus(row.status, row.status_detail);
   const patch: Record<string, unknown> = {
     payment_provider: "mercadopago",
