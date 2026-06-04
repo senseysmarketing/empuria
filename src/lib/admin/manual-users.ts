@@ -57,7 +57,9 @@ export async function createOrReuseManualCustomer(input: {
   adminNotes?: string | null;
 }): Promise<ManualCustomerResult> {
   const email = normalizeEmail(input.email);
-  const phone = input.phone?.trim() || null;
+  const rawPhone = input.phone?.trim() || null;
+  const phone = rawPhone ? (normalizePhone(rawPhone) ?? rawPhone) : null;
+  const phoneCountry = phone ? getCountryFromPhone(phone) : null;
   let user = await findAuthUserByEmail(email);
   let created = false;
 
