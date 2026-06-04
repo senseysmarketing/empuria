@@ -158,17 +158,21 @@ export function NewOrderWizard({
   const payCents = payAmount ? Math.round(parseFloat(payAmount) * 100) : amountCents;
   const isFree = amountCents === 0;
 
+  const mpNeedsBrl = !isFree && method === "mercadopago" && payCurrency !== "BRL";
+
   const canSubmit =
     customer &&
     (serviceMode === "cadastrado" ? !!service : customTitle.length >= 2) &&
     amount !== "" &&
     (!isFree || confirmFree) &&
-    (method !== "manual" || reason.length >= 3);
+    (method !== "manual" || reason.length >= 3) &&
+    !mpNeedsBrl;
 
   const submit = async () => {
-    if (!canSubmit || !customer) return;
+    if (!canSubmit || !customer || submitting) return;
+    setSubmitting(true);
     try {
-      await createOrder({
+      const created = await createOrder({
         data: {
           user_id: customer.id,
           customer_name: customer.full_name ?? "Sem nome",
@@ -185,12 +189,34 @@ export function NewOrderWizard({
           notes: notes || undefined,
         },
       });
+      const effectiveMethod: PaymentMethod = isFree ? "gratuito" : method;
+      let reference: string | null = null;
+      let paymentUrl: string | null = null;
+      if (effectiveMethod === "mercadopago") {
+        try {
+          const link = await genLink({ data: { id: created.id } });
+          reference = link.reference ?? `EMP-${created.id}`;
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Não foi possível preparar o link MP");
+        }
+        if (typeof window !== "undefined") {
+          paymentUrl = `${window.location.origin}/portal/servicos?order=${created.id}`;
+        }
+      }
+      setCreatedOrder({ id: created.id, reference, paymentUrl, method: effectiveMethod });
+      setStep(5);
       toast.success("Pedido criado");
       onCreated();
-      onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado`);
   };
 
   return (
