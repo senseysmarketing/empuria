@@ -62,7 +62,7 @@ export function MyServicesPanel() {
           </div>
           <ul className="space-y-1 text-sm text-admin-ink">
             {pending.map((o) => (
-              <li key={o.id}>{o.service_title} · € {(o.amount_cents / 100).toFixed(2)}</li>
+              <li key={o.id}>{o.service_title} · {new Intl.NumberFormat(o.currency === "BRL" ? "pt-BR" : "pt-PT", { style: "currency", currency: o.currency || "EUR" }).format(o.amount_cents / 100)}</li>
             ))}
           </ul>
         </div>
