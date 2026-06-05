@@ -40,6 +40,7 @@ function ServiceDetailPage() {
       </div>
     );
   }
+  const isInactive = service.is_active === false;
 
   const price = (service.price_cents / 100).toFixed(0);
   const docs = Array.isArray(service.document_checklist) ? (service.document_checklist as string[]) : [];
