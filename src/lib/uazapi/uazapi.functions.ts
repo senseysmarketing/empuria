@@ -610,11 +610,13 @@ async function recordInboundMessage(
   }
 
   const lead = await findLeadByPhone(parsed.phone);
+  const storedPhone = parsed.phoneE164 ?? parsed.phone;
+  const chatIdFallback = parsed.chatId ?? `wa:${parsed.rawDigits ?? storedPhone.replace(/\D/g, "")}`;
   const inboxInsert = {
     provider: "whatsapp",
     provider_message_id: parsed.providerEventId,
-    provider_chat_id: parsed.chatId ?? `wa:${parsed.phone}`,
-    from_phone: parsed.phone,
+    provider_chat_id: chatIdFallback,
+    from_phone: storedPhone,
     from_name: parsed.senderName,
     message_type: parsed.messageType,
     body: parsed.body,
@@ -641,8 +643,8 @@ async function recordInboundMessage(
       {
         lead_id: lead.id,
         provider: "whatsapp",
-        provider_chat_id: parsed.chatId ?? `wa:${parsed.phone}`,
-        phone: parsed.phone,
+        provider_chat_id: chatIdFallback,
+        phone: storedPhone,
         last_message_at: receivedAt,
         last_inbound_at: receivedAt,
       },
