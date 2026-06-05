@@ -1,8 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin, requireModule } from "./auth";
 import { sendUazapiTextInternal } from "@/lib/uazapi/uazapi.functions";
+import {
+  normalizePhone as normalizeE164Phone,
+  phoneToWhatsAppJid,
+  getCountryFromPhone,
+} from "@/lib/phone/phone.utils";
+
 
 const systemStageKeys = new Set(["novo", "em_contato", "reuniao", "fechado", "descartado"]);
 
@@ -385,12 +392,14 @@ export const createCrmLead = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = context.supabase as any;
+    const normalizedPhone = normalizeE164Phone(data.phone, "BR") ?? data.phone;
     const { data: row, error } = await db
       .from("leads")
       .insert({
         full_name: data.full_name,
         email: data.email || fallbackEmail(data.full_name, data.phone),
-        phone: data.phone,
+        phone: normalizedPhone,
+        phone_country_iso: getCountryFromPhone(normalizedPhone),
         target_visa: data.target_visa || null,
         message: data.message || null,
         first_message: data.message || null,
@@ -678,7 +687,9 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
       .single();
     if (leadError) throw new Error(leadError.message);
     const leadRow = lead as CrmLeadRow;
-    const phoneDigits = leadRow.phone.replace(/\D/g, "");
+    const leadE164 =
+      normalizeE164Phone(leadRow.phone) ?? normalizeE164Phone(leadRow.phone, "BR");
+    const phoneDigits = phoneToWhatsAppJid(leadE164) ?? leadRow.phone.replace(/\D/g, "");
     if (phoneDigits.length < 8) throw new Error("Lead sem telefone valido para WhatsApp.");
     if (isFinalStage(leadRow.pipeline_stage))
       throw new Error("Lead em etapa final nao pode receber follow-up.");
@@ -712,7 +723,7 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
           lead_id: leadRow.id,
           provider: "whatsapp",
           provider_chat_id: `wa:${phoneDigits}`,
-          phone: leadRow.phone,
+          phone: leadE164 ?? leadRow.phone,
           last_message_at: new Date().toISOString(),
           last_outbound_at: new Date().toISOString(),
         },
@@ -798,7 +809,7 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
     return {
       ok: true,
       delivery,
-      whatsappUrl: delivery === "wa_me" ? whatsappUrl(leadRow.phone, data.message) : null,
+      whatsappUrl: delivery === "wa_me" ? whatsappUrl(leadE164 ?? leadRow.phone, data.message) : null,
     };
   });
 
@@ -955,6 +966,10 @@ async function linkInboxToLeadInternal(db: any, inboxId: string, leadId: string,
     .single();
   if (inboxError) throw new Error(inboxError.message);
 
+  const inboxPhoneE164 =
+    normalizeE164Phone(inbox.from_phone) ??
+    normalizeE164Phone(inbox.from_phone, "BR") ??
+    inbox.from_phone;
   const { data: conversation, error: conversationError } = await db
     .from("crm_conversations")
     .upsert(
@@ -962,7 +977,7 @@ async function linkInboxToLeadInternal(db: any, inboxId: string, leadId: string,
         lead_id: leadId,
         provider: inbox.provider,
         provider_chat_id: inbox.provider_chat_id,
-        phone: inbox.from_phone,
+        phone: inboxPhoneE164,
         last_message_at: inbox.created_at,
         last_inbound_at: inbox.created_at,
       },

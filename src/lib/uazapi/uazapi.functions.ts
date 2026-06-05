@@ -4,6 +4,11 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireModule } from "@/lib/admin/auth";
 import type { Json } from "@/integrations/supabase/types";
+import {
+  normalizePhone as normalizeE164Phone,
+  phoneToWhatsAppJid,
+} from "@/lib/phone/phone.utils";
+
 
 type WhatsAppMode = "disabled" | "suggestion" | "automatic";
 type UazapiConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -95,7 +100,8 @@ function deepFind(payload: unknown, keys: string[]): unknown {
   return null;
 }
 
-function normalizePhone(value?: string | null) {
+/** Apenas dígitos (>=8). Usado para extrair número cru de um JID/chatid. */
+function digitsOnly(value?: string | null) {
   const digits = (value ?? "").replace(/\D/g, "");
   return digits.length >= 8 ? digits : null;
 }
@@ -103,7 +109,22 @@ function normalizePhone(value?: string | null) {
 function phoneFromChat(value?: string | null) {
   const text = value ?? "";
   const beforeAt = text.includes("@") ? text.split("@")[0] : text;
-  return normalizePhone(beforeAt);
+  return digitsOnly(beforeAt);
+}
+
+/**
+ * Converte um número cru (JID ou digits) para E.164.
+ * Como a Uazapi sempre devolve dígitos com DDI, primeiro tenta interpretar
+ * o número como já internacional (prefixando '+'); se falhar, assume BR.
+ */
+function toE164FromRaw(value?: string | null): string | null {
+  const digits = digitsOnly(value);
+  if (!digits) return null;
+  return (
+    normalizeE164Phone(`+${digits}`) ??
+    normalizeE164Phone(digits, "BR") ??
+    null
+  );
 }
 
 function firstObjectWithMessageShape(value: unknown): Record<string, unknown> | null {
@@ -531,13 +552,16 @@ function parseWebhookPayload(payload: Record<string, unknown>, fallbackEventId: 
     fallbackEventId;
   const chatId = asString(message?.chatid) ?? asString(deepFind(payload, ["chatid", "wa_chatid"]));
   const sender = asString(message?.sender) ?? asString(deepFind(payload, ["sender", "from"]));
-  const phone = phoneFromChat(sender) ?? phoneFromChat(chatId);
+  const rawDigits = phoneFromChat(sender) ?? phoneFromChat(chatId);
+  const phoneE164 = toE164FromRaw(rawDigits);
   return {
     eventType,
     providerEventId,
     message,
     chatId,
-    phone,
+    rawDigits,
+    phone: phoneE164 ?? rawDigits,
+    phoneE164,
     senderName:
       asString(message?.senderName) ??
       asString(deepFind(payload, ["senderName", "pushName", "name", "wa_name"])),
@@ -565,8 +589,14 @@ async function findLeadByPhone(phone: string | null) {
     .order("created_at", { ascending: false })
     .limit(800);
   if (error) throw new Error(error.message);
+  const target =
+    normalizeE164Phone(phone) ?? normalizeE164Phone(phone, "BR") ?? phone;
   return ((data ?? []) as Array<{ id: string; full_name: string; phone: string | null }>).find(
-    (lead) => normalizePhone(lead.phone) === phone,
+    (lead) => {
+      const leadE164 =
+        normalizeE164Phone(lead.phone) ?? normalizeE164Phone(lead.phone, "BR");
+      return leadE164 === target;
+    },
   );
 }
 
@@ -580,11 +610,13 @@ async function recordInboundMessage(
   }
 
   const lead = await findLeadByPhone(parsed.phone);
+  const storedPhone = parsed.phoneE164 ?? parsed.phone;
+  const chatIdFallback = parsed.chatId ?? `wa:${parsed.rawDigits ?? storedPhone.replace(/\D/g, "")}`;
   const inboxInsert = {
     provider: "whatsapp",
     provider_message_id: parsed.providerEventId,
-    provider_chat_id: parsed.chatId ?? `wa:${parsed.phone}`,
-    from_phone: parsed.phone,
+    provider_chat_id: chatIdFallback,
+    from_phone: storedPhone,
     from_name: parsed.senderName,
     message_type: parsed.messageType,
     body: parsed.body,
@@ -611,8 +643,8 @@ async function recordInboundMessage(
       {
         lead_id: lead.id,
         provider: "whatsapp",
-        provider_chat_id: parsed.chatId ?? `wa:${parsed.phone}`,
-        phone: parsed.phone,
+        provider_chat_id: chatIdFallback,
+        phone: storedPhone,
         last_message_at: receivedAt,
         last_inbound_at: receivedAt,
       },
@@ -727,7 +759,9 @@ export async function sendUazapiTextInternal({
   if (setting.uazapi_connection_status !== "connected") {
     throw new Error("WhatsApp/Uazapi ainda nao esta conectado.");
   }
-  const phone = normalizePhone(number);
+  const e164 =
+    normalizeE164Phone(number) ?? normalizeE164Phone(number, "BR");
+  const phone = phoneToWhatsAppJid(e164) ?? digitsOnly(number);
   if (!phone) throw new Error("Telefone invalido para envio via WhatsApp.");
 
   const response = await uazapiFetch<Record<string, unknown>>(setting, "/send/text", {

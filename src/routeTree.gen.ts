@@ -31,6 +31,7 @@ import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_auth
 import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenticated/portal.clube'
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
 import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
+import { Route as AuthenticatedAdminTelefonesMigracaoRouteImport } from './routes/_authenticated/admin.telefones-migracao'
 import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
 import { Route as AuthenticatedAdminRelatoriosRouteImport } from './routes/_authenticated/admin.relatorios'
 import { Route as AuthenticatedAdminPdvRouteImport } from './routes/_authenticated/admin.pdv'
@@ -160,6 +161,12 @@ const AuthenticatedAdminTriagemRoute =
     path: '/triagem',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminTelefonesMigracaoRoute =
+  AuthenticatedAdminTelefonesMigracaoRouteImport.update({
+    id: '/telefones-migracao',
+    path: '/telefones-migracao',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminSlotsRoute = AuthenticatedAdminSlotsRouteImport.update({
   id: '/slots',
   path: '/slots',
@@ -258,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/admin/relatorios': typeof AuthenticatedAdminRelatoriosRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
+  '/admin/telefones-migracao': typeof AuthenticatedAdminTelefonesMigracaoRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRouteWithChildren
@@ -292,6 +300,7 @@ export interface FileRoutesByTo {
   '/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/admin/relatorios': typeof AuthenticatedAdminRelatoriosRoute
   '/admin/slots': typeof AuthenticatedAdminSlotsRoute
+  '/admin/telefones-migracao': typeof AuthenticatedAdminTelefonesMigracaoRoute
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/portal/clube': typeof AuthenticatedPortalClubeRouteWithChildren
@@ -330,6 +339,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/pdv': typeof AuthenticatedAdminPdvRoute
   '/_authenticated/admin/relatorios': typeof AuthenticatedAdminRelatoriosRoute
   '/_authenticated/admin/slots': typeof AuthenticatedAdminSlotsRoute
+  '/_authenticated/admin/telefones-migracao': typeof AuthenticatedAdminTelefonesMigracaoRoute
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/_authenticated/portal/clube': typeof AuthenticatedPortalClubeRouteWithChildren
@@ -368,6 +378,7 @@ export interface FileRouteTypes {
     | '/admin/pdv'
     | '/admin/relatorios'
     | '/admin/slots'
+    | '/admin/telefones-migracao'
     | '/admin/triagem'
     | '/admin/usuarios'
     | '/portal/clube'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/admin/pdv'
     | '/admin/relatorios'
     | '/admin/slots'
+    | '/admin/telefones-migracao'
     | '/admin/triagem'
     | '/admin/usuarios'
     | '/portal/clube'
@@ -439,6 +451,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/pdv'
     | '/_authenticated/admin/relatorios'
     | '/_authenticated/admin/slots'
+    | '/_authenticated/admin/telefones-migracao'
     | '/_authenticated/admin/triagem'
     | '/_authenticated/admin/usuarios'
     | '/_authenticated/portal/clube'
@@ -623,6 +636,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminTriagemRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/telefones-migracao': {
+      id: '/_authenticated/admin/telefones-migracao'
+      path: '/telefones-migracao'
+      fullPath: '/admin/telefones-migracao'
+      preLoaderRoute: typeof AuthenticatedAdminTelefonesMigracaoRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/slots': {
       id: '/_authenticated/admin/slots'
       path: '/slots'
@@ -730,6 +750,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminPdvRoute: typeof AuthenticatedAdminPdvRoute
   AuthenticatedAdminRelatoriosRoute: typeof AuthenticatedAdminRelatoriosRoute
   AuthenticatedAdminSlotsRoute: typeof AuthenticatedAdminSlotsRoute
+  AuthenticatedAdminTelefonesMigracaoRoute: typeof AuthenticatedAdminTelefonesMigracaoRoute
   AuthenticatedAdminTriagemRoute: typeof AuthenticatedAdminTriagemRoute
   AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -748,6 +769,8 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminPdvRoute: AuthenticatedAdminPdvRoute,
   AuthenticatedAdminRelatoriosRoute: AuthenticatedAdminRelatoriosRoute,
   AuthenticatedAdminSlotsRoute: AuthenticatedAdminSlotsRoute,
+  AuthenticatedAdminTelefonesMigracaoRoute:
+    AuthenticatedAdminTelefonesMigracaoRoute,
   AuthenticatedAdminTriagemRoute: AuthenticatedAdminTriagemRoute,
   AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
