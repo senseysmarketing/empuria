@@ -809,7 +809,7 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
     return {
       ok: true,
       delivery,
-      whatsappUrl: delivery === "wa_me" ? whatsappUrl(leadRow.phone, data.message) : null,
+      whatsappUrl: delivery === "wa_me" ? whatsappUrl(leadE164 ?? leadRow.phone, data.message) : null,
     };
   });
 
