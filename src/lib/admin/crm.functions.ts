@@ -687,7 +687,9 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
       .single();
     if (leadError) throw new Error(leadError.message);
     const leadRow = lead as CrmLeadRow;
-    const phoneDigits = leadRow.phone.replace(/\D/g, "");
+    const leadE164 =
+      normalizeE164Phone(leadRow.phone) ?? normalizeE164Phone(leadRow.phone, "BR");
+    const phoneDigits = phoneToWhatsAppJid(leadE164) ?? leadRow.phone.replace(/\D/g, "");
     if (phoneDigits.length < 8) throw new Error("Lead sem telefone valido para WhatsApp.");
     if (isFinalStage(leadRow.pipeline_stage))
       throw new Error("Lead em etapa final nao pode receber follow-up.");
@@ -721,7 +723,7 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
           lead_id: leadRow.id,
           provider: "whatsapp",
           provider_chat_id: `wa:${phoneDigits}`,
-          phone: leadRow.phone,
+          phone: leadE164 ?? leadRow.phone,
           last_message_at: new Date().toISOString(),
           last_outbound_at: new Date().toISOString(),
         },
@@ -964,6 +966,10 @@ async function linkInboxToLeadInternal(db: any, inboxId: string, leadId: string,
     .single();
   if (inboxError) throw new Error(inboxError.message);
 
+  const inboxPhoneE164 =
+    normalizeE164Phone(inbox.from_phone) ??
+    normalizeE164Phone(inbox.from_phone, "BR") ??
+    inbox.from_phone;
   const { data: conversation, error: conversationError } = await db
     .from("crm_conversations")
     .upsert(
@@ -971,7 +977,7 @@ async function linkInboxToLeadInternal(db: any, inboxId: string, leadId: string,
         lead_id: leadId,
         provider: inbox.provider,
         provider_chat_id: inbox.provider_chat_id,
-        phone: inbox.from_phone,
+        phone: inboxPhoneE164,
         last_message_at: inbox.created_at,
         last_inbound_at: inbox.created_at,
       },
