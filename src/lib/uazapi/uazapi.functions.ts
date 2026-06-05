@@ -4,6 +4,11 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireModule } from "@/lib/admin/auth";
 import type { Json } from "@/integrations/supabase/types";
+import {
+  normalizePhone as normalizeE164Phone,
+  phoneToWhatsAppJid,
+} from "@/lib/phone/phone.utils";
+
 
 type WhatsAppMode = "disabled" | "suggestion" | "automatic";
 type UazapiConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -95,7 +100,8 @@ function deepFind(payload: unknown, keys: string[]): unknown {
   return null;
 }
 
-function normalizePhone(value?: string | null) {
+/** Apenas dígitos (>=8). Usado para extrair número cru de um JID/chatid. */
+function digitsOnly(value?: string | null) {
   const digits = (value ?? "").replace(/\D/g, "");
   return digits.length >= 8 ? digits : null;
 }
@@ -103,7 +109,22 @@ function normalizePhone(value?: string | null) {
 function phoneFromChat(value?: string | null) {
   const text = value ?? "";
   const beforeAt = text.includes("@") ? text.split("@")[0] : text;
-  return normalizePhone(beforeAt);
+  return digitsOnly(beforeAt);
+}
+
+/**
+ * Converte um número cru (JID ou digits) para E.164.
+ * Como a Uazapi sempre devolve dígitos com DDI, primeiro tenta interpretar
+ * o número como já internacional (prefixando '+'); se falhar, assume BR.
+ */
+function toE164FromRaw(value?: string | null): string | null {
+  const digits = digitsOnly(value);
+  if (!digits) return null;
+  return (
+    normalizeE164Phone(`+${digits}`) ??
+    normalizeE164Phone(digits, "BR") ??
+    null
+  );
 }
 
 function firstObjectWithMessageShape(value: unknown): Record<string, unknown> | null {
