@@ -552,13 +552,16 @@ function parseWebhookPayload(payload: Record<string, unknown>, fallbackEventId: 
     fallbackEventId;
   const chatId = asString(message?.chatid) ?? asString(deepFind(payload, ["chatid", "wa_chatid"]));
   const sender = asString(message?.sender) ?? asString(deepFind(payload, ["sender", "from"]));
-  const phone = phoneFromChat(sender) ?? phoneFromChat(chatId);
+  const rawDigits = phoneFromChat(sender) ?? phoneFromChat(chatId);
+  const phoneE164 = toE164FromRaw(rawDigits);
   return {
     eventType,
     providerEventId,
     message,
     chatId,
-    phone,
+    rawDigits,
+    phone: phoneE164 ?? rawDigits,
+    phoneE164,
     senderName:
       asString(message?.senderName) ??
       asString(deepFind(payload, ["senderName", "pushName", "name", "wa_name"])),
@@ -586,8 +589,14 @@ async function findLeadByPhone(phone: string | null) {
     .order("created_at", { ascending: false })
     .limit(800);
   if (error) throw new Error(error.message);
+  const target =
+    normalizeE164Phone(phone) ?? normalizeE164Phone(phone, "BR") ?? phone;
   return ((data ?? []) as Array<{ id: string; full_name: string; phone: string | null }>).find(
-    (lead) => normalizePhone(lead.phone) === phone,
+    (lead) => {
+      const leadE164 =
+        normalizeE164Phone(lead.phone) ?? normalizeE164Phone(lead.phone, "BR");
+      return leadE164 === target;
+    },
   );
 }
 
@@ -748,7 +757,9 @@ export async function sendUazapiTextInternal({
   if (setting.uazapi_connection_status !== "connected") {
     throw new Error("WhatsApp/Uazapi ainda nao esta conectado.");
   }
-  const phone = normalizePhone(number);
+  const e164 =
+    normalizeE164Phone(number) ?? normalizeE164Phone(number, "BR");
+  const phone = phoneToWhatsAppJid(e164) ?? digitsOnly(number);
   if (!phone) throw new Error("Telefone invalido para envio via WhatsApp.");
 
   const response = await uazapiFetch<Record<string, unknown>>(setting, "/send/text", {
