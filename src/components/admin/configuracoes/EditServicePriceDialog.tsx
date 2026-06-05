@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -15,13 +16,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { updateServicePrice } from "@/lib/admin/service-prices.functions";
-import { Loader2, Save } from "lucide-react";
+import {
+  updateServicePrice,
+  createServiceImageUploadUrl,
+} from "@/lib/admin/service-prices.functions";
+import { getServiceImage } from "@/lib/service-images";
+import { Loader2, Save, Upload, RotateCcw } from "lucide-react";
 
 export type ServiceRow = {
   id: string;
   slug: string;
   title: string;
+  short_description: string | null;
+  description: string | null;
   category: string | null;
   kind: string | null;
   price_cents: number;
@@ -33,6 +40,7 @@ export type ServiceRow = {
   requires_slot: boolean;
   requires_documents: boolean;
   duration_minutes: number | null;
+  image_url: string | null;
 };
 
 function centsToInput(cents: number | null | undefined) {
@@ -48,16 +56,27 @@ type Props = {
 
 export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }: Props) {
   const updateFn = useServerFn(updateServicePrice);
+  const uploadUrlFn = useServerFn(createServiceImageUploadUrl);
 
+  const [title, setTitle] = useState("");
+  const [shortDesc, setShortDesc] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [priceInput, setPriceInput] = useState("0,00");
   const [isActive, setIsActive] = useState(true);
   const [requiresSlot, setRequiresSlot] = useState(false);
   const [requiresDocuments, setRequiresDocuments] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [note, setNote] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!service) return;
+    setTitle(service.title ?? "");
+    setShortDesc(service.short_description ?? "");
+    setDescription(service.description ?? "");
+    setImageUrl(service.image_url ?? null);
     setPriceInput(centsToInput(service.online_price_cents ?? service.price_cents));
     setIsActive(Boolean(service.is_active));
     setRequiresSlot(Boolean(service.requires_slot));
@@ -66,12 +85,48 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
     setNote(service.display_price_note ?? "");
   }, [service]);
 
+  const handleFile = async (file: File) => {
+    if (!service) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Use JPG, PNG ou WEBP.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("Imagem máxima de 4 MB.");
+      return;
+    }
+    try {
+      setUploading(true);
+      const signed = await uploadUrlFn({
+        data: {
+          service_id: service.id,
+          filename: file.name,
+          content_type: file.type,
+        },
+      });
+      if (!signed.uploadUrl) throw new Error("Falha ao gerar URL de upload");
+      const res = await fetch(signed.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Falha ao enviar imagem");
+      setImageUrl(signed.publicUrl);
+      toast.success("Imagem enviada");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao enviar imagem");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (!service) throw new Error("Serviço inválido");
       const priceNumber = Number(String(priceInput).replace(",", "."));
       const cents = Math.round((Number.isFinite(priceNumber) ? priceNumber : 0) * 100);
 
+      if (!title.trim()) throw new Error("Informe um título.");
       if (requiresSlot && (!duration || duration <= 0)) {
         throw new Error("Informe uma duração maior que zero para serviços com agendamento.");
       }
@@ -85,6 +140,10 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
       return updateFn({
         data: {
           id: service.id,
+          title: title.trim(),
+          short_description: shortDesc.trim() || null,
+          description: description.trim() || null,
+          image_url: imageUrl,
           online_price_cents: cents,
           online_currency: "BRL",
           display_price_note: note.trim() || null,
@@ -105,19 +164,101 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
     },
   });
 
+  const previewSrc = imageUrl || getServiceImage({ image_url: null, kind: service?.kind ?? null });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             {service?.title ?? "Editar serviço"}
           </DialogTitle>
           <DialogDescription>
-            Ajuste o valor cobrado no site e as regras de venda deste serviço.
+            Ajuste o conteúdo público, imagem de capa, valor e regras de venda.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {/* Imagem de capa */}
+          <div className="space-y-2">
+            <Label>Imagem de capa</Label>
+            <div className="flex gap-4">
+              <div className="h-28 w-40 overflow-hidden rounded-lg border border-admin-border bg-admin-surface-2">
+                <img src={previewSrc} alt="Capa" className="h-full w-full object-cover" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleFile(f);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                  {imageUrl ? "Trocar imagem" : "Enviar imagem"}
+                </Button>
+                {imageUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-admin-ink-muted"
+                    onClick={() => setImageUrl(null)}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Voltar para padrão
+                  </Button>
+                )}
+                <p className="text-xs text-admin-ink-muted">JPG, PNG ou WEBP até 4 MB.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Identidade */}
+          <div className="space-y-2">
+            <Label>Título</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Descrição curta</Label>
+            <Textarea
+              value={shortDesc}
+              onChange={(e) => setShortDesc(e.target.value)}
+              maxLength={280}
+              rows={2}
+              placeholder="Resumo de uma linha exibido no card do serviço."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Descrição completa</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={4000}
+              rows={5}
+              placeholder="Detalhes exibidos na página do serviço."
+            />
+          </div>
+
+          {/* Preço */}
           <div className="space-y-2">
             <Label>Valor cobrado no site (BRL)</Label>
             <div className="grid grid-cols-[1fr_84px] gap-2">

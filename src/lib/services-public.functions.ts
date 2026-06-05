@@ -19,6 +19,7 @@ export type PublicServiceRow = {
   document_checklist?: string[] | null;
   meeting_address: string | null;
   image_url: string | null;
+  is_active?: boolean;
 };
 
 const db = supabaseAdmin as unknown as {
@@ -45,10 +46,9 @@ export const getPublicService = createServerFn({ method: "POST" })
     const { data: svc } = await db
       .from("services")
       .select(
-        "id,slug,title,short_description,description,kind,price_cents,currency,online_price_cents,online_currency,display_price_note,requires_slot,requires_documents,document_checklist,meeting_address,image_url",
+        "id,slug,title,short_description,description,kind,price_cents,currency,online_price_cents,online_currency,display_price_note,requires_slot,requires_documents,document_checklist,meeting_address,image_url,is_active",
       )
       .eq("slug", data.slug)
-      .eq("is_active", true)
-      .single();
+      .maybeSingle();
     return (svc ?? null) as PublicServiceRow | null;
   });

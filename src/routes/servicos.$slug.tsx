@@ -40,6 +40,7 @@ function ServiceDetailPage() {
       </div>
     );
   }
+  const isInactive = service.is_active === false;
 
   const price = (service.price_cents / 100).toFixed(0);
   const docs = Array.isArray(service.document_checklist) ? (service.document_checklist as string[]) : [];
@@ -91,15 +92,28 @@ function ServiceDetailPage() {
                   Investimento
                 </div>
                 <div className="font-display font-extrabold text-4xl text-brown mt-1">€{price}</div>
-                <button
-                  onClick={() => setOpen(true)}
-                  className="mt-5 w-full inline-flex items-center justify-center gap-2 bg-orange-brand text-offwhite px-5 py-3 rounded-md font-display font-bold text-sm uppercase tracking-widest hover:bg-red-brand transition-all"
-                >
-                  Comprar Agora <ArrowRight className="w-4 h-4" />
-                </button>
-                <p className="text-[11px] text-brown-deep/50 mt-3 font-body text-center">
-                  Pagamento via PIX ou Cartão · Acesso imediato ao Portal
-                </p>
+                {isInactive ? (
+                  <div className="mt-5 rounded-md border border-red-brand/40 bg-red-brand/5 px-4 py-3 text-center">
+                    <div className="font-display text-sm font-bold uppercase tracking-widest text-red-brand">
+                      Indisponível
+                    </div>
+                    <p className="mt-1 text-xs text-brown-deep/70">
+                      Este serviço está temporariamente inativo. Volte em breve.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setOpen(true)}
+                      className="mt-5 w-full inline-flex items-center justify-center gap-2 bg-orange-brand text-offwhite px-5 py-3 rounded-md font-display font-bold text-sm uppercase tracking-widest hover:bg-red-brand transition-all"
+                    >
+                      Comprar Agora <ArrowRight className="w-4 h-4" />
+                    </button>
+                    <p className="text-[11px] text-brown-deep/50 mt-3 font-body text-center">
+                      Pagamento via PIX ou Cartão · Acesso imediato ao Portal
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
