@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { BentoCard } from "@/components/admin/BentoCard";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -12,7 +11,7 @@ import {
   toggleServiceActive,
 } from "@/lib/admin/service-prices.functions";
 import { getServiceImage } from "@/lib/service-images";
-import { Loader2, Pencil, Search, Tags } from "lucide-react";
+import { Pencil, Search } from "lucide-react";
 import { EditServicePriceDialog, type ServiceRow } from "./EditServicePriceDialog";
 
 function money(cents: number, currency = "BRL") {
@@ -84,53 +83,44 @@ export function ServicosPrecosTab() {
   });
 
   return (
-    <BentoCard>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-admin-accent/10 text-admin-accent">
-            <Tags className="h-5 w-5" />
-          </div>
+    <BentoCard padded={false}>
+      <div className="p-5 border-b border-admin-border space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="font-display text-2xl font-bold text-admin-ink">Serviços & Valores</h2>
-            <p className="mt-1 text-sm text-admin-ink-muted">
-              Gerencie os valores exibidos no site, conteúdo público e regras de venda.
+            <h3 className="font-display text-lg text-admin-ink">Serviços & Valores</h3>
+            <p className="text-xs text-admin-ink-muted mt-1">
+              {services.length} serviços · {totalActive} ativos
             </p>
           </div>
+          <span className="text-xs text-admin-ink-muted tabular-nums mt-1">
+            {filtered.length} de {services.length} {services.length === 1 ? "serviço" : "serviços"}
+          </span>
         </div>
-        <Badge variant="outline">{totalActive} ativos</Badge>
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative w-full max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-ink-muted" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por título, slug ou categoria..."
-            className="pl-9"
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-admin-ink-muted" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por título, slug ou categoria…"
+              className="pl-8 bg-admin-bg border-admin-border h-9"
+            />
+          </div>
         </div>
       </div>
 
       {servicesQ.isLoading ? (
-        <div className="flex items-center gap-2 text-admin-ink-muted">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando serviços...
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-admin-border p-8 text-center text-admin-ink-muted">
-          {services.length === 0 ? "Nenhum serviço cadastrado." : "Nenhum serviço encontrado."}
-        </div>
+        <div className="p-8 text-center text-admin-ink-muted text-sm">Carregando…</div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-admin-border">
-          <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-admin-surface-2 text-left text-xs uppercase tracking-wide text-admin-ink-muted">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-admin-bg text-[10px] uppercase tracking-wider text-admin-ink-muted">
               <tr>
-                <th className="px-4 py-3">Serviço</th>
-                <th className="px-4 py-3">Valor</th>
-                <th className="px-4 py-3">Regras</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Ação</th>
+                <th className="text-left p-3 font-display">Serviço</th>
+                <th className="text-right p-3 font-display">Valor</th>
+                <th className="text-left p-3 font-display">Regras</th>
+                <th className="text-center p-3 font-display">Status</th>
+                <th className="text-right p-3 font-display">Ação</th>
               </tr>
             </thead>
             <tbody>
@@ -139,39 +129,37 @@ export function ServicosPrecosTab() {
                 const showZeroWarn = s.is_active && cents === 0;
                 const img = getServiceImage({ image_url: s.image_url, kind: s.kind });
                 return (
-                  <tr key={s.id} className="border-t border-admin-border align-middle">
-                    <td className="px-4 py-3">
+                  <tr key={s.id} className="border-t border-admin-border hover:bg-admin-bg/50 align-middle">
+                    <td className="p-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-admin-border bg-admin-surface-2">
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-admin-border bg-admin-bg">
                           <img src={img} alt={s.title} className="h-full w-full object-cover" />
                         </div>
                         <div className="min-w-0">
                           <div className="truncate font-medium text-admin-ink">{s.title}</div>
-                          <div className="mt-0.5 truncate text-xs text-admin-ink-muted">
+                          <div className="mt-0.5 truncate text-[11px] text-admin-ink-muted">
                             {s.slug}
                             {s.category ? ` · ${s.category}` : ""}
                           </div>
                           {s.display_price_note && (
-                            <div className="mt-1 truncate text-xs italic text-admin-ink-muted">
-                              “{s.display_price_note}”
+                            <div className="mt-0.5 truncate text-[11px] italic text-admin-ink-muted">
+                              "{s.display_price_note}"
                             </div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-display text-base text-admin-ink">
-                        {money(cents, "BRL")}
-                      </div>
+                    <td className="p-3 text-right tabular-nums">
+                      <div className="text-admin-ink">{money(cents, "BRL")}</div>
                       {showZeroWarn && (
-                        <div className="mt-1 text-[11px] text-amber-600">
-                          Valor zerado em serviço ativo
+                        <div className="mt-0.5 text-[10px] text-amber-600">
+                          Valor zerado
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-admin-ink-muted">{rulesSummary(s)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                    <td className="p-3 text-admin-ink-muted">{rulesSummary(s)}</td>
+                    <td className="p-3 text-center">
+                      <div className="inline-flex items-center gap-2">
                         <Switch
                           checked={s.is_active}
                           onCheckedChange={(v) =>
@@ -179,25 +167,32 @@ export function ServicosPrecosTab() {
                           }
                           disabled={toggleMutation.isPending}
                         />
-                        <span className="text-xs text-admin-ink-muted">
+                        <span className="text-[11px] text-admin-ink-muted">
                           {s.is_active ? "Ativo" : "Inativo"}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="p-3 text-right">
                       <Button
+                        variant="ghost"
                         size="sm"
-                        variant="outline"
-                        className="gap-2"
                         onClick={() => setEditing(s)}
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        Editar
                       </Button>
                     </td>
                   </tr>
                 );
               })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-admin-ink-muted text-sm">
+                    {services.length === 0
+                      ? "Nenhum serviço cadastrado."
+                      : "Nenhum serviço corresponde à busca."}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
