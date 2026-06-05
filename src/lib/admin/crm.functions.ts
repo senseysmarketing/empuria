@@ -1,8 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin, requireModule } from "./auth";
 import { sendUazapiTextInternal } from "@/lib/uazapi/uazapi.functions";
+import {
+  normalizePhone as normalizeE164Phone,
+  phoneToWhatsAppJid,
+  getCountryFromPhone,
+} from "@/lib/phone/phone.utils";
+
 
 const systemStageKeys = new Set(["novo", "em_contato", "reuniao", "fechado", "descartado"]);
 
@@ -385,12 +392,14 @@ export const createCrmLead = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = context.supabase as any;
+    const normalizedPhone = normalizeE164Phone(data.phone, "BR") ?? data.phone;
     const { data: row, error } = await db
       .from("leads")
       .insert({
         full_name: data.full_name,
         email: data.email || fallbackEmail(data.full_name, data.phone),
-        phone: data.phone,
+        phone: normalizedPhone,
+        phone_country_iso: getCountryFromPhone(normalizedPhone),
         target_visa: data.target_visa || null,
         message: data.message || null,
         first_message: data.message || null,
