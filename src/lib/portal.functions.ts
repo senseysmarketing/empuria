@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getUserStaffAccess } from "@/lib/admin/permission-checks";
 
 export const getMyDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -29,15 +30,8 @@ export const getAdminOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const { data: isAdmin } = await supabase.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    });
-    const { data: isStaffRole } = await supabase.rpc("has_role", {
-      _user_id: userId,
-      _role: "staff",
-    });
-    if (!isAdmin && !isStaffRole) throw new Error("Acesso negado");
+    const access = await getUserStaffAccess(userId);
+    if (!access.canAccessAdmin) throw new Error("Acesso negado");
 
     const [leadsRes, apptRes, membersRes] = await Promise.all([
       supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(100),

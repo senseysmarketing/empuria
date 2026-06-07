@@ -3,6 +3,7 @@ import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
+import { supabaseAdmin } from './client.server'
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -82,15 +83,17 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
         throw new Error('Unauthorized: Invalid impersonation target');
       }
 
-      const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
-        _user_id: data.claims.sub,
-        _role: 'admin',
-      });
-      if (roleError || !isAdmin) {
+      const { data: adminRole, error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .select('user_id')
+        .eq('user_id', data.claims.sub)
+        .eq('role', 'admin')
+        .maybeSingle();
+      if (roleError || !adminRole) {
         throw new Error('Acesso negado: impersonação restrita a admins');
       }
 
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('id,full_name')
         .eq('id', requestedImpersonation)
