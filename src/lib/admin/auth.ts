@@ -1,17 +1,14 @@
 // Shared staff/module guards for admin server functions.
 import { createMiddleware } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getUserStaffAccess, userHasModuleAccess } from "./permission-checks";
 
 export const requireStaff = createMiddleware({ type: "function" })
   .middleware([requireSupabaseAuth])
   .server(async ({ next, context }) => {
-    const { supabase, userId } = context;
-    const [{ data: isAdmin }, { data: isStaffRole }] = await Promise.all([
-      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
-      supabase.rpc("has_role", { _user_id: userId, _role: "staff" }),
-    ]);
-    if (!isAdmin && !isStaffRole) throw new Error("Acesso negado");
-    return next({ context: { isAdmin: !!isAdmin } });
+    const access = await getUserStaffAccess(context.userId);
+    if (!access.canAccessAdmin) throw new Error("Acesso negado");
+    return next({ context: { isAdmin: access.isAdmin } });
   });
 
 /**
@@ -23,12 +20,8 @@ export function requireModule(moduleKey: string) {
     .middleware([requireStaff])
     .server(async ({ next, context }) => {
       if (context.isAdmin) return next({ context: { module: moduleKey } });
-      const { data, error } = await context.supabase.rpc("has_module_access", {
-        _user_id: context.userId,
-        _module: moduleKey,
-      });
-      if (error) throw new Error(error.message);
-      if (!data) throw new Error("MODULE_FORBIDDEN");
+      const allowed = await userHasModuleAccess(context.userId, moduleKey);
+      if (!allowed) throw new Error("MODULE_FORBIDDEN");
       return next({ context: { module: moduleKey } });
     });
 }

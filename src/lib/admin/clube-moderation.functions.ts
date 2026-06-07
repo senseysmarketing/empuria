@@ -1,21 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getUserStaffAccess } from "./permission-checks";
 
-async function assertAdmin(supabase: unknown, userId: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
-  const { data: isStaff } = await sb.rpc("is_staff", { _user_id: userId });
-  const { data: isAdmin } = await sb.rpc("has_role", { _user_id: userId, _role: "admin" });
-  if (!isStaff && !isAdmin) throw new Error("Acesso restrito.");
+async function assertStaff(userId: string) {
+  const access = await getUserStaffAccess(userId);
+  if (!access.canAccessAdmin) throw new Error("Acesso restrito.");
 }
 
 export const listAllComments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase } = context;
-    const userId = context.effectiveUserId ?? context.userId;
-    await assertAdmin(supabase, userId);
+    const userId = context.userId;
+    await assertStaff(userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,9 +75,8 @@ export const setCommentHidden = createServerFn({ method: "POST" })
     z.object({ commentId: z.string().uuid(), hidden: z.boolean() }).parse(d)
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const userId = context.effectiveUserId ?? context.userId;
-    await assertAdmin(supabase, userId);
+    const userId = context.userId;
+    await assertStaff(userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,9 +93,8 @@ export const deleteCommentAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ commentId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const userId = context.effectiveUserId ?? context.userId;
-    await assertAdmin(supabase, userId);
+    const userId = context.userId;
+    await assertStaff(userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

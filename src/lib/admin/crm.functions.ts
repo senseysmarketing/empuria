@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin, requireModule } from "./auth";
+import { userHasAction } from "./permission-checks";
 import { sendUazapiTextInternal } from "@/lib/uazapi/uazapi.functions";
 import {
   normalizePhone as normalizeE164Phone,
@@ -271,11 +272,7 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
 
     let canSeeAll = Boolean(context.isAdmin);
     if (!canSeeAll) {
-      const { data: allowed } = await db.rpc("has_action", {
-        _user_id: context.userId,
-        _action: "crm.view_all_leads",
-      });
-      canSeeAll = Boolean(allowed);
+      canSeeAll = await userHasAction(context.userId, "crm.view_all_leads");
     }
 
     const leadsQuery = db.from("leads").select("*").order("created_at", { ascending: false }).limit(400);

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
+import { userHasAction } from "./permission-checks";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { createOrReuseManualCustomer } from "./manual-users";
@@ -324,11 +325,7 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
 
     let canVoid = Boolean(context.isAdmin);
     if (!canVoid) {
-      const { data: allowed } = await context.supabase.rpc("has_action", {
-        _user_id: context.userId,
-        _action: "pdv.void_sale",
-      });
-      canVoid = Boolean(allowed);
+      canVoid = await userHasAction(context.userId, "pdv.void_sale");
     }
 
     return {
@@ -430,11 +427,7 @@ export const voidPdvSale = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     if (!context.isAdmin) {
-      const { data: allowed, error: aerr } = await context.supabase.rpc("has_action", {
-        _user_id: context.userId,
-        _action: "pdv.void_sale",
-      });
-      if (aerr) throw new Error(aerr.message);
+      const allowed = await userHasAction(context.userId, "pdv.void_sale");
       if (!allowed) throw new Error("Sem permissão para anular vendas.");
     }
     const { error } = await supabaseAdmin.rpc("pdv_void_sale", {
