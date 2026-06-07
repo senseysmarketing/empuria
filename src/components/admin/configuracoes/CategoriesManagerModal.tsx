@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { listCategories, createCategory, updateCategory, deleteCategory } from "@/lib/admin/categories.functions";
+import { EmojiPickerField } from "@/components/admin/EmojiPickerField";
 
 type Category = Awaited<ReturnType<typeof listCategories>>[number];
 
@@ -139,10 +140,10 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
           {/* Create */}
           <div className="rounded-xl border border-admin-border bg-admin-bg/50 p-4 space-y-3">
             <h4 className="text-sm font-display text-admin-ink-muted">Nova categoria</h4>
-            <div className="grid grid-cols-[60px_1fr_80px_auto] gap-2 items-end">
+            <div className="grid grid-cols-[auto_1fr_80px_auto] gap-2 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">Emoji</Label>
-                <Input value={newForm.emoji} onChange={(e) => setNewForm({ ...newForm, emoji: e.target.value })} className="bg-admin-surface border-admin-border text-center" maxLength={4} />
+                <EmojiPickerField value={newForm.emoji} onChange={(v) => setNewForm({ ...newForm, emoji: v })} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Nome</Label>
@@ -167,8 +168,8 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
             ) : (
               categories.map((c) =>
                 editingId === c.id ? (
-                  <div key={c.id} className="grid grid-cols-[60px_1fr_80px_auto] gap-2 items-end p-3 rounded-lg border border-admin-accent bg-admin-bg/50">
-                    <Input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} className="bg-admin-surface border-admin-border text-center" maxLength={4} />
+                  <div key={c.id} className="grid grid-cols-[auto_1fr_80px_auto] gap-2 items-end p-3 rounded-lg border border-admin-accent bg-admin-bg/50">
+                    <EmojiPickerField value={editForm.emoji} onChange={(v) => setEditForm({ ...editForm, emoji: v })} />
                     <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="bg-admin-surface border-admin-border" />
                     <Input type="number" value={editForm.position} onChange={(e) => setEditForm({ ...editForm, position: parseInt(e.target.value || "0", 10) })} className="bg-admin-surface border-admin-border" />
                     <div className="flex gap-1">
