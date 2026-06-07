@@ -62,6 +62,7 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  Workflow,
   XCircle,
   UserRound,
   UsersRound,
@@ -322,7 +323,7 @@ function CrmPage() {
             </Badge>
           </div>
           <p className="text-admin-ink-muted mt-1 text-sm">
-            Funil operacional com responsavel obrigatorio, inbox WhatsApp e follow-ups da equipe.
+            Funil operacional com responsavel obrigatorio, inbox WhatsApp e automacoes comerciais.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -344,7 +345,7 @@ function CrmPage() {
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric icon={UserRound} label="Meus leads" value={metrics.mine} tone="blue" />
-        <Metric icon={CalendarClock} label="Follow-ups pendentes" value={metrics.followups} tone="amber" />
+        <Metric icon={CalendarClock} label="Pendencias do CRM" value={metrics.followups} tone="amber" />
         <Metric icon={MessageCircle} label="Mensagens novas" value={metrics.inbox} tone="green" />
         <Metric icon={Clock} label="Leads atrasados" value={metrics.late} tone="red" />
       </section>
@@ -390,10 +391,10 @@ function CrmPage() {
             Inbox WhatsApp
           </TabsTrigger>
           <TabsTrigger
-            value="followups"
+            value="automacoes"
             className="data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
-            Follow-ups
+            Automações
           </TabsTrigger>
         </TabsList>
 
@@ -416,8 +417,8 @@ function CrmPage() {
           <InboxTab messages={data.inbox} leads={data.leads} onOpenLead={setSelectedLead} />
         </TabsContent>
 
-        <TabsContent value="followups" className="mt-0">
-          <FollowupsTab followups={data.followups} onOpenLead={setSelectedLead} />
+        <TabsContent value="automacoes" className="mt-0">
+          <AutomationsEntryCard />
         </TabsContent>
       </Tabs>
 
@@ -437,6 +438,31 @@ function CrmPage() {
         onClose={() => setFollowupLead(null)}
         users={data.users}
       />
+    </div>
+  );
+}
+
+function AutomationsEntryCard() {
+  return (
+    <div className="rounded-xl border border-admin-border bg-admin-surface p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-admin-border bg-admin-bg">
+            <Workflow className="h-5 w-5 text-admin-accent" />
+          </div>
+          <div>
+            <h2 className="font-display text-2xl font-semibold text-admin-ink">
+              Central de Automações CRM & WhatsApp
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-admin-ink-muted">
+              Crie fluxos de WhatsApp, acompanhe proximos envios, pause automacoes e consulte logs de atendimento.
+            </p>
+          </div>
+        </div>
+        <Button className="gap-2" onClick={() => (window.location.href = "/admin/automacoes")}>
+          <Workflow className="h-4 w-4" /> Abrir central
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1203,9 +1229,9 @@ function LeadDialog({
             <Button
               className="w-full justify-start gap-2"
               variant="outline"
-              onClick={() => onCreateFollowup(lead)}
+              onClick={() => (window.location.href = "/admin/automacoes")}
             >
-              <CalendarClock className="h-4 w-4" /> Criar follow-up
+              <Workflow className="h-4 w-4" /> Ver automações
             </Button>
 
             <section className="rounded-xl border border-admin-border bg-admin-surface-2 p-3">

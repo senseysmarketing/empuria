@@ -42,12 +42,25 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   relatorios: "Relatórios",
 };
 
-export const ALL_ACTIONS = ["pdv.void_sale", "crm.view_all_leads"] as const;
+export const ALL_ACTIONS = [
+  "pdv.void_sale",
+  "crm.view_all_leads",
+  "crm.automations.view",
+  "crm.automations.manage",
+  "crm.automations.pause",
+  "crm.automations.logs",
+  "crm.automations.cancel_pending_action",
+] as const;
 export type ActionKey = (typeof ALL_ACTIONS)[number];
 
 export const ACTION_LABELS: Record<ActionKey, string> = {
   "pdv.void_sale": "Anular venda",
   "crm.view_all_leads": "Ver todos os leads",
+  "crm.automations.view": "Ver automacoes do CRM",
+  "crm.automations.manage": "Criar e editar automacoes do CRM",
+  "crm.automations.pause": "Pausar automacoes do CRM",
+  "crm.automations.logs": "Ver logs de automacoes do CRM",
+  "crm.automations.cancel_pending_action": "Cancelar envios pendentes do CRM",
 };
 
 /** Returns the modules the current user can access. Admins get all. */

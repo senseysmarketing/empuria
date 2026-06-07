@@ -11,6 +11,7 @@ import {
   Users,
   WalletCards,
   BarChart3,
+  Workflow,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useModuleAccess } from "@/hooks/use-module-access";
@@ -22,6 +23,7 @@ const items = [
   { to: "/admin/eventos", label: "Eventos", icon: Ticket, module: "eventos" },
   { to: "/admin/esteira", label: "Esteira", icon: PackageCheck, module: "esteira" },
   { to: "/admin/crm", label: "CRM", icon: Filter, module: "crm" },
+  { to: "/admin/automacoes", label: "Automações", icon: Workflow, module: "automacoes" },
   { to: "/admin/financeiro", label: "Caixa", icon: WalletCards, module: "financeiro" },
   { to: "/admin/relatorios", label: "Relatórios", icon: BarChart3, module: "relatorios" },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays, module: "agenda" },
