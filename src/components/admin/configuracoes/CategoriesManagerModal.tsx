@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { listCategories, createCategory, updateCategory, deleteCategory } from "@/lib/admin/categories.functions";
+import { EmojiPickerField } from "@/components/admin/EmojiPickerField";
 
 type Category = Awaited<ReturnType<typeof listCategories>>[number];
 
