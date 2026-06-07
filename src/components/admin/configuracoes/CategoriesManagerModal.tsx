@@ -168,8 +168,8 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
             ) : (
               categories.map((c) =>
                 editingId === c.id ? (
-                  <div key={c.id} className="grid grid-cols-[60px_1fr_80px_auto] gap-2 items-end p-3 rounded-lg border border-admin-accent bg-admin-bg/50">
-                    <Input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} className="bg-admin-surface border-admin-border text-center" maxLength={4} />
+                  <div key={c.id} className="grid grid-cols-[auto_1fr_80px_auto] gap-2 items-end p-3 rounded-lg border border-admin-accent bg-admin-bg/50">
+                    <EmojiPickerField value={editForm.emoji} onChange={(v) => setEditForm({ ...editForm, emoji: v })} />
                     <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="bg-admin-surface border-admin-border" />
                     <Input type="number" value={editForm.position} onChange={(e) => setEditForm({ ...editForm, position: parseInt(e.target.value || "0", 10) })} className="bg-admin-surface border-admin-border" />
                     <div className="flex gap-1">
