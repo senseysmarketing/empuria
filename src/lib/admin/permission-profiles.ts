@@ -94,6 +94,31 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
         label: "Ver todos os leads",
         description: "Acesso aos leads de toda equipe (visão de gestor).",
       },
+      {
+        key: "crm.automations.view",
+        label: "Ver automações",
+        description: "Visualiza fluxos, próximos envios e histórico de automações.",
+      },
+      {
+        key: "crm.automations.manage",
+        label: "Gerenciar automações",
+        description: "Cria, edita, ativa e arquiva fluxos de WhatsApp do CRM.",
+      },
+      {
+        key: "crm.automations.pause",
+        label: "Pausar automações",
+        description: "Permite interromper fluxos ativos quando necessário.",
+      },
+      {
+        key: "crm.automations.logs",
+        label: "Ver logs de automações",
+        description: "Acessa auditoria de envios, respostas, erros e reagendamentos.",
+      },
+      {
+        key: "crm.automations.cancel_pending_action",
+        label: "Cancelar envio pendente",
+        description: "Cancela um envio automatico antes da execução.",
+      },
     ],
   },
   {

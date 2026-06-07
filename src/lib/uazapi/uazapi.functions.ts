@@ -677,6 +677,74 @@ async function recordInboundMessage(
   return { status: "processed", inboxId: inbox.id as string, leadId: lead.id };
 }
 
+async function recordManualOutboundMessage(
+  parsed: ReturnType<typeof parseWebhookPayload>,
+  payload: Record<string, unknown>,
+) {
+  if (!parsed.phone) return { status: "ignored", reason: "Telefone nao identificado." };
+  if (!parsed.fromMe || parsed.wasSentByApi || parsed.isGroup) {
+    return { status: "ignored", reason: "Nao e uma mensagem manual de saida." };
+  }
+
+  const lead = await findLeadByPhone(parsed.phone);
+  if (!lead?.id) return { status: "ignored", reason: "Mensagem manual sem lead associado." };
+
+  const sentAt = nowIso();
+  const storedPhone = parsed.phoneE164 ?? parsed.phone;
+  const chatIdFallback = parsed.chatId ?? `wa:${parsed.rawDigits ?? storedPhone.replace(/\D/g, "")}`;
+  const { data: conversation, error: conversationError } = await db
+    .from("crm_conversations")
+    .upsert(
+      {
+        lead_id: lead.id,
+        provider: "whatsapp",
+        provider_chat_id: chatIdFallback,
+        phone: storedPhone,
+        last_message_at: sentAt,
+        last_outbound_at: sentAt,
+      },
+      { onConflict: "provider,provider_chat_id" },
+    )
+    .select("id")
+    .single();
+  if (conversationError) throw new Error(conversationError.message);
+
+  const { error: messageError } = await db.from("crm_messages").insert({
+    lead_id: lead.id,
+    conversation_id: conversation.id,
+    direction: "outbound",
+    provider: "whatsapp",
+    provider_message_id: parsed.providerEventId,
+    body: parsed.body,
+    message_type: parsed.messageType,
+    status: "manual_sent",
+    created_at: sentAt,
+  });
+  if (messageError) {
+    if (messageError.code === "23505") return { status: "duplicate", reason: "Mensagem duplicada." };
+    throw new Error(messageError.message);
+  }
+
+  await Promise.all([
+    db
+      .from("leads")
+      .update({ last_outbound_at: sentAt, last_interaction_at: sentAt })
+      .eq("id", lead.id),
+    db.from("lead_activity_log").insert({
+      lead_id: lead.id,
+      kind: "message_outbound",
+      payload: {
+        provider: "whatsapp",
+        source: "manual_whatsapp",
+        raw_payload: safeJson(payload),
+      },
+      actor_id: null,
+    }),
+  ]);
+
+  return { status: "processed", leadId: lead.id };
+}
+
 export async function processUazapiWebhook(
   payload: Record<string, unknown>,
   fallbackEventId: string,
@@ -716,7 +784,10 @@ export async function processUazapiWebhook(
       return { ok: true, status: "processed", eventId };
     }
 
-    const result = await recordInboundMessage(parsed, payload);
+    const result =
+      parsed.fromMe && !parsed.wasSentByApi && !parsed.isGroup
+        ? await recordManualOutboundMessage(parsed, payload)
+        : await recordInboundMessage(parsed, payload);
     await db
       .from("integration_events")
       .update({

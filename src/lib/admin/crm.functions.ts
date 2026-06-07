@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin, requireModule } from "./auth";
 import { userHasAction } from "./permission-checks";
+import { startMatchingCrmAutomationsForLead } from "./crm-automations.functions";
 import { sendUazapiTextInternal } from "@/lib/uazapi/uazapi.functions";
 import {
   normalizePhone as normalizeE164Phone,
@@ -326,16 +327,6 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
       };
     });
 
-    const now = Date.now();
-    const suggestionCandidates = leads.filter(
-      (lead) =>
-        lead.pipeline_stage === "novo" &&
-        new Date(lead.created_at).getTime() + 2 * 60 * 60 * 1000 <= now,
-    );
-    for (const lead of suggestionCandidates.slice(0, 20)) {
-      await createSuggestedFollowupForLead(db, lead, context.userId);
-    }
-
     const followupsQuery = db
       .from("crm_followups")
       .select("*")
@@ -418,9 +409,12 @@ export const createCrmLead = createServerFn({ method: "POST" })
       actor_id: context.userId,
     });
 
-    const { data: createdLead } = await db.from("leads").select("*").eq("id", row.id).single();
-    if (createdLead)
-      await createSuggestedFollowupForLead(db, createdLead as CrmLeadRow, context.userId);
+    await startMatchingCrmAutomationsForLead({
+      leadId: row.id,
+      triggerType: "lead_created",
+      triggerPayload: { source: data.source },
+      actorId: context.userId,
+    });
 
     if (data.inbox_message_id) {
       await linkInboxToLeadInternal(db, data.inbox_message_id, row.id, context.userId);
@@ -463,6 +457,15 @@ export const updateCrmLeadColumn = createServerFn({ method: "POST" })
           to_label: column.label,
         },
         actor_id: context.userId,
+      });
+    }
+
+    if (systemStageKeys.has(column.key) && lead.pipeline_stage !== column.key) {
+      await startMatchingCrmAutomationsForLead({
+        leadId: data.leadId,
+        triggerType: "pipeline_stage_entered",
+        triggerPayload: { from: lead.pipeline_stage, stage: column.key, column_id: data.columnId },
+        actorId: context.userId,
       });
     }
 

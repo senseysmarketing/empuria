@@ -25,6 +25,7 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as ApiWebhooksUazapiRouteImport } from './routes/api.webhooks.uazapi'
 import { Route as ApiWebhooksMercadopagoRouteImport } from './routes/api.webhooks.mercadopago'
 import { Route as ApiWebhooksHublaRouteImport } from './routes/api.webhooks.hubla'
+import { Route as ApiCrmAutomationsWorkerRouteImport } from './routes/api.crm-automations.worker'
 import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
 import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
 import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_authenticated/portal.ingressos'
@@ -123,6 +124,11 @@ const ApiWebhooksMercadopagoRoute = ApiWebhooksMercadopagoRouteImport.update({
 const ApiWebhooksHublaRoute = ApiWebhooksHublaRouteImport.update({
   id: '/api/webhooks/hubla',
   path: '/api/webhooks/hubla',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCrmAutomationsWorkerRoute = ApiCrmAutomationsWorkerRouteImport.update({
+  id: '/api/crm-automations/worker',
+  path: '/api/crm-automations/worker',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedPortalServicosRoute =
@@ -264,6 +270,7 @@ export interface FileRoutesByFullPath {
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
+  '/api/crm-automations/worker': typeof ApiCrmAutomationsWorkerRoute
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
@@ -298,6 +305,7 @@ export interface FileRoutesByTo {
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
+  '/api/crm-automations/worker': typeof ApiCrmAutomationsWorkerRoute
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
@@ -336,6 +344,7 @@ export interface FileRoutesById {
   '/_authenticated/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/_authenticated/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/_authenticated/portal/servicos': typeof AuthenticatedPortalServicosRoute
+  '/api/crm-automations/worker': typeof ApiCrmAutomationsWorkerRoute
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
@@ -374,6 +383,7 @@ export interface FileRouteTypes {
     | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
+    | '/api/crm-automations/worker'
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
+    | '/api/crm-automations/worker'
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
@@ -445,6 +456,7 @@ export interface FileRouteTypes {
     | '/_authenticated/portal/ingressos'
     | '/_authenticated/portal/loja'
     | '/_authenticated/portal/servicos'
+    | '/api/crm-automations/worker'
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
@@ -462,6 +474,7 @@ export interface RootRouteChildren {
   ClubeSucessoRoute: typeof ClubeSucessoRoute
   EventoSlugRoute: typeof EventoSlugRoute
   PagarTokenRoute: typeof PagarTokenRoute
+  ApiCrmAutomationsWorkerRoute: typeof ApiCrmAutomationsWorkerRoute
   ApiWebhooksHublaRoute: typeof ApiWebhooksHublaRoute
   ApiWebhooksMercadopagoRoute: typeof ApiWebhooksMercadopagoRoute
   ApiWebhooksUazapiRoute: typeof ApiWebhooksUazapiRoute
@@ -579,6 +592,13 @@ declare module '@tanstack/react-router' {
       path: '/api/webhooks/hubla'
       fullPath: '/api/webhooks/hubla'
       preLoaderRoute: typeof ApiWebhooksHublaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/crm-automations/worker': {
+      id: '/api/crm-automations/worker'
+      path: '/api/crm-automations/worker'
+      fullPath: '/api/crm-automations/worker'
+      preLoaderRoute: typeof ApiCrmAutomationsWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/portal/servicos': {
@@ -825,6 +845,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClubeSucessoRoute: ClubeSucessoRoute,
   EventoSlugRoute: EventoSlugRoute,
   PagarTokenRoute: PagarTokenRoute,
+  ApiCrmAutomationsWorkerRoute: ApiCrmAutomationsWorkerRoute,
   ApiWebhooksHublaRoute: ApiWebhooksHublaRoute,
   ApiWebhooksMercadopagoRoute: ApiWebhooksMercadopagoRoute,
   ApiWebhooksUazapiRoute: ApiWebhooksUazapiRoute,
