@@ -20,9 +20,11 @@ export type PdvCatalogItem = {
 export function SaleCatalogGrid({
   items,
   onAdd,
+  pendingProductId = null,
 }: {
   items: PdvCatalogItem[];
   onAdd: (item: PdvCatalogItem) => void;
+  pendingProductId?: string | null;
 }) {
   const grouped = new Map<string, { label: string; items: PdvCatalogItem[] }>();
   for (const it of items) {
