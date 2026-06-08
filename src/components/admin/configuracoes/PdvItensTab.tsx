@@ -250,7 +250,7 @@ export function PdvItensTab() {
                 <th className="text-left p-3 font-display">Item</th>
                 <th className="text-left p-3 font-display">Tipo</th>
                 <th className="text-left p-3 font-display">Categoria</th>
-                <th className="text-right p-3 font-display">R$ / €</th>
+                <th className="text-right p-3 font-display">€</th>
                 <th className="text-right p-3 font-display">Estoque</th>
                 <th className="text-center p-3 font-display">Ativo</th>
                 <th className="text-right p-3 font-display">Ações</th>
