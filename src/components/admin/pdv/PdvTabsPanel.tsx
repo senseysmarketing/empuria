@@ -69,6 +69,22 @@ import { cn } from "@/lib/utils";
 
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
 
+const PAYMENT_LABEL: Record<PdvTabPaymentMethod, string> = {
+  pix: "Pix",
+  cartao: "Cartão",
+  dinheiro: "Dinheiro",
+};
+
+function fireConfetti() {
+  if (typeof window === "undefined") return;
+  const defaults = { spread: 70, ticks: 80, gravity: 0.9, scalar: 1, zIndex: 9999 };
+  confetti({ ...defaults, particleCount: 90, origin: { x: 0.5, y: 0.6 } });
+  setTimeout(() => {
+    confetti({ ...defaults, particleCount: 60, angle: 60, origin: { x: 0, y: 0.7 } });
+    confetti({ ...defaults, particleCount: 60, angle: 120, origin: { x: 1, y: 0.7 } });
+  }, 180);
+}
+
 function money(cents: number, currency: "BRL" | "EUR" = "EUR") {
   return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", {
     style: "currency",
