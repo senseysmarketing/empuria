@@ -14,7 +14,7 @@ const tierSchema = z.object({
 
 const eventSchema = z.object({
   id: z.string().uuid().optional(),
-  slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/, "slug inválido"),
+  slug: z.string().trim().max(120).regex(/^[a-z0-9-]*$/, "slug inválido").optional().or(z.literal("")),
   title: z.string().trim().min(2).max(160),
   description: z.string().max(8000).optional().nullable(),
   starts_at: z.string(),
@@ -28,6 +28,18 @@ const eventSchema = z.object({
   is_published: z.boolean().default(false),
   tiers: z.array(tierSchema).min(1).max(20),
 });
+
+function slugify(input: string): string {
+  return (
+    input
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 100) || `evento-${Date.now().toString(36)}`
+  );
+}
 
 export const listEventsAdmin = createServerFn({ method: "GET" })
   .middleware([requireStaff])
@@ -83,8 +95,29 @@ export const upsertEvent = createServerFn({ method: "POST" })
   .inputValidator((d) => eventSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { tiers, id, ...eventData } = data;
+
+    // Ensure unique slug: generate from title if empty, then suffix -2, -3… on collision
+    const base =
+      eventData.slug && eventData.slug.length >= 2
+        ? eventData.slug
+        : slugify(eventData.title);
+    let finalSlug = base;
+    for (let i = 0; i < 200; i++) {
+      const candidate = i === 0 ? base : `${base}-${i + 1}`;
+      const { data: clash } = await context.supabase
+        .from("events")
+        .select("id")
+        .eq("slug", candidate)
+        .maybeSingle();
+      if (!clash || (id && clash.id === id)) {
+        finalSlug = candidate;
+        break;
+      }
+    }
+
     const payload = {
       ...eventData,
+      slug: finalSlug,
       cover_url: eventData.cover_url || null,
       ends_at: eventData.ends_at || null,
       description: eventData.description || null,

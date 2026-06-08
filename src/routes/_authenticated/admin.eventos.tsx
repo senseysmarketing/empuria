@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,10 +11,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TicketScannerDialog } from "@/components/admin/TicketScannerDialog";
-import { Plus, Trash2, Pencil, ExternalLink, X } from "lucide-react";
+import { Plus, Trash2, Pencil, ExternalLink, X, Upload, Loader2, ImageIcon } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { supabase } from "@/integrations/supabase/client";
 
 import { toast } from "sonner";
+
+const COVER_MAX_BYTES = 5 * 1024 * 1024;
+
+function pad2(n: number) { return n.toString().padStart(2, "0"); }
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function fromLocalInput(local: string): string {
+  return new Date(local).toISOString();
+}
 
 export const Route = createFileRoute("/_authenticated/admin/eventos")({
   component: EventsPage,
@@ -32,7 +46,6 @@ type Tier = {
 
 type FormState = {
   id?: string;
-  slug: string;
   title: string;
   description: string;
   starts_at: string;
@@ -45,7 +58,6 @@ type FormState = {
 };
 
 const emptyForm = (): FormState => ({
-  slug: "",
   title: "",
   description: "",
   starts_at: "",
@@ -65,6 +77,8 @@ function EventsPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const { data } = useQuery({ queryKey: ["admin-events"], queryFn: () => fetchList() });
 
@@ -87,10 +101,10 @@ function EventsPage() {
     const tiers = (data?.tiers ?? []).filter((t) => t.event_id === eventId).sort((a, b) => a.position - b.position);
     if (!ev) return;
     setForm({
-      id: ev.id, slug: ev.slug, title: ev.title,
+      id: ev.id, title: ev.title,
       description: ev.description ?? "",
-      starts_at: ev.starts_at.slice(0, 16),
-      ends_at: ev.ends_at ? ev.ends_at.slice(0, 16) : "",
+      starts_at: toLocalInput(ev.starts_at),
+      ends_at: toLocalInput(ev.ends_at),
       location_address: ev.location_address ?? "",
       cover_url: ev.cover_url ?? "",
       sales_mode: ev.sales_mode as "simples" | "categorias",
@@ -105,12 +119,15 @@ function EventsPage() {
   };
 
   const submit = async () => {
+    if (uploadingCover) return;
+    if (!form.title.trim()) { toast.error("Informe o título"); return; }
+    if (!form.starts_at) { toast.error("Informe a data de início"); return; }
     try {
       await save({
         data: {
           ...form,
-          starts_at: new Date(form.starts_at).toISOString(),
-          ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
+          starts_at: fromLocalInput(form.starts_at),
+          ends_at: form.ends_at ? fromLocalInput(form.ends_at) : null,
         },
       });
       toast.success("Evento salvo");
@@ -118,6 +135,36 @@ function EventsPage() {
       qc.invalidateQueries({ queryKey: ["admin-events"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
+    }
+  };
+
+  const handleCoverFile = async (file: File | undefined | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem");
+      return;
+    }
+    if (file.size > COVER_MAX_BYTES) {
+      toast.error("Imagem maior que 5 MB. Reduza o arquivo e tente novamente.");
+      return;
+    }
+    setUploadingCover(true);
+    try {
+      const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]+/g, "");
+      const safeExt = ext.length > 0 && ext.length <= 5 ? ext : "jpg";
+      const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
+      const { error: upErr } = await supabase.storage
+        .from("event-covers")
+        .upload(path, file, { cacheControl: "31536000", upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("event-covers").getPublicUrl(path);
+      setForm((f) => ({ ...f, cover_url: pub.publicUrl }));
+      toast.success("Imagem enviada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao enviar imagem");
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
     }
   };
 
@@ -200,17 +247,68 @@ function EventsPage() {
             <DialogTitle className="font-display">{form.id ? "Editar" : "Novo"} evento</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Título</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value, slug: form.slug || e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") })} /></div>
-              <div><Label>Slug</Label><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></div>
-            </div>
+            <div><Label>Título</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
             <div><Label>Descrição</Label><Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Início</Label><Input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></div>
               <div><Label>Fim (opcional)</Label><Input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></div>
             </div>
             <div><Label>Endereço</Label><Input value={form.location_address} onChange={(e) => setForm({ ...form, location_address: e.target.value })} placeholder="Gran Via, 40, Madrid" /></div>
-            <div><Label>URL da capa (imagem)</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://..." /></div>
+            <div>
+              <Label>Capa do evento</Label>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => handleCoverFile(e.target.files?.[0])}
+              />
+              {form.cover_url ? (
+                <div className="mt-2 relative rounded-lg overflow-hidden border border-admin-border">
+                  <img src={form.cover_url} alt="Capa" className="w-full h-40 object-cover" />
+                  <div className="absolute top-2 right-2 flex gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={uploadingCover}
+                      onClick={() => coverInputRef.current?.click()}
+                    >
+                      {uploadingCover ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      Trocar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={uploadingCover}
+                      onClick={() => setForm({ ...form, cover_url: "" })}
+                    >
+                      <X className="h-3 w-3" /> Remover
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={uploadingCover}
+                  onClick={() => coverInputRef.current?.click()}
+                  className="mt-2 w-full border-2 border-dashed border-admin-border rounded-lg p-6 flex flex-col items-center justify-center gap-2 hover:border-admin-accent transition-colors disabled:opacity-60"
+                >
+                  {uploadingCover ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-admin-accent" />
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-admin-ink-muted" />
+                  )}
+                  <span className="text-sm text-admin-ink">
+                    {uploadingCover ? "Enviando..." : "Selecionar imagem"}
+                  </span>
+                </button>
+              )}
+              <p className="text-[11px] text-admin-ink-muted mt-1">
+                Opcional. Tamanho máximo 5 MB. Resolução recomendada: 1600×900 (16:9).
+              </p>
+            </div>
             <div className="flex gap-4 items-center">
               <div className="flex items-center gap-2"><Switch checked={form.sales_mode === "categorias"} onCheckedChange={(v) => setForm({ ...form, sales_mode: v ? "categorias" : "simples" })} /><Label>Múltiplas categorias</Label></div>
               <div className="flex items-center gap-2"><Switch checked={form.is_published} onCheckedChange={(v) => setForm({ ...form, is_published: v })} /><Label>Publicado</Label></div>
@@ -244,7 +342,7 @@ function EventsPage() {
                 ))}
               </div>
             </div>
-            <Button size="sm" onClick={submit} className="w-full bg-admin-accent hover:bg-admin-accent/90">Salvar</Button>
+            <Button size="sm" onClick={submit} disabled={uploadingCover} className="w-full bg-admin-accent hover:bg-admin-accent/90">{uploadingCover ? "Enviando imagem..." : "Salvar"}</Button>
           </div>
         </DialogContent>
       </Dialog>
