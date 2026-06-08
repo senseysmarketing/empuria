@@ -391,13 +391,8 @@ export function PdvTabsPanel() {
                       </div>
                       <div className="text-right">
                         <div className="font-display text-lg text-admin-accent tabular-nums">
-                          {money(totals.brl)}
+                          {money(totals.eur)}
                         </div>
-                        {totals.eur > 0 && (
-                          <div className="text-[11px] text-admin-ink-muted tabular-nums">
-                            {money(totals.eur, "EUR")}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </button>
