@@ -784,10 +784,10 @@ export function PdvTabsPanel() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isBusy}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={isBusy}
+              disabled={isBusy || !selectedTab}
               onClick={(event) => {
                 event.preventDefault();
-                closeMut.mutate();
+                if (selectedTab) closeMut.mutate(selectedTab.id);
               }}
               className="bg-admin-accent text-white"
             >
