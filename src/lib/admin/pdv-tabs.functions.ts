@@ -159,13 +159,6 @@ async function hydratePdvTabs(tabs: PdvTabRecord[], context: { isAdmin: boolean;
     itemsByTab.set(item.tab_id, bucket);
   }
 
-  const [canRemoveItem, canCancelTab] = context.isAdmin
-    ? [true, true]
-    : await Promise.all([
-        userHasAction(context.userId, "pdv.remove_tab_item"),
-        userHasAction(context.userId, "pdv.cancel_tab"),
-      ]);
-
   return {
     tabs: tabs.map((tab) => ({
       ...tab,
@@ -178,8 +171,8 @@ async function hydratePdvTabs(tabs: PdvTabRecord[], context: { isAdmin: boolean;
       canAddItems: true,
       canUpdateItemQty: true,
       canCloseTabs: true,
-      canRemoveItem,
-      canCancelTab,
+      canRemoveItem: true,
+      canCancelTab: true,
       canCancelEmptyTab: true,
     },
   };
