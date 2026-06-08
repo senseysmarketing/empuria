@@ -10,6 +10,8 @@ import {
   checkPublicMercadoPagoPayment,
   createPublicMercadoPagoPayment,
 } from "@/lib/mercadopago/mercadopago.functions";
+import { getPublicWisePayment } from "@/lib/wise/wise.functions";
+import { WisePaymentPanel } from "@/components/payments/WisePaymentPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,9 +121,18 @@ function loadMercadoPagoSdk() {
 function PagarPage() {
   const { token } = Route.useParams();
   const fetchLink = useServerFn(getPublicPaymentLink);
+  const fetchWise = useServerFn(getPublicWisePayment);
+
   const linkQuery = useQuery({
     queryKey: ["payment-link", token],
     queryFn: () => fetchLink({ data: { token } }),
+    refetchOnWindowFocus: false,
+  });
+
+  const wiseQuery = useQuery({
+    queryKey: ["wise-payment", token],
+    queryFn: () => fetchWise({ data: { token } }),
+    enabled: !!linkQuery.data && linkQuery.data.ok === true,
     refetchOnWindowFocus: false,
   });
 
@@ -168,6 +179,36 @@ function PagarPage() {
           title={titles[data.reason] ?? "Link indisponível"}
           message={data.message}
         />
+      </Shell>
+    );
+  }
+
+  // Wise (EUR) is the primary provider. Use it whenever the order is in EUR
+  // or the wise payment row exists. Mercado Pago stays as legacy fallback.
+  const isWise = (wiseQuery.data?.currency ?? data.currency ?? "").toUpperCase() === "EUR";
+  if (isWise && wiseQuery.data) {
+    const w = wiseQuery.data;
+    return (
+      <Shell>
+        <div className="space-y-5">
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <div className="font-display text-[11px] uppercase tracking-widest text-brown-deep/50">
+              Resumo do pedido
+            </div>
+            <div className="mt-1 text-base font-medium">{w.serviceTitle}</div>
+            <div className="text-sm text-brown-deep/60">Cliente: {w.customerName}</div>
+          </div>
+          <WisePaymentPanel
+            orderId={w.orderId}
+            amountCents={w.amountCents}
+            currency={w.currency}
+            reference={w.reference}
+            paymentUrl={w.paymentUrl}
+            iban={w.iban}
+            bic={w.bic}
+            beneficiaryName={w.beneficiaryName}
+          />
+        </div>
       </Shell>
     );
   }
