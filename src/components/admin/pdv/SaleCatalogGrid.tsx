@@ -8,6 +8,8 @@ export type PdvCatalogItem = {
   price_eur_cents: number;
   price_brl_cents: number;
   stock_quantity: number;
+  reserved_stock_quantity?: number;
+  available_stock_quantity?: number;
   track_stock: boolean;
   stock_min_quantity: number;
   item_type: string;
@@ -43,8 +45,9 @@ export function SaleCatalogGrid({
           <h3 className="font-display text-xs uppercase tracking-wider text-admin-ink-soft mb-3">{group.label}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
             {group.items.map((p) => {
-              const outOfStock = p.track_stock && p.stock_quantity <= 0;
-              const low = p.track_stock && p.stock_quantity > 0 && p.stock_quantity <= p.stock_min_quantity;
+              const available = p.available_stock_quantity ?? Math.max(0, p.stock_quantity - (p.reserved_stock_quantity ?? 0));
+              const outOfStock = p.track_stock && available <= 0;
+              const low = p.track_stock && available > 0 && available <= p.stock_min_quantity;
               return (
                 <button
                   key={p.id}
@@ -70,7 +73,7 @@ export function SaleCatalogGrid({
                       outOfStock ? "text-red-400" : low ? "text-yellow-brand" : "text-admin-ink-muted"
                     )}>
                       {(outOfStock || low) && <AlertTriangle className="h-3 w-3" />}
-                      Est: {p.stock_quantity}
+                      Disp: {available}
                     </div>
                   )}
                 </button>

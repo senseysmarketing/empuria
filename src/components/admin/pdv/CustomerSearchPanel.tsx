@@ -17,7 +17,15 @@ export type PdvCustomer = {
   is_blocked: boolean;
 };
 
-export function CustomerSearchPanel({ onSelect }: { onSelect: (c: PdvCustomer) => void }) {
+export function CustomerSearchPanel({
+  onSelect,
+  title = "Nova venda",
+  subtitle = "Comece buscando ou cadastrando o cliente.",
+}: {
+  onSelect: (c: PdvCustomer) => void;
+  title?: string;
+  subtitle?: string;
+}) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [openCreate, setOpenCreate] = useState(false);
@@ -37,8 +45,8 @@ export function CustomerSearchPanel({ onSelect }: { onSelect: (c: PdvCustomer) =
   return (
     <div className="max-w-2xl mx-auto w-full space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="font-display text-3xl text-admin-ink">Nova venda</h2>
-        <p className="text-admin-ink-muted text-sm">Comece buscando ou cadastrando o cliente.</p>
+        <h2 className="font-display text-3xl text-admin-ink">{title}</h2>
+        <p className="text-admin-ink-muted text-sm">{subtitle}</p>
       </div>
       <div className="relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-admin-ink-muted" />
