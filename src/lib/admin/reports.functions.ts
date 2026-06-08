@@ -336,7 +336,7 @@ export const getReportsOverview = createServerFn({ method: "POST" })
     if (current.expensesPending > 0) {
       alerts.push({
         type: "pending_payments",
-        message: `Há ${(current.expensesPending / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em despesas pendentes.`,
+        message: `Há ${(current.expensesPending / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })} em despesas pendentes.`,
         severity: "warn",
       });
     }
