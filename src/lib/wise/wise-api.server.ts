@@ -153,19 +153,18 @@ export async function verifyWiseWebhookSignature(args: {
     return false;
   }
   try {
+    const keyBuf = keyBytes.buffer.slice(keyBytes.byteOffset, keyBytes.byteOffset + keyBytes.byteLength) as ArrayBuffer;
+    const sigBuf = signatureBytes.buffer.slice(signatureBytes.byteOffset, signatureBytes.byteOffset + signatureBytes.byteLength) as ArrayBuffer;
+    const bodyEnc = new TextEncoder().encode(args.rawBody);
+    const bodyBuf = bodyEnc.buffer.slice(bodyEnc.byteOffset, bodyEnc.byteOffset + bodyEnc.byteLength) as ArrayBuffer;
     const key = await globalThis.crypto.subtle.importKey(
       "spki",
-      keyBytes,
+      keyBuf,
       { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
       false,
       ["verify"],
     );
-    return await globalThis.crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5",
-      key,
-      signatureBytes,
-      new TextEncoder().encode(args.rawBody),
-    );
+    return await globalThis.crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, sigBuf, bodyBuf);
   } catch {
     return false;
   }

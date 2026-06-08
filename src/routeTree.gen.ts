@@ -22,6 +22,7 @@ import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiWebhooksWiseRouteImport } from './routes/api.webhooks.wise'
 import { Route as ApiWebhooksUazapiRouteImport } from './routes/api.webhooks.uazapi'
 import { Route as ApiWebhooksMercadopagoRouteImport } from './routes/api.webhooks.mercadopago'
 import { Route as ApiWebhooksHublaRouteImport } from './routes/api.webhooks.hubla'
@@ -110,6 +111,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const ApiWebhooksWiseRoute = ApiWebhooksWiseRouteImport.update({
+  id: '/api/webhooks/wise',
+  path: '/api/webhooks/wise',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWebhooksUazapiRoute = ApiWebhooksUazapiRouteImport.update({
   id: '/api/webhooks/uazapi',
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
+  '/api/webhooks/wise': typeof ApiWebhooksWiseRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
   '/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
@@ -309,6 +316,7 @@ export interface FileRoutesByTo {
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
+  '/api/webhooks/wise': typeof ApiWebhooksWiseRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
   '/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
@@ -348,6 +356,7 @@ export interface FileRoutesById {
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
+  '/api/webhooks/wise': typeof ApiWebhooksWiseRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
   '/_authenticated/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
@@ -387,6 +396,7 @@ export interface FileRouteTypes {
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
+    | '/api/webhooks/wise'
     | '/admin/'
     | '/portal/'
     | '/portal/clube/certificado/$code'
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
+    | '/api/webhooks/wise'
     | '/admin'
     | '/portal'
     | '/portal/clube/certificado/$code'
@@ -460,6 +471,7 @@ export interface FileRouteTypes {
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
+    | '/api/webhooks/wise'
     | '/_authenticated/admin/'
     | '/_authenticated/portal/'
     | '/_authenticated/portal/clube/certificado/$code'
@@ -478,6 +490,7 @@ export interface RootRouteChildren {
   ApiWebhooksHublaRoute: typeof ApiWebhooksHublaRoute
   ApiWebhooksMercadopagoRoute: typeof ApiWebhooksMercadopagoRoute
   ApiWebhooksUazapiRoute: typeof ApiWebhooksUazapiRoute
+  ApiWebhooksWiseRoute: typeof ApiWebhooksWiseRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -572,6 +585,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/webhooks/wise': {
+      id: '/api/webhooks/wise'
+      path: '/api/webhooks/wise'
+      fullPath: '/api/webhooks/wise'
+      preLoaderRoute: typeof ApiWebhooksWiseRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/webhooks/uazapi': {
       id: '/api/webhooks/uazapi'
@@ -849,6 +869,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebhooksHublaRoute: ApiWebhooksHublaRoute,
   ApiWebhooksMercadopagoRoute: ApiWebhooksMercadopagoRoute,
   ApiWebhooksUazapiRoute: ApiWebhooksUazapiRoute,
+  ApiWebhooksWiseRoute: ApiWebhooksWiseRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

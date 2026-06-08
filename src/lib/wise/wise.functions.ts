@@ -185,7 +185,7 @@ export async function createWisePaymentForOrder(args: {
     .maybeSingle();
 
   let reference: string;
-  let wisePaymentId: string;
+  let wisePaymentId = "";
   let paymentUrl: string | null = null;
   let raw_request: Record<string, unknown> = {};
   let raw_response: Record<string, unknown> = {};
