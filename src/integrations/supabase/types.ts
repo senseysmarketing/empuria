@@ -867,6 +867,347 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_automation_execution_logs: {
+        Row: {
+          created_at: string
+          event_type: string
+          execution_id: string | null
+          flow_id: string | null
+          id: string
+          lead_id: string | null
+          message: string | null
+          metadata: Json
+          step_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          execution_id?: string | null
+          flow_id?: string | null
+          id?: string
+          lead_id?: string | null
+          message?: string | null
+          metadata?: Json
+          step_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          execution_id?: string | null
+          flow_id?: string | null
+          id?: string
+          lead_id?: string | null
+          message?: string | null
+          metadata?: Json
+          step_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_automation_execution_logs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_execution_logs_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_execution_logs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_execution_logs_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_automation_executions: {
+        Row: {
+          completed_at: string | null
+          conversation_id: string | null
+          created_at: string
+          current_step_id: string | null
+          flow_id: string
+          id: string
+          last_activity_at: string
+          last_error: string | null
+          lead_id: string
+          started_at: string
+          status: string
+          stop_reason: string | null
+          trigger_payload: Json
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          current_step_id?: string | null
+          flow_id: string
+          id?: string
+          last_activity_at?: string
+          last_error?: string | null
+          lead_id: string
+          started_at?: string
+          status?: string
+          stop_reason?: string | null
+          trigger_payload?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          current_step_id?: string | null
+          flow_id?: string
+          id?: string
+          last_activity_at?: string
+          last_error?: string | null
+          lead_id?: string
+          started_at?: string
+          status?: string
+          stop_reason?: string | null
+          trigger_payload?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_automation_executions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "crm_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_executions_current_step_id_fkey"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_executions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_executions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_automation_flows: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_deleted: boolean
+          metrics: Json
+          name: string
+          schedule_window: Json
+          status: string
+          stop_rules: Json
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_deleted?: boolean
+          metrics?: Json
+          name: string
+          schedule_window?: Json
+          status?: string
+          stop_rules?: Json
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_deleted?: boolean
+          metrics?: Json
+          name?: string
+          schedule_window?: Json
+          status?: string
+          stop_rules?: Json
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_automation_flows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_automation_pending_actions: {
+        Row: {
+          action_type: string
+          attempts: number
+          created_at: string
+          execution_id: string
+          flow_id: string
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lead_id: string
+          locked_at: string | null
+          payload: Json
+          run_at: string
+          status: string
+          step_id: string
+          updated_at: string
+        }
+        Insert: {
+          action_type?: string
+          attempts?: number
+          created_at?: string
+          execution_id: string
+          flow_id: string
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          lead_id: string
+          locked_at?: string | null
+          payload?: Json
+          run_at?: string
+          status?: string
+          step_id: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          attempts?: number
+          created_at?: string
+          execution_id?: string
+          flow_id?: string
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          lead_id?: string
+          locked_at?: string | null
+          payload?: Json
+          run_at?: string
+          status?: string
+          step_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_automation_pending_actions_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_pending_actions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_pending_actions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_pending_actions_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_automation_steps: {
+        Row: {
+          config: Json
+          created_at: string
+          flow_id: string
+          id: string
+          is_deleted: boolean
+          next_step_id: string | null
+          position: number
+          step_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          flow_id: string
+          id?: string
+          is_deleted?: boolean
+          next_step_id?: string | null
+          position?: number
+          step_type: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          flow_id?: string
+          id?: string
+          is_deleted?: boolean
+          next_step_id?: string | null
+          position?: number
+          step_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_automation_steps_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_automation_steps_next_step_id_fkey"
+            columns: ["next_step_id"]
+            isOneToOne: false
+            referencedRelation: "crm_automation_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_columns: {
         Row: {
           created_at: string
@@ -2958,6 +3299,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      crm_automation_increment_metric: {
+        Args: { p_amount?: number; p_flow_id: string; p_key: string }
+        Returns: undefined
+      }
+      crm_automation_stop_for_lead: {
+        Args: { p_lead_id: string; p_reason: string; p_step_id?: string }
+        Returns: undefined
+      }
       email_exists: { Args: { p_email: string }; Returns: boolean }
       finance_account_id_for_payment: {
         Args: { p_payment_method: string }
