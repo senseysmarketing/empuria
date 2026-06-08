@@ -242,7 +242,7 @@ export function HomeEventsSection() {
                       key={ev.id}
                       to="/evento/$slug"
                       params={{ slug: ev.slug }}
-                      className={`group shrink-0 snap-start rounded-2xl overflow-hidden bg-brown text-offwhite shadow-warm border border-brown-deep/10 ${others.length === 1 ? "w-full" : "w-[82%]"}`}
+                      className={`group shrink-0 snap-start rounded-2xl overflow-hidden bg-brown text-offwhite shadow-warm border border-brown-deep/10 ${others.length === 1 ? "w-full" : "w-[70%]"}`}
                     >
                       <div className="relative aspect-[4/5]">
                         {img ? (
