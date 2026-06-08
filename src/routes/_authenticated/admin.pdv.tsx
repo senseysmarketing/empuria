@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Wine, Loader2, History, ShoppingCart } from "lucide-react";
+import { Wine, Loader2, History, ShoppingCart, Package } from "lucide-react";
 import { toast } from "sonner";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { CustomerSearchPanel, type PdvCustomer } from "@/components/admin/pdv/CustomerSearchPanel";
@@ -10,6 +10,9 @@ import { SaleCatalogGrid, type PdvCatalogItem } from "@/components/admin/pdv/Sal
 import { SaleCartPanel, type CartLine, type Discount } from "@/components/admin/pdv/SaleCartPanel";
 import { SaleSuccessOverlay } from "@/components/admin/pdv/SaleSuccessOverlay";
 import { PdvHistoryPanel } from "@/components/admin/pdv/PdvHistoryPanel";
+import { PdvItensTab } from "@/components/admin/configuracoes/PdvItensTab";
+import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
+import { useModuleAccess } from "@/hooks/use-module-access";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listPdvCatalog, closePdvSale } from "@/lib/admin/pdv-sales.functions";
 
@@ -25,6 +28,8 @@ function PdvPage() {
   const [closing, setClosing] = useState(false);
   const [success, setSuccess] = useState<{ brl: number; eur: number } | null>(null);
   const [tab, setTab] = useState("venda");
+  const { can, isAdmin } = useModuleAccess();
+  const canItens = isAdmin || can("pdv_itens");
 
   const catalogQ = useQuery({
     queryKey: ["pdv-catalog"],
@@ -118,6 +123,14 @@ function PdvPage() {
           >
             <History className="h-4 w-4" /> Historico
           </TabsTrigger>
+          {canItens && (
+            <TabsTrigger
+              value="itens"
+              className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+            >
+              <Package className="h-4 w-4" /> Itens
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="venda" className="mt-0">
@@ -155,6 +168,14 @@ function PdvPage() {
 
         <TabsContent value="historico" className="mt-0">
           <PdvHistoryPanel />
+        </TabsContent>
+
+        <TabsContent value="itens" className="mt-0">
+          {canItens ? (
+            <PdvItensTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso ao módulo PDV Itens podem gerenciar este catálogo." />
+          )}
         </TabsContent>
       </Tabs>
 
