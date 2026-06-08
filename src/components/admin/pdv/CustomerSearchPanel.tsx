@@ -128,6 +128,7 @@ export function CustomerSearchPanel({
         <Button
           variant="outline"
           onClick={() => setOpenCreate(true)}
+          disabled={isSubmitting}
           className="border-admin-border"
         >
           <UserPlus className="h-4 w-4" /> Cadastrar novo cliente
