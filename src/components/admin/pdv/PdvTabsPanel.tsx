@@ -11,8 +11,8 @@ import {
   QrCode,
   ReceiptText,
   Search,
-  Trash2,
   UserPlus,
+  X,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
