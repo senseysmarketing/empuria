@@ -80,7 +80,7 @@ const searchSchema = z.object({
   compare: fallback(z.enum(["none", "prev_period", "prev_month"]), "prev_period").default(
     "prev_period",
   ),
-  currency: fallback(z.enum(["BRL", "EUR", "both"]), "both").default("both"),
+  currency: fallback(z.enum(["BRL", "EUR", "both"]), "EUR").default("EUR"),
   origin: z.string().optional(),
 });
 
