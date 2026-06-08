@@ -598,7 +598,10 @@ export function PdvTabsPanel() {
         </div>
       )}
 
-      <Dialog open={openCustomerDialog} onOpenChange={setOpenCustomerDialog}>
+      <Dialog
+        open={openCustomerDialog}
+        onOpenChange={(open) => !openMut.isPending && setOpenCustomerDialog(open)}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Nova comanda</DialogTitle>
@@ -609,7 +612,12 @@ export function PdvTabsPanel() {
           <CustomerSearchPanel
             title="Selecionar cliente"
             subtitle="A comanda sera vinculada ao cliente escolhido."
-            onSelect={(customer) => openMut.mutate(customer)}
+            onSelect={(customer) => {
+              if (openMut.isPending) return;
+              openMut.mutate(customer);
+            }}
+            isSubmitting={openMut.isPending}
+            selectedId={openMut.variables?.id ?? null}
           />
         </DialogContent>
       </Dialog>
