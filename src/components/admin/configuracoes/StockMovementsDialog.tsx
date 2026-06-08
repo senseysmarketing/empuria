@@ -226,7 +226,7 @@ export function StockMovementsDialog({ open, onOpenChange, product }: Props) {
                   <tbody>
                     {rows.map((r) => (
                       <tr key={r.id} className="border-t border-admin-border">
-                        <td className="p-2 text-admin-ink-muted">{new Date(r.created_at).toLocaleString("pt-BR")}</td>
+                        <td className="p-2 text-admin-ink-muted">{new Date(r.created_at).toLocaleString("pt-PT")}</td>
                         <td className="p-2">{typeLabel[r.type] ?? r.type}</td>
                         <td className="p-2 text-right tabular-nums">{r.quantity}</td>
                         <td className="p-2 text-right tabular-nums">{r.previous_stock}</td>

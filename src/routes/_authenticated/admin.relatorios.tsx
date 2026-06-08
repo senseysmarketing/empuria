@@ -80,7 +80,7 @@ const searchSchema = z.object({
   compare: fallback(z.enum(["none", "prev_period", "prev_month"]), "prev_period").default(
     "prev_period",
   ),
-  currency: fallback(z.enum(["BRL", "EUR", "both"]), "both").default("both"),
+  currency: fallback(z.enum(["BRL", "EUR", "both"]), "EUR").default("EUR"),
   origin: z.string().optional(),
 });
 
@@ -96,7 +96,7 @@ function normalizeSearch(search: Partial<SearchSchema>): SearchSchema {
     tab: search.tab ?? "visao",
     period: search.period ?? "30d",
     compare: search.compare ?? "prev_period",
-    currency: search.currency ?? "both",
+    currency: search.currency ?? "EUR",
     from: search.from,
     to: search.to,
     origin: search.origin,
@@ -130,8 +130,8 @@ const ORIGIN_LABEL: Record<string, string> = {
   hubla: "Hubla",
 };
 
-function money(cents: number, currency = "BRL") {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format((cents ?? 0) / 100);
+function money(cents: number, currency = "EUR") {
+  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", { style: "currency", currency }).format((cents ?? 0) / 100);
 }
 
 function number(n: number) {
@@ -292,8 +292,6 @@ function GlobalFiltersBar({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="both">Todas moedas</SelectItem>
-            <SelectItem value="BRL">BRL</SelectItem>
             <SelectItem value="EUR">EUR</SelectItem>
           </SelectContent>
         </Select>
@@ -929,17 +927,10 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
   const d = q.data;
   const c = d.cards;
 
-  // PDV opera em BRL como moeda principal. EUR é convertido/secundário.
-  const showEur = filters.currency !== "BRL";
-  const showBrl = filters.currency !== "EUR";
-  const primary: "BRL" | "EUR" = showBrl ? "BRL" : "EUR";
-
-  const pickMain = (cents: number, eurCents?: number) =>
-    primary === "BRL" ? cents : (eurCents ?? 0);
-  const pickHint = (cents: number, eurCents?: number) => {
-    if (primary === "BRL" && showEur) return `≈ ${money(eurCents ?? 0, "EUR")}`;
-    return undefined;
-  };
+  // PDV opera em EUR como moeda única.
+  const primary: "EUR" = "EUR";
+  const pickMain = (_cents: number, eurCents?: number) => eurCents ?? 0;
+  const pickHint = (_cents: number, _eurCents?: number) => undefined;
 
   return (
     <div className="space-y-4">
@@ -995,9 +986,7 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.topProducts.map((p) => ({
               label: `${p.name} · ${number(p.qty)}un`,
-              value: money(primary === "BRL" ? p.revenueBrl : p.revenue, primary),
-              subValue:
-                primary === "BRL" && showEur ? `≈ ${money(p.revenue, "EUR")}` : undefined,
+              value: money(p.revenue, "EUR"),
               raw: p.qty,
             }))}
             empty="Sem vendas no período."
@@ -1007,10 +996,8 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.topCashiers.map((c) => ({
               label: `${c.label} · ${number(c.count)} vendas`,
-              value: money(primary === "BRL" ? c.revenueBrl : c.revenue, primary),
-              subValue:
-                primary === "BRL" && showEur ? `≈ ${money(c.revenue, "EUR")}` : undefined,
-              raw: primary === "BRL" ? c.revenueBrl : c.revenue,
+              value: money(c.revenue, "EUR"),
+              raw: c.revenue,
             }))}
             empty="Sem operadores no período."
           />
@@ -1019,10 +1006,8 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.paymentMethods.map((p) => ({
               label: `${p.label} · ${number(p.count)}x`,
-              value: money(primary === "BRL" ? p.revenueBrl : p.revenue, primary),
-              subValue:
-                primary === "BRL" && showEur ? `≈ ${money(p.revenue, "EUR")}` : undefined,
-              raw: primary === "BRL" ? p.revenueBrl : p.revenue,
+              value: money(p.revenue, "EUR"),
+              raw: p.revenue,
             }))}
             empty="Sem pagamentos registrados."
           />
@@ -1054,7 +1039,7 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           )}
         </BentoCard>
         <BentoCard title="Horários de maior venda" className="col-span-12">
-          <HourlySalesChart data={d.hourly} currency={primary} showEur={primary === "BRL" && showEur} />
+          <HourlySalesChart data={d.hourly} currency="EUR" showEur={false} />
         </BentoCard>
       </div>
     </div>

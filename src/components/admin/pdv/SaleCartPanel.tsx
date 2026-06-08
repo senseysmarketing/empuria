@@ -119,7 +119,7 @@ export function SaleCartPanel({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm font-display tabular-nums text-admin-ink">R$ {((l.qty * l.item.price_brl_cents) / 100).toFixed(2)}</div>
+              <div className="text-sm font-display tabular-nums text-admin-ink">€ {((l.qty * l.item.price_eur_cents) / 100).toFixed(2)}</div>
             </div>
             <button onClick={() => remove(l.item.id)} className="text-admin-ink-muted hover:text-red-brand opacity-0 group-hover:opacity-100">
               <Trash2 className="h-3.5 w-3.5" />
@@ -139,7 +139,7 @@ export function SaleCartPanel({
               <SelectTrigger className="bg-admin-bg border-admin-border h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Sem</SelectItem>
-                <SelectItem value="amount">R$</SelectItem>
+                <SelectItem value="amount">€</SelectItem>
                 <SelectItem value="percent">%</SelectItem>
               </SelectContent>
             </Select>
@@ -156,24 +156,23 @@ export function SaleCartPanel({
           />
         </div>
 
-        {discountCents.brl > 0 && (
+        {discountCents.eur > 0 && (
           <div className="flex justify-between text-xs text-admin-ink-muted">
             <span>Subtotal</span>
-            <span className="tabular-nums">R$ {(subtotal.brl / 100).toFixed(2)}</span>
+            <span className="tabular-nums">€ {(subtotal.eur / 100).toFixed(2)}</span>
           </div>
         )}
-        {discountCents.brl > 0 && (
+        {discountCents.eur > 0 && (
           <div className="flex justify-between text-xs text-yellow-brand">
             <span>Desconto</span>
-            <span className="tabular-nums">− R$ {(discountCents.brl / 100).toFixed(2)}</span>
+            <span className="tabular-nums">− € {(discountCents.eur / 100).toFixed(2)}</span>
           </div>
         )}
 
         <div className="flex justify-between items-baseline">
           <span className="text-xs uppercase tracking-widest font-display text-admin-ink-muted">Total</span>
           <div className="text-right">
-            <div className="font-display text-3xl font-bold text-admin-accent tabular-nums">R$ {(total.brl / 100).toFixed(2)}</div>
-            {total.eur > 0 && <div className="text-xs text-admin-ink-muted tabular-nums">€ {(total.eur / 100).toFixed(2)}</div>}
+            <div className="font-display text-3xl font-bold text-admin-accent tabular-nums">€ {(total.eur / 100).toFixed(2)}</div>
           </div>
         </div>
 
@@ -219,19 +218,18 @@ export function SaleCartPanel({
           <div className="space-y-2 rounded-lg border border-admin-border bg-admin-bg/40 p-4">
             <div className="flex justify-between text-xs text-admin-ink-muted">
               <span>Subtotal</span>
-              <span className="tabular-nums">R$ {(subtotal.brl / 100).toFixed(2)}</span>
+              <span className="tabular-nums">€ {(subtotal.eur / 100).toFixed(2)}</span>
             </div>
-            {discountCents.brl > 0 && (
+            {discountCents.eur > 0 && (
               <div className="flex justify-between text-xs text-yellow-brand">
                 <span>Desconto</span>
-                <span className="tabular-nums">− R$ {(discountCents.brl / 100).toFixed(2)}</span>
+                <span className="tabular-nums">− € {(discountCents.eur / 100).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between items-baseline pt-2 border-t border-admin-border">
               <span className="text-[10px] uppercase tracking-widest font-display text-admin-ink-muted">Total</span>
               <div className="text-right">
-                <div className="font-display text-2xl font-bold text-admin-accent tabular-nums">R$ {(total.brl / 100).toFixed(2)}</div>
-                {total.eur > 0 && <div className="text-xs text-admin-ink-muted tabular-nums">€ {(total.eur / 100).toFixed(2)}</div>}
+                <div className="font-display text-2xl font-bold text-admin-accent tabular-nums">€ {(total.eur / 100).toFixed(2)}</div>
               </div>
             </div>
             <div className="flex justify-between items-center pt-2 border-t border-admin-border">

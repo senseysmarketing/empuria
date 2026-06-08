@@ -66,15 +66,15 @@ import { cn } from "@/lib/utils";
 
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
 
-function money(cents: number, currency: "BRL" | "EUR" = "BRL") {
-  return new Intl.NumberFormat("pt-BR", {
+function money(cents: number, currency: "BRL" | "EUR" = "EUR") {
+  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", {
     style: "currency",
     currency,
   }).format((cents ?? 0) / 100);
 }
 
 function shortTime(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
+  return new Intl.DateTimeFormat("pt-PT", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -391,13 +391,8 @@ export function PdvTabsPanel() {
                       </div>
                       <div className="text-right">
                         <div className="font-display text-lg text-admin-accent tabular-nums">
-                          {money(totals.brl)}
+                          {money(totals.eur)}
                         </div>
-                        {totals.eur > 0 && (
-                          <div className="text-[11px] text-admin-ink-muted tabular-nums">
-                            {money(totals.eur, "EUR")}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </button>
@@ -562,13 +557,8 @@ export function PdvTabsPanel() {
                         </div>
                         <div className="text-right">
                           <div className="font-display text-sm text-admin-ink tabular-nums">
-                            {money(item.total_brl_cents)}
+                            {money(item.total_eur_cents)}
                           </div>
-                          {item.total_eur_cents > 0 && (
-                            <div className="text-[11px] text-admin-ink-muted tabular-nums">
-                              {money(item.total_eur_cents, "EUR")}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -580,7 +570,7 @@ export function PdvTabsPanel() {
               <div className="border-t border-admin-border pt-3 space-y-3">
                 <div className="flex justify-between text-xs text-admin-ink-muted">
                   <span>Subtotal</span>
-                  <span className="tabular-nums">{money(selectedTotals.brl)}</span>
+                  <span className="tabular-nums">{money(selectedTotals.eur)}</span>
                 </div>
                 <div className="flex justify-between items-baseline">
                   <span className="text-xs uppercase tracking-widest font-display text-admin-ink-muted">
@@ -588,13 +578,8 @@ export function PdvTabsPanel() {
                   </span>
                   <div className="text-right">
                     <div className="font-display text-3xl font-bold text-admin-accent tabular-nums">
-                      {money(selectedTotals.brl)}
+                      {money(selectedTotals.eur)}
                     </div>
-                    {selectedTotals.eur > 0 && (
-                      <div className="text-xs text-admin-ink-muted tabular-nums">
-                        {money(selectedTotals.eur, "EUR")}
-                      </div>
-                    )}
                   </div>
                 </div>
                 <Button
@@ -683,7 +668,7 @@ export function PdvTabsPanel() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sem</SelectItem>
-                    <SelectItem value="amount">R$</SelectItem>
+                    <SelectItem value="amount">€</SelectItem>
                     <SelectItem value="percent">%</SelectItem>
                   </SelectContent>
                 </Select>
@@ -742,12 +727,12 @@ export function PdvTabsPanel() {
             <div className="rounded-lg border border-admin-border bg-admin-bg/40 p-4 space-y-2">
               <div className="flex justify-between text-xs text-admin-ink-muted">
                 <span>Subtotal</span>
-                <span>{money(selectedTotals.brl)}</span>
+                <span>{money(selectedTotals.eur)}</span>
               </div>
-              {discountCents.brl > 0 && (
+              {discountCents.eur > 0 && (
                 <div className="flex justify-between text-xs text-yellow-brand">
                   <span>Desconto</span>
-                  <span>- {money(discountCents.brl)}</span>
+                  <span>- {money(discountCents.eur)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-admin-border pt-2">
@@ -755,7 +740,7 @@ export function PdvTabsPanel() {
                   Total
                 </span>
                 <span className="font-display text-xl text-admin-accent">
-                  {money(closeTotal.brl)}
+                  {money(closeTotal.eur)}
                 </span>
               </div>
             </div>

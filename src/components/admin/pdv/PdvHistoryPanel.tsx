@@ -60,8 +60,8 @@ type PdvSaleDetail = {
 
 const PAGE_SIZE = 25;
 
-function money(cents: number, currency: "EUR" | "BRL") {
-  return new Intl.NumberFormat("pt-BR", {
+function money(cents: number, currency: "EUR" | "BRL" = "EUR") {
+  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", {
     style: "currency",
     currency,
   }).format((cents ?? 0) / 100);
@@ -69,7 +69,7 @@ function money(cents: number, currency: "EUR" | "BRL") {
 
 function dateTime(value: string | null | undefined) {
   if (!value) return "-";
-  return new Intl.DateTimeFormat("pt-BR", {
+  return new Intl.DateTimeFormat("pt-PT", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
@@ -287,8 +287,7 @@ export function PdvHistoryPanel() {
                   <th className="text-left p-3 font-display">Cliente</th>
                   <th className="text-left p-3 font-display">Operador</th>
                   <th className="text-center p-3 font-display">Itens</th>
-                  <th className="text-right p-3 font-display">Total EUR</th>
-                  <th className="text-right p-3 font-display">Total R$</th>
+                  <th className="text-right p-3 font-display">Total €</th>
                   <th className="text-left p-3 font-display">Pagamento</th>
                   <th className="text-left p-3 font-display">Status</th>
                   <th className="text-right p-3 font-display">Ações</th>
@@ -312,7 +311,6 @@ export function PdvHistoryPanel() {
                     </td>
                     <td className="p-3 text-center tabular-nums">{sale.item_count}</td>
                     <td className="p-3 text-right tabular-nums">{money(sale.total_eur_cents, "EUR")}</td>
-                    <td className="p-3 text-right tabular-nums">{money(sale.total_brl_cents, "BRL")}</td>
                     <td className="p-3 text-admin-ink-soft">{paymentLabel(sale.payment_method)}</td>
                     <td className="p-3">{statusBadge(sale.status)}</td>
                     <td className="p-3 text-right">
@@ -502,11 +500,10 @@ function SaleDetailsContent({
         <DetailTile label="Status" value={sale.status === "cancelada" ? "Anulada" : "Concluida"} />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <DetailTile label="Subtotal EUR" value={money(sale.subtotal_eur_cents, "EUR")} />
-        <DetailTile label="Desconto EUR" value={money(sale.discount_eur_cents, "EUR")} />
-        <DetailTile label="Total EUR" value={money(sale.total_eur_cents, "EUR")} accent />
-        <DetailTile label="Total R$" value={money(sale.total_brl_cents, "BRL")} accent />
+      <div className="grid gap-3 md:grid-cols-3">
+        <DetailTile label="Subtotal €" value={money(sale.subtotal_eur_cents, "EUR")} />
+        <DetailTile label="Desconto €" value={money(sale.discount_eur_cents, "EUR")} />
+        <DetailTile label="Total €" value={money(sale.total_eur_cents, "EUR")} accent />
       </div>
 
       {sale.status === "cancelada" && (
@@ -529,10 +526,8 @@ function SaleDetailsContent({
               <TableRow className="border-admin-border hover:bg-transparent">
                 <TableHead>Item</TableHead>
                 <TableHead className="text-center">Qtd</TableHead>
-                <TableHead className="text-right">Unit EUR</TableHead>
-                <TableHead className="text-right">Unit R$</TableHead>
-                <TableHead className="text-right">Total EUR</TableHead>
-                <TableHead className="text-right">Total R$</TableHead>
+                <TableHead className="text-right">Unit €</TableHead>
+                <TableHead className="text-right">Total €</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -547,13 +542,7 @@ function SaleDetailsContent({
                     {money(item.unit_price_eur_cents, "EUR")}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {money(item.unit_price_brl_cents, "BRL")}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
                     {money(item.total_eur_cents, "EUR")}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {money(item.total_brl_cents, "BRL")}
                   </TableCell>
                 </TableRow>
               ))}
