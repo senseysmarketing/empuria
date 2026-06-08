@@ -194,7 +194,7 @@ export function HomeEventsSection() {
                   params={{ slug: ev.slug }}
                   className="group block rounded-2xl overflow-hidden bg-brown text-offwhite shadow-warm hover:-translate-y-1 transition-all border border-brown-deep/10 h-full"
                 >
-                  <div className="relative aspect-[4/5]">
+                  <div className="relative aspect-[4/5] overflow-hidden">
                     {img ? (
                       <img
                         src={img}
@@ -244,7 +244,7 @@ export function HomeEventsSection() {
                       params={{ slug: ev.slug }}
                       className={`group shrink-0 snap-start rounded-2xl overflow-hidden bg-brown text-offwhite shadow-warm border border-brown-deep/10 ${others.length === 1 ? "w-full" : "w-[70%]"}`}
                     >
-                      <div className="relative aspect-[4/5]">
+                      <div className="relative aspect-[4/5] overflow-hidden">
                         {img ? (
                           <img
                             src={img}
