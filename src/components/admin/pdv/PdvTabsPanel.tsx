@@ -739,45 +739,6 @@ export function PdvTabsPanel() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={cancelItemTarget !== null}
-        onOpenChange={(open) => {
-          if (!open && !isBusy) {
-            setCancelItemTarget(null);
-            setReason("");
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover item da comanda</AlertDialogTitle>
-            <AlertDialogDescription>
-              A reserva de estoque sera liberada e o item ficara registrado em auditoria.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Textarea
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            className="bg-admin-bg border-admin-border"
-            placeholder="Motivo da remocao..."
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isBusy}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isBusy || reason.trim().length < 3}
-              onClick={(event) => {
-                event.preventDefault();
-                if (cancelItemTarget) {
-                  cancelItemMut.mutate({ itemId: cancelItemTarget.id, reason });
-                }
-              }}
-              className="bg-red-brand text-white"
-            >
-              Remover item
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog
         open={cancelTabTarget !== null}
