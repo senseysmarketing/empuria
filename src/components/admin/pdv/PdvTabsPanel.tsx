@@ -66,15 +66,15 @@ import { cn } from "@/lib/utils";
 
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
 
-function money(cents: number, currency: "BRL" | "EUR" = "BRL") {
-  return new Intl.NumberFormat("pt-BR", {
+function money(cents: number, currency: "BRL" | "EUR" = "EUR") {
+  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", {
     style: "currency",
     currency,
   }).format((cents ?? 0) / 100);
 }
 
 function shortTime(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
+  return new Intl.DateTimeFormat("pt-PT", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
