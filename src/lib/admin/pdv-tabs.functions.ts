@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
-import { userHasAction } from "./permission-checks";
+
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export type PdvTabStatus = "aberta" | "fechada" | "cancelada";
@@ -159,13 +159,6 @@ async function hydratePdvTabs(tabs: PdvTabRecord[], context: { isAdmin: boolean;
     itemsByTab.set(item.tab_id, bucket);
   }
 
-  const [canRemoveItem, canCancelTab] = context.isAdmin
-    ? [true, true]
-    : await Promise.all([
-        userHasAction(context.userId, "pdv.remove_tab_item"),
-        userHasAction(context.userId, "pdv.cancel_tab"),
-      ]);
-
   return {
     tabs: tabs.map((tab) => ({
       ...tab,
@@ -178,8 +171,8 @@ async function hydratePdvTabs(tabs: PdvTabRecord[], context: { isAdmin: boolean;
       canAddItems: true,
       canUpdateItemQty: true,
       canCloseTabs: true,
-      canRemoveItem,
-      canCancelTab,
+      canRemoveItem: true,
+      canCancelTab: true,
       canCancelEmptyTab: true,
     },
   };
@@ -264,10 +257,6 @@ export const cancelPdvTabItem = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => cancelItemSchema.parse(data))
   .handler(async ({ data, context }) => {
-    if (!context.isAdmin) {
-      const allowed = await userHasAction(context.userId, "pdv.remove_tab_item");
-      if (!allowed) throw new Error("Sem permissao para remover itens da comanda.");
-    }
     const { error } = await pdvDb.rpc<null>("pdv_cancel_tab_item", {
       p_item_id: data.itemId,
       p_actor_id: context.userId,
@@ -298,20 +287,6 @@ export const cancelPdvTab = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => cancelTabSchema.parse(data))
   .handler(async ({ data, context }) => {
-    let allowed = context.isAdmin;
-    if (!context.isAdmin) {
-      allowed = await userHasAction(context.userId, "pdv.cancel_tab");
-      if (!allowed) {
-        const { data: activeItemsRaw, error: itemsError } = await supabaseAdmin
-          .from("pdv_tab_items")
-          .select("id")
-          .eq("tab_id", data.tabId)
-          .is("cancelled_at", null);
-        if (itemsError) throw new Error(itemsError.message);
-        allowed = (activeItemsRaw ?? []).length === 0;
-      }
-      if (!allowed) throw new Error("Sem permissao para cancelar comandas com itens.");
-    }
     const { error } = await pdvDb.rpc<null>("pdv_cancel_tab", {
       p_tab_id: data.tabId,
       p_actor_id: context.userId,
