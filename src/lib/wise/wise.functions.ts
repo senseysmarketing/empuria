@@ -1,0 +1,556 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireStaff } from "@/lib/admin/auth";
+import {
+  createWisePaymentLink,
+  getWisePaymentLink,
+  listWiseProfiles,
+  type WiseClientOptions,
+  type WiseEnvironment,
+} from "./wise-api.server";
+
+const db = supabaseAdmin as unknown as {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rpc: (fn: string, args?: Record<string, unknown>) => Promise<any>;
+};
+
+export type WiseSetting = {
+  is_enabled: boolean;
+  wise_environment: WiseEnvironment;
+  wise_api_token: string | null;
+  wise_profile_id: string | null;
+  wise_balance_id_eur: string | null;
+  wise_beneficiary_name: string | null;
+  wise_iban: string | null;
+  wise_bic: string | null;
+  wise_default_payment_url: string | null;
+  wise_webhook_public_key: string | null;
+  wise_last_event_at: string | null;
+  wise_confirmation_mode: string;
+};
+
+function tokenFromSettingOrEnv(setting: Pick<WiseSetting, "wise_api_token">) {
+  return setting.wise_api_token ?? process.env.WISE_API_TOKEN ?? null;
+}
+
+function maskedSetting(s: WiseSetting): WiseSetting {
+  return {
+    ...s,
+    wise_api_token: s.wise_api_token ? "********" : null,
+  };
+}
+
+async function loadSetting(): Promise<WiseSetting> {
+  const { data } = await db
+    .from("integration_settings")
+    .select(
+      "is_enabled,wise_environment,wise_api_token,wise_profile_id,wise_balance_id_eur,wise_beneficiary_name,wise_iban,wise_bic,wise_default_payment_url,wise_webhook_public_key,wise_last_event_at,wise_confirmation_mode",
+    )
+    .eq("provider", "wise")
+    .maybeSingle();
+  const row = (data ?? null) as Partial<WiseSetting> | null;
+  return {
+    is_enabled: !!row?.is_enabled,
+    wise_environment: (row?.wise_environment as WiseEnvironment) ?? "sandbox",
+    wise_api_token: row?.wise_api_token ?? null,
+    wise_profile_id: row?.wise_profile_id ?? null,
+    wise_balance_id_eur: row?.wise_balance_id_eur ?? null,
+    wise_beneficiary_name: row?.wise_beneficiary_name ?? null,
+    wise_iban: row?.wise_iban ?? null,
+    wise_bic: row?.wise_bic ?? null,
+    wise_default_payment_url: row?.wise_default_payment_url ?? null,
+    wise_webhook_public_key: row?.wise_webhook_public_key ?? null,
+    wise_last_event_at: row?.wise_last_event_at ?? null,
+    wise_confirmation_mode: row?.wise_confirmation_mode ?? "webhook_and_manual",
+  };
+}
+
+export const getWiseAdminOverview = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .handler(async () => {
+    const setting = await loadSetting();
+    const { data: events } = await db
+      .from("wise_events")
+      .select("id,event_type,match_status,created_at,processed_at,signature_valid,notes")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const { data: payments } = await db
+      .from("wise_payments")
+      .select("id,order_id,external_reference,status,amount_cents,currency,wise_payment_link_url,paid_at,created_at")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    return {
+      setting: maskedSetting(setting),
+      events: events ?? [],
+      payments: payments ?? [],
+      webhookUrl: "/api/public/webhooks/wise",
+      hasEnvToken: !!process.env.WISE_API_TOKEN,
+    };
+  });
+
+const saveSchema = z.object({
+  is_enabled: z.boolean(),
+  wise_environment: z.enum(["sandbox", "live"]),
+  wise_api_token: z.string().trim().min(1).max(500).nullable(),
+  wise_profile_id: z.string().trim().max(60).nullable(),
+  wise_balance_id_eur: z.string().trim().max(60).nullable(),
+  wise_beneficiary_name: z.string().trim().max(120).nullable(),
+  wise_iban: z.string().trim().max(60).nullable(),
+  wise_bic: z.string().trim().max(20).nullable(),
+  wise_default_payment_url: z.string().trim().url().max(500).nullable(),
+  wise_webhook_public_key: z.string().trim().max(4000).nullable(),
+  wise_confirmation_mode: z.enum(["webhook_only", "manual_only", "webhook_and_manual"]),
+});
+
+export const saveWiseSettings = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) => saveSchema.parse(d))
+  .handler(async ({ data }) => {
+    // Preserve existing token if empty submitted
+    const existing = await loadSetting();
+    const tokenToWrite = data.wise_api_token ?? existing.wise_api_token;
+    const { error } = await db
+      .from("integration_settings")
+      .update({
+        is_enabled: data.is_enabled,
+        wise_environment: data.wise_environment,
+        wise_api_token: tokenToWrite,
+        wise_profile_id: data.wise_profile_id,
+        wise_balance_id_eur: data.wise_balance_id_eur,
+        wise_beneficiary_name: data.wise_beneficiary_name,
+        wise_iban: data.wise_iban,
+        wise_bic: data.wise_bic,
+        wise_default_payment_url: data.wise_default_payment_url,
+        wise_webhook_public_key: data.wise_webhook_public_key,
+        wise_confirmation_mode: data.wise_confirmation_mode,
+      })
+      .eq("provider", "wise");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const testWiseConnection = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .handler(async () => {
+    const setting = await loadSetting();
+    const token = tokenFromSettingOrEnv(setting);
+    if (!token) return { ok: false, message: "Token Wise nao configurado." };
+    const client: WiseClientOptions = { token, environment: setting.wise_environment };
+    const res = await listWiseProfiles(client);
+    if (!res.ok) return { ok: false, message: res.error };
+    return {
+      ok: true,
+      message: `Wise OK · ${res.data.length} perfil(s) encontrado(s).`,
+      profiles: res.data.map((p) => ({ id: p.id, type: p.type, name: p.fullName ?? null })),
+    };
+  });
+
+/* ============================================================
+   Internal: called by checkout to mint a Wise payment for an order.
+   ============================================================ */
+
+export async function createWisePaymentForOrder(args: {
+  orderId: string;
+  amountCents: number;
+  currency: string;
+  description: string;
+  customerEmail?: string | null;
+}): Promise<{
+  reference: string;
+  paymentUrl: string | null;
+  manualOnly: boolean;
+  wisePaymentId: string;
+  amountCents: number;
+  currency: string;
+  iban: string | null;
+  bic: string | null;
+  beneficiaryName: string | null;
+}> {
+  if (args.currency !== "EUR") {
+    throw new Error("Wise V1 aceita apenas EUR. Configure o preco em EUR para o serviço.");
+  }
+  const setting = await loadSetting();
+  // Reuse existing payment for this order if pending
+  const { data: existing } = await db
+    .from("wise_payments")
+    .select("*")
+    .eq("order_id", args.orderId)
+    .in("status", ["created", "waiting_payment", "pending_conciliation"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let reference: string;
+  let wisePaymentId = "";
+  let paymentUrl: string | null = null;
+  let raw_request: Record<string, unknown> = {};
+  let raw_response: Record<string, unknown> = {};
+
+  if (existing) {
+    reference = existing.external_reference as string;
+    wisePaymentId = existing.id as string;
+    paymentUrl = (existing.wise_payment_link_url as string | null) ?? null;
+  } else {
+    const refRpc = await db.rpc("wise_next_reference");
+    reference =
+      (refRpc?.data as string | null) ?? `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
+  }
+
+  const token = tokenFromSettingOrEnv(setting);
+  const profileId = setting.wise_profile_id;
+  const manualOnly = setting.wise_confirmation_mode === "manual_only" || !token || !profileId;
+
+  if (!existing && !manualOnly && token && profileId) {
+    const client: WiseClientOptions = { token, environment: setting.wise_environment };
+    const description = (args.description ?? "Instituto Empuria").slice(0, 100);
+    raw_request = {
+      amount: args.amountCents / 100,
+      currency: args.currency,
+      reference: reference.slice(0, 35),
+      description,
+    };
+    const created = await createWisePaymentLink(client, profileId, {
+      amount: args.amountCents / 100,
+      currency: args.currency,
+      reference: reference.slice(0, 35),
+      description,
+      metadata: { order_id: args.orderId, reference },
+    });
+    if (!created.ok) {
+      // Fallback to manual mode rather than blocking the user.
+      raw_response = { error: created.error, body: created.body as unknown };
+    } else {
+      raw_response = created.data as unknown as Record<string, unknown>;
+      paymentUrl =
+        (created.data.paymentUrl as string | undefined) ??
+        (created.data.url as string | undefined) ??
+        null;
+    }
+  }
+
+  if (!existing) {
+    const { data: inserted, error } = await db
+      .from("wise_payments")
+      .insert({
+        order_id: args.orderId,
+        external_reference: reference,
+        status: "waiting_payment",
+        amount_cents: args.amountCents,
+        currency: args.currency,
+        description: args.description,
+        wise_payment_link_id:
+          (raw_response.id as string | undefined) ?? null,
+        wise_payment_link_url: paymentUrl,
+        raw_request,
+        raw_response,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    wisePaymentId = inserted.id as string;
+  }
+
+  // Update order to wise/EUR
+  await db
+    .from("orders")
+    .update({
+      payment_provider: "wise",
+      payment_amount_cents: args.amountCents,
+      payment_currency: args.currency,
+      payment_url: paymentUrl,
+      payment_provider_reference: reference,
+      external_reference: reference,
+      payment_method: "wise",
+    })
+    .eq("id", args.orderId);
+
+  return {
+    reference,
+    paymentUrl: paymentUrl ?? setting.wise_default_payment_url,
+    manualOnly,
+    wisePaymentId,
+    amountCents: args.amountCents,
+    currency: args.currency,
+    iban: setting.wise_iban,
+    bic: setting.wise_bic,
+    beneficiaryName: setting.wise_beneficiary_name,
+  };
+}
+
+/* Public read for /pagar/:token */
+export const getPublicWisePayment = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ token: z.string().min(8).max(120) }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: link } = await db
+      .from("order_payment_links")
+      .select("id,order_id,status,expires_at")
+      .eq("token", data.token)
+      .maybeSingle();
+    if (!link) throw new Error("Link nao encontrado.");
+    if (link.status === "revoked") throw new Error("Link revogado.");
+    if (new Date(link.expires_at).getTime() < Date.now()) throw new Error("Link expirado.");
+    const { data: order } = await db
+      .from("orders")
+      .select(
+        "id,customer_name,service_title,payment_amount_cents,payment_currency,payment_status,payment_url,payment_provider_reference,external_reference",
+      )
+      .eq("id", link.order_id)
+      .maybeSingle();
+    if (!order) throw new Error("Pedido nao encontrado.");
+
+    const { data: payment } = await db
+      .from("wise_payments")
+      .select("status,amount_cents,currency,wise_payment_link_url,external_reference,paid_at")
+      .eq("order_id", order.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const setting = await loadSetting();
+    return {
+      orderId: order.id as string,
+      customerName: order.customer_name as string,
+      serviceTitle: order.service_title as string,
+      reference:
+        (payment?.external_reference as string | undefined) ??
+        (order.payment_provider_reference as string | undefined) ??
+        (order.external_reference as string | undefined) ??
+        `EMP-${order.id}`,
+      amountCents:
+        (payment?.amount_cents as number | undefined) ??
+        (order.payment_amount_cents as number | undefined) ??
+        0,
+      currency:
+        (payment?.currency as string | undefined) ??
+        (order.payment_currency as string | undefined) ??
+        "EUR",
+      paymentUrl:
+        (payment?.wise_payment_link_url as string | null | undefined) ??
+        (order.payment_url as string | null | undefined) ??
+        setting.wise_default_payment_url,
+      paymentStatus: order.payment_status as string,
+      iban: setting.wise_iban,
+      bic: setting.wise_bic,
+      beneficiaryName: setting.wise_beneficiary_name,
+      enabled: setting.is_enabled,
+    };
+  });
+
+/* Polling: re-fetch current status (refreshes wise link if api configured) */
+export const refreshWisePaymentStatus = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ orderId: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: order } = await db
+      .from("orders")
+      .select("id,payment_status")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (!order) throw new Error("Pedido nao encontrado.");
+
+    const { data: payment } = await db
+      .from("wise_payments")
+      .select("id,status,wise_payment_link_id")
+      .eq("order_id", data.orderId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Optional: sync from Wise API
+    if (payment?.wise_payment_link_id) {
+      const setting = await loadSetting();
+      const token = tokenFromSettingOrEnv(setting);
+      if (token && setting.wise_profile_id) {
+        const res = await getWisePaymentLink(
+          { token, environment: setting.wise_environment },
+          setting.wise_profile_id,
+          payment.wise_payment_link_id as string,
+        );
+        if (res.ok) {
+          const status = String(res.data.status ?? "").toLowerCase();
+          if (status === "paid" || status === "claimed" || status === "completed") {
+            await db
+              .from("wise_payments")
+              .update({ status: "paid", paid_at: new Date().toISOString(), raw_webhook: res.data })
+              .eq("id", payment.id);
+            await db
+              .from("orders")
+              .update({ payment_status: "aprovado", paid_at: new Date().toISOString() })
+              .eq("id", data.orderId);
+          }
+        }
+      }
+    }
+
+    const { data: latest } = await db
+      .from("orders")
+      .select("payment_status")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    return {
+      paymentStatus: (latest?.payment_status as string) ?? "pendente",
+      wiseStatus: (payment?.status as string | undefined) ?? "waiting_payment",
+    };
+  });
+
+/* Conciliation: list pending events, match, approve, ignore */
+
+export const listWiseEvents = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z
+      .object({ matchStatus: z.string().optional(), limit: z.number().int().min(1).max(200).optional() })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    let q = db
+      .from("wise_events")
+      .select(
+        "id,event_id,event_type,match_status,signature_valid,payload,matched_payment_id,matched_order_id,processed_at,notes,created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(data.limit ?? 50);
+    if (data.matchStatus) q = q.eq("match_status", data.matchStatus);
+    const { data: rows } = await q;
+    return { events: rows ?? [] };
+  });
+
+export const manuallyMatchWiseEvent = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z
+      .object({
+        eventId: z.string().uuid(),
+        orderId: z.string().uuid(),
+        approve: z.boolean().default(true),
+        notes: z.string().trim().max(500).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: order } = await db.from("orders").select("id,payment_status").eq("id", data.orderId).maybeSingle();
+    if (!order) throw new Error("Pedido nao encontrado.");
+    const { data: payment } = await db
+      .from("wise_payments")
+      .select("id")
+      .eq("order_id", data.orderId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    await db
+      .from("wise_events")
+      .update({
+        match_status: "manual_matched",
+        matched_order_id: data.orderId,
+        matched_payment_id: payment?.id ?? null,
+        processed_at: new Date().toISOString(),
+        notes: data.notes ?? null,
+      })
+      .eq("id", data.eventId);
+    if (data.approve) {
+      if (payment?.id) {
+        await db
+          .from("wise_payments")
+          .update({ status: "paid", paid_at: new Date().toISOString() })
+          .eq("id", payment.id);
+      }
+      await db
+        .from("orders")
+        .update({ payment_status: "aprovado", paid_at: new Date().toISOString() })
+        .eq("id", data.orderId);
+    }
+    await db.from("audit_logs").insert({
+      actor_id: context.userId,
+      module: "financeiro",
+      entity_type: "wise_event",
+      entity_id: data.eventId,
+      action: "wise_event.manually_matched",
+      new_data: { order_id: data.orderId, approve: data.approve, notes: data.notes ?? null },
+    });
+    return { ok: true };
+  });
+
+export const ignoreWiseEvent = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z.object({ eventId: z.string().uuid(), notes: z.string().trim().max(500).optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await db
+      .from("wise_events")
+      .update({
+        match_status: "ignored",
+        processed_at: new Date().toISOString(),
+        notes: data.notes ?? null,
+      })
+      .eq("id", data.eventId);
+    await db.from("audit_logs").insert({
+      actor_id: context.userId,
+      module: "financeiro",
+      entity_type: "wise_event",
+      entity_id: data.eventId,
+      action: "wise_event.ignored",
+    });
+    return { ok: true };
+  });
+
+export const manuallyApproveWisePayment = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z
+      .object({ orderId: z.string().uuid(), reason: z.string().trim().min(10).max(500) })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: payment } = await db
+      .from("wise_payments")
+      .select("id")
+      .eq("order_id", data.orderId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (payment?.id) {
+      await db
+        .from("wise_payments")
+        .update({ status: "paid", paid_at: new Date().toISOString() })
+        .eq("id", payment.id);
+    }
+    await db
+      .from("orders")
+      .update({ payment_status: "aprovado", paid_at: new Date().toISOString() })
+      .eq("id", data.orderId);
+    await db.from("audit_logs").insert({
+      actor_id: context.userId,
+      module: "financeiro",
+      entity_type: "order",
+      entity_id: data.orderId,
+      action: "wise_payment.manually_approved",
+      new_data: { reason: data.reason },
+    });
+    return { ok: true };
+  });
+
+/* Used by the authenticated checkout flow to mint a wise payment. */
+export const createWiseCheckoutPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ orderId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = context.effectiveUserId ?? context.userId;
+    const { data: order } = await db
+      .from("orders")
+      .select("id,user_id,service_title,payment_amount_cents,payment_currency,amount_cents,currency,customer_email")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (!order) throw new Error("Pedido nao encontrado.");
+    if (order.user_id !== userId) throw new Error("Acesso negado.");
+    return createWisePaymentForOrder({
+      orderId: order.id,
+      amountCents: order.payment_amount_cents ?? order.amount_cents,
+      currency: order.payment_currency ?? order.currency ?? "EUR",
+      description: order.service_title,
+      customerEmail: order.customer_email,
+    });
+  });

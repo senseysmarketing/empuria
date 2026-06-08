@@ -51,6 +51,7 @@ import {
   saveUazapiSettings,
   testUazapiConfiguration,
 } from "@/lib/uazapi/uazapi.functions";
+import { WiseIntegrationCard } from "./WiseIntegrationCard";
 
 type IntegrationEvent = {
   id: string;
@@ -403,12 +404,14 @@ export function IntegracoesTab() {
           loading={hublaQ.isLoading}
         />
 
+        <WiseIntegrationCard />
+
         <IntegrationCard
           icon={CreditCard}
           iconClassName="text-sky-600"
           name="Mercado Pago"
-          description="Pix, boleto e cartao no checkout interno"
-          badge={<Badge className={mpStatus.className}>{mpStatus.label}</Badge>}
+          description="Pix, boleto e cartao (BRL) · legado, mantido para pedidos antigos"
+          badge={<Badge variant="outline" className="border-amber-400 text-amber-700">Legado · secundario</Badge>}
           details={[
             ["Status", mpStatus.label],
             [
