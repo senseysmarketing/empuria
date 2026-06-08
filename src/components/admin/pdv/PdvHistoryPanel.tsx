@@ -60,8 +60,8 @@ type PdvSaleDetail = {
 
 const PAGE_SIZE = 25;
 
-function money(cents: number, currency: "EUR" | "BRL") {
-  return new Intl.NumberFormat("pt-BR", {
+function money(cents: number, currency: "EUR" | "BRL" = "EUR") {
+  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", {
     style: "currency",
     currency,
   }).format((cents ?? 0) / 100);
@@ -69,7 +69,7 @@ function money(cents: number, currency: "EUR" | "BRL") {
 
 function dateTime(value: string | null | undefined) {
   if (!value) return "-";
-  return new Intl.DateTimeFormat("pt-BR", {
+  return new Intl.DateTimeFormat("pt-PT", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
