@@ -102,7 +102,7 @@ const updateQtySchema = z.object({
 
 const cancelItemSchema = z.object({
   itemId: z.string().uuid(),
-  reason: z.string().trim().min(3).max(500),
+  reason: z.string().trim().max(500).optional(),
 });
 
 const closeSchema = z.object({
