@@ -53,7 +53,7 @@ export function HomeEventsSection() {
           </Reveal>
           <Reveal delay={200}>
             <p className="font-body italic mt-5 text-brown-deep/75 text-lg">
-              Mais do que serviços, criamos conexões. Confira os próximos encontros na Gran Vía
+              Mais do que serviços, criamos conexões. Confira os próximos encontros na Gran Via, 40
               ou relembre o que já rolou por aqui.
             </p>
           </Reveal>
