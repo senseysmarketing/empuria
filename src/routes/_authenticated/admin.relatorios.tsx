@@ -1039,7 +1039,7 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           )}
         </BentoCard>
         <BentoCard title="Horários de maior venda" className="col-span-12">
-          <HourlySalesChart data={d.hourly} currency={primary} showEur={primary === "BRL" && showEur} />
+          <HourlySalesChart data={d.hourly} currency="EUR" showEur={false} />
         </BentoCard>
       </div>
     </div>
