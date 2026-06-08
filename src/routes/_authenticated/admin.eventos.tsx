@@ -326,10 +326,73 @@ function EventsPage() {
                 Opcional. Tamanho máximo 5 MB. Resolução recomendada: 1600×900 (16:9).
               </p>
             </div>
-            <div className="flex gap-4 items-center">
+
+            <div>
+              <Label>Capa vertical (mobile / destaque vertical)</Label>
+              <input
+                ref={coverVInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => handleCoverVFile(e.target.files?.[0])}
+              />
+              {form.cover_url_vertical ? (
+                <div className="mt-2 relative rounded-lg overflow-hidden border border-admin-border max-w-[220px]">
+                  <img src={form.cover_url_vertical} alt="Capa vertical" className="w-full aspect-[4/5] object-cover" />
+                  <div className="absolute top-2 right-2 flex gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={uploadingCoverV}
+                      onClick={() => coverVInputRef.current?.click()}
+                    >
+                      {uploadingCoverV ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      Trocar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={uploadingCoverV}
+                      onClick={() => setForm({ ...form, cover_url_vertical: "" })}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={uploadingCoverV}
+                  onClick={() => coverVInputRef.current?.click()}
+                  className="mt-2 w-full border-2 border-dashed border-admin-border rounded-lg p-6 flex flex-col items-center justify-center gap-2 hover:border-admin-accent transition-colors disabled:opacity-60"
+                >
+                  {uploadingCoverV ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-admin-accent" />
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-admin-ink-muted" />
+                  )}
+                  <span className="text-sm text-admin-ink">
+                    {uploadingCoverV ? "Enviando..." : "Selecionar imagem vertical"}
+                  </span>
+                </button>
+              )}
+              <p className="text-[11px] text-admin-ink-muted mt-1">
+                Opcional. Usada no mobile e em destaques verticais. Resolução recomendada: 1080×1350 (4:5).
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-4 items-center">
               <div className="flex items-center gap-2"><Switch checked={form.sales_mode === "categorias"} onCheckedChange={(v) => setForm({ ...form, sales_mode: v ? "categorias" : "simples" })} /><Label>Múltiplas categorias</Label></div>
               <div className="flex items-center gap-2"><Switch checked={form.is_published} onCheckedChange={(v) => setForm({ ...form, is_published: v })} /><Label>Publicado</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.is_home_featured} onCheckedChange={(v) => setForm({ ...form, is_home_featured: v })} /><Label>Destacar na home</Label></div>
             </div>
+            {form.is_home_featured && (
+              <p className="text-[11px] text-orange-brand -mt-2">
+                Ao salvar, este será o único evento em destaque na página inicial — qualquer outro destaque atual será substituído.
+              </p>
+            )}
 
             <div className="border-t border-admin-border pt-3">
               <div className="flex justify-between items-center mb-2">
