@@ -169,6 +169,14 @@ function PdvPage() {
         <TabsContent value="historico" className="mt-0">
           <PdvHistoryPanel />
         </TabsContent>
+
+        <TabsContent value="itens" className="mt-0">
+          {canItens ? (
+            <PdvItensTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso ao módulo PDV Itens podem gerenciar este catálogo." />
+          )}
+        </TabsContent>
       </Tabs>
 
       {success !== null && <SaleSuccessOverlay totalBrlCents={success.brl} totalEurCents={success.eur} onReset={reset} />}
