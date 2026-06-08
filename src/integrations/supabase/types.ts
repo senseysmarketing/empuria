@@ -2774,6 +2774,224 @@ export type Database = {
           },
         ]
       }
+      pdv_tab_code_counters: {
+        Row: {
+          day: string
+          last_value: number
+          updated_at: string
+        }
+        Insert: {
+          day: string
+          last_value?: number
+          updated_at?: string
+        }
+        Update: {
+          day?: string
+          last_value?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pdv_tab_items: {
+        Row: {
+          added_by: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          id: string
+          product_emoji_snapshot: string | null
+          product_id: string | null
+          product_name_snapshot: string
+          qty: number
+          tab_id: string
+          total_brl_cents: number
+          total_eur_cents: number
+          unit_price_brl_cents: number
+          unit_price_eur_cents: number
+          updated_at: string
+        }
+        Insert: {
+          added_by: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          id?: string
+          product_emoji_snapshot?: string | null
+          product_id?: string | null
+          product_name_snapshot: string
+          qty: number
+          tab_id: string
+          total_brl_cents?: number
+          total_eur_cents?: number
+          unit_price_brl_cents?: number
+          unit_price_eur_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          added_by?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          id?: string
+          product_emoji_snapshot?: string | null
+          product_id?: string | null
+          product_name_snapshot?: string
+          qty?: number
+          tab_id?: string
+          total_brl_cents?: number
+          total_eur_cents?: number
+          unit_price_brl_cents?: number
+          unit_price_eur_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdv_tab_items_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdv_tab_items_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdv_tab_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdv_tab_items_tab_id_fkey"
+            columns: ["tab_id"]
+            isOneToOne: false
+            referencedRelation: "pdv_tabs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pdv_tabs: {
+        Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          customer_id: string
+          discount_brl_cents: number
+          discount_eur_cents: number
+          discount_type: string
+          discount_value: number
+          id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string
+          sale_id: string | null
+          status: string
+          subtotal_brl_cents: number
+          subtotal_eur_cents: number
+          tab_code: string
+          total_brl_cents: number
+          total_eur_cents: number
+          updated_at: string
+        }
+        Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          customer_id: string
+          discount_brl_cents?: number
+          discount_eur_cents?: number
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by: string
+          sale_id?: string | null
+          status?: string
+          subtotal_brl_cents?: number
+          subtotal_eur_cents?: number
+          tab_code: string
+          total_brl_cents?: number
+          total_eur_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          customer_id?: string
+          discount_brl_cents?: number
+          discount_eur_cents?: number
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string
+          sale_id?: string | null
+          status?: string
+          subtotal_brl_cents?: number
+          subtotal_eur_cents?: number
+          tab_code?: string
+          total_brl_cents?: number
+          total_eur_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdv_tabs_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdv_tabs_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdv_tabs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdv_tabs_opened_by_fkey"
+            columns: ["opened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdv_tabs_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: true
+            referencedRelation: "pdv_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_categories: {
         Row: {
           created_at: string
@@ -2818,6 +3036,8 @@ export type Database = {
           quantity: number
           reason: string | null
           sale_id: string | null
+          tab_id: string | null
+          tab_item_id: string | null
           type: string
         }
         Insert: {
@@ -2830,6 +3050,8 @@ export type Database = {
           quantity: number
           reason?: string | null
           sale_id?: string | null
+          tab_id?: string | null
+          tab_item_id?: string | null
           type: string
         }
         Update: {
@@ -2842,6 +3064,8 @@ export type Database = {
           quantity?: number
           reason?: string | null
           sale_id?: string | null
+          tab_id?: string | null
+          tab_item_id?: string | null
           type?: string
         }
         Relationships: [
@@ -2859,10 +3083,25 @@ export type Database = {
             referencedRelation: "pdv_sales"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_stock_movements_tab_id_fkey"
+            columns: ["tab_id"]
+            isOneToOne: false
+            referencedRelation: "pdv_tabs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_stock_movements_tab_item_id_fkey"
+            columns: ["tab_item_id"]
+            isOneToOne: false
+            referencedRelation: "pdv_tab_items"
+            referencedColumns: ["id"]
+          },
         ]
       }
       products: {
         Row: {
+          available_stock_quantity: number | null
           category: Database["public"]["Enums"]["product_category"]
           category_id: string
           created_at: string
@@ -2875,6 +3114,7 @@ export type Database = {
           price_brl_cents: number
           price_cents: number
           price_eur_cents: number
+          reserved_stock_quantity: number
           slug: string
           stock_min_quantity: number
           stock_quantity: number
@@ -2882,6 +3122,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          available_stock_quantity?: number | null
           category?: Database["public"]["Enums"]["product_category"]
           category_id: string
           created_at?: string
@@ -2894,6 +3135,7 @@ export type Database = {
           price_brl_cents?: number
           price_cents?: number
           price_eur_cents?: number
+          reserved_stock_quantity?: number
           slug: string
           stock_min_quantity?: number
           stock_quantity?: number
@@ -2901,6 +3143,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          available_stock_quantity?: number | null
           category?: Database["public"]["Enums"]["product_category"]
           category_id?: string
           created_at?: string
@@ -2913,6 +3156,7 @@ export type Database = {
           price_brl_cents?: number
           price_cents?: number
           price_eur_cents?: number
+          reserved_stock_quantity?: number
           slug?: string
           stock_min_quantity?: number
           stock_quantity?: number
@@ -3334,6 +3578,23 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      pdv_add_tab_item: {
+        Args: {
+          p_actor_id: string
+          p_product_id: string
+          p_qty: number
+          p_tab_id: string
+        }
+        Returns: string
+      }
+      pdv_cancel_tab: {
+        Args: { p_actor_id: string; p_reason: string; p_tab_id: string }
+        Returns: undefined
+      }
+      pdv_cancel_tab_item: {
+        Args: { p_actor_id: string; p_item_id: string; p_reason: string }
+        Returns: undefined
+      }
       pdv_close_sale: {
         Args: {
           p_cashier_id: string
@@ -3346,7 +3607,27 @@ export type Database = {
         }
         Returns: string
       }
+      pdv_close_tab: {
+        Args: {
+          p_cashier_id: string
+          p_discount_type: string
+          p_discount_value: number
+          p_notes?: string
+          p_payment_method: string
+          p_tab_id: string
+        }
+        Returns: string
+      }
       pdv_next_sale_code: { Args: { p_closed_at?: string }; Returns: string }
+      pdv_next_tab_code: { Args: { p_at?: string }; Returns: string }
+      pdv_open_tab: {
+        Args: { p_customer_id: string; p_notes?: string; p_opened_by: string }
+        Returns: Json
+      }
+      pdv_update_tab_item_qty: {
+        Args: { p_actor_id: string; p_item_id: string; p_qty: number }
+        Returns: undefined
+      }
       pdv_void_sale: {
         Args: { p_admin_id: string; p_reason: string; p_sale_id: string }
         Returns: undefined
