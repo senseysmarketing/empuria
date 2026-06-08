@@ -186,7 +186,8 @@ export function PdvTabsPanel() {
   });
 
   const cancelItemMut = useMutation({
-    mutationFn: () => cancelItem({ data: { itemId: cancelItemTarget!.id, reason } }),
+    mutationFn: ({ itemId, reason }: { itemId: string; reason?: string }) =>
+      cancelItem({ data: { itemId, reason } }),
     onSuccess: () => {
       toast.success("Item removido e reserva liberada.");
       setCancelItemTarget(null);
