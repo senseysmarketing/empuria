@@ -454,9 +454,13 @@ export function PdvTabsPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      disabled={cancelTabMut.isPending}
                       onClick={() => {
                         if (selectedTotals.qty === 0) {
-                          cancelTabMut.mutate({ tabId: selectedTab.id });
+                          cancelTabMut.mutate({
+                            tabId: selectedTab.id,
+                            reason: "Comanda vazia",
+                          });
                           return;
                         }
                         setReason("");
