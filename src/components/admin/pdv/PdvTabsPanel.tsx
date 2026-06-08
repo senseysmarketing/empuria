@@ -222,7 +222,8 @@ export function PdvTabsPanel() {
   });
 
   const cancelTabMut = useMutation({
-    mutationFn: () => cancelTabFn({ data: { tabId: cancelTabTarget!.id, reason } }),
+    mutationFn: ({ tabId, reason: r }: { tabId: string; reason?: string }) =>
+      cancelTabFn({ data: { tabId, reason: r } }),
     onSuccess: () => {
       toast.success("Comanda cancelada e reservas liberadas.");
       setCancelTabTarget(null);
