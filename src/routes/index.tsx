@@ -424,7 +424,9 @@ function HomePage() {
             </Reveal>
             <Reveal delay={300}>
               <a
-                href="/login?redirect=/portal/clube"
+                href="https://pay.hub.la/051PZzfAQ2R68zw9Oy8y"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-8 inline-flex items-center gap-2 bg-orange-brand hover:bg-red-brand text-offwhite px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all hover:shadow-warm hover:-translate-y-0.5"
               >
                 Quero Fazer Parte do Clube <ArrowRight className="w-4 h-4" />

@@ -8,7 +8,7 @@ import { PassportCard } from "@/components/portal/PassportCard";
 import { NextStepWidget } from "@/components/portal/NextStepWidget";
 import { TabWidget } from "@/components/portal/TabWidget";
 import { DashboardSkeleton } from "@/components/portal/PortalSkeleton";
-import { Wallet, CalendarClock, Crown, Receipt, ArrowRight, ShoppingBag } from "lucide-react";
+import { Wallet, CalendarClock, Receipt, ArrowRight, ShoppingBag } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/portal/")({
   component: PortalDashboard,
@@ -65,14 +65,6 @@ function PortalDashboard() {
           value={data.upcomingAppointments.length}
           hint="Agendamentos"
           icon={CalendarClock}
-        />
-        <MetricTile
-          className="col-span-6 lg:col-span-3"
-          label="Clube"
-          value={data.metrics.isClubMember ? "Ativo" : "—"}
-          hint={data.metrics.isClubMember ? "Acesso liberado" : "Não associado"}
-          icon={Crown}
-          accent={data.metrics.isClubMember ? "success" : "neutral"}
         />
         <MetricTile
           className="col-span-6 lg:col-span-3"

@@ -1,11 +1,10 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Home, Crown, Wallet, ShoppingBag, Ticket, LogOut } from "lucide-react";
+import { Home, Wallet, ShoppingBag, Ticket, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import logoIcone from "@/assets/logo-empuria-icone.png";
 
 const items = [
   { to: "/portal", label: "Início", icon: Home, exact: true },
-  { to: "/portal/clube", label: "Clube", icon: Crown },
   { to: "/portal/servicos", label: "Serviços", icon: Wallet },
   { to: "/portal/ingressos", label: "Ingressos", icon: Ticket },
   { to: "/portal/loja", label: "Loja", icon: ShoppingBag },
