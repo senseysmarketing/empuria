@@ -449,12 +449,12 @@ export function CheckoutModal({
             },
           },
         }),
-        fetchMpConfig(),
+        fetchMpConfig().catch(() => null),
       ]);
       setIntent(intentRes);
       setMpConfig(configRes);
       setStep("payment");
-      if (!configRes.enabled) toast.error("Mercado Pago ainda nao esta ativo. Fale com a equipe.");
+      // Wise (EUR) is the primary provider; MP fallback is silent unless EUR price is missing.
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao processar");
     } finally {
