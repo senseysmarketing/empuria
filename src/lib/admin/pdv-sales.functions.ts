@@ -370,7 +370,7 @@ export const listPdvCashiers = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const profiles = await getProfilesByIds((data ?? []).map((row) => row.cashier_id));
     return [...profiles.values()].sort((a, b) =>
-      (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt-BR"),
+      (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt-PT"),
     );
   });
 
