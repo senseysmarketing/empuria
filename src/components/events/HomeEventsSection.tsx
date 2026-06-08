@@ -5,8 +5,7 @@ import { ArrowRight, MapPin, Calendar } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
 import { listHomeEvents } from "@/lib/events/tickets.functions";
 
-const GRAN_VIA_MAPS =
-  "https://www.google.com/maps/search/?api=1&query=Gran+V%C3%ADa+Madrid+Instituto+Empuria";
+const GRAN_VIA_MAPS = "https://maps.app.goo.gl/RCrtChFM8PC1Ycbs7";
 
 type EventRow = {
   id: string;
