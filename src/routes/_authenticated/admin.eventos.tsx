@@ -342,7 +342,7 @@ function EventsPage() {
                 ))}
               </div>
             </div>
-            <Button size="sm" onClick={submit} className="w-full bg-admin-accent hover:bg-admin-accent/90">Salvar</Button>
+            <Button size="sm" onClick={submit} disabled={uploadingCover} className="w-full bg-admin-accent hover:bg-admin-accent/90">{uploadingCover ? "Enviando imagem..." : "Salvar"}</Button>
           </div>
         </DialogContent>
       </Dialog>
