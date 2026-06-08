@@ -292,8 +292,6 @@ function GlobalFiltersBar({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="both">Todas moedas</SelectItem>
-            <SelectItem value="BRL">BRL</SelectItem>
             <SelectItem value="EUR">EUR</SelectItem>
           </SelectContent>
         </Select>
