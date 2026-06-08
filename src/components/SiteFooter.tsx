@@ -16,7 +16,7 @@ export function SiteFooter() {
               A Embaixada Emocional do Brasileiro no Exterior.
             </p>
             <div className="mt-6 font-display text-sm uppercase tracking-widest text-yellow-brand">
-              Gran Vía · Madrid · Espanha
+              Gran Via, 40 · Madrid · Espanha
             </div>
           </div>
 
