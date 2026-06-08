@@ -12,6 +12,7 @@ import { HomeEventsSection } from "@/components/events/HomeEventsSection";
 import { ConsultoriaWizardModal } from "@/components/leads/ConsultoriaWizardModal";
 import { listPublicServices } from "@/lib/services-public.functions";
 import lounge from "@/assets/instituto-lounge.jpg";
+import heroWelcome from "@/assets/hero-welcome-brazil-madrid.jpg.asset.json";
 import barbearia from "@/assets/instituto-barbearia.jpg";
 import bar from "@/assets/instituto-bar.jpg";
 import granvia from "@/assets/gran-via.jpg";
