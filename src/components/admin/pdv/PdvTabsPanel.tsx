@@ -569,10 +569,7 @@ export function PdvTabsPanel() {
                   <Button
                     variant="outline"
                     disabled={isBusy}
-                    onClick={() => {
-                      setReason("Comanda vazia aberta por engano");
-                      setCancelTabTarget(selectedTab);
-                    }}
+                    onClick={() => cancelTabMut.mutate({ tabId: selectedTab.id })}
                     className="h-10 w-full border-red-brand/30 text-red-brand hover:bg-red-brand/10"
                   >
                     Cancelar comanda vazia
