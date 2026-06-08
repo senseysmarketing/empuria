@@ -198,15 +198,19 @@ export function PdvTabsPanel() {
   });
 
   const closeMut = useMutation({
-    mutationFn: () =>
-      closeTab({
+    mutationFn: () => {
+      if (!selectedTabId) {
+        return Promise.reject(new Error("Nenhuma comanda selecionada"));
+      }
+      return closeTab({
         data: {
-          tabId: selectedTabId!,
+          tabId: selectedTabId,
           discount,
           paymentMethod,
           notes: notes || undefined,
         },
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success("Comanda fechada e venda registrada.");
       setCloseDialogOpen(false);
