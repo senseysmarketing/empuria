@@ -117,7 +117,7 @@ const closeSchema = z.object({
 
 const cancelTabSchema = z.object({
   tabId: z.string().uuid(),
-  reason: z.string().trim().min(3).max(500),
+  reason: z.string().trim().max(500).optional(),
 });
 
 async function getProfilesByIds(ids: string[]) {
