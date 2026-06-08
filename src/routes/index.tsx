@@ -149,7 +149,7 @@ function HomePage() {
               </div>
               <div className="absolute -bottom-6 -left-6 bg-offwhite text-brown-deep px-5 py-3 rounded-md shadow-warm">
                 <div className="font-display font-extrabold text-xs uppercase tracking-widest text-orange-brand">
-                  Gran Vía
+                  Gran Via, 40
                 </div>
                 <div className="font-body italic text-sm">Madrid · Espanha</div>
               </div>
