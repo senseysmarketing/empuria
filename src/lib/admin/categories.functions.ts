@@ -31,7 +31,7 @@ export const listCategories = createServerFn({ method: "GET" })
 const categorySchema = z.object({
   name: z.string().trim().min(1).max(80),
   slug: z.string().trim().min(1).max(80).regex(/^[a-z0-9_-]+$/, "Use apenas letras minúsculas, números, - ou _"),
-  emoji: z.string().trim().max(8).nullable().optional(),
+  emoji: z.string().trim().max(32).nullable().optional(),
   position: z.number().int().min(0).max(9999).default(0),
   is_active: z.boolean().default(true),
 });
