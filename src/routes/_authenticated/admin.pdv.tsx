@@ -123,6 +123,14 @@ function PdvPage() {
           >
             <History className="h-4 w-4" /> Historico
           </TabsTrigger>
+          {canItens && (
+            <TabsTrigger
+              value="itens"
+              className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+            >
+              <Package className="h-4 w-4" /> Itens
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="venda" className="mt-0">
