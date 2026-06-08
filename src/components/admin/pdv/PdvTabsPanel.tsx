@@ -840,6 +840,56 @@ export function PdvTabsPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={successInfo !== null}
+        onOpenChange={(open) => {
+          if (!open) setSuccessInfo(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md border-admin-border bg-admin-bg text-admin-ink">
+          <DialogHeader className="items-center text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/40 animate-scale-in">
+              <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+            </div>
+            <DialogTitle className="text-xl font-display mt-2">Venda concluída!</DialogTitle>
+            <DialogDescription className="text-admin-ink-muted">
+              A comanda foi fechada e a venda registrada com sucesso.
+            </DialogDescription>
+          </DialogHeader>
+          {successInfo && (
+            <div className="rounded-lg border border-admin-border bg-admin-bg/60 p-4 space-y-2 text-sm animate-fade-in">
+              <div className="flex justify-between">
+                <span className="text-admin-ink-muted">Comanda</span>
+                <span className="font-mono">{successInfo.tabCode}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-admin-ink-muted">Cliente</span>
+                <span className="text-right">{successInfo.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-admin-ink-muted">Pagamento</span>
+                <span>{PAYMENT_LABEL[successInfo.paymentMethod]}</span>
+              </div>
+              <div className="flex justify-between border-t border-admin-border pt-2">
+                <span className="text-xs uppercase tracking-widest text-admin-ink-muted">Total</span>
+                <span className="font-display text-xl text-admin-accent">
+                  {money(successInfo.totalCents)}
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              className="w-full bg-admin-accent text-white"
+              onClick={() => setSuccessInfo(null)}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
