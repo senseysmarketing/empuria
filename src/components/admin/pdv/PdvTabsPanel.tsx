@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -192,6 +192,7 @@ export function PdvTabsPanel() {
       toast.success("Item removido e reserva liberada.");
       setCancelItemTarget(null);
       setReason("");
+      if (typeof document !== "undefined") document.body.style.pointerEvents = "";
       invalidate();
     },
     onError: (error) =>
@@ -229,11 +230,25 @@ export function PdvTabsPanel() {
       setCancelTabTarget(null);
       setSelectedTabId(null);
       setReason("");
+      if (typeof document !== "undefined") document.body.style.pointerEvents = "";
       invalidate();
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Erro ao cancelar comanda"),
   });
+
+  // Defesa contra bug do Radix que pode deixar pointer-events: none no body
+  useEffect(() => {
+    if (
+      !openCustomerDialog &&
+      !closeDialogOpen &&
+      cancelItemTarget === null &&
+      cancelTabTarget === null &&
+      typeof document !== "undefined"
+    ) {
+      document.body.style.pointerEvents = "";
+    }
+  }, [openCustomerDialog, closeDialogOpen, cancelItemTarget, cancelTabTarget]);
 
   const tabs = useMemo(() => tabsQ.data?.tabs ?? [], [tabsQ.data?.tabs]);
   const permissions = tabsQ.data?.permissions;
@@ -439,9 +454,13 @@ export function PdvTabsPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      disabled={cancelTabMut.isPending}
                       onClick={() => {
                         if (selectedTotals.qty === 0) {
-                          cancelTabMut.mutate({ tabId: selectedTab.id });
+                          cancelTabMut.mutate({
+                            tabId: selectedTab.id,
+                            reason: "Comanda vazia",
+                          });
                           return;
                         }
                         setReason("");
@@ -479,11 +498,14 @@ export function PdvTabsPanel() {
                         </div>
                         {permissions?.canRemoveItem && (
                           <button
-                            disabled={isBusy}
+                            disabled={cancelItemMut.isPending}
                             onClick={() => {
                               const ageMs = Date.now() - new Date(item.created_at).getTime();
                               if (ageMs < 60_000) {
-                                cancelItemMut.mutate({ itemId: item.id });
+                                cancelItemMut.mutate({
+                                  itemId: item.id,
+                                  reason: "Removido pelo operador",
+                                });
                                 return;
                               }
                               setReason("");
@@ -501,7 +523,7 @@ export function PdvTabsPanel() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0"
-                            disabled={item.qty <= 1 || isBusy}
+                            disabled={item.qty <= 1 || qtyMut.isPending}
                             onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty - 1 })}
                           >
                             <Minus className="h-3 w-3" />
@@ -511,7 +533,7 @@ export function PdvTabsPanel() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0"
-                            disabled={isBusy}
+                            disabled={qtyMut.isPending}
                             onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty + 1 })}
                           >
                             <Plus className="h-3 w-3" />
@@ -568,8 +590,13 @@ export function PdvTabsPanel() {
                 {selectedTotals.qty === 0 && canCancelSelectedTab && (
                   <Button
                     variant="outline"
-                    disabled={isBusy}
-                    onClick={() => cancelTabMut.mutate({ tabId: selectedTab.id })}
+                    disabled={cancelTabMut.isPending}
+                    onClick={() =>
+                      cancelTabMut.mutate({
+                        tabId: selectedTab.id,
+                        reason: "Comanda vazia",
+                      })
+                    }
                     className="h-10 w-full border-red-brand/30 text-red-brand hover:bg-red-brand/10"
                   >
                     Cancelar comanda vazia
