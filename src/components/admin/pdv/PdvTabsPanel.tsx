@@ -223,21 +223,17 @@ export function PdvTabsPanel() {
   });
 
   const closeMut = useMutation({
-    mutationFn: () => {
-      if (!selectedTabId) {
-        return Promise.reject(new Error("Nenhuma comanda selecionada"));
-      }
-      return closeTab({
+    mutationFn: (tabId: string) =>
+      closeTab({
         data: {
-          tabId: selectedTabId,
+          tabId,
           discount,
           paymentMethod,
           notes: notes || undefined,
         },
-      });
-    },
-    onSuccess: () => {
-      const tab = tabs.find((t) => t.id === selectedTabId) ?? selectedTab;
+      }),
+    onSuccess: (_data, tabId) => {
+      const tab = tabs.find((t) => t.id === tabId) ?? selectedTab;
       const totalCents = closeTotal.eur;
       if (tab) {
         setSuccessInfo({
