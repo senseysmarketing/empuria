@@ -287,8 +287,7 @@ export function PdvHistoryPanel() {
                   <th className="text-left p-3 font-display">Cliente</th>
                   <th className="text-left p-3 font-display">Operador</th>
                   <th className="text-center p-3 font-display">Itens</th>
-                  <th className="text-right p-3 font-display">Total EUR</th>
-                  <th className="text-right p-3 font-display">Total R$</th>
+                  <th className="text-right p-3 font-display">Total €</th>
                   <th className="text-left p-3 font-display">Pagamento</th>
                   <th className="text-left p-3 font-display">Status</th>
                   <th className="text-right p-3 font-display">Ações</th>
@@ -312,7 +311,6 @@ export function PdvHistoryPanel() {
                     </td>
                     <td className="p-3 text-center tabular-nums">{sale.item_count}</td>
                     <td className="p-3 text-right tabular-nums">{money(sale.total_eur_cents, "EUR")}</td>
-                    <td className="p-3 text-right tabular-nums">{money(sale.total_brl_cents, "BRL")}</td>
                     <td className="p-3 text-admin-ink-soft">{paymentLabel(sale.payment_method)}</td>
                     <td className="p-3">{statusBadge(sale.status)}</td>
                     <td className="p-3 text-right">
