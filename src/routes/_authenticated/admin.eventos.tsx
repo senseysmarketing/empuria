@@ -127,7 +127,7 @@ function EventsPage() {
   };
 
   const submit = async () => {
-    if (uploadingCover) return;
+    if (uploadingCover || uploadingCoverV) return;
     if (!form.title.trim()) { toast.error("Informe o título"); return; }
     if (!form.starts_at) { toast.error("Informe a data de início"); return; }
     try {
