@@ -271,7 +271,7 @@ export const cancelPdvTabItem = createServerFn({ method: "POST" })
     const { error } = await pdvDb.rpc<null>("pdv_cancel_tab_item", {
       p_item_id: data.itemId,
       p_actor_id: context.userId,
-      p_reason: data.reason,
+      p_reason: data.reason && data.reason.length >= 3 ? data.reason : "Removido pelo operador",
     });
     if (error) throw new Error(error.message);
     return { ok: true };
