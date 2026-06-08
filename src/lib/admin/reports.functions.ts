@@ -343,7 +343,7 @@ export const getReportsOverview = createServerFn({ method: "POST" })
     if (current.receivable > 0) {
       alerts.push({
         type: "pending_receivables",
-        message: `Há ${(current.receivable / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} a receber.`,
+        message: `Há ${(current.receivable / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })} a receber.`,
         severity: "warn",
       });
     }
