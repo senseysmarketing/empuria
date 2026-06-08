@@ -15,6 +15,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, Copy, CreditCard, FileText, Loader2, QrCode, RotateCcw } from "lucide-react";
+import { WisePaymentPanel } from "@/components/payments/WisePaymentPanel";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 
@@ -249,6 +250,12 @@ export function CheckoutModal({
     reference: string;
     amountCents: number;
     currency: string;
+    provider?: "wise" | "mercadopago";
+    paymentUrl?: string | null;
+    iban?: string | null;
+    bic?: string | null;
+    beneficiaryName?: string | null;
+    manualOnly?: boolean;
   } | null>(null);
   const [mpConfig, setMpConfig] = useState<{
     enabled: boolean;
@@ -754,7 +761,43 @@ export function CheckoutModal({
           </div>
         )}
 
-        {step === "payment" && intent && (
+        {step === "payment" && intent && intent.provider === "wise" && (
+          <div className="space-y-4">
+            <WisePaymentPanel
+              orderId={intent.orderId}
+              amountCents={intent.amountCents}
+              currency={intent.currency}
+              reference={intent.reference}
+              paymentUrl={intent.paymentUrl ?? null}
+              iban={intent.iban ?? null}
+              bic={intent.bic ?? null}
+              beneficiaryName={intent.beneficiaryName ?? null}
+              onApproved={() => {
+                setStep("done");
+                setTimeout(() => {
+                  onOpenChange(false);
+                  navigate({ to: "/portal" });
+                }, 1200);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (service) clearPendingPix(service.slug);
+                setPayment(null);
+                setIntent(null);
+                setQrUrl(null);
+                setStep("data");
+              }}
+              className="inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-brown-deep/50 hover:text-orange-brand transition-colors"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Iniciar novo pedido
+            </button>
+          </div>
+        )}
+
+        {step === "payment" && intent && intent.provider !== "wise" && (
           <div className="space-y-4">
             <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
               <div className="flex justify-between gap-3">
