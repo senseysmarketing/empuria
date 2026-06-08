@@ -95,8 +95,29 @@ export const upsertEvent = createServerFn({ method: "POST" })
   .inputValidator((d) => eventSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { tiers, id, ...eventData } = data;
+
+    // Ensure unique slug: generate from title if empty, then suffix -2, -3… on collision
+    const base =
+      eventData.slug && eventData.slug.length >= 2
+        ? eventData.slug
+        : slugify(eventData.title);
+    let finalSlug = base;
+    for (let i = 0; i < 200; i++) {
+      const candidate = i === 0 ? base : `${base}-${i + 1}`;
+      const { data: clash } = await context.supabase
+        .from("events")
+        .select("id")
+        .eq("slug", candidate)
+        .maybeSingle();
+      if (!clash || (id && clash.id === id)) {
+        finalSlug = candidate;
+        break;
+      }
+    }
+
     const payload = {
       ...eventData,
+      slug: finalSlug,
       cover_url: eventData.cover_url || null,
       ends_at: eventData.ends_at || null,
       description: eventData.description || null,
