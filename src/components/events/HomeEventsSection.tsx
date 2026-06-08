@@ -122,7 +122,7 @@ export function HomeEventsSection() {
                 </h3>
                 <p className="font-body mt-6 text-offwhite/80 text-lg leading-relaxed">
                   Nossa equipe está preparando a próxima grande experiência para a comunidade.
-                  Enquanto a data não sai, as portas da Gran Vía seguem abertas. Venha tomar um
+                  Enquanto a data não sai, as portas da Gran Via, 40 seguem abertas. Venha tomar um
                   café, jogar uma partida de videogame e bater um papo conosco hoje mesmo.
                 </p>
                 <a
