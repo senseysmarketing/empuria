@@ -85,6 +85,10 @@ const openSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
+const customerTabsSchema = z.object({
+  customerId: z.string().uuid(),
+});
+
 const addItemSchema = z.object({
   tabId: z.string().uuid(),
   productId: z.string().uuid(),
@@ -127,6 +131,60 @@ async function getProfilesByIds(ids: string[]) {
   return new Map((data ?? []).map((profile) => [profile.id, profile as PdvTabProfile]));
 }
 
+async function hydratePdvTabs(tabs: PdvTabRecord[], context: { isAdmin: boolean; userId: string }) {
+  const tabIds = tabs.map((tab) => tab.id);
+
+  const { data: itemsRaw, error: itemsError } = tabIds.length
+    ? await pdvDb
+        .from<PdvTabItemRecord[]>("pdv_tab_items")
+        .select("*")
+        .in("tab_id", tabIds)
+        .order("created_at", { ascending: true })
+    : { data: [], error: null };
+  if (itemsError) throw new Error(itemsError.message);
+
+  const items = (itemsRaw ?? []) as PdvTabItemRecord[];
+  const profileIds = tabs
+    .flatMap((tab) => [tab.customer_id, tab.opened_by])
+    .concat(items.map((item) => item.added_by));
+  const profiles = await getProfilesByIds(profileIds);
+
+  const itemsByTab = new Map<
+    string,
+    Array<PdvTabItemRecord & { added_by_profile: PdvTabProfile | null }>
+  >();
+  for (const item of items) {
+    const bucket = itemsByTab.get(item.tab_id) ?? [];
+    bucket.push({ ...item, added_by_profile: profiles.get(item.added_by) ?? null });
+    itemsByTab.set(item.tab_id, bucket);
+  }
+
+  const [canRemoveItem, canCancelTab] = context.isAdmin
+    ? [true, true]
+    : await Promise.all([
+        userHasAction(context.userId, "pdv.remove_tab_item"),
+        userHasAction(context.userId, "pdv.cancel_tab"),
+      ]);
+
+  return {
+    tabs: tabs.map((tab) => ({
+      ...tab,
+      customer: profiles.get(tab.customer_id) ?? null,
+      opened_by_profile: profiles.get(tab.opened_by) ?? null,
+      items: itemsByTab.get(tab.id) ?? [],
+    })),
+    permissions: {
+      canOpenTabs: true,
+      canAddItems: true,
+      canUpdateItemQty: true,
+      canCloseTabs: true,
+      canRemoveItem,
+      canCancelTab,
+      canCancelEmptyTab: true,
+    },
+  };
+}
+
 export const listPdvTabsWorkspace = createServerFn({ method: "GET" })
   .middleware([requireModule("pdv")])
   .handler(async ({ context }) => {
@@ -138,53 +196,22 @@ export const listPdvTabsWorkspace = createServerFn({ method: "GET" })
     if (tabsError) throw new Error(tabsError.message);
 
     const tabs = (tabsRaw ?? []) as PdvTabRecord[];
-    const tabIds = tabs.map((tab) => tab.id);
+    return hydratePdvTabs(tabs, context);
+  });
 
-    const { data: itemsRaw, error: itemsError } = tabIds.length
-      ? await pdvDb
-          .from<PdvTabItemRecord[]>("pdv_tab_items")
-          .select("*")
-          .in("tab_id", tabIds)
-          .order("created_at", { ascending: true })
-      : { data: [], error: null };
-    if (itemsError) throw new Error(itemsError.message);
+export const listOpenPdvTabsForCustomer = createServerFn({ method: "POST" })
+  .middleware([requireModule("pdv")])
+  .inputValidator((data) => customerTabsSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { data: tabsRaw, error: tabsError } = await pdvDb
+      .from<PdvTabRecord[]>("pdv_tabs")
+      .select("*")
+      .eq("customer_id", data.customerId)
+      .eq("status", "aberta")
+      .order("opened_at", { ascending: false });
+    if (tabsError) throw new Error(tabsError.message);
 
-    const items = (itemsRaw ?? []) as PdvTabItemRecord[];
-    const profileIds = tabs.flatMap((tab) => [tab.customer_id, tab.opened_by]).concat(
-      items.map((item) => item.added_by),
-    );
-    const profiles = await getProfilesByIds(profileIds);
-
-    const itemsByTab = new Map<string, Array<PdvTabItemRecord & { added_by_profile: PdvTabProfile | null }>>();
-    for (const item of items) {
-      const bucket = itemsByTab.get(item.tab_id) ?? [];
-      bucket.push({ ...item, added_by_profile: profiles.get(item.added_by) ?? null });
-      itemsByTab.set(item.tab_id, bucket);
-    }
-
-    const [canRemoveItem, canCancelTab] = context.isAdmin
-      ? [true, true]
-      : await Promise.all([
-          userHasAction(context.userId, "pdv.remove_tab_item"),
-          userHasAction(context.userId, "pdv.cancel_tab"),
-        ]);
-
-    return {
-      tabs: tabs.map((tab) => ({
-        ...tab,
-        customer: profiles.get(tab.customer_id) ?? null,
-        opened_by_profile: profiles.get(tab.opened_by) ?? null,
-        items: itemsByTab.get(tab.id) ?? [],
-      })),
-      permissions: {
-        canOpenTabs: true,
-        canAddItems: true,
-        canUpdateItemQty: true,
-        canCloseTabs: true,
-        canRemoveItem,
-        canCancelTab,
-      },
-    };
+    return hydratePdvTabs((tabsRaw ?? []) as PdvTabRecord[], context);
   });
 
 export const openPdvTab = createServerFn({ method: "POST" })
@@ -271,9 +298,20 @@ export const cancelPdvTab = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => cancelTabSchema.parse(data))
   .handler(async ({ data, context }) => {
+    let allowed = context.isAdmin;
     if (!context.isAdmin) {
-      const allowed = await userHasAction(context.userId, "pdv.cancel_tab");
-      if (!allowed) throw new Error("Sem permissao para cancelar comandas.");
+      allowed = await userHasAction(context.userId, "pdv.cancel_tab");
+      if (!allowed) {
+        const { data: activeItemsRaw, error: itemsError } = await pdvDb
+          .from<PdvTabItemRecord[]>("pdv_tab_items")
+          .select("id")
+          .eq("tab_id", data.tabId)
+          .eq("cancelled_at", null)
+          .order("created_at", { ascending: true });
+        if (itemsError) throw new Error(itemsError.message);
+        allowed = ((activeItemsRaw ?? []) as PdvTabItemRecord[]).length === 0;
+      }
+      if (!allowed) throw new Error("Sem permissao para cancelar comandas com itens.");
     }
     const { error } = await pdvDb.rpc<null>("pdv_cancel_tab", {
       p_tab_id: data.tabId,

@@ -39,7 +39,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomerSearchPanel, type PdvCustomer } from "./CustomerSearchPanel";
 import { SaleCatalogGrid, type PdvCatalogItem } from "./SaleCatalogGrid";
@@ -245,7 +251,12 @@ export function PdvTabsPanel() {
 
   const selectedTab =
     tabs.find((tab) => tab.id === selectedTabId) ?? filteredTabs[0] ?? tabs[0] ?? null;
-  const selectedTotals = selectedTab ? tabTotals(selectedTab) : { brl: 0, eur: 0, qty: 0, lines: 0 };
+  const selectedTotals = selectedTab
+    ? tabTotals(selectedTab)
+    : { brl: 0, eur: 0, qty: 0, lines: 0 };
+  const canCancelSelectedTab = Boolean(
+    permissions?.canCancelTab || (permissions?.canCancelEmptyTab && selectedTotals.qty === 0),
+  );
   const discountCents = useMemo(() => {
     if (discount.type === "amount") {
       const amount = Math.round(discount.value * 100);
@@ -286,7 +297,10 @@ export function PdvTabsPanel() {
               Consumo presencial com reserva de estoque em tempo real.
             </p>
           </div>
-          <Button onClick={() => setOpenCustomerDialog(true)} className="bg-admin-accent text-white">
+          <Button
+            onClick={() => setOpenCustomerDialog(true)}
+            className="bg-admin-accent text-white"
+          >
             <UserPlus className="h-4 w-4" />
             Nova comanda
           </Button>
@@ -390,7 +404,9 @@ export function PdvTabsPanel() {
                   Cada clique salva o item e reserva estoque imediatamente.
                 </p>
               </div>
-              {catalogQ.isFetching && <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />}
+              {catalogQ.isFetching && (
+                <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />
+              )}
             </div>
             <SaleCatalogGrid
               items={(catalogQ.data ?? []) as unknown as PdvCatalogItem[]}
@@ -417,7 +433,7 @@ export function PdvTabsPanel() {
                       {selectedTab.customer?.phone ?? "Sem telefone"}
                     </p>
                   </div>
-                  {permissions?.canCancelTab && (
+                  {canCancelSelectedTab && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -440,7 +456,10 @@ export function PdvTabsPanel() {
                   </p>
                 ) : (
                   activeItems(selectedTab).map((item) => (
-                    <div key={item.id} className="group rounded-lg border border-admin-border bg-admin-surface-2 p-3">
+                    <div
+                      key={item.id}
+                      className="group rounded-lg border border-admin-border bg-admin-surface-2 p-3"
+                    >
                       <div className="flex items-start gap-2">
                         <span className="text-xl">{item.product_emoji_snapshot ?? "•"}</span>
                         <div className="min-w-0 flex-1">
@@ -448,7 +467,8 @@ export function PdvTabsPanel() {
                             {item.product_name_snapshot}
                           </p>
                           <p className="text-[11px] text-admin-ink-muted">
-                            {item.added_by_profile?.full_name ?? "Equipe"} · {shortTime(item.created_at)}
+                            {item.added_by_profile?.full_name ?? "Equipe"} ·{" "}
+                            {shortTime(item.created_at)}
                           </p>
                         </div>
                         {permissions?.canRemoveItem && (
@@ -533,6 +553,19 @@ export function PdvTabsPanel() {
                 >
                   Fechar comanda
                 </Button>
+                {selectedTotals.qty === 0 && canCancelSelectedTab && (
+                  <Button
+                    variant="outline"
+                    disabled={isBusy}
+                    onClick={() => {
+                      setReason("Comanda vazia aberta por engano");
+                      setCancelTabTarget(selectedTab);
+                    }}
+                    className="h-10 w-full border-red-brand/30 text-red-brand hover:bg-red-brand/10"
+                  >
+                    Cancelar comanda vazia
+                  </Button>
+                )}
               </div>
             </div>
           </BentoCard>
@@ -543,7 +576,9 @@ export function PdvTabsPanel() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Nova comanda</DialogTitle>
-            <DialogDescription>Selecione ou cadastre o cliente presente no atendimento.</DialogDescription>
+            <DialogDescription>
+              Selecione ou cadastre o cliente presente no atendimento.
+            </DialogDescription>
           </DialogHeader>
           <CustomerSearchPanel
             title="Selecionar cliente"
@@ -553,12 +588,16 @@ export function PdvTabsPanel() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={closeDialogOpen} onOpenChange={(open) => !isBusy && setCloseDialogOpen(open)}>
+      <AlertDialog
+        open={closeDialogOpen}
+        onOpenChange={(open) => !isBusy && setCloseDialogOpen(open)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Fechar comanda</AlertDialogTitle>
             <AlertDialogDescription>
-              O fechamento cria uma venda definitiva, baixa estoque fisico e envia o registro ao financeiro.
+              O fechamento cria uma venda definitiva, baixa estoque fisico e envia o registro ao
+              financeiro.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4">
@@ -646,8 +685,12 @@ export function PdvTabsPanel() {
                 </div>
               )}
               <div className="flex justify-between border-t border-admin-border pt-2">
-                <span className="text-xs uppercase tracking-widest text-admin-ink-muted">Total</span>
-                <span className="font-display text-xl text-admin-accent">{money(closeTotal.brl)}</span>
+                <span className="text-xs uppercase tracking-widest text-admin-ink-muted">
+                  Total
+                </span>
+                <span className="font-display text-xl text-admin-accent">
+                  {money(closeTotal.brl)}
+                </span>
               </div>
             </div>
           </div>
