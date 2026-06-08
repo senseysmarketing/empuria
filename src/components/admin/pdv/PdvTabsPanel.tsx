@@ -190,8 +190,6 @@ export function PdvTabsPanel() {
       cancelItem({ data: { itemId, reason } }),
     onSuccess: () => {
       toast.success("Item removido e reserva liberada.");
-      setCancelItemTarget(null);
-      setReason("");
       if (typeof document !== "undefined") document.body.style.pointerEvents = "";
       invalidate();
     },
