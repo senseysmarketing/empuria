@@ -2088,6 +2088,17 @@ export type Database = {
           updated_at: string
           webhook_secret: string | null
           whatsapp_group_url: string | null
+          wise_api_token: string | null
+          wise_balance_id_eur: string | null
+          wise_beneficiary_name: string | null
+          wise_bic: string | null
+          wise_confirmation_mode: string | null
+          wise_default_payment_url: string | null
+          wise_environment: string | null
+          wise_iban: string | null
+          wise_last_event_at: string | null
+          wise_profile_id: string | null
+          wise_webhook_public_key: string | null
         }
         Insert: {
           access_token?: string | null
@@ -2118,6 +2129,17 @@ export type Database = {
           updated_at?: string
           webhook_secret?: string | null
           whatsapp_group_url?: string | null
+          wise_api_token?: string | null
+          wise_balance_id_eur?: string | null
+          wise_beneficiary_name?: string | null
+          wise_bic?: string | null
+          wise_confirmation_mode?: string | null
+          wise_default_payment_url?: string | null
+          wise_environment?: string | null
+          wise_iban?: string | null
+          wise_last_event_at?: string | null
+          wise_profile_id?: string | null
+          wise_webhook_public_key?: string | null
         }
         Update: {
           access_token?: string | null
@@ -2148,6 +2170,17 @@ export type Database = {
           updated_at?: string
           webhook_secret?: string | null
           whatsapp_group_url?: string | null
+          wise_api_token?: string | null
+          wise_balance_id_eur?: string | null
+          wise_beneficiary_name?: string | null
+          wise_bic?: string | null
+          wise_confirmation_mode?: string | null
+          wise_default_payment_url?: string | null
+          wise_environment?: string | null
+          wise_iban?: string | null
+          wise_last_event_at?: string | null
+          wise_profile_id?: string | null
+          wise_webhook_public_key?: string | null
         }
         Relationships: []
       }
@@ -3538,6 +3571,134 @@ export type Database = {
         }
         Relationships: []
       }
+      wise_events: {
+        Row: {
+          created_at: string
+          event_id: string | null
+          event_type: string
+          id: string
+          match_status: string
+          matched_order_id: string | null
+          matched_payment_id: string | null
+          notes: string | null
+          payload: Json
+          processed_at: string | null
+          signature_valid: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_id?: string | null
+          event_type: string
+          id?: string
+          match_status?: string
+          matched_order_id?: string | null
+          matched_payment_id?: string | null
+          notes?: string | null
+          payload: Json
+          processed_at?: string | null
+          signature_valid?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          match_status?: string
+          matched_order_id?: string | null
+          matched_payment_id?: string | null
+          notes?: string | null
+          payload?: Json
+          processed_at?: string | null
+          signature_valid?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wise_events_matched_order_id_fkey"
+            columns: ["matched_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wise_events_matched_payment_id_fkey"
+            columns: ["matched_payment_id"]
+            isOneToOne: false
+            referencedRelation: "wise_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wise_payments: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          description: string | null
+          external_reference: string
+          id: string
+          order_id: string
+          paid_at: string | null
+          raw_request: Json | null
+          raw_response: Json | null
+          raw_webhook: Json | null
+          status: string
+          updated_at: string
+          wise_balance_credit_id: string | null
+          wise_payment_link_id: string | null
+          wise_payment_link_url: string | null
+          wise_transfer_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          external_reference: string
+          id?: string
+          order_id: string
+          paid_at?: string | null
+          raw_request?: Json | null
+          raw_response?: Json | null
+          raw_webhook?: Json | null
+          status?: string
+          updated_at?: string
+          wise_balance_credit_id?: string | null
+          wise_payment_link_id?: string | null
+          wise_payment_link_url?: string | null
+          wise_transfer_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          external_reference?: string
+          id?: string
+          order_id?: string
+          paid_at?: string | null
+          raw_request?: Json | null
+          raw_response?: Json | null
+          raw_webhook?: Json | null
+          status?: string
+          updated_at?: string
+          wise_balance_credit_id?: string | null
+          wise_payment_link_id?: string | null
+          wise_payment_link_url?: string | null
+          wise_transfer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wise_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -3632,6 +3793,7 @@ export type Database = {
         Args: { p_admin_id: string; p_reason: string; p_sale_id: string }
         Returns: undefined
       }
+      wise_next_reference: { Args: never; Returns: string }
     }
     Enums: {
       activity_type:
