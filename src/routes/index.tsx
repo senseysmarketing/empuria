@@ -146,7 +146,7 @@ function HomePage() {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-sunset opacity-30 blur-3xl rounded-full" />
               <div className="relative aspect-[3/4] rounded-2xl overflow-hidden border-2 border-yellow-brand/30 shadow-warm">
-                <img src={lounge} alt="Lounge Empuria" className="w-full h-full object-cover" />
+                <img src={heroWelcome.url} alt="Welcome Brazil Madrid — Lounge do Instituto Empuria na Gran Via, 40" className="w-full h-full object-cover" />
               </div>
               <div className="absolute -bottom-6 -left-6 bg-offwhite text-brown-deep px-5 py-3 rounded-md shadow-warm">
                 <div className="font-display font-extrabold text-xs uppercase tracking-widest text-orange-brand">
