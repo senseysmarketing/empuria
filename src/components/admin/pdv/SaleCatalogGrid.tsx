@@ -50,19 +50,26 @@ export function SaleCatalogGrid({
               const available = p.available_stock_quantity ?? Math.max(0, p.stock_quantity - (p.reserved_stock_quantity ?? 0));
               const outOfStock = p.track_stock && available <= 0;
               const low = p.track_stock && available > 0 && available <= p.stock_min_quantity;
+              const isBusy = pendingProductId !== null;
+              const isLoadingThis = pendingProductId === p.id;
               return (
                 <button
                   key={p.id}
-                  onClick={() => !outOfStock && onAdd(p)}
-                  disabled={outOfStock}
+                  onClick={() => !outOfStock && !isBusy && onAdd(p)}
+                  disabled={outOfStock || isBusy}
                   className={cn(
                     "relative bg-admin-surface-2 hover:bg-admin-accent/10 border border-admin-border hover:border-admin-accent rounded-xl p-3 text-left transition-all group",
-                    outOfStock && "opacity-40 cursor-not-allowed"
+                    outOfStock && "opacity-40 cursor-not-allowed",
+                    isBusy && !isLoadingThis && "opacity-60 cursor-not-allowed",
                   )}
                 >
                   <div className="flex items-start justify-between mb-1">
                     <span className="text-2xl">{p.emoji ?? (p.item_type === "servico" ? "🧰" : "📦")}</span>
-                    <Plus className="h-4 w-4 text-admin-ink-muted group-hover:text-admin-accent" />
+                    {isLoadingThis ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />
+                    ) : (
+                      <Plus className="h-4 w-4 text-admin-ink-muted group-hover:text-admin-accent" />
+                    )}
                   </div>
                   <div className="font-display text-sm text-admin-ink truncate">{p.name}</div>
                   <div className="text-xs text-admin-accent mt-1 tabular-nums font-display">R$ {(p.price_brl_cents / 100).toFixed(2)}</div>
