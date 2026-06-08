@@ -139,7 +139,7 @@ export function SaleCartPanel({
               <SelectTrigger className="bg-admin-bg border-admin-border h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Sem</SelectItem>
-                <SelectItem value="amount">R$</SelectItem>
+                <SelectItem value="amount">€</SelectItem>
                 <SelectItem value="percent">%</SelectItem>
               </SelectContent>
             </Select>
