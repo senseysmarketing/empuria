@@ -14,7 +14,7 @@ const tierSchema = z.object({
 
 const eventSchema = z.object({
   id: z.string().uuid().optional(),
-  slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/, "slug inválido"),
+  slug: z.string().trim().max(120).regex(/^[a-z0-9-]*$/, "slug inválido").optional().or(z.literal("")),
   title: z.string().trim().min(2).max(160),
   description: z.string().max(8000).optional().nullable(),
   starts_at: z.string(),
@@ -28,6 +28,18 @@ const eventSchema = z.object({
   is_published: z.boolean().default(false),
   tiers: z.array(tierSchema).min(1).max(20),
 });
+
+function slugify(input: string): string {
+  return (
+    input
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 100) || `evento-${Date.now().toString(36)}`
+  );
+}
 
 export const listEventsAdmin = createServerFn({ method: "GET" })
   .middleware([requireStaff])
