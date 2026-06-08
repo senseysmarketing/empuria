@@ -130,7 +130,9 @@ function HomePage() {
                   Ver Nossos Serviços <ArrowRight className="w-4 h-4" />
                 </a>
                 <a
-                  href="#instituto"
+                  href="https://maps.app.goo.gl/RCrtChFM8PC1Ycbs7"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 border border-yellow-brand/60 text-yellow-brand hover:bg-yellow-brand hover:text-brown px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all"
                 >
                   Conhecer o Instituto Físico
