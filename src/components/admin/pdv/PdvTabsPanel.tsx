@@ -424,10 +424,26 @@ export function PdvTabsPanel() {
             </div>
             <SaleCatalogGrid
               items={(catalogQ.data ?? []) as unknown as PdvCatalogItem[]}
+              pendingProductId={
+                addMut.isPending
+                  ? addMut.variables?.id ?? null
+                  : qtyMut.isPending
+                    ? activeItems(selectedTab).find(
+                        (it) => it.id === qtyMut.variables?.itemId,
+                      )?.product_id ?? null
+                    : null
+              }
               onAdd={(item) => {
                 if (isBusy) return;
                 setSelectedTabId(selectedTab.id);
-                addMut.mutate(item);
+                const existing = activeItems(selectedTab).find(
+                  (it) => it.product_id === item.id,
+                );
+                if (existing) {
+                  qtyMut.mutate({ itemId: existing.id, qty: existing.qty + 1 });
+                } else {
+                  addMut.mutate(item);
+                }
               }}
             />
           </BentoCard>
