@@ -130,7 +130,7 @@ export function PdvTabsPanel() {
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [openCustomerDialog, setOpenCustomerDialog] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
-  const [cancelItemTarget, setCancelItemTarget] = useState<PdvTabItemRecord | null>(null);
+  
   const [cancelTabTarget, setCancelTabTarget] = useState<PdvTabWithRelations | null>(null);
   const [reason, setReason] = useState("");
   const [discount, setDiscount] = useState<DiscountState>({ type: "none", value: 0 });
@@ -190,8 +190,6 @@ export function PdvTabsPanel() {
       cancelItem({ data: { itemId, reason } }),
     onSuccess: () => {
       toast.success("Item removido e reserva liberada.");
-      setCancelItemTarget(null);
-      setReason("");
       if (typeof document !== "undefined") document.body.style.pointerEvents = "";
       invalidate();
     },
@@ -242,13 +240,12 @@ export function PdvTabsPanel() {
     if (
       !openCustomerDialog &&
       !closeDialogOpen &&
-      cancelItemTarget === null &&
       cancelTabTarget === null &&
       typeof document !== "undefined"
     ) {
       document.body.style.pointerEvents = "";
     }
-  }, [openCustomerDialog, closeDialogOpen, cancelItemTarget, cancelTabTarget]);
+  }, [openCustomerDialog, closeDialogOpen, cancelTabTarget]);
 
   const tabs = useMemo(() => tabsQ.data?.tabs ?? [], [tabsQ.data?.tabs]);
   const permissions = tabsQ.data?.permissions;
@@ -487,18 +484,12 @@ export function PdvTabsPanel() {
                     >
                       <button
                         disabled={cancelItemMut.isPending}
-                        onClick={() => {
-                          const ageMs = Date.now() - new Date(item.created_at).getTime();
-                          if (ageMs < 60_000) {
-                            cancelItemMut.mutate({
-                              itemId: item.id,
-                              reason: "Removido pelo operador",
-                            });
-                            return;
-                          }
-                          setReason("");
-                          setCancelItemTarget(item);
-                        }}
+                        onClick={() =>
+                          cancelItemMut.mutate({
+                            itemId: item.id,
+                            reason: "Removido pelo operador",
+                          })
+                        }
                         className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-admin-ink-muted hover:bg-red-brand/10 hover:text-red-brand disabled:opacity-50"
                         aria-label="Remover item"
                       >
@@ -745,45 +736,6 @@ export function PdvTabsPanel() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={cancelItemTarget !== null}
-        onOpenChange={(open) => {
-          if (!open && !isBusy) {
-            setCancelItemTarget(null);
-            setReason("");
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover item da comanda</AlertDialogTitle>
-            <AlertDialogDescription>
-              A reserva de estoque sera liberada e o item ficara registrado em auditoria.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Textarea
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            className="bg-admin-bg border-admin-border"
-            placeholder="Motivo da remocao..."
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isBusy}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isBusy || reason.trim().length < 3}
-              onClick={(event) => {
-                event.preventDefault();
-                if (cancelItemTarget) {
-                  cancelItemMut.mutate({ itemId: cancelItemTarget.id, reason });
-                }
-              }}
-              className="bg-red-brand text-white"
-            >
-              Remover item
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog
         open={cancelTabTarget !== null}
