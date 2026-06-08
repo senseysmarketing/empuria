@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Wine, History, ShoppingCart, Package, ReceiptText } from "lucide-react";
+import { Wine, History, Package, ReceiptText } from "lucide-react";
 import { PdvHistoryPanel } from "@/components/admin/pdv/PdvHistoryPanel";
-import { PdvSalePanel } from "@/components/admin/pdv/PdvSalePanel";
 import { PdvTabsPanel } from "@/components/admin/pdv/PdvTabsPanel";
 import { PdvItensTab } from "@/components/admin/configuracoes/PdvItensTab";
 import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
@@ -14,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/admin/pdv")({
 });
 
 function PdvPage() {
-  const [tab, setTab] = useState("venda");
+  const [tab, setTab] = useState("comandas");
   const { can, isAdmin } = useModuleAccess();
   const canItens = isAdmin || can("pdv_itens");
 
@@ -27,19 +26,13 @@ function PdvPage() {
         <div>
           <h1 className="font-display text-4xl font-bold tracking-tight">PDV Empuria</h1>
           <p className="text-admin-ink-muted text-sm mt-1">
-            Caixa de balcão · Barbearia · Instituto
+            Comandas · Caixa · Instituto
           </p>
         </div>
       </header>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="bg-admin-surface border border-admin-border">
-          <TabsTrigger
-            value="venda"
-            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
-          >
-            <ShoppingCart className="h-4 w-4" /> Venda
-          </TabsTrigger>
           <TabsTrigger
             value="comandas"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
@@ -62,16 +55,12 @@ function PdvPage() {
           )}
         </TabsList>
 
-        <TabsContent value="venda" className="mt-0">
-          <PdvSalePanel />
+        <TabsContent value="comandas" className="mt-0">
+          <PdvTabsPanel />
         </TabsContent>
 
         <TabsContent value="historico" className="mt-0">
           <PdvHistoryPanel />
-        </TabsContent>
-
-        <TabsContent value="comandas" className="mt-0">
-          <PdvTabsPanel />
         </TabsContent>
 
         <TabsContent value="itens" className="mt-0">

@@ -186,7 +186,8 @@ export function PdvTabsPanel() {
   });
 
   const cancelItemMut = useMutation({
-    mutationFn: () => cancelItem({ data: { itemId: cancelItemTarget!.id, reason } }),
+    mutationFn: ({ itemId, reason }: { itemId: string; reason?: string }) =>
+      cancelItem({ data: { itemId, reason } }),
     onSuccess: () => {
       toast.success("Item removido e reserva liberada.");
       setCancelItemTarget(null);
@@ -221,7 +222,8 @@ export function PdvTabsPanel() {
   });
 
   const cancelTabMut = useMutation({
-    mutationFn: () => cancelTabFn({ data: { tabId: cancelTabTarget!.id, reason } }),
+    mutationFn: ({ tabId, reason: r }: { tabId: string; reason?: string }) =>
+      cancelTabFn({ data: { tabId, reason: r } }),
     onSuccess: () => {
       toast.success("Comanda cancelada e reservas liberadas.");
       setCancelTabTarget(null);
@@ -438,6 +440,10 @@ export function PdvTabsPanel() {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
+                        if (selectedTotals.qty === 0) {
+                          cancelTabMut.mutate({ tabId: selectedTab.id });
+                          return;
+                        }
                         setReason("");
                         setCancelTabTarget(selectedTab);
                       }}
@@ -473,11 +479,17 @@ export function PdvTabsPanel() {
                         </div>
                         {permissions?.canRemoveItem && (
                           <button
+                            disabled={isBusy}
                             onClick={() => {
+                              const ageMs = Date.now() - new Date(item.created_at).getTime();
+                              if (ageMs < 60_000) {
+                                cancelItemMut.mutate({ itemId: item.id });
+                                return;
+                              }
                               setReason("");
                               setCancelItemTarget(item);
                             }}
-                            className="text-admin-ink-muted hover:text-red-brand"
+                            className="text-admin-ink-muted hover:text-red-brand disabled:opacity-50"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -557,10 +569,7 @@ export function PdvTabsPanel() {
                   <Button
                     variant="outline"
                     disabled={isBusy}
-                    onClick={() => {
-                      setReason("Comanda vazia aberta por engano");
-                      setCancelTabTarget(selectedTab);
-                    }}
+                    onClick={() => cancelTabMut.mutate({ tabId: selectedTab.id })}
                     className="h-10 w-full border-red-brand/30 text-red-brand hover:bg-red-brand/10"
                   >
                     Cancelar comanda vazia
@@ -738,7 +747,9 @@ export function PdvTabsPanel() {
               disabled={isBusy || reason.trim().length < 3}
               onClick={(event) => {
                 event.preventDefault();
-                cancelItemMut.mutate();
+                if (cancelItemTarget) {
+                  cancelItemMut.mutate({ itemId: cancelItemTarget.id, reason });
+                }
               }}
               className="bg-red-brand text-white"
             >
@@ -776,7 +787,9 @@ export function PdvTabsPanel() {
               disabled={isBusy || reason.trim().length < 3}
               onClick={(event) => {
                 event.preventDefault();
-                cancelTabMut.mutate();
+                if (cancelTabTarget) {
+                  cancelTabMut.mutate({ tabId: cancelTabTarget.id, reason });
+                }
               }}
               className="bg-red-brand text-white"
             >

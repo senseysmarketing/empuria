@@ -102,7 +102,7 @@ const updateQtySchema = z.object({
 
 const cancelItemSchema = z.object({
   itemId: z.string().uuid(),
-  reason: z.string().trim().min(3).max(500),
+  reason: z.string().trim().max(500).optional(),
 });
 
 const closeSchema = z.object({
@@ -117,7 +117,7 @@ const closeSchema = z.object({
 
 const cancelTabSchema = z.object({
   tabId: z.string().uuid(),
-  reason: z.string().trim().min(3).max(500),
+  reason: z.string().trim().max(500).optional(),
 });
 
 async function getProfilesByIds(ids: string[]) {
@@ -271,7 +271,7 @@ export const cancelPdvTabItem = createServerFn({ method: "POST" })
     const { error } = await pdvDb.rpc<null>("pdv_cancel_tab_item", {
       p_item_id: data.itemId,
       p_actor_id: context.userId,
-      p_reason: data.reason,
+      p_reason: data.reason && data.reason.length >= 3 ? data.reason : "Removido pelo operador",
     });
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -302,21 +302,20 @@ export const cancelPdvTab = createServerFn({ method: "POST" })
     if (!context.isAdmin) {
       allowed = await userHasAction(context.userId, "pdv.cancel_tab");
       if (!allowed) {
-        const { data: activeItemsRaw, error: itemsError } = await pdvDb
-          .from<PdvTabItemRecord[]>("pdv_tab_items")
+        const { data: activeItemsRaw, error: itemsError } = await supabaseAdmin
+          .from("pdv_tab_items")
           .select("id")
           .eq("tab_id", data.tabId)
-          .eq("cancelled_at", null)
-          .order("created_at", { ascending: true });
+          .is("cancelled_at", null);
         if (itemsError) throw new Error(itemsError.message);
-        allowed = ((activeItemsRaw ?? []) as PdvTabItemRecord[]).length === 0;
+        allowed = (activeItemsRaw ?? []).length === 0;
       }
       if (!allowed) throw new Error("Sem permissao para cancelar comandas com itens.");
     }
     const { error } = await pdvDb.rpc<null>("pdv_cancel_tab", {
       p_tab_id: data.tabId,
       p_actor_id: context.userId,
-      p_reason: data.reason,
+      p_reason: data.reason && data.reason.length >= 3 ? data.reason : "Comanda cancelada pelo operador",
     });
     if (error) throw new Error(error.message);
     return { ok: true };
