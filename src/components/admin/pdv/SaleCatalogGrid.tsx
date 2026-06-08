@@ -72,10 +72,7 @@ export function SaleCatalogGrid({
                     )}
                   </div>
                   <div className="font-display text-sm text-admin-ink truncate">{p.name}</div>
-                  <div className="text-xs text-admin-accent mt-1 tabular-nums font-display">R$ {(p.price_brl_cents / 100).toFixed(2)}</div>
-                  {p.price_eur_cents > 0 && (
-                    <div className="text-[10px] text-admin-ink-muted tabular-nums">€ {(p.price_eur_cents / 100).toFixed(2)}</div>
-                  )}
+                  <div className="text-xs text-admin-accent mt-1 tabular-nums font-display">€ {(p.price_eur_cents / 100).toFixed(2)}</div>
                   {p.track_stock && (
                     <div className={cn(
                       "text-[10px] mt-1 font-display tracking-wider uppercase flex items-center gap-1",
