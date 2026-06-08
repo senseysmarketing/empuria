@@ -180,9 +180,9 @@ export function HomeEventsSection() {
           }
 
           const gridCols =
-            others.length === 1 ? "md:grid-cols-1 md:max-w-md md:mx-auto"
-            : others.length === 2 ? "md:grid-cols-2"
-            : "md:grid-cols-2 lg:grid-cols-3";
+            others.length === 1 ? "md:grid-cols-1 md:max-w-[280px] md:mx-auto"
+            : others.length === 2 ? "md:grid-cols-2 md:max-w-3xl md:mx-auto"
+            : "md:grid-cols-2 lg:grid-cols-3 lg:max-w-5xl lg:mx-auto";
 
           const renderCard = (ev: EventRow, i: number) => {
             const { day, month } = formatTag(ev.starts_at);
@@ -206,23 +206,23 @@ export function HomeEventsSection() {
                       <div className="absolute inset-0 bg-gradient-to-br from-brown to-brown-deep" />
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-brown via-brown/20 to-transparent" />
-                    <div className="absolute top-4 left-4 bg-yellow-brand text-brown rounded-lg px-3 py-2 text-center shadow-warm">
-                      <div className="font-display font-extrabold text-2xl leading-none">{day}</div>
-                      <div className="font-display font-semibold text-[10px] tracking-widest mt-0.5">{month}</div>
+                    <div className="absolute top-3 left-3 bg-yellow-brand text-brown rounded-md px-2.5 py-1.5 text-center shadow-warm">
+                      <div className="font-display font-extrabold text-lg leading-none">{day}</div>
+                      <div className="font-display font-semibold text-[9px] tracking-widest mt-0.5">{month}</div>
                     </div>
                   </div>
-                  <div className="p-5">
-                    <h3 className="font-display font-extrabold text-xl uppercase leading-tight">
+                  <div className="p-4">
+                    <h3 className="font-display font-extrabold text-base uppercase leading-tight line-clamp-2">
                       {ev.title}
                     </h3>
                     {ev.location_address && (
-                      <div className="mt-2 flex items-start gap-2 text-offwhite/70 text-sm font-body">
-                        <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-yellow-brand" />
-                        <span className="line-clamp-2">{ev.location_address}</span>
+                      <div className="mt-1.5 flex items-start gap-1.5 text-offwhite/70 text-xs font-body">
+                        <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-yellow-brand" />
+                        <span className="line-clamp-1">{ev.location_address}</span>
                       </div>
                     )}
-                    <div className="mt-5 inline-flex items-center gap-2 bg-orange-brand text-offwhite px-5 py-3 rounded-md font-display font-bold text-xs uppercase tracking-widest group-hover:bg-yellow-brand group-hover:text-brown transition-colors">
-                      Ver Detalhes e Ingressos <ArrowRight className="w-4 h-4" />
+                    <div className="mt-4 inline-flex items-center gap-1.5 bg-orange-brand text-offwhite px-3.5 py-2 rounded-md font-display font-bold text-[11px] uppercase tracking-widest group-hover:bg-yellow-brand group-hover:text-brown transition-colors">
+                      Ver Detalhes <ArrowRight className="w-3.5 h-3.5" />
                     </div>
                   </div>
                 </Link>
