@@ -21,10 +21,14 @@ export function CustomerSearchPanel({
   onSelect,
   title = "Nova venda",
   subtitle = "Comece buscando ou cadastrando o cliente.",
+  isSubmitting = false,
+  selectedId = null,
 }: {
   onSelect: (c: PdvCustomer) => void;
   title?: string;
   subtitle?: string;
+  isSubmitting?: boolean;
+  selectedId?: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
