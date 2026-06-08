@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import confetti from "canvas-confetti";
 import {
   Banknote,
+  CheckCircle2,
   Clock,
   CreditCard,
   Loader2,
