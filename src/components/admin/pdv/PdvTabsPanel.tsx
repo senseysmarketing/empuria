@@ -557,13 +557,8 @@ export function PdvTabsPanel() {
                         </div>
                         <div className="text-right">
                           <div className="font-display text-sm text-admin-ink tabular-nums">
-                            {money(item.total_brl_cents)}
+                            {money(item.total_eur_cents)}
                           </div>
-                          {item.total_eur_cents > 0 && (
-                            <div className="text-[11px] text-admin-ink-muted tabular-nums">
-                              {money(item.total_eur_cents, "EUR")}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
