@@ -111,12 +111,6 @@ function ConfiguracoesPage() {
             <Tags className="h-4 w-4" /> Serviços &amp; Preços
           </TabsTrigger>
           <TabsTrigger
-            value="pdv-itens"
-            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
-          >
-            <ShoppingCart className="h-4 w-4" /> PDV Itens
-          </TabsTrigger>
-          <TabsTrigger
             value="automacoes"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
