@@ -119,7 +119,7 @@ export function SaleCartPanel({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm font-display tabular-nums text-admin-ink">R$ {((l.qty * l.item.price_brl_cents) / 100).toFixed(2)}</div>
+              <div className="text-sm font-display tabular-nums text-admin-ink">€ {((l.qty * l.item.price_eur_cents) / 100).toFixed(2)}</div>
             </div>
             <button onClick={() => remove(l.item.id)} className="text-admin-ink-muted hover:text-red-brand opacity-0 group-hover:opacity-100">
               <Trash2 className="h-3.5 w-3.5" />
