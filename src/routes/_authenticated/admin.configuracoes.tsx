@@ -3,12 +3,11 @@ import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Settings, User, Plug, Users, ShoppingCart, Zap, FileText, Tags, Crown } from "lucide-react";
+import { Settings, User, Plug, Users, Zap, FileText, Tags, Crown } from "lucide-react";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import { PerfilContaTab } from "@/components/admin/configuracoes/PerfilContaTab";
 import { IntegracoesTab } from "@/components/admin/configuracoes/IntegracoesTab";
 import { EquipePermissoesTab } from "@/components/admin/configuracoes/EquipePermissoesTab";
-import { PdvItensTab } from "@/components/admin/configuracoes/PdvItensTab";
 import { ServicosPrecosTab } from "@/components/admin/configuracoes/ServicosPrecosTab";
 import { AutomacoesPanel } from "@/components/admin/AutomacoesPanel";
 import { LogsAuditoriaTab } from "@/components/admin/configuracoes/LogsAuditoriaTab";
@@ -21,7 +20,6 @@ const TABS = [
   "equipe",
   "clube",
   "servicos-precos",
-  "pdv-itens",
   "automacoes",
   "logs",
 ] as const;
