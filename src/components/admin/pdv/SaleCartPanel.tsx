@@ -81,7 +81,7 @@ export function SaleCartPanel({
 
   const remove = (id: string) => setCart(cart.filter((l) => l.item.id !== id));
 
-  const cantPay = cart.length === 0 || closing || total.brl === 0;
+  const cantPay = cart.length === 0 || closing;
 
   return (
     <div className="flex flex-col h-full">

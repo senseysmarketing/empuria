@@ -36,7 +36,7 @@ const itemSchema = z.object({
   price_eur_cents: z.number().int().min(0).max(10_000_000).default(0),
   price_brl_cents: z.number().int().min(0).max(10_000_000).default(0),
   category_id: z.string().uuid(),
-  emoji: z.string().trim().max(8).nullable().optional(),
+  emoji: z.string().trim().max(32).nullable().optional(),
   is_active: z.boolean().default(true),
   position: z.number().int().min(0).max(9999).default(0),
   item_type: z.enum(["produto", "servico"]).default("produto"),

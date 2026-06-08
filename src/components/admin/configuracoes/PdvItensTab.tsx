@@ -135,7 +135,7 @@ export function PdvItensTab() {
     try {
       await update({ data: { id: item.id, is_active: v } });
       qc.invalidateQueries({ queryKey: ["pdv-itens"] });
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) { console.error("[PdvItensTab] toggleActive", e); toast.error(e instanceof Error ? e.message : "Erro"); }
   };
 
   const save = async () => {
@@ -168,7 +168,7 @@ export function PdvItensTab() {
       toast.success(editing ? "Item atualizado" : "Item criado");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["pdv-itens"] });
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) { console.error("[PdvItensTab] save", e); toast.error(e instanceof Error ? e.message : "Erro"); }
     finally { setSaving(false); }
   };
 
@@ -178,7 +178,7 @@ export function PdvItensTab() {
       await remove({ data: { id: item.id } });
       toast.success("Item removido");
       qc.invalidateQueries({ queryKey: ["pdv-itens"] });
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) { console.error("[PdvItensTab] del", e); toast.error(e instanceof Error ? e.message : "Erro"); }
   };
 
   return (
