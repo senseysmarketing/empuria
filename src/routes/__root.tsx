@@ -84,6 +84,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Instituto Empuria" },
       { name: "twitter:description", content: "Imigracao Brasileira" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/8aVyRqk1eFa43KWFr6pmmKR81FI3/social-images/social-1780923463552-LogoCompleta.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/8aVyRqk1eFa43KWFr6pmmKR81FI3/social-images/social-1780923463552-LogoCompleta.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
