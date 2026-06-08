@@ -747,7 +747,9 @@ export function PdvTabsPanel() {
               disabled={isBusy || reason.trim().length < 3}
               onClick={(event) => {
                 event.preventDefault();
-                cancelItemMut.mutate();
+                if (cancelItemTarget) {
+                  cancelItemMut.mutate({ itemId: cancelItemTarget.id, reason });
+                }
               }}
               className="bg-red-brand text-white"
             >
