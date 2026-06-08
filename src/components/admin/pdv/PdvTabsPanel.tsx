@@ -424,10 +424,26 @@ export function PdvTabsPanel() {
             </div>
             <SaleCatalogGrid
               items={(catalogQ.data ?? []) as unknown as PdvCatalogItem[]}
+              pendingProductId={
+                addMut.isPending
+                  ? addMut.variables?.id ?? null
+                  : qtyMut.isPending
+                    ? activeItems(selectedTab).find(
+                        (it) => it.id === qtyMut.variables?.itemId,
+                      )?.product_id ?? null
+                    : null
+              }
               onAdd={(item) => {
                 if (isBusy) return;
                 setSelectedTabId(selectedTab.id);
-                addMut.mutate(item);
+                const existing = activeItems(selectedTab).find(
+                  (it) => it.product_id === item.id,
+                );
+                if (existing) {
+                  qtyMut.mutate({ itemId: existing.id, qty: existing.qty + 1 });
+                } else {
+                  addMut.mutate(item);
+                }
               }}
             />
           </BentoCard>
@@ -477,13 +493,18 @@ export function PdvTabsPanel() {
                     Adicione itens do catalogo para montar a comanda.
                   </p>
                 ) : (
-                  activeItems(selectedTab).map((item) => (
+                  activeItems(selectedTab).map((item) => {
+                    const isRemoving =
+                      cancelItemMut.isPending && cancelItemMut.variables?.itemId === item.id;
+                    const isUpdatingQty =
+                      qtyMut.isPending && qtyMut.variables?.itemId === item.id;
+                    return (
                     <div
                       key={item.id}
                       className="group relative rounded-lg border border-admin-border bg-admin-surface-2 p-3"
                     >
                       <button
-                        disabled={cancelItemMut.isPending}
+                        disabled={isBusy}
                         onClick={() =>
                           cancelItemMut.mutate({
                             itemId: item.id,
@@ -493,7 +514,11 @@ export function PdvTabsPanel() {
                         className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-admin-ink-muted hover:bg-red-brand/10 hover:text-red-brand disabled:opacity-50"
                         aria-label="Remover item"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        {isRemoving ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
                       </button>
                       <div className="flex items-start gap-2 pr-7">
                         <span className="text-xl">{item.product_emoji_snapshot ?? "•"}</span>
@@ -513,17 +538,23 @@ export function PdvTabsPanel() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0"
-                            disabled={item.qty <= 1 || qtyMut.isPending}
+                            disabled={item.qty <= 1 || isBusy}
                             onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty - 1 })}
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="w-7 text-center text-xs tabular-nums">{item.qty}</span>
+                          <span className="w-7 text-center text-xs tabular-nums inline-flex items-center justify-center">
+                            {isUpdatingQty ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-admin-accent" />
+                            ) : (
+                              item.qty
+                            )}
+                          </span>
                           <Button
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0"
-                            disabled={qtyMut.isPending}
+                            disabled={isBusy}
                             onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty + 1 })}
                           >
                             <Plus className="h-3 w-3" />
@@ -541,7 +572,8 @@ export function PdvTabsPanel() {
                         </div>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
