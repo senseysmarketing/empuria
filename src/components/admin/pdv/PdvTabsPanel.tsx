@@ -221,13 +221,23 @@ export function PdvTabsPanel() {
       });
     },
     onSuccess: () => {
-      toast.success("Comanda fechada e venda registrada.");
+      const tab = tabs.find((t) => t.id === selectedTabId) ?? selectedTab;
+      const totalCents = closeTotal.eur;
+      if (tab) {
+        setSuccessInfo({
+          tabCode: tab.tab_code,
+          customerName: tab.customer?.full_name ?? "Cliente sem nome",
+          totalCents,
+          paymentMethod,
+        });
+      }
       setCloseDialogOpen(false);
       setSelectedTabId(null);
       setDiscount({ type: "none", value: 0 });
       setPaymentMethod("pix");
       setNotes("");
       invalidate();
+      fireConfetti();
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Erro ao fechar comanda"),
