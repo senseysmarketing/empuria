@@ -526,10 +526,8 @@ function SaleDetailsContent({
               <TableRow className="border-admin-border hover:bg-transparent">
                 <TableHead>Item</TableHead>
                 <TableHead className="text-center">Qtd</TableHead>
-                <TableHead className="text-right">Unit EUR</TableHead>
-                <TableHead className="text-right">Unit R$</TableHead>
-                <TableHead className="text-right">Total EUR</TableHead>
-                <TableHead className="text-right">Total R$</TableHead>
+                <TableHead className="text-right">Unit €</TableHead>
+                <TableHead className="text-right">Total €</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -544,13 +542,7 @@ function SaleDetailsContent({
                     {money(item.unit_price_eur_cents, "EUR")}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {money(item.unit_price_brl_cents, "BRL")}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
                     {money(item.total_eur_cents, "EUR")}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {money(item.total_brl_cents, "BRL")}
                   </TableCell>
                 </TableRow>
               ))}
