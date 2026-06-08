@@ -81,12 +81,14 @@ export function CustomerSearchPanel({
             </Button>
           </div>
         ) : (
-          results.map((c) => (
+          results.map((c) => {
+            const isLoadingThis = isSubmitting && selectedId === c.id;
+            return (
             <button
               key={c.id}
-              onClick={() => !c.is_blocked && onSelect(c)}
-              disabled={c.is_blocked}
-              className="w-full flex items-center gap-3 p-4 hover:bg-admin-surface-2 transition-colors text-left disabled:opacity-50"
+              onClick={() => !c.is_blocked && !isSubmitting && onSelect(c)}
+              disabled={c.is_blocked || isSubmitting}
+              className="w-full flex items-center gap-3 p-4 hover:bg-admin-surface-2 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Avatar className="h-10 w-10">
                 <AvatarImage src={c.avatar_url ?? undefined} />
@@ -100,18 +102,25 @@ export function CustomerSearchPanel({
                 </div>
                 <div className="text-xs text-admin-ink-muted truncate">{c.phone ?? "—"}</div>
               </div>
-              {c.is_club_member && (
-                <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-brand text-brown-deep font-display">
-                  Clube
-                </span>
-              )}
-              {c.is_blocked && (
-                <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-display">
-                  Bloqueado
-                </span>
+              {isLoadingThis ? (
+                <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />
+              ) : (
+                <>
+                  {c.is_club_member && (
+                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-brand text-brown-deep font-display">
+                      Clube
+                    </span>
+                  )}
+                  {c.is_blocked && (
+                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-display">
+                      Bloqueado
+                    </span>
+                  )}
+                </>
               )}
             </button>
-          ))
+            );
+          })
         )}
       </div>
 
