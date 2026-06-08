@@ -119,12 +119,15 @@ function EventsPage() {
   };
 
   const submit = async () => {
+    if (uploadingCover) return;
+    if (!form.title.trim()) { toast.error("Informe o título"); return; }
+    if (!form.starts_at) { toast.error("Informe a data de início"); return; }
     try {
       await save({
         data: {
           ...form,
-          starts_at: new Date(form.starts_at).toISOString(),
-          ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
+          starts_at: fromLocalInput(form.starts_at),
+          ends_at: form.ends_at ? fromLocalInput(form.ends_at) : null,
         },
       });
       toast.success("Evento salvo");
@@ -132,6 +135,36 @@ function EventsPage() {
       qc.invalidateQueries({ queryKey: ["admin-events"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
+    }
+  };
+
+  const handleCoverFile = async (file: File | undefined | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem");
+      return;
+    }
+    if (file.size > COVER_MAX_BYTES) {
+      toast.error("Imagem maior que 5 MB. Reduza o arquivo e tente novamente.");
+      return;
+    }
+    setUploadingCover(true);
+    try {
+      const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]+/g, "");
+      const safeExt = ext.length > 0 && ext.length <= 5 ? ext : "jpg";
+      const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
+      const { error: upErr } = await supabase.storage
+        .from("event-covers")
+        .upload(path, file, { cacheControl: "31536000", upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("event-covers").getPublicUrl(path);
+      setForm((f) => ({ ...f, cover_url: pub.publicUrl }));
+      toast.success("Imagem enviada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao enviar imagem");
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
     }
   };
 
