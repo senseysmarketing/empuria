@@ -5,8 +5,7 @@ import { ArrowRight, MapPin, Calendar } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
 import { listHomeEvents } from "@/lib/events/tickets.functions";
 
-const GRAN_VIA_MAPS =
-  "https://www.google.com/maps/search/?api=1&query=Gran+V%C3%ADa+Madrid+Instituto+Empuria";
+const GRAN_VIA_MAPS = "https://maps.app.goo.gl/RCrtChFM8PC1Ycbs7";
 
 type EventRow = {
   id: string;
@@ -54,7 +53,7 @@ export function HomeEventsSection() {
           </Reveal>
           <Reveal delay={200}>
             <p className="font-body italic mt-5 text-brown-deep/75 text-lg">
-              Mais do que serviços, criamos conexões. Confira os próximos encontros na Gran Vía
+              Mais do que serviços, criamos conexões. Confira os próximos encontros na Gran Via, 40
               ou relembre o que já rolou por aqui.
             </p>
           </Reveal>
@@ -123,7 +122,7 @@ export function HomeEventsSection() {
                 </h3>
                 <p className="font-body mt-6 text-offwhite/80 text-lg leading-relaxed">
                   Nossa equipe está preparando a próxima grande experiência para a comunidade.
-                  Enquanto a data não sai, as portas da Gran Vía seguem abertas. Venha tomar um
+                  Enquanto a data não sai, as portas da Gran Via, 40 seguem abertas. Venha tomar um
                   café, jogar uma partida de videogame e bater um papo conosco hoje mesmo.
                 </p>
                 <a

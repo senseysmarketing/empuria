@@ -34,10 +34,10 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "O primeiro instituto de imigração brasileiro do mundo. Na Gran Vía, em Madrid. Recepção no aeroporto, consultoria imigratória, espaço físico de acolhimento e mais.",
+          "O primeiro instituto de imigração brasileiro do mundo. Na Gran Via, 40, em Madrid. Recepção no aeroporto, consultoria imigratória, espaço físico de acolhimento e mais.",
       },
       { property: "og:title", content: "Instituto Empuria — A Casa do Brasileiro em Madrid" },
-      { property: "og:description", content: "Nenhum brasileiro está sozinho. Gran Vía, Madrid." },
+      { property: "og:description", content: "Nenhum brasileiro está sozinho. Gran Via, 40 · Madrid." },
     ],
   }),
   component: HomePage,
@@ -130,7 +130,9 @@ function HomePage() {
                   Ver Nossos Serviços <ArrowRight className="w-4 h-4" />
                 </a>
                 <a
-                  href="#instituto"
+                  href="https://maps.app.goo.gl/RCrtChFM8PC1Ycbs7"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 border border-yellow-brand/60 text-yellow-brand hover:bg-yellow-brand hover:text-brown px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all"
                 >
                   Conhecer o Instituto Físico
@@ -147,7 +149,7 @@ function HomePage() {
               </div>
               <div className="absolute -bottom-6 -left-6 bg-offwhite text-brown-deep px-5 py-3 rounded-md shadow-warm">
                 <div className="font-display font-extrabold text-xs uppercase tracking-widest text-orange-brand">
-                  Gran Vía
+                  Gran Via, 40
                 </div>
                 <div className="font-body italic text-sm">Madrid · Espanha</div>
               </div>
@@ -250,7 +252,7 @@ function HomePage() {
             </Reveal>
             <Reveal delay={200}>
               <p className="font-body italic text-xl mt-6 text-offwhite/90">
-                Seu primeiro destino oficial em Madrid é na Gran Vía.
+                Seu primeiro destino oficial em Madrid é na Gran Via, 40.
               </p>
             </Reveal>
             <Reveal delay={300}>
@@ -276,7 +278,9 @@ function HomePage() {
             </ul>
             <Reveal delay={750}>
               <a
-                href="#"
+                href="https://maps.app.goo.gl/RCrtChFM8PC1Ycbs7"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-10 inline-flex items-center gap-2 bg-orange-brand hover:bg-yellow-brand hover:text-brown text-offwhite px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all hover:shadow-warm"
               >
                 Quero Visitar o Instituto <ArrowRight className="w-4 h-4" />

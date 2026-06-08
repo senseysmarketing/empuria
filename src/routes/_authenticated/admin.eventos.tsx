@@ -209,7 +209,7 @@ function EventsPage() {
               <div><Label>Início</Label><Input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></div>
               <div><Label>Fim (opcional)</Label><Input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></div>
             </div>
-            <div><Label>Endereço</Label><Input value={form.location_address} onChange={(e) => setForm({ ...form, location_address: e.target.value })} placeholder="Gran Vía 32, Madrid" /></div>
+            <div><Label>Endereço</Label><Input value={form.location_address} onChange={(e) => setForm({ ...form, location_address: e.target.value })} placeholder="Gran Via, 40, Madrid" /></div>
             <div><Label>URL da capa (imagem)</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://..." /></div>
             <div className="flex gap-4 items-center">
               <div className="flex items-center gap-2"><Switch checked={form.sales_mode === "categorias"} onCheckedChange={(v) => setForm({ ...form, sales_mode: v ? "categorias" : "simples" })} /><Label>Múltiplas categorias</Label></div>
