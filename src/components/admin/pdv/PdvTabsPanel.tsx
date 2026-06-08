@@ -192,6 +192,7 @@ export function PdvTabsPanel() {
       toast.success("Item removido e reserva liberada.");
       setCancelItemTarget(null);
       setReason("");
+      if (typeof document !== "undefined") document.body.style.pointerEvents = "";
       invalidate();
     },
     onError: (error) =>
