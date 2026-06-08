@@ -420,17 +420,7 @@ export function PdvItensTab() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Preço em R$ (Real)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={(form.price_brl_cents / 100).toFixed(2)}
-                  onChange={(e) => setForm({ ...form, price_brl_cents: Math.round(parseFloat(e.target.value || "0") * 100) })}
-                  className="bg-admin-bg border-admin-border"
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-3">
               <div className="space-y-1.5">
                 <Label>Preço em € (Euro)</Label>
                 <Input
