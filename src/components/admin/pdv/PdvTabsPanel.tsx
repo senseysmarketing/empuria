@@ -487,18 +487,12 @@ export function PdvTabsPanel() {
                     >
                       <button
                         disabled={cancelItemMut.isPending}
-                        onClick={() => {
-                          const ageMs = Date.now() - new Date(item.created_at).getTime();
-                          if (ageMs < 60_000) {
-                            cancelItemMut.mutate({
-                              itemId: item.id,
-                              reason: "Removido pelo operador",
-                            });
-                            return;
-                          }
-                          setReason("");
-                          setCancelItemTarget(item);
-                        }}
+                        onClick={() =>
+                          cancelItemMut.mutate({
+                            itemId: item.id,
+                            reason: "Removido pelo operador",
+                          })
+                        }
                         className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-admin-ink-muted hover:bg-red-brand/10 hover:text-red-brand disabled:opacity-50"
                         aria-label="Remover item"
                       >
