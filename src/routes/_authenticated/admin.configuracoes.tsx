@@ -1,6 +1,7 @@
-import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch, useRouter } from "@tanstack/react-router";
 import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Settings, User, Plug, Users, ShoppingCart, Zap, FileText, Tags, Crown } from "lucide-react";
 import { useModuleAccess } from "@/hooks/use-module-access";
@@ -34,7 +35,27 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authenticated/admin/configuracoes")({
   validateSearch: zodValidator(searchSchema),
   component: ConfiguracoesPage,
+  errorComponent: ConfiguracoesErrorBoundary,
 });
+
+function ConfiguracoesErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  console.error("[ConfiguracoesPage] render error", error);
+  return (
+    <div className="max-w-2xl mx-auto mt-12 p-6 rounded-xl border border-admin-border bg-admin-surface text-admin-ink space-y-3">
+      <h2 className="font-display text-2xl">Algo deu errado nesta aba</h2>
+      <p className="text-sm text-admin-ink-muted">
+        Ocorreu um erro ao renderizar Configurações. Detalhes técnicos:
+      </p>
+      <pre className="text-xs bg-admin-bg p-3 rounded overflow-auto max-h-48 whitespace-pre-wrap">
+        {error?.message ?? String(error)}
+      </pre>
+      <Button onClick={() => { router.invalidate(); reset(); }} className="bg-admin-accent text-white">
+        Tentar novamente
+      </Button>
+    </div>
+  );
+}
 
 function ConfiguracoesPage() {
   const { tab } = useSearch({ from: "/_authenticated/admin/configuracoes" });
