@@ -590,8 +590,13 @@ export function PdvTabsPanel() {
                 {selectedTotals.qty === 0 && canCancelSelectedTab && (
                   <Button
                     variant="outline"
-                    disabled={isBusy}
-                    onClick={() => cancelTabMut.mutate({ tabId: selectedTab.id })}
+                    disabled={cancelTabMut.isPending}
+                    onClick={() =>
+                      cancelTabMut.mutate({
+                        tabId: selectedTab.id,
+                        reason: "Comanda vazia",
+                      })
+                    }
                     className="h-10 w-full border-red-brand/30 text-red-brand hover:bg-red-brand/10"
                   >
                     Cancelar comanda vazia
