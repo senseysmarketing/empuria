@@ -77,6 +77,8 @@ function EventsPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const { data } = useQuery({ queryKey: ["admin-events"], queryFn: () => fetchList() });
 
