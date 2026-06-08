@@ -28,6 +28,8 @@ function PdvPage() {
   const [closing, setClosing] = useState(false);
   const [success, setSuccess] = useState<{ brl: number; eur: number } | null>(null);
   const [tab, setTab] = useState("venda");
+  const { can, isAdmin } = useModuleAccess();
+  const canItens = isAdmin || can("pdv_itens");
 
   const catalogQ = useQuery({
     queryKey: ["pdv-catalog"],
