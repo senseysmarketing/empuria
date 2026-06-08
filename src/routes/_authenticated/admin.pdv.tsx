@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Wine, Loader2, History, ShoppingCart, Package } from "lucide-react";
+import { Wine, Loader2, History, ShoppingCart, Package, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { CustomerSearchPanel, type PdvCustomer } from "@/components/admin/pdv/CustomerSearchPanel";
@@ -10,6 +10,7 @@ import { SaleCatalogGrid, type PdvCatalogItem } from "@/components/admin/pdv/Sal
 import { SaleCartPanel, type CartLine, type Discount } from "@/components/admin/pdv/SaleCartPanel";
 import { SaleSuccessOverlay } from "@/components/admin/pdv/SaleSuccessOverlay";
 import { PdvHistoryPanel } from "@/components/admin/pdv/PdvHistoryPanel";
+import { PdvTabsPanel } from "@/components/admin/pdv/PdvTabsPanel";
 import { PdvItensTab } from "@/components/admin/configuracoes/PdvItensTab";
 import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
 import { useModuleAccess } from "@/hooks/use-module-access";
@@ -46,12 +47,19 @@ function PdvPage() {
   const handleAdd = (item: PdvCatalogItem) => {
     setCart((prev) => {
       const existing = prev.find((l) => l.item.id === item.id);
+      const available =
+        item.available_stock_quantity ??
+        Math.max(0, item.stock_quantity - (item.reserved_stock_quantity ?? 0));
       if (existing) {
-        if (item.track_stock && existing.qty + 1 > item.stock_quantity) {
+        if (item.track_stock && existing.qty + 1 > available) {
           toast.error("Estoque insuficiente");
           return prev;
         }
         return prev.map((l) => (l.item.id === item.id ? { ...l, qty: l.qty + 1 } : l));
+      }
+      if (item.track_stock && available <= 0) {
+        toast.error("Estoque insuficiente");
+        return prev;
       }
       return [...prev, { item, qty: 1 }];
     });
@@ -118,6 +126,12 @@ function PdvPage() {
             <ShoppingCart className="h-4 w-4" /> Venda
           </TabsTrigger>
           <TabsTrigger
+            value="comandas"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <ReceiptText className="h-4 w-4" /> Comandas
+          </TabsTrigger>
+          <TabsTrigger
             value="historico"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
@@ -168,6 +182,10 @@ function PdvPage() {
 
         <TabsContent value="historico" className="mt-0">
           <PdvHistoryPanel />
+        </TabsContent>
+
+        <TabsContent value="comandas" className="mt-0">
+          <PdvTabsPanel />
         </TabsContent>
 
         <TabsContent value="itens" className="mt-0">

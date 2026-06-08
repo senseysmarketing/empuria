@@ -81,6 +81,16 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
         label: "Anular venda",
         description: "Permite cancelar vendas do PDV e reverter estoque.",
       },
+      {
+        key: "pdv.remove_tab_item",
+        label: "Remover item de comanda",
+        description: "Permite remover itens salvos em comandas abertas com motivo auditado.",
+      },
+      {
+        key: "pdv.cancel_tab",
+        label: "Cancelar comanda",
+        description: "Permite cancelar uma comanda inteira e liberar as reservas de estoque.",
+      },
     ],
   },
   {

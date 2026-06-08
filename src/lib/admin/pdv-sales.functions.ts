@@ -10,6 +10,12 @@ import { createOrReuseManualCustomer } from "./manual-users";
 export const listPdvCatalog = createServerFn({ method: "GET" })
   .middleware([requireModule("pdv")])
   .handler(async () => {
+    type CatalogRow = {
+      stock_quantity?: number;
+      reserved_stock_quantity?: number;
+      available_stock_quantity?: number;
+      [key: string]: unknown;
+    };
     const { data, error } = await supabaseAdmin
       .from("products")
       .select("*, product_categories(id, slug, name, emoji, position)")
@@ -17,7 +23,15 @@ export const listPdvCatalog = createServerFn({ method: "GET" })
       .order("position", { ascending: true })
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return ((data ?? []) as CatalogRow[]).map((row) => {
+      const reserved = row.reserved_stock_quantity ?? 0;
+      return {
+        ...row,
+        reserved_stock_quantity: reserved,
+        available_stock_quantity:
+          row.available_stock_quantity ?? Math.max(0, (row.stock_quantity ?? 0) - reserved),
+      };
+    });
   });
 
 // ---------- Clientes ----------

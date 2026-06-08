@@ -6,7 +6,15 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 export type StockMovementRecord = {
   id: string;
   product_id: string;
-  type: "entrada" | "saida" | "ajuste" | "venda" | "cancelamento";
+  type:
+    | "entrada"
+    | "saida"
+    | "ajuste"
+    | "venda"
+    | "cancelamento"
+    | "reserva_comanda"
+    | "liberacao_reserva_comanda"
+    | "venda_comanda";
   quantity: number;
   previous_stock: number;
   new_stock: number;
@@ -16,12 +24,19 @@ export type StockMovementRecord = {
   created_at: string;
 };
 
-type ProductStockRow = { id: string; name: string; stock_quantity: number; track_stock: boolean };
+type ProductStockRow = {
+  id: string;
+  name: string;
+  stock_quantity: number;
+  reserved_stock_quantity?: number;
+  available_stock_quantity?: number;
+  track_stock: boolean;
+};
 
 async function fetchProduct(productId: string): Promise<ProductStockRow> {
   const { data, error } = await supabaseAdmin
     .from("products")
-    .select("id, name, stock_quantity, track_stock")
+    .select("id, name, stock_quantity, reserved_stock_quantity, available_stock_quantity, track_stock")
     .eq("id", productId)
     .maybeSingle();
   if (error || !data) throw new Error(error?.message ?? "Produto não encontrado");
@@ -93,7 +108,9 @@ export const registerStockExit = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const p = await fetchProduct(data.productId);
-    if (p.stock_quantity < data.quantity) throw new Error("Estoque insuficiente");
+    const available =
+      p.available_stock_quantity ?? Math.max(0, p.stock_quantity - (p.reserved_stock_quantity ?? 0));
+    if (available < data.quantity) throw new Error("Estoque disponivel insuficiente");
     await applyMovement({
       productId: data.productId,
       type: "saida",
@@ -116,6 +133,10 @@ export const adjustStock = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const p = await fetchProduct(data.productId);
+    const reserved = p.reserved_stock_quantity ?? 0;
+    if (data.newQuantity < reserved) {
+      throw new Error(`Ajuste invalido: ${reserved} unidade(s) estao reservadas em comandas abertas.`);
+    }
     await applyMovement({
       productId: data.productId,
       type: "ajuste",

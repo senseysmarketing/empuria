@@ -74,7 +74,15 @@ export function SaleCartPanel({
   const updateQty = (id: string, delta: number) => {
     setCart(
       cart
-        .map((l) => (l.item.id === id ? { ...l, qty: Math.max(0, l.qty + delta) } : l))
+        .map((l) => {
+          if (l.item.id !== id) return l;
+          const available =
+            l.item.available_stock_quantity ??
+            Math.max(0, l.item.stock_quantity - (l.item.reserved_stock_quantity ?? 0));
+          const nextQty = Math.max(0, l.qty + delta);
+          if (l.item.track_stock) return { ...l, qty: Math.min(nextQty, available) };
+          return { ...l, qty: nextQty };
+        })
         .filter((l) => l.qty > 0)
     );
   };

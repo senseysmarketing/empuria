@@ -44,6 +44,8 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
 
 export const ALL_ACTIONS = [
   "pdv.void_sale",
+  "pdv.remove_tab_item",
+  "pdv.cancel_tab",
   "crm.view_all_leads",
   "crm.automations.view",
   "crm.automations.manage",
@@ -55,6 +57,8 @@ export type ActionKey = (typeof ALL_ACTIONS)[number];
 
 export const ACTION_LABELS: Record<ActionKey, string> = {
   "pdv.void_sale": "Anular venda",
+  "pdv.remove_tab_item": "Remover item de comanda",
+  "pdv.cancel_tab": "Cancelar comanda",
   "crm.view_all_leads": "Ver todos os leads",
   "crm.automations.view": "Ver automacoes do CRM",
   "crm.automations.manage": "Criar e editar automacoes do CRM",

@@ -258,15 +258,26 @@ export function PdvItensTab() {
             </thead>
             <tbody>
               {paged.map((raw) => {
-                const it = raw as Item & { item_type?: string; price_eur_cents?: number; price_brl_cents?: number; track_stock?: boolean; stock_quantity?: number; stock_min_quantity?: number };
+                const it = raw as Item & {
+                  item_type?: string;
+                  price_eur_cents?: number;
+                  price_brl_cents?: number;
+                  track_stock?: boolean;
+                  stock_quantity?: number;
+                  reserved_stock_quantity?: number;
+                  available_stock_quantity?: number;
+                  stock_min_quantity?: number;
+                };
                 const cat = (raw as Item & { product_categories?: { name: string; emoji: string | null } | null }).product_categories;
                 const eur = it.price_eur_cents ?? it.price_cents;
                 const brl = it.price_brl_cents ?? 0;
                 const isService = it.item_type === "servico";
                 const tracks = !!it.track_stock;
                 const stock = it.stock_quantity ?? 0;
+                const reserved = it.reserved_stock_quantity ?? 0;
+                const available = it.available_stock_quantity ?? Math.max(0, stock - reserved);
                 const min = it.stock_min_quantity ?? 0;
-                const low = tracks && stock <= min;
+                const low = tracks && available <= min;
                 return (
                   <tr key={it.id} className="border-t border-admin-border hover:bg-admin-bg/50">
                     <td className="p-3 text-admin-ink-muted tabular-nums">{it.position}</td>
@@ -295,7 +306,17 @@ export function PdvItensTab() {
                       {isService || !tracks ? (
                         <span className="text-admin-ink-muted italic">—</span>
                       ) : (
-                        <span className={low ? "text-red-500 font-medium" : ""}>{stock}{low && " ⚠"}</span>
+                        <div className="space-y-0.5">
+                          <span className={low ? "text-red-500 font-medium" : ""}>
+                            {available}
+                            {low && " ⚠"}
+                          </span>
+                          {reserved > 0 && (
+                            <div className="text-[10px] text-admin-ink-muted">
+                              {stock} fisico · {reserved} reservado
+                            </div>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="p-3 text-center">
