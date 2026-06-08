@@ -13,6 +13,9 @@ import { ConsultoriaWizardModal } from "@/components/leads/ConsultoriaWizardModa
 import { listPublicServices } from "@/lib/services-public.functions";
 import lounge from "@/assets/instituto-lounge.jpg";
 import heroWelcome from "@/assets/hero-welcome-brazil-madrid.jpg.asset.json";
+import manifesto1 from "@/assets/manifesto-instituto-1.jpg.asset.json";
+import manifesto2 from "@/assets/manifesto-instituto-2.jpg.asset.json";
+import manifesto3 from "@/assets/manifesto-instituto-3.jpg.asset.json";
 import barbearia from "@/assets/instituto-barbearia.jpg";
 import bar from "@/assets/instituto-bar.jpg";
 import granvia from "@/assets/gran-via.jpg";
