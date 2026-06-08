@@ -620,6 +620,7 @@ export function PdvTabsPanel() {
                 <Button
                   disabled={selectedTotals.qty === 0 || isBusy}
                   onClick={() => {
+                    setSelectedTabId(selectedTab.id);
                     setDiscount({ type: "none", value: 0 });
                     setPaymentMethod("pix");
                     setNotes("");
