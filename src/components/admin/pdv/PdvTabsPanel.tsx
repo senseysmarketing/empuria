@@ -133,7 +133,13 @@ export function PdvTabsPanel() {
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [openCustomerDialog, setOpenCustomerDialog] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
-  
+  const [successInfo, setSuccessInfo] = useState<{
+    tabCode: string;
+    customerName: string;
+    totalCents: number;
+    paymentMethod: PdvTabPaymentMethod;
+  } | null>(null);
+
   const [cancelTabTarget, setCancelTabTarget] = useState<PdvTabWithRelations | null>(null);
   const [reason, setReason] = useState("");
   const [discount, setDiscount] = useState<DiscountState>({ type: "none", value: 0 });
