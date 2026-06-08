@@ -986,9 +986,7 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.topProducts.map((p) => ({
               label: `${p.name} · ${number(p.qty)}un`,
-              value: money(primary === "BRL" ? p.revenueBrl : p.revenue, primary),
-              subValue:
-                primary === "BRL" && showEur ? `≈ ${money(p.revenue, "EUR")}` : undefined,
+              value: money(p.revenue, "EUR"),
               raw: p.qty,
             }))}
             empty="Sem vendas no período."
@@ -998,10 +996,8 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.topCashiers.map((c) => ({
               label: `${c.label} · ${number(c.count)} vendas`,
-              value: money(primary === "BRL" ? c.revenueBrl : c.revenue, primary),
-              subValue:
-                primary === "BRL" && showEur ? `≈ ${money(c.revenue, "EUR")}` : undefined,
-              raw: primary === "BRL" ? c.revenueBrl : c.revenue,
+              value: money(c.revenue, "EUR"),
+              raw: c.revenue,
             }))}
             empty="Sem operadores no período."
           />
@@ -1010,10 +1006,8 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
           <RankingList
             rows={d.paymentMethods.map((p) => ({
               label: `${p.label} · ${number(p.count)}x`,
-              value: money(primary === "BRL" ? p.revenueBrl : p.revenue, primary),
-              subValue:
-                primary === "BRL" && showEur ? `≈ ${money(p.revenue, "EUR")}` : undefined,
-              raw: primary === "BRL" ? p.revenueBrl : p.revenue,
+              value: money(p.revenue, "EUR"),
+              raw: p.revenue,
             }))}
             empty="Sem pagamentos registrados."
           />
