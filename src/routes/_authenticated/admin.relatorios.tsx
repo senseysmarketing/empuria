@@ -130,8 +130,8 @@ const ORIGIN_LABEL: Record<string, string> = {
   hubla: "Hubla",
 };
 
-function money(cents: number, currency = "BRL") {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format((cents ?? 0) / 100);
+function money(cents: number, currency = "EUR") {
+  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", { style: "currency", currency }).format((cents ?? 0) / 100);
 }
 
 function number(n: number) {
