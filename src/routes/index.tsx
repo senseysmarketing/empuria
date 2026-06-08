@@ -295,7 +295,7 @@ function HomePage() {
           {/* Carousel marquee */}
           <div className="lg:col-span-6 relative h-[520px] overflow-hidden rounded-2xl border border-yellow-brand/30">
             <div className="flex marquee-track gap-4 h-full" style={{ width: "200%" }}>
-              {[lounge, barbearia, bar, lounge, barbearia, bar].map((src, i) => (
+              {[manifesto1.url, manifesto2.url, manifesto3.url, manifesto1.url, manifesto2.url, manifesto3.url].map((src, i) => (
                 <div
                   key={i}
                   className="relative h-full aspect-[3/4] shrink-0 rounded-xl overflow-hidden"
