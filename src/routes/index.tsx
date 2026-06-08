@@ -252,7 +252,7 @@ function HomePage() {
             </Reveal>
             <Reveal delay={200}>
               <p className="font-body italic text-xl mt-6 text-offwhite/90">
-                Seu primeiro destino oficial em Madrid é na Gran Vía.
+                Seu primeiro destino oficial em Madrid é na Gran Via, 40.
               </p>
             </Reveal>
             <Reveal delay={300}>
