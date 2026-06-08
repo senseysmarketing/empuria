@@ -156,13 +156,6 @@ function ConfiguracoesPage() {
             <RestrictedAreaCard message="Apenas membros com acesso a Configurações podem gerenciar serviços e preços." />
           )}
         </TabsContent>
-        <TabsContent value="pdv-itens" className="mt-6">
-          {isLoading ? null : can("pdv_itens") ? (
-            <PdvItensTab />
-          ) : (
-            <RestrictedAreaCard message="Apenas membros com acesso ao módulo PDV Itens podem gerenciar este catálogo." />
-          )}
-        </TabsContent>
         <TabsContent value="automacoes" className="mt-6">
           {isLoading ? null : can("automacoes") ? (
             <AutomacoesPanel />
