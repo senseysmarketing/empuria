@@ -572,7 +572,8 @@ export function PdvTabsPanel() {
                         </div>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
