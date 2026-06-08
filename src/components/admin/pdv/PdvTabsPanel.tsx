@@ -240,13 +240,12 @@ export function PdvTabsPanel() {
     if (
       !openCustomerDialog &&
       !closeDialogOpen &&
-      cancelItemTarget === null &&
       cancelTabTarget === null &&
       typeof document !== "undefined"
     ) {
       document.body.style.pointerEvents = "";
     }
-  }, [openCustomerDialog, closeDialogOpen, cancelItemTarget, cancelTabTarget]);
+  }, [openCustomerDialog, closeDialogOpen, cancelTabTarget]);
 
   const tabs = useMemo(() => tabsQ.data?.tabs ?? [], [tabsQ.data?.tabs]);
   const permissions = tabsQ.data?.permissions;
