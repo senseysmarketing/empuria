@@ -22,7 +22,6 @@ import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
-import { Route as ApiWebhooksWiseRouteImport } from './routes/api.webhooks.wise'
 import { Route as ApiWebhooksUazapiRouteImport } from './routes/api.webhooks.uazapi'
 import { Route as ApiWebhooksMercadopagoRouteImport } from './routes/api.webhooks.mercadopago'
 import { Route as ApiWebhooksHublaRouteImport } from './routes/api.webhooks.hubla'
@@ -46,6 +45,7 @@ import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
 import { Route as AuthenticatedAdminAgendaRouteImport } from './routes/_authenticated/admin.agenda'
 import { Route as AuthenticatedAdminAcessoNegadoRouteImport } from './routes/_authenticated/admin.acesso-negado'
+import { Route as ApiPublicWebhooksWiseRouteImport } from './routes/api.public.webhooks.wise'
 import { Route as AuthenticatedPortalClubeCertificadoCodeRouteImport } from './routes/_authenticated/portal.clube.certificado.$code'
 
 const ServicosRoute = ServicosRouteImport.update({
@@ -112,11 +112,6 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const ApiWebhooksWiseRoute = ApiWebhooksWiseRouteImport.update({
-  id: '/api/webhooks/wise',
-  path: '/api/webhooks/wise',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWebhooksUazapiRoute = ApiWebhooksUazapiRouteImport.update({
   id: '/api/webhooks/uazapi',
@@ -247,6 +242,11 @@ const AuthenticatedAdminAcessoNegadoRoute =
     path: '/acesso-negado',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const ApiPublicWebhooksWiseRoute = ApiPublicWebhooksWiseRouteImport.update({
+  id: '/api/public/webhooks/wise',
+  path: '/api/public/webhooks/wise',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedPortalClubeCertificadoCodeRoute =
   AuthenticatedPortalClubeCertificadoCodeRouteImport.update({
     id: '/certificado/$code',
@@ -288,9 +288,9 @@ export interface FileRoutesByFullPath {
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
-  '/api/webhooks/wise': typeof ApiWebhooksWiseRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
+  '/api/public/webhooks/wise': typeof ApiPublicWebhooksWiseRoute
   '/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
 }
 export interface FileRoutesByTo {
@@ -325,9 +325,9 @@ export interface FileRoutesByTo {
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
-  '/api/webhooks/wise': typeof ApiWebhooksWiseRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
+  '/api/public/webhooks/wise': typeof ApiPublicWebhooksWiseRoute
   '/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
 }
 export interface FileRoutesById {
@@ -366,9 +366,9 @@ export interface FileRoutesById {
   '/api/webhooks/hubla': typeof ApiWebhooksHublaRoute
   '/api/webhooks/mercadopago': typeof ApiWebhooksMercadopagoRoute
   '/api/webhooks/uazapi': typeof ApiWebhooksUazapiRoute
-  '/api/webhooks/wise': typeof ApiWebhooksWiseRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
+  '/api/public/webhooks/wise': typeof ApiPublicWebhooksWiseRoute
   '/_authenticated/portal/clube/certificado/$code': typeof AuthenticatedPortalClubeCertificadoCodeRoute
 }
 export interface FileRouteTypes {
@@ -407,9 +407,9 @@ export interface FileRouteTypes {
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
-    | '/api/webhooks/wise'
     | '/admin/'
     | '/portal/'
+    | '/api/public/webhooks/wise'
     | '/portal/clube/certificado/$code'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -444,9 +444,9 @@ export interface FileRouteTypes {
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
-    | '/api/webhooks/wise'
     | '/admin'
     | '/portal'
+    | '/api/public/webhooks/wise'
     | '/portal/clube/certificado/$code'
   id:
     | '__root__'
@@ -484,9 +484,9 @@ export interface FileRouteTypes {
     | '/api/webhooks/hubla'
     | '/api/webhooks/mercadopago'
     | '/api/webhooks/uazapi'
-    | '/api/webhooks/wise'
     | '/_authenticated/admin/'
     | '/_authenticated/portal/'
+    | '/api/public/webhooks/wise'
     | '/_authenticated/portal/clube/certificado/$code'
   fileRoutesById: FileRoutesById
 }
@@ -503,7 +503,7 @@ export interface RootRouteChildren {
   ApiWebhooksHublaRoute: typeof ApiWebhooksHublaRoute
   ApiWebhooksMercadopagoRoute: typeof ApiWebhooksMercadopagoRoute
   ApiWebhooksUazapiRoute: typeof ApiWebhooksUazapiRoute
-  ApiWebhooksWiseRoute: typeof ApiWebhooksWiseRoute
+  ApiPublicWebhooksWiseRoute: typeof ApiPublicWebhooksWiseRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -598,13 +598,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/api/webhooks/wise': {
-      id: '/api/webhooks/wise'
-      path: '/api/webhooks/wise'
-      fullPath: '/api/webhooks/wise'
-      preLoaderRoute: typeof ApiWebhooksWiseRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/api/webhooks/uazapi': {
       id: '/api/webhooks/uazapi'
@@ -767,6 +760,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAcessoNegadoRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/api/public/webhooks/wise': {
+      id: '/api/public/webhooks/wise'
+      path: '/api/public/webhooks/wise'
+      fullPath: '/api/public/webhooks/wise'
+      preLoaderRoute: typeof ApiPublicWebhooksWiseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/portal/clube/certificado/$code': {
       id: '/_authenticated/portal/clube/certificado/$code'
       path: '/certificado/$code'
@@ -892,8 +892,18 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebhooksHublaRoute: ApiWebhooksHublaRoute,
   ApiWebhooksMercadopagoRoute: ApiWebhooksMercadopagoRoute,
   ApiWebhooksUazapiRoute: ApiWebhooksUazapiRoute,
-  ApiWebhooksWiseRoute: ApiWebhooksWiseRoute,
+  ApiPublicWebhooksWiseRoute: ApiPublicWebhooksWiseRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
