@@ -500,11 +500,10 @@ function SaleDetailsContent({
         <DetailTile label="Status" value={sale.status === "cancelada" ? "Anulada" : "Concluida"} />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <DetailTile label="Subtotal EUR" value={money(sale.subtotal_eur_cents, "EUR")} />
-        <DetailTile label="Desconto EUR" value={money(sale.discount_eur_cents, "EUR")} />
-        <DetailTile label="Total EUR" value={money(sale.total_eur_cents, "EUR")} accent />
-        <DetailTile label="Total R$" value={money(sale.total_brl_cents, "BRL")} accent />
+      <div className="grid gap-3 md:grid-cols-3">
+        <DetailTile label="Subtotal €" value={money(sale.subtotal_eur_cents, "EUR")} />
+        <DetailTile label="Desconto €" value={money(sale.discount_eur_cents, "EUR")} />
+        <DetailTile label="Total €" value={money(sale.total_eur_cents, "EUR")} accent />
       </div>
 
       {sale.status === "cancelada" && (
