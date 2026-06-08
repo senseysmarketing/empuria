@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,10 +11,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TicketScannerDialog } from "@/components/admin/TicketScannerDialog";
-import { Plus, Trash2, Pencil, ExternalLink, X } from "lucide-react";
+import { Plus, Trash2, Pencil, ExternalLink, X, Upload, Loader2, ImageIcon } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { supabase } from "@/integrations/supabase/client";
 
 import { toast } from "sonner";
+
+const COVER_MAX_BYTES = 5 * 1024 * 1024;
+
+function pad2(n: number) { return n.toString().padStart(2, "0"); }
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function fromLocalInput(local: string): string {
+  return new Date(local).toISOString();
+}
 
 export const Route = createFileRoute("/_authenticated/admin/eventos")({
   component: EventsPage,
