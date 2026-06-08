@@ -59,6 +59,7 @@ export function CustomerSearchPanel({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar cliente por nome, e-mail ou telefone..."
+          disabled={isSubmitting}
           className="pl-12 h-14 text-base bg-admin-surface-2 border-admin-border"
         />
       </div>
