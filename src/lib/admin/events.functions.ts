@@ -23,9 +23,11 @@ const eventSchema = z.object({
   location_lat: z.number().nullable().optional(),
   location_lng: z.number().nullable().optional(),
   cover_url: z.string().url().optional().nullable().or(z.literal("")),
+  cover_url_vertical: z.string().url().optional().nullable().or(z.literal("")),
   cover_kind: z.enum(["image", "video"]).default("image"),
   sales_mode: z.enum(["simples", "categorias"]).default("simples"),
   is_published: z.boolean().default(false),
+  is_home_featured: z.boolean().default(false),
   tiers: z.array(tierSchema).min(1).max(20),
 });
 
