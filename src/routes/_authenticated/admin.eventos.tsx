@@ -111,8 +111,10 @@ function EventsPage() {
       ends_at: toLocalInput(ev.ends_at),
       location_address: ev.location_address ?? "",
       cover_url: ev.cover_url ?? "",
+      cover_url_vertical: (ev as { cover_url_vertical?: string | null }).cover_url_vertical ?? "",
       sales_mode: ev.sales_mode as "simples" | "categorias",
       is_published: ev.is_published,
+      is_home_featured: (ev as { is_home_featured?: boolean }).is_home_featured ?? false,
       tiers: tiers.map((t) => ({
         id: t.id, name: t.name, price_cents: t.price_cents,
         capacity: t.capacity, benefits: (t.benefits as string[]) ?? [],
