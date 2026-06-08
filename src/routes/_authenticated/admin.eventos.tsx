@@ -101,10 +101,10 @@ function EventsPage() {
     const tiers = (data?.tiers ?? []).filter((t) => t.event_id === eventId).sort((a, b) => a.position - b.position);
     if (!ev) return;
     setForm({
-      id: ev.id, slug: ev.slug, title: ev.title,
+      id: ev.id, title: ev.title,
       description: ev.description ?? "",
-      starts_at: ev.starts_at.slice(0, 16),
-      ends_at: ev.ends_at ? ev.ends_at.slice(0, 16) : "",
+      starts_at: toLocalInput(ev.starts_at),
+      ends_at: toLocalInput(ev.ends_at),
       location_address: ev.location_address ?? "",
       cover_url: ev.cover_url ?? "",
       sales_mode: ev.sales_mode as "simples" | "categorias",
