@@ -927,17 +927,10 @@ function PdvTab({ filters }: { filters: ReportFilters }) {
   const d = q.data;
   const c = d.cards;
 
-  // PDV opera em BRL como moeda principal. EUR é convertido/secundário.
-  const showEur = filters.currency !== "BRL";
-  const showBrl = filters.currency !== "EUR";
-  const primary: "BRL" | "EUR" = showBrl ? "BRL" : "EUR";
-
-  const pickMain = (cents: number, eurCents?: number) =>
-    primary === "BRL" ? cents : (eurCents ?? 0);
-  const pickHint = (cents: number, eurCents?: number) => {
-    if (primary === "BRL" && showEur) return `≈ ${money(eurCents ?? 0, "EUR")}`;
-    return undefined;
-  };
+  // PDV opera em EUR como moeda única.
+  const primary: "EUR" = "EUR";
+  const pickMain = (_cents: number, eurCents?: number) => eurCents ?? 0;
+  const pickHint = (_cents: number, _eurCents?: number) => undefined;
 
   return (
     <div className="space-y-4">
