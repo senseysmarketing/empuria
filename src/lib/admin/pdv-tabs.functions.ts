@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
-import { userHasAction } from "./permission-checks";
+
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export type PdvTabStatus = "aberta" | "fechada" | "cancelada";
