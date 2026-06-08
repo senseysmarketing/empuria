@@ -278,7 +278,9 @@ function HomePage() {
             </ul>
             <Reveal delay={750}>
               <a
-                href="#"
+                href="https://maps.app.goo.gl/RCrtChFM8PC1Ycbs7"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-10 inline-flex items-center gap-2 bg-orange-brand hover:bg-yellow-brand hover:text-brown text-offwhite px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all hover:shadow-warm"
               >
                 Quero Visitar o Instituto <ArrowRight className="w-4 h-4" />
