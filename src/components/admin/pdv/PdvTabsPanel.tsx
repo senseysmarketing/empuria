@@ -440,6 +440,10 @@ export function PdvTabsPanel() {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
+                        if (selectedTotals.qty === 0) {
+                          cancelTabMut.mutate({ tabId: selectedTab.id });
+                          return;
+                        }
                         setReason("");
                         setCancelTabTarget(selectedTab);
                       }}
