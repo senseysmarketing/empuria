@@ -146,7 +146,10 @@ function EventsPage() {
     }
   };
 
-  const handleCoverFile = async (file: File | undefined | null) => {
+  const uploadCover = async (
+    file: File | undefined | null,
+    target: "cover_url" | "cover_url_vertical",
+  ) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Selecione um arquivo de imagem");
@@ -156,25 +159,31 @@ function EventsPage() {
       toast.error("Imagem maior que 5 MB. Reduza o arquivo e tente novamente.");
       return;
     }
-    setUploadingCover(true);
+    const setBusy = target === "cover_url" ? setUploadingCover : setUploadingCoverV;
+    const ref = target === "cover_url" ? coverInputRef : coverVInputRef;
+    setBusy(true);
     try {
       const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]+/g, "");
       const safeExt = ext.length > 0 && ext.length <= 5 ? ext : "jpg";
-      const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
+      const prefix = target === "cover_url" ? "covers" : "covers-vertical";
+      const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
       const { error: upErr } = await supabase.storage
         .from("event-covers")
         .upload(path, file, { cacheControl: "31536000", upsert: false, contentType: file.type });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("event-covers").getPublicUrl(path);
-      setForm((f) => ({ ...f, cover_url: pub.publicUrl }));
+      setForm((f) => ({ ...f, [target]: pub.publicUrl }));
       toast.success("Imagem enviada");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao enviar imagem");
     } finally {
-      setUploadingCover(false);
-      if (coverInputRef.current) coverInputRef.current.value = "";
+      setBusy(false);
+      if (ref.current) ref.current.value = "";
     }
   };
+
+  const handleCoverFile = (file: File | undefined | null) => uploadCover(file, "cover_url");
+  const handleCoverVFile = (file: File | undefined | null) => uploadCover(file, "cover_url_vertical");
 
   const onDelete = async (id: string) => {
     if (!confirm("Excluir evento e todos os ingressos?")) return;
