@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import confetti from "canvas-confetti";
 import {
   Banknote,
+  CheckCircle2,
   Clock,
   CreditCard,
   Loader2,
@@ -34,6 +36,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -65,6 +68,22 @@ import {
 import { cn } from "@/lib/utils";
 
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
+
+const PAYMENT_LABEL: Record<PdvTabPaymentMethod, string> = {
+  pix: "Pix",
+  cartao: "Cartão",
+  dinheiro: "Dinheiro",
+};
+
+function fireConfetti() {
+  if (typeof window === "undefined") return;
+  const defaults = { spread: 70, ticks: 80, gravity: 0.9, scalar: 1, zIndex: 9999 };
+  confetti({ ...defaults, particleCount: 90, origin: { x: 0.5, y: 0.6 } });
+  setTimeout(() => {
+    confetti({ ...defaults, particleCount: 60, angle: 60, origin: { x: 0, y: 0.7 } });
+    confetti({ ...defaults, particleCount: 60, angle: 120, origin: { x: 1, y: 0.7 } });
+  }, 180);
+}
 
 function money(cents: number, currency: "BRL" | "EUR" = "EUR") {
   return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", {
@@ -130,7 +149,13 @@ export function PdvTabsPanel() {
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [openCustomerDialog, setOpenCustomerDialog] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
-  
+  const [successInfo, setSuccessInfo] = useState<{
+    tabCode: string;
+    customerName: string;
+    totalCents: number;
+    paymentMethod: PdvTabPaymentMethod;
+  } | null>(null);
+
   const [cancelTabTarget, setCancelTabTarget] = useState<PdvTabWithRelations | null>(null);
   const [reason, setReason] = useState("");
   const [discount, setDiscount] = useState<DiscountState>({ type: "none", value: 0 });
@@ -212,13 +237,23 @@ export function PdvTabsPanel() {
       });
     },
     onSuccess: () => {
-      toast.success("Comanda fechada e venda registrada.");
+      const tab = tabs.find((t) => t.id === selectedTabId) ?? selectedTab;
+      const totalCents = closeTotal.eur;
+      if (tab) {
+        setSuccessInfo({
+          tabCode: tab.tab_code,
+          customerName: tab.customer?.full_name ?? "Cliente sem nome",
+          totalCents,
+          paymentMethod,
+        });
+      }
       setCloseDialogOpen(false);
       setSelectedTabId(null);
       setDiscount({ type: "none", value: 0 });
       setPaymentMethod("pix");
       setNotes("");
       invalidate();
+      fireConfetti();
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Erro ao fechar comanda"),
@@ -805,6 +840,56 @@ export function PdvTabsPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={successInfo !== null}
+        onOpenChange={(open) => {
+          if (!open) setSuccessInfo(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md border-admin-border bg-admin-bg text-admin-ink">
+          <DialogHeader className="items-center text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/40 animate-scale-in">
+              <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+            </div>
+            <DialogTitle className="text-xl font-display mt-2">Venda concluída!</DialogTitle>
+            <DialogDescription className="text-admin-ink-muted">
+              A comanda foi fechada e a venda registrada com sucesso.
+            </DialogDescription>
+          </DialogHeader>
+          {successInfo && (
+            <div className="rounded-lg border border-admin-border bg-admin-bg/60 p-4 space-y-2 text-sm animate-fade-in">
+              <div className="flex justify-between">
+                <span className="text-admin-ink-muted">Comanda</span>
+                <span className="font-mono">{successInfo.tabCode}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-admin-ink-muted">Cliente</span>
+                <span className="text-right">{successInfo.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-admin-ink-muted">Pagamento</span>
+                <span>{PAYMENT_LABEL[successInfo.paymentMethod]}</span>
+              </div>
+              <div className="flex justify-between border-t border-admin-border pt-2">
+                <span className="text-xs uppercase tracking-widest text-admin-ink-muted">Total</span>
+                <span className="font-display text-xl text-admin-accent">
+                  {money(successInfo.totalCents)}
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              className="w-full bg-admin-accent text-white"
+              onClick={() => setSuccessInfo(null)}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
