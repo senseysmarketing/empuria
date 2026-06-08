@@ -13,6 +13,9 @@ import { ConsultoriaWizardModal } from "@/components/leads/ConsultoriaWizardModa
 import { listPublicServices } from "@/lib/services-public.functions";
 import lounge from "@/assets/instituto-lounge.jpg";
 import heroWelcome from "@/assets/hero-welcome-brazil-madrid.jpg.asset.json";
+import manifesto1 from "@/assets/manifesto-instituto-1.jpg.asset.json";
+import manifesto2 from "@/assets/manifesto-instituto-2.jpg.asset.json";
+import manifesto3 from "@/assets/manifesto-instituto-3.jpg.asset.json";
 import barbearia from "@/assets/instituto-barbearia.jpg";
 import bar from "@/assets/instituto-bar.jpg";
 import granvia from "@/assets/gran-via.jpg";
@@ -292,7 +295,7 @@ function HomePage() {
           {/* Carousel marquee */}
           <div className="lg:col-span-6 relative h-[520px] overflow-hidden rounded-2xl border border-yellow-brand/30">
             <div className="flex marquee-track gap-4 h-full" style={{ width: "200%" }}>
-              {[lounge, barbearia, bar, lounge, barbearia, bar].map((src, i) => (
+              {[manifesto1.url, manifesto2.url, manifesto3.url, manifesto1.url, manifesto2.url, manifesto3.url].map((src, i) => (
                 <div
                   key={i}
                   className="relative h-full aspect-[3/4] shrink-0 rounded-xl overflow-hidden"
