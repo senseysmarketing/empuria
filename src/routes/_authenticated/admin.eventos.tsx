@@ -235,9 +235,16 @@ function EventsPage() {
                     {new Date(ev.starts_at).toLocaleString("pt-BR")}
                   </p>
                 </div>
-                <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-display ${ev.is_published ? "bg-green-600/20 text-green-700" : "bg-muted text-admin-ink-muted"}`}>
-                  {ev.is_published ? "Publicado" : "Rascunho"}
-                </span>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-display ${ev.is_published ? "bg-green-600/20 text-green-700" : "bg-muted text-admin-ink-muted"}`}>
+                    {ev.is_published ? "Publicado" : "Rascunho"}
+                  </span>
+                  {(ev as { is_home_featured?: boolean }).is_home_featured && (
+                    <span className="text-[10px] uppercase px-2 py-0.5 rounded font-display bg-orange-brand/15 text-orange-brand">
+                      Em destaque
+                    </span>
+                  )}
+                </div>
               </div>
               <div className={`mt-3 grid ${isAdmin ? "grid-cols-3" : "grid-cols-2"} gap-2 text-xs`}>
                 <div><div className="text-admin-ink-muted">Vendidos</div><div className="font-display text-admin-ink">{sold}{cap ? `/${cap}` : ""}</div></div>
