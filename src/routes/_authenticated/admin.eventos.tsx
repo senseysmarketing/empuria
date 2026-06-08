@@ -52,8 +52,10 @@ type FormState = {
   ends_at: string;
   location_address: string;
   cover_url: string;
+  cover_url_vertical: string;
   sales_mode: "simples" | "categorias";
   is_published: boolean;
+  is_home_featured: boolean;
   tiers: Tier[];
 };
 
@@ -64,8 +66,10 @@ const emptyForm = (): FormState => ({
   ends_at: "",
   location_address: "",
   cover_url: "",
+  cover_url_vertical: "",
   sales_mode: "simples",
   is_published: false,
+  is_home_featured: false,
   tiers: [{ name: "Padrão", price_cents: 0, capacity: null, benefits: [], position: 0, is_active: true }],
 });
 
