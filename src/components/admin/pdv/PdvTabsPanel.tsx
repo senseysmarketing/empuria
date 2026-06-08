@@ -230,11 +230,25 @@ export function PdvTabsPanel() {
       setCancelTabTarget(null);
       setSelectedTabId(null);
       setReason("");
+      if (typeof document !== "undefined") document.body.style.pointerEvents = "";
       invalidate();
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Erro ao cancelar comanda"),
   });
+
+  // Defesa contra bug do Radix que pode deixar pointer-events: none no body
+  useEffect(() => {
+    if (
+      !openCustomerDialog &&
+      !closeDialogOpen &&
+      cancelItemTarget === null &&
+      cancelTabTarget === null &&
+      typeof document !== "undefined"
+    ) {
+      document.body.style.pointerEvents = "";
+    }
+  }, [openCustomerDialog, closeDialogOpen, cancelItemTarget, cancelTabTarget]);
 
   const tabs = useMemo(() => tabsQ.data?.tabs ?? [], [tabsQ.data?.tabs]);
   const permissions = tabsQ.data?.permissions;
