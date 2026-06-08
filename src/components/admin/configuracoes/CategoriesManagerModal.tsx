@@ -72,7 +72,7 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
       toast.success("Categoria criada");
       setNewForm({ ...emptyForm, position: categories.length + 1 });
       invalidate();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) { console.error("[CategoriesManager] create", e); toast.error(e instanceof Error ? e.message : "Erro"); }
     finally { setSaving(false); }
   };
 
@@ -105,7 +105,7 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
       toast.success("Categoria atualizada");
       setEditingId(null);
       invalidate();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) { console.error("[CategoriesManager] saveEdit", e); toast.error(e instanceof Error ? e.message : "Erro"); }
     finally { setSaving(false); }
   };
 
@@ -113,7 +113,7 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
     try {
       await update({ data: { id: c.id, is_active: v } });
       invalidate();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) { console.error("[CategoriesManager] toggleActive", e); toast.error(e instanceof Error ? e.message : "Erro"); }
   };
 
   const handleDelete = async () => {
@@ -124,6 +124,7 @@ export function CategoriesManagerModal({ open, onOpenChange }: { open: boolean; 
       setConfirmDelete(null);
       invalidate();
     } catch (e) {
+      console.error("[CategoriesManager] delete", e);
       toast.error(e instanceof Error ? e.message : "Erro ao remover");
     }
   };
