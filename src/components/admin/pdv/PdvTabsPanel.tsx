@@ -479,11 +479,17 @@ export function PdvTabsPanel() {
                         </div>
                         {permissions?.canRemoveItem && (
                           <button
+                            disabled={isBusy}
                             onClick={() => {
+                              const ageMs = Date.now() - new Date(item.created_at).getTime();
+                              if (ageMs < 60_000) {
+                                cancelItemMut.mutate({ itemId: item.id });
+                                return;
+                              }
                               setReason("");
                               setCancelItemTarget(item);
                             }}
-                            className="text-admin-ink-muted hover:text-red-brand"
+                            className="text-admin-ink-muted hover:text-red-brand disabled:opacity-50"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
