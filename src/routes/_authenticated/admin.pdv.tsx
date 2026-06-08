@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Wine, Loader2, History, ShoppingCart } from "lucide-react";
+import { Wine, Loader2, History, ShoppingCart, Package } from "lucide-react";
 import { toast } from "sonner";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { CustomerSearchPanel, type PdvCustomer } from "@/components/admin/pdv/CustomerSearchPanel";
@@ -10,6 +10,9 @@ import { SaleCatalogGrid, type PdvCatalogItem } from "@/components/admin/pdv/Sal
 import { SaleCartPanel, type CartLine, type Discount } from "@/components/admin/pdv/SaleCartPanel";
 import { SaleSuccessOverlay } from "@/components/admin/pdv/SaleSuccessOverlay";
 import { PdvHistoryPanel } from "@/components/admin/pdv/PdvHistoryPanel";
+import { PdvItensTab } from "@/components/admin/configuracoes/PdvItensTab";
+import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
+import { useModuleAccess } from "@/hooks/use-module-access";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listPdvCatalog, closePdvSale } from "@/lib/admin/pdv-sales.functions";
 
