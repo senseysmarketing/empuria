@@ -96,7 +96,7 @@ function normalizeSearch(search: Partial<SearchSchema>): SearchSchema {
     tab: search.tab ?? "visao",
     period: search.period ?? "30d",
     compare: search.compare ?? "prev_period",
-    currency: search.currency ?? "both",
+    currency: search.currency ?? "EUR",
     from: search.from,
     to: search.to,
     origin: search.origin,
