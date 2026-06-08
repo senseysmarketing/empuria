@@ -64,7 +64,7 @@ function pickCurrency(p: WisePayload): string | null {
   );
 }
 
-export const Route = createFileRoute("/api/webhooks/wise")({
+export const Route = createFileRoute("/api/public/webhooks/wise")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
