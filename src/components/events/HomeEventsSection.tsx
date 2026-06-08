@@ -13,11 +13,14 @@ type EventRow = {
   title: string;
   starts_at: string;
   cover_url: string | null;
+  cover_url_vertical?: string | null;
   location_address: string | null;
+  is_home_featured?: boolean;
 };
 
 const dayFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit" });
 const monthFmt = new Intl.DateTimeFormat("pt-BR", { month: "short" });
+const fullDateFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
 function formatTag(iso: string) {
   const d = new Date(iso);
@@ -33,6 +36,7 @@ export function HomeEventsSection() {
     queryFn: () => fetchEvents(),
   });
 
+  const featured = (data?.featured ?? null) as EventRow | null;
   const upcoming = (data?.upcoming ?? []) as EventRow[];
   const past = (data?.past ?? []) as EventRow[];
 
@@ -58,6 +62,87 @@ export function HomeEventsSection() {
             </p>
           </Reveal>
         </div>
+
+        {/* DESTAQUE — evento manual em destaque na home */}
+        {featured && (
+          <Reveal>
+            <Link
+              to="/evento/$slug"
+              params={{ slug: featured.slug }}
+              className="group mt-14 block relative overflow-hidden rounded-2xl bg-brown text-offwhite shadow-warm border border-yellow-brand/20"
+            >
+              {/* Mobile: vertical 4:5 */}
+              <div className="md:hidden relative aspect-[4/5]">
+                {(featured.cover_url_vertical || featured.cover_url) ? (
+                  <img
+                    src={featured.cover_url_vertical || featured.cover_url || ""}
+                    alt={featured.title}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-brown to-brown-deep" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-brown via-brown/40 to-transparent" />
+                <div className="absolute top-4 left-4 bg-yellow-brand text-brown rounded-lg px-3 py-2 text-center shadow-warm">
+                  <div className="font-display font-extrabold text-2xl leading-none">{formatTag(featured.starts_at).day}</div>
+                  <div className="font-display font-semibold text-[10px] tracking-widest mt-0.5">{formatTag(featured.starts_at).month}</div>
+                </div>
+                <div className="absolute inset-x-0 bottom-0 p-6">
+                  <div className="text-yellow-brand font-display font-semibold text-[10px] tracking-[0.3em] uppercase mb-2">
+                    Evento em destaque
+                  </div>
+                  <h3 className="font-display font-extrabold text-2xl uppercase leading-tight">
+                    {featured.title}
+                  </h3>
+                  {featured.location_address && (
+                    <div className="mt-2 flex items-start gap-2 text-offwhite/80 text-sm font-body">
+                      <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-yellow-brand" />
+                      <span className="line-clamp-2">{featured.location_address}</span>
+                    </div>
+                  )}
+                  <div className="mt-4 inline-flex items-center gap-2 bg-orange-brand text-offwhite px-5 py-3 rounded-md font-display font-bold text-xs uppercase tracking-widest">
+                    Ver detalhes e ingressos <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop: horizontal 21:9 */}
+              <div className="hidden md:block relative aspect-[21/9]">
+                {featured.cover_url ? (
+                  <img
+                    src={featured.cover_url}
+                    alt={featured.title}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-brown to-brown-deep" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-r from-brown via-brown/60 to-transparent" />
+                <div className="absolute top-6 left-6 bg-yellow-brand text-brown rounded-lg px-4 py-3 text-center shadow-warm">
+                  <div className="font-display font-extrabold text-3xl leading-none">{formatTag(featured.starts_at).day}</div>
+                  <div className="font-display font-semibold text-xs tracking-widest mt-1">{formatTag(featured.starts_at).month}</div>
+                </div>
+                <div className="absolute inset-y-0 left-0 flex flex-col justify-end p-10 max-w-2xl">
+                  <div className="text-yellow-brand font-display font-semibold text-xs tracking-[0.3em] uppercase mb-3">
+                    Evento em destaque · {fullDateFmt.format(new Date(featured.starts_at))}
+                  </div>
+                  <h3 className="font-display font-extrabold text-offwhite text-3xl lg:text-5xl uppercase leading-[1]">
+                    {featured.title}
+                  </h3>
+                  {featured.location_address && (
+                    <div className="mt-4 flex items-start gap-2 text-offwhite/80 text-sm font-body">
+                      <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-yellow-brand" />
+                      <span>{featured.location_address}</span>
+                    </div>
+                  )}
+                  <div className="mt-6 inline-flex items-center gap-2 self-start bg-orange-brand text-offwhite group-hover:bg-yellow-brand group-hover:text-brown px-6 py-3 rounded-md font-display font-bold text-xs uppercase tracking-widest transition-all">
+                    Ver detalhes e ingressos <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </Reveal>
+        )}
 
         {/* CENÁRIO A — eventos próximos */}
         {upcoming.length > 0 ? (
@@ -107,7 +192,7 @@ export function HomeEventsSection() {
               );
             })}
           </div>
-        ) : (
+        ) : featured ? null : (
           // CENÁRIO B — card convite
           <Reveal>
             <div className="mt-14 relative overflow-hidden rounded-2xl bg-brown bg-topo text-offwhite p-10 md:p-16 border border-yellow-brand/20 shadow-warm">

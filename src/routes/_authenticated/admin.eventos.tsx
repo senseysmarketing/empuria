@@ -52,8 +52,10 @@ type FormState = {
   ends_at: string;
   location_address: string;
   cover_url: string;
+  cover_url_vertical: string;
   sales_mode: "simples" | "categorias";
   is_published: boolean;
+  is_home_featured: boolean;
   tiers: Tier[];
 };
 
@@ -64,8 +66,10 @@ const emptyForm = (): FormState => ({
   ends_at: "",
   location_address: "",
   cover_url: "",
+  cover_url_vertical: "",
   sales_mode: "simples",
   is_published: false,
+  is_home_featured: false,
   tiers: [{ name: "Padrão", price_cents: 0, capacity: null, benefits: [], position: 0, is_active: true }],
 });
 
@@ -78,7 +82,9 @@ function EventsPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingCoverV, setUploadingCoverV] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const coverVInputRef = useRef<HTMLInputElement>(null);
 
   const { data } = useQuery({ queryKey: ["admin-events"], queryFn: () => fetchList() });
 
@@ -107,8 +113,10 @@ function EventsPage() {
       ends_at: toLocalInput(ev.ends_at),
       location_address: ev.location_address ?? "",
       cover_url: ev.cover_url ?? "",
+      cover_url_vertical: (ev as { cover_url_vertical?: string | null }).cover_url_vertical ?? "",
       sales_mode: ev.sales_mode as "simples" | "categorias",
       is_published: ev.is_published,
+      is_home_featured: (ev as { is_home_featured?: boolean }).is_home_featured ?? false,
       tiers: tiers.map((t) => ({
         id: t.id, name: t.name, price_cents: t.price_cents,
         capacity: t.capacity, benefits: (t.benefits as string[]) ?? [],
@@ -119,7 +127,7 @@ function EventsPage() {
   };
 
   const submit = async () => {
-    if (uploadingCover) return;
+    if (uploadingCover || uploadingCoverV) return;
     if (!form.title.trim()) { toast.error("Informe o título"); return; }
     if (!form.starts_at) { toast.error("Informe a data de início"); return; }
     try {
@@ -138,7 +146,10 @@ function EventsPage() {
     }
   };
 
-  const handleCoverFile = async (file: File | undefined | null) => {
+  const uploadCover = async (
+    file: File | undefined | null,
+    target: "cover_url" | "cover_url_vertical",
+  ) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Selecione um arquivo de imagem");
@@ -148,25 +159,31 @@ function EventsPage() {
       toast.error("Imagem maior que 5 MB. Reduza o arquivo e tente novamente.");
       return;
     }
-    setUploadingCover(true);
+    const setBusy = target === "cover_url" ? setUploadingCover : setUploadingCoverV;
+    const ref = target === "cover_url" ? coverInputRef : coverVInputRef;
+    setBusy(true);
     try {
       const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]+/g, "");
       const safeExt = ext.length > 0 && ext.length <= 5 ? ext : "jpg";
-      const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
+      const prefix = target === "cover_url" ? "covers" : "covers-vertical";
+      const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
       const { error: upErr } = await supabase.storage
         .from("event-covers")
         .upload(path, file, { cacheControl: "31536000", upsert: false, contentType: file.type });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("event-covers").getPublicUrl(path);
-      setForm((f) => ({ ...f, cover_url: pub.publicUrl }));
+      setForm((f) => ({ ...f, [target]: pub.publicUrl }));
       toast.success("Imagem enviada");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao enviar imagem");
     } finally {
-      setUploadingCover(false);
-      if (coverInputRef.current) coverInputRef.current.value = "";
+      setBusy(false);
+      if (ref.current) ref.current.value = "";
     }
   };
+
+  const handleCoverFile = (file: File | undefined | null) => uploadCover(file, "cover_url");
+  const handleCoverVFile = (file: File | undefined | null) => uploadCover(file, "cover_url_vertical");
 
   const onDelete = async (id: string) => {
     if (!confirm("Excluir evento e todos os ingressos?")) return;
@@ -218,9 +235,16 @@ function EventsPage() {
                     {new Date(ev.starts_at).toLocaleString("pt-BR")}
                   </p>
                 </div>
-                <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-display ${ev.is_published ? "bg-green-600/20 text-green-700" : "bg-muted text-admin-ink-muted"}`}>
-                  {ev.is_published ? "Publicado" : "Rascunho"}
-                </span>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-display ${ev.is_published ? "bg-green-600/20 text-green-700" : "bg-muted text-admin-ink-muted"}`}>
+                    {ev.is_published ? "Publicado" : "Rascunho"}
+                  </span>
+                  {(ev as { is_home_featured?: boolean }).is_home_featured && (
+                    <span className="text-[10px] uppercase px-2 py-0.5 rounded font-display bg-orange-brand/15 text-orange-brand">
+                      Em destaque
+                    </span>
+                  )}
+                </div>
               </div>
               <div className={`mt-3 grid ${isAdmin ? "grid-cols-3" : "grid-cols-2"} gap-2 text-xs`}>
                 <div><div className="text-admin-ink-muted">Vendidos</div><div className="font-display text-admin-ink">{sold}{cap ? `/${cap}` : ""}</div></div>
@@ -309,10 +333,73 @@ function EventsPage() {
                 Opcional. Tamanho máximo 5 MB. Resolução recomendada: 1600×900 (16:9).
               </p>
             </div>
-            <div className="flex gap-4 items-center">
+
+            <div>
+              <Label>Capa vertical (mobile / destaque vertical)</Label>
+              <input
+                ref={coverVInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => handleCoverVFile(e.target.files?.[0])}
+              />
+              {form.cover_url_vertical ? (
+                <div className="mt-2 relative rounded-lg overflow-hidden border border-admin-border max-w-[220px]">
+                  <img src={form.cover_url_vertical} alt="Capa vertical" className="w-full aspect-[4/5] object-cover" />
+                  <div className="absolute top-2 right-2 flex gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={uploadingCoverV}
+                      onClick={() => coverVInputRef.current?.click()}
+                    >
+                      {uploadingCoverV ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      Trocar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={uploadingCoverV}
+                      onClick={() => setForm({ ...form, cover_url_vertical: "" })}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={uploadingCoverV}
+                  onClick={() => coverVInputRef.current?.click()}
+                  className="mt-2 w-full border-2 border-dashed border-admin-border rounded-lg p-6 flex flex-col items-center justify-center gap-2 hover:border-admin-accent transition-colors disabled:opacity-60"
+                >
+                  {uploadingCoverV ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-admin-accent" />
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-admin-ink-muted" />
+                  )}
+                  <span className="text-sm text-admin-ink">
+                    {uploadingCoverV ? "Enviando..." : "Selecionar imagem vertical"}
+                  </span>
+                </button>
+              )}
+              <p className="text-[11px] text-admin-ink-muted mt-1">
+                Opcional. Usada no mobile e em destaques verticais. Resolução recomendada: 1080×1350 (4:5).
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-4 items-center">
               <div className="flex items-center gap-2"><Switch checked={form.sales_mode === "categorias"} onCheckedChange={(v) => setForm({ ...form, sales_mode: v ? "categorias" : "simples" })} /><Label>Múltiplas categorias</Label></div>
               <div className="flex items-center gap-2"><Switch checked={form.is_published} onCheckedChange={(v) => setForm({ ...form, is_published: v })} /><Label>Publicado</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.is_home_featured} onCheckedChange={(v) => setForm({ ...form, is_home_featured: v })} /><Label>Destacar na home</Label></div>
             </div>
+            {form.is_home_featured && (
+              <p className="text-[11px] text-orange-brand -mt-2">
+                Ao salvar, este será o único evento em destaque na página inicial — qualquer outro destaque atual será substituído.
+              </p>
+            )}
 
             <div className="border-t border-admin-border pt-3">
               <div className="flex justify-between items-center mb-2">

@@ -30,23 +30,37 @@ export const listPublishedEvents = createServerFn({ method: "GET" })
 export const listHomeEvents = createServerFn({ method: "GET" })
   .handler(async () => {
     const nowIso = new Date().toISOString();
-    const [{ data: upcoming }, { data: past }] = await Promise.all([
+    const cols = "id,slug,title,starts_at,cover_url,cover_url_vertical,location_address,is_home_featured";
+    const [{ data: featured }, { data: upcoming }, { data: past }] = await Promise.all([
       supabaseAdmin
         .from("events")
-        .select("id,slug,title,starts_at,cover_url,location_address")
+        .select(cols)
+        .eq("is_published", true)
+        .eq("is_home_featured", true)
+        .order("starts_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("events")
+        .select(cols)
         .eq("is_published", true)
         .gte("starts_at", nowIso)
         .order("starts_at", { ascending: true })
-        .limit(3),
+        .limit(6),
       supabaseAdmin
         .from("events")
-        .select("id,slug,title,starts_at,cover_url,location_address")
+        .select(cols)
         .eq("is_published", true)
         .lt("starts_at", nowIso)
         .order("starts_at", { ascending: false })
         .limit(12),
     ]);
-    return { upcoming: upcoming ?? [], past: past ?? [] };
+    const featuredId = featured?.id ?? null;
+    return {
+      featured: featured ?? null,
+      upcoming: (upcoming ?? []).filter((e) => e.id !== featuredId).slice(0, 3),
+      past: (past ?? []).filter((e) => e.id !== featuredId),
+    };
   });
 
 const generateCode = () => {
