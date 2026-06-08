@@ -247,17 +247,68 @@ function EventsPage() {
             <DialogTitle className="font-display">{form.id ? "Editar" : "Novo"} evento</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Título</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value, slug: form.slug || e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") })} /></div>
-              <div><Label>Slug</Label><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></div>
-            </div>
+            <div><Label>Título</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
             <div><Label>Descrição</Label><Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Início</Label><Input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></div>
               <div><Label>Fim (opcional)</Label><Input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></div>
             </div>
             <div><Label>Endereço</Label><Input value={form.location_address} onChange={(e) => setForm({ ...form, location_address: e.target.value })} placeholder="Gran Via, 40, Madrid" /></div>
-            <div><Label>URL da capa (imagem)</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://..." /></div>
+            <div>
+              <Label>Capa do evento</Label>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => handleCoverFile(e.target.files?.[0])}
+              />
+              {form.cover_url ? (
+                <div className="mt-2 relative rounded-lg overflow-hidden border border-admin-border">
+                  <img src={form.cover_url} alt="Capa" className="w-full h-40 object-cover" />
+                  <div className="absolute top-2 right-2 flex gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={uploadingCover}
+                      onClick={() => coverInputRef.current?.click()}
+                    >
+                      {uploadingCover ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      Trocar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={uploadingCover}
+                      onClick={() => setForm({ ...form, cover_url: "" })}
+                    >
+                      <X className="h-3 w-3" /> Remover
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={uploadingCover}
+                  onClick={() => coverInputRef.current?.click()}
+                  className="mt-2 w-full border-2 border-dashed border-admin-border rounded-lg p-6 flex flex-col items-center justify-center gap-2 hover:border-admin-accent transition-colors disabled:opacity-60"
+                >
+                  {uploadingCover ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-admin-accent" />
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-admin-ink-muted" />
+                  )}
+                  <span className="text-sm text-admin-ink">
+                    {uploadingCover ? "Enviando..." : "Selecionar imagem"}
+                  </span>
+                </button>
+              )}
+              <p className="text-[11px] text-admin-ink-muted mt-1">
+                Opcional. Tamanho máximo 5 MB. Resolução recomendada: 1600×900 (16:9).
+              </p>
+            </div>
             <div className="flex gap-4 items-center">
               <div className="flex items-center gap-2"><Switch checked={form.sales_mode === "categorias"} onCheckedChange={(v) => setForm({ ...form, sales_mode: v ? "categorias" : "simples" })} /><Label>Múltiplas categorias</Label></div>
               <div className="flex items-center gap-2"><Switch checked={form.is_published} onCheckedChange={(v) => setForm({ ...form, is_published: v })} /><Label>Publicado</Label></div>
