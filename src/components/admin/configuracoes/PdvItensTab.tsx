@@ -299,8 +299,7 @@ export function PdvItensTab() {
                       {cat ? `${cat.emoji ?? ""} ${cat.name}`.trim() : <span className="italic opacity-60">—</span>}
                     </td>
                     <td className="p-3 text-right tabular-nums">
-                      <div>R$ {(brl / 100).toFixed(2)}</div>
-                      <div className="text-[11px] text-admin-ink-muted">€ {(eur / 100).toFixed(2)}</div>
+                      <div>€ {(eur / 100).toFixed(2)}</div>
                     </td>
                     <td className="p-3 text-right tabular-nums">
                       {isService || !tracks ? (
