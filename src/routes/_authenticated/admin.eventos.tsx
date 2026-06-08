@@ -46,7 +46,6 @@ type Tier = {
 
 type FormState = {
   id?: string;
-  slug: string;
   title: string;
   description: string;
   starts_at: string;
@@ -59,7 +58,6 @@ type FormState = {
 };
 
 const emptyForm = (): FormState => ({
-  slug: "",
   title: "",
   description: "",
   starts_at: "",
