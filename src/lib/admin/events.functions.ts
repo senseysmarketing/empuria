@@ -121,6 +121,7 @@ export const upsertEvent = createServerFn({ method: "POST" })
       ...eventData,
       slug: finalSlug,
       cover_url: eventData.cover_url || null,
+      cover_url_vertical: eventData.cover_url_vertical || null,
       ends_at: eventData.ends_at || null,
       description: eventData.description || null,
       location_address: eventData.location_address || null,
