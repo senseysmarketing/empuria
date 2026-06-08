@@ -498,11 +498,14 @@ export function PdvTabsPanel() {
                         </div>
                         {permissions?.canRemoveItem && (
                           <button
-                            disabled={isBusy}
+                            disabled={cancelItemMut.isPending}
                             onClick={() => {
                               const ageMs = Date.now() - new Date(item.created_at).getTime();
                               if (ageMs < 60_000) {
-                                cancelItemMut.mutate({ itemId: item.id });
+                                cancelItemMut.mutate({
+                                  itemId: item.id,
+                                  reason: "Removido pelo operador",
+                                });
                                 return;
                               }
                               setReason("");
@@ -520,7 +523,7 @@ export function PdvTabsPanel() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0"
-                            disabled={item.qty <= 1 || isBusy}
+                            disabled={item.qty <= 1 || qtyMut.isPending}
                             onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty - 1 })}
                           >
                             <Minus className="h-3 w-3" />
@@ -530,7 +533,7 @@ export function PdvTabsPanel() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0"
-                            disabled={isBusy}
+                            disabled={qtyMut.isPending}
                             onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty + 1 })}
                           >
                             <Plus className="h-3 w-3" />
