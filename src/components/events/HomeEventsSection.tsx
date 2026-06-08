@@ -192,7 +192,7 @@ export function HomeEventsSection() {
               );
             })}
           </div>
-        ) : (
+        ) : featured ? null : (
           // CENÁRIO B — card convite
           <Reveal>
             <div className="mt-14 relative overflow-hidden rounded-2xl bg-brown bg-topo text-offwhite p-10 md:p-16 border border-yellow-brand/20 shadow-warm">
