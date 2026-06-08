@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
+import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
+
 
 export const checkEmail = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ email: z.string().trim().email().max(255) }).parse(d))
@@ -131,7 +133,7 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
           original_currency: service.currency,
         },
         payment_status: "pendente",
-        payment_provider: "mercadopago",
+        payment_provider: "wise",
         payment_amount_cents: paymentAmountCents,
         payment_currency: paymentCurrency,
         external_reference: "pending",
@@ -139,6 +141,36 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
       .select()
       .single();
     if (orderErr || !order) throw new Error(orderErr?.message ?? "Erro ao criar pedido");
+
+    // Generate Wise payment (V1: EUR only). If currency is not EUR, fall back
+    // to a plain reference so the checkout doesn't crash for legacy services
+    // — admin can fill the EUR price afterwards.
+    if (paymentCurrency === "EUR") {
+      try {
+        const wise = await createWisePaymentForOrder({
+          orderId: order.id,
+          amountCents: paymentAmountCents,
+          currency: paymentCurrency,
+          description: service.title,
+          customerEmail,
+        });
+        return {
+          orderId: order.id,
+          reference: wise.reference,
+          amountCents: paymentAmountCents,
+          currency: paymentCurrency,
+          provider: "wise" as const,
+          paymentUrl: wise.paymentUrl,
+          iban: wise.iban,
+          bic: wise.bic,
+          beneficiaryName: wise.beneficiaryName,
+          manualOnly: wise.manualOnly,
+        };
+      } catch (err) {
+        console.error("[wise] createWisePaymentForOrder failed", err);
+        // proceed with a plain reference so the user can still see the order
+      }
+    }
 
     const reference = `EMP-${order.id}`;
     await supabaseAdmin
@@ -151,6 +183,12 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
       reference,
       amountCents: paymentAmountCents,
       currency: paymentCurrency,
+      provider: "wise" as const,
+      paymentUrl: null as string | null,
+      iban: null as string | null,
+      bic: null as string | null,
+      beneficiaryName: null as string | null,
+      manualOnly: true,
     };
   });
 
