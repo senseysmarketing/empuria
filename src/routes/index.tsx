@@ -34,10 +34,10 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "O primeiro instituto de imigração brasileiro do mundo. Na Gran Vía, em Madrid. Recepção no aeroporto, consultoria imigratória, espaço físico de acolhimento e mais.",
+          "O primeiro instituto de imigração brasileiro do mundo. Na Gran Via, 40, em Madrid. Recepção no aeroporto, consultoria imigratória, espaço físico de acolhimento e mais.",
       },
       { property: "og:title", content: "Instituto Empuria — A Casa do Brasileiro em Madrid" },
-      { property: "og:description", content: "Nenhum brasileiro está sozinho. Gran Vía, Madrid." },
+      { property: "og:description", content: "Nenhum brasileiro está sozinho. Gran Via, 40 · Madrid." },
     ],
   }),
   component: HomePage,
