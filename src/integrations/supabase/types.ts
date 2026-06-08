@@ -1712,11 +1712,13 @@ export type Database = {
         Row: {
           cover_kind: string
           cover_url: string | null
+          cover_url_vertical: string | null
           created_at: string
           created_by: string | null
           description: string | null
           ends_at: string | null
           id: string
+          is_home_featured: boolean
           is_published: boolean
           location_address: string | null
           location_lat: number | null
@@ -1730,11 +1732,13 @@ export type Database = {
         Insert: {
           cover_kind?: string
           cover_url?: string | null
+          cover_url_vertical?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           ends_at?: string | null
           id?: string
+          is_home_featured?: boolean
           is_published?: boolean
           location_address?: string | null
           location_lat?: number | null
@@ -1748,11 +1752,13 @@ export type Database = {
         Update: {
           cover_kind?: string
           cover_url?: string | null
+          cover_url_vertical?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           ends_at?: string | null
           id?: string
+          is_home_featured?: boolean
           is_published?: boolean
           location_address?: string | null
           location_lat?: number | null
