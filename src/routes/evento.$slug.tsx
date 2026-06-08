@@ -109,12 +109,33 @@ function EventPage() {
             <p className="font-display text-xl mt-1">{dateLabel}</p>
           </div>
         </div>
-        <div className="col-span-12 md:col-span-4 bg-brown text-offwhite rounded-2xl p-6 flex flex-col justify-between min-h-[180px]">
+        <div className="col-span-12 md:col-span-4 bg-brown text-offwhite rounded-2xl p-6 flex flex-col gap-4 min-h-[180px]">
           <MapPin className="h-6 w-6" />
           <div>
             <p className="text-xs uppercase tracking-widest font-display opacity-80">Onde</p>
-            <p className="font-display text-base mt-1">{event.location_address ?? "Local a definir"}</p>
+            {event.location_address ? (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location_address)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-display text-base mt-1 inline-block hover:underline"
+              >
+                {event.location_address}
+              </a>
+            ) : (
+              <p className="font-display text-base mt-1">Local a definir</p>
+            )}
           </div>
+          {event.location_address && (
+            <iframe
+              title="Mapa do local do evento"
+              src={`https://www.google.com/maps?q=${encodeURIComponent(event.location_address)}&output=embed`}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+              className="w-full h-[220px] rounded-xl border-0 bg-black/20 mt-auto"
+            />
+          )}
         </div>
         <div className="col-span-12 md:col-span-8 bg-offwhite border border-brown/20 rounded-2xl p-8">
           <h2 className="font-display uppercase tracking-widest text-xs opacity-60 mb-4">Ingressos</h2>
