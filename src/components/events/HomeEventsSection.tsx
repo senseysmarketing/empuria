@@ -13,11 +13,14 @@ type EventRow = {
   title: string;
   starts_at: string;
   cover_url: string | null;
+  cover_url_vertical?: string | null;
   location_address: string | null;
+  is_home_featured?: boolean;
 };
 
 const dayFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit" });
 const monthFmt = new Intl.DateTimeFormat("pt-BR", { month: "short" });
+const fullDateFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
 function formatTag(iso: string) {
   const d = new Date(iso);
@@ -33,6 +36,7 @@ export function HomeEventsSection() {
     queryFn: () => fetchEvents(),
   });
 
+  const featured = (data?.featured ?? null) as EventRow | null;
   const upcoming = (data?.upcoming ?? []) as EventRow[];
   const past = (data?.past ?? []) as EventRow[];
 
