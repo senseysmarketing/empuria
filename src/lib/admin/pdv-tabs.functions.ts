@@ -257,10 +257,6 @@ export const cancelPdvTabItem = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => cancelItemSchema.parse(data))
   .handler(async ({ data, context }) => {
-    if (!context.isAdmin) {
-      const allowed = await userHasAction(context.userId, "pdv.remove_tab_item");
-      if (!allowed) throw new Error("Sem permissao para remover itens da comanda.");
-    }
     const { error } = await pdvDb.rpc<null>("pdv_cancel_tab_item", {
       p_item_id: data.itemId,
       p_actor_id: context.userId,
@@ -291,20 +287,6 @@ export const cancelPdvTab = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => cancelTabSchema.parse(data))
   .handler(async ({ data, context }) => {
-    let allowed = context.isAdmin;
-    if (!context.isAdmin) {
-      allowed = await userHasAction(context.userId, "pdv.cancel_tab");
-      if (!allowed) {
-        const { data: activeItemsRaw, error: itemsError } = await supabaseAdmin
-          .from("pdv_tab_items")
-          .select("id")
-          .eq("tab_id", data.tabId)
-          .is("cancelled_at", null);
-        if (itemsError) throw new Error(itemsError.message);
-        allowed = (activeItemsRaw ?? []).length === 0;
-      }
-      if (!allowed) throw new Error("Sem permissao para cancelar comandas com itens.");
-    }
     const { error } = await pdvDb.rpc<null>("pdv_cancel_tab", {
       p_tab_id: data.tabId,
       p_actor_id: context.userId,
