@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BentoCard } from "@/components/admin/BentoCard";
@@ -6,11 +6,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Tags, Boxes, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { listPdvItems, createPdvItem, updatePdvItem, deletePdvItem } from "@/lib/admin/pdv-itens.functions";
+import {
+  listPdvItems,
+  createPdvItem,
+  updatePdvItem,
+  deletePdvItem,
+} from "@/lib/admin/pdv-itens.functions";
 import { listCategories } from "@/lib/admin/categories.functions";
 import { CategoriesManagerModal } from "./CategoriesManagerModal";
 import { EmojiPickerField } from "@/components/admin/EmojiPickerField";
@@ -41,7 +59,52 @@ const emptyForm = {
   stock_min_quantity: 0,
 };
 
+const NO_CATEGORY_VALUE = "__none";
+
+class PdvItensErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[PdvItensTab] render crash", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <BentoCard padded>
+          <div className="space-y-3">
+            <h3 className="font-display text-lg text-admin-ink">Erro ao carregar itens do PDV</h3>
+            <p className="text-sm text-admin-ink-muted">
+              A lista de itens encontrou um dado inesperado. Tente recarregar esta aba.
+            </p>
+            <Button
+              type="button"
+              onClick={() => this.setState({ error: null })}
+              className="bg-admin-accent text-white"
+            >
+              Tentar de novo
+            </Button>
+          </div>
+        </BentoCard>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function PdvItensTab() {
+  return (
+    <PdvItensErrorBoundary>
+      <PdvItensTabContent />
+    </PdvItensErrorBoundary>
+  );
+}
+
+function PdvItensTabContent() {
   const fetchList = useServerFn(listPdvItems);
   const fetchCategories = useServerFn(listCategories);
   const create = useServerFn(createPdvItem);
@@ -59,12 +122,23 @@ export function PdvItensTab() {
     queryFn: () => fetchCategories(),
   });
 
+  const activeCategories = useMemo(() => categories.filter((c) => c.is_active), [categories]);
+
   const [editing, setEditing] = useState<Item | null>(null);
   const [open, setOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [stockProduct, setStockProduct] = useState<{ id: string; name: string; stock_quantity: number } | null>(null);
+  const [stockProduct, setStockProduct] = useState<{
+    id: string;
+    name: string;
+    stock_quantity: number;
+  } | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const formCategoryOptions = useMemo(
+    () =>
+      categories.filter((c) => c.is_active || (!!form.category_id && c.id === form.category_id)),
+    [categories, form.category_id],
+  );
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("__all");
@@ -77,7 +151,9 @@ export function PdvItensTab() {
     const q = search.trim().toLowerCase();
     return items.filter((raw) => {
       const it = raw as Item & { item_type?: string };
-      if (q && !it.name.toLowerCase().includes(q) && !it.slug.toLowerCase().includes(q)) return false;
+      const name = String(it.name ?? "").toLowerCase();
+      const slug = String(it.slug ?? "").toLowerCase();
+      if (q && !name.includes(q) && !slug.includes(q)) return false;
       if (categoryFilter !== "__all" && it.category_id !== categoryFilter) return false;
       if (typeFilter === "produto" && it.item_type === "servico") return false;
       if (typeFilter === "servico" && it.item_type !== "servico") return false;
@@ -102,18 +178,26 @@ export function PdvItensTab() {
     setPage(1);
   };
 
-  const onFilterChange = <T,>(setter: (v: T) => void) => (v: T) => {
-    setter(v);
-    setPage(1);
-  };
+  const onFilterChange =
+    <T,>(setter: (v: T) => void) =>
+    (v: T) => {
+      setter(v);
+      setPage(1);
+    };
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, position: items.length, category_id: categories[0]?.id ?? "" });
+    setForm({ ...emptyForm, position: items.length, category_id: activeCategories[0]?.id ?? "" });
     setOpen(true);
   };
   const openEdit = (item: Item) => {
-    const it = item as Item & { item_type?: string; price_eur_cents?: number; price_brl_cents?: number; track_stock?: boolean; stock_min_quantity?: number };
+    const it = item as Item & {
+      item_type?: string;
+      price_eur_cents?: number;
+      price_brl_cents?: number;
+      track_stock?: boolean;
+      stock_min_quantity?: number;
+    };
     setEditing(item);
     setForm({
       name: item.name,
@@ -123,8 +207,8 @@ export function PdvItensTab() {
       category_id: item.category_id ?? "",
       emoji: item.emoji ?? "",
       is_active: item.is_active,
-      position: item.position,
-      item_type: (it.item_type === "servico" ? "servico" : "produto"),
+      position: Number.isFinite(Number(item.position)) ? Number(item.position) : 0,
+      item_type: it.item_type === "servico" ? "servico" : "produto",
       track_stock: !!it.track_stock,
       stock_min_quantity: it.stock_min_quantity ?? 0,
     });
@@ -135,14 +219,23 @@ export function PdvItensTab() {
     try {
       await update({ data: { id: item.id, is_active: v } });
       qc.invalidateQueries({ queryKey: ["pdv-itens"] });
-    } catch (e) { console.error("[PdvItensTab] toggleActive", e); toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) {
+      console.error("[PdvItensTab] toggleActive", e);
+      toast.error(e instanceof Error ? e.message : "Erro");
+    }
   };
 
   const save = async () => {
-    if (!form.category_id) { toast.error("Selecione uma categoria"); return; }
+    if (!form.category_id) {
+      toast.error("Selecione uma categoria");
+      return;
+    }
     const name = form.name.trim();
     const slug = slugify(name);
-    if (!slug) { toast.error("Informe um nome válido"); return; }
+    if (!slug) {
+      toast.error("Informe um nome válido");
+      return;
+    }
     if (items.some((i) => i.slug === slug && (!editing || i.id !== editing.id))) {
       toast.error("Já existe um item com este nome.");
       return;
@@ -158,18 +251,27 @@ export function PdvItensTab() {
         category_id: form.category_id,
         emoji: form.emoji.trim() || null,
         is_active: form.is_active,
-        position: form.position,
+        position: Number.isFinite(Number(form.position)) ? Number(form.position) : 0,
         item_type: form.item_type,
         track_stock: form.item_type === "produto" ? form.track_stock : false,
-        stock_min_quantity: form.stock_min_quantity,
+        stock_min_quantity: Number.isFinite(Number(form.stock_min_quantity))
+          ? Number(form.stock_min_quantity)
+          : 0,
       };
       if (editing) await update({ data: { id: editing.id, ...payload } });
       else await create({ data: payload });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["pdv-itens"] }),
+        qc.invalidateQueries({ queryKey: ["pdv-catalog"] }),
+      ]);
       toast.success(editing ? "Item atualizado" : "Item criado");
       setOpen(false);
-      qc.invalidateQueries({ queryKey: ["pdv-itens"] });
-    } catch (e) { console.error("[PdvItensTab] save", e); toast.error(e instanceof Error ? e.message : "Erro"); }
-    finally { setSaving(false); }
+    } catch (e) {
+      console.error("[PdvItensTab] save", e);
+      toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const del = async (item: Item) => {
@@ -178,7 +280,10 @@ export function PdvItensTab() {
       await remove({ data: { id: item.id } });
       toast.success("Item removido");
       qc.invalidateQueries({ queryKey: ["pdv-itens"] });
-    } catch (e) { console.error("[PdvItensTab] del", e); toast.error(e instanceof Error ? e.message : "Erro"); }
+    } catch (e) {
+      console.error("[PdvItensTab] del", e);
+      toast.error(e instanceof Error ? e.message : "Erro");
+    }
   };
 
   return (
@@ -198,30 +303,52 @@ export function PdvItensTab() {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-admin-ink-muted" />
             <Input
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               placeholder="Buscar por nome ou slug…"
               className="pl-8 bg-admin-bg border-admin-border h-9"
             />
           </div>
           <Select value={categoryFilter} onValueChange={onFilterChange(setCategoryFilter)}>
-            <SelectTrigger className="w-[170px] h-9 bg-admin-bg border-admin-border"><SelectValue placeholder="Categoria" /></SelectTrigger>
+            <SelectTrigger className="w-[170px] h-9 bg-admin-bg border-admin-border">
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all">Todas as categorias</SelectItem>
               {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.emoji ? `${c.emoji} ` : ""}{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>
+                  {c.emoji ? `${c.emoji} ` : ""}
+                  {c.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={typeFilter} onValueChange={onFilterChange((v: string) => setTypeFilter(v as "all" | "produto" | "servico"))}>
-            <SelectTrigger className="w-[130px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+          <Select
+            value={typeFilter}
+            onValueChange={onFilterChange((v: string) =>
+              setTypeFilter(v as "all" | "produto" | "servico"),
+            )}
+          >
+            <SelectTrigger className="w-[130px] h-9 bg-admin-bg border-admin-border">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="produto">Produto</SelectItem>
               <SelectItem value="servico">Serviço</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={onFilterChange((v: string) => setStatusFilter(v as "all" | "active" | "inactive"))}>
-            <SelectTrigger className="w-[130px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+          <Select
+            value={statusFilter}
+            onValueChange={onFilterChange((v: string) =>
+              setStatusFilter(v as "all" | "active" | "inactive"),
+            )}
+          >
+            <SelectTrigger className="w-[130px] h-9 bg-admin-bg border-admin-border">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos status</SelectItem>
               <SelectItem value="active">Ativos</SelectItem>
@@ -229,7 +356,11 @@ export function PdvItensTab() {
             </SelectContent>
           </Select>
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="outline" onClick={() => setCategoriesOpen(true)} className="border-admin-border h-9">
+            <Button
+              variant="outline"
+              onClick={() => setCategoriesOpen(true)}
+              className="border-admin-border h-9"
+            >
               <Tags className="h-4 w-4" /> Gerenciar Categorias
             </Button>
             <Button onClick={openCreate} className="bg-admin-accent text-white h-9">
@@ -268,7 +399,11 @@ export function PdvItensTab() {
                   available_stock_quantity?: number;
                   stock_min_quantity?: number;
                 };
-                const cat = (raw as Item & { product_categories?: { name: string; emoji: string | null } | null }).product_categories;
+                const cat = (
+                  raw as Item & {
+                    product_categories?: { name?: string | null; emoji?: string | null } | null;
+                  }
+                ).product_categories;
                 const eur = it.price_eur_cents ?? it.price_cents;
                 const brl = it.price_brl_cents ?? 0;
                 const isService = it.item_type === "servico";
@@ -280,7 +415,7 @@ export function PdvItensTab() {
                 const low = tracks && available <= min;
                 return (
                   <tr key={it.id} className="border-t border-admin-border hover:bg-admin-bg/50">
-                    <td className="p-3 text-admin-ink-muted tabular-nums">{it.position}</td>
+                    <td className="p-3 text-admin-ink-muted tabular-nums">{it.position ?? 0}</td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         {it.emoji && <span className="text-lg">{it.emoji}</span>}
@@ -291,12 +426,18 @@ export function PdvItensTab() {
                       </div>
                     </td>
                     <td className="p-3">
-                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${isService ? "bg-blue-500/10 text-blue-600" : "bg-emerald-500/10 text-emerald-600"}`}>
+                      <span
+                        className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded ${isService ? "bg-blue-500/10 text-blue-600" : "bg-emerald-500/10 text-emerald-600"}`}
+                      >
                         {isService ? "Serviço" : "Produto"}
                       </span>
                     </td>
                     <td className="p-3 text-admin-ink-muted">
-                      {cat ? `${cat.emoji ?? ""} ${cat.name}`.trim() : <span className="italic opacity-60">—</span>}
+                      {cat?.name ? (
+                        `${cat.emoji ?? ""} ${cat.name}`.trim()
+                      ) : (
+                        <span className="italic opacity-60">—</span>
+                      )}
                     </td>
                     <td className="p-3 text-right tabular-nums">
                       <div>€ {(eur / 100).toFixed(2)}</div>
@@ -324,12 +465,23 @@ export function PdvItensTab() {
                     <td className="p-3 text-right">
                       <div className="inline-flex gap-1">
                         {tracks && !isService && (
-                          <Button variant="ghost" size="sm" title="Movimentações" onClick={() => setStockProduct({ id: it.id, name: it.name, stock_quantity: stock })}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Movimentações"
+                            onClick={() =>
+                              setStockProduct({ id: it.id, name: it.name, stock_quantity: stock })
+                            }
+                          >
                             <Boxes className="h-3.5 w-3.5" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(it)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="sm" onClick={() => del(it)}><Trash2 className="h-3.5 w-3.5 text-red-500" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(it)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => del(it)}>
+                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -343,7 +495,9 @@ export function PdvItensTab() {
                     ) : (
                       <>
                         Nenhum item corresponde aos filtros.{" "}
-                        <button onClick={resetFilters} className="text-admin-accent underline">Limpar filtros</button>
+                        <button onClick={resetFilters} className="text-admin-accent underline">
+                          Limpar filtros
+                        </button>
                       </>
                     )}
                   </td>
@@ -356,8 +510,16 @@ export function PdvItensTab() {
             <div className="flex items-center justify-between gap-3 p-3 border-t border-admin-border flex-wrap">
               <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
                 <span>Por página:</span>
-                <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(parseInt(v, 10)); setPage(1); }}>
-                  <SelectTrigger className="h-8 w-[80px] bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => {
+                    setPageSize(parseInt(v, 10));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[80px] bg-admin-bg border-admin-border">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="10">10</SelectItem>
                     <SelectItem value="25">25</SelectItem>
@@ -366,11 +528,25 @@ export function PdvItensTab() {
                 </Select>
               </div>
               <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
-                <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="h-8"
+                >
                   <ChevronLeft className="h-3.5 w-3.5" /> Anterior
                 </Button>
-                <span className="tabular-nums">Página {safePage} de {totalPages}</span>
-                <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="h-8">
+                <span className="tabular-nums">
+                  Página {safePage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="h-8"
+                >
                   Próximo <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -379,29 +555,42 @@ export function PdvItensTab() {
         </div>
       )}
 
-
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-admin-surface border-admin-border text-admin-ink">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">{editing ? "Editar item" : "Novo item"}</DialogTitle>
+            <DialogTitle className="font-display text-2xl">
+              {editing ? "Editar item" : "Novo item"}
+            </DialogTitle>
             <DialogDescription>Preencha os dados do item do PDV.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-[auto_1fr] gap-3 items-end">
               <div className="space-y-1.5">
                 <Label>Emoji</Label>
-                <EmojiPickerField value={form.emoji} onChange={(v) => setForm({ ...form, emoji: v })} />
+                <EmojiPickerField
+                  value={form.emoji}
+                  onChange={(v) => setForm({ ...form, emoji: v })}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Nome</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-admin-bg border-admin-border" />
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="bg-admin-bg border-admin-border"
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Tipo</Label>
-                <Select value={form.item_type} onValueChange={(v) => setForm({ ...form, item_type: v as "produto" | "servico" })}>
-                  <SelectTrigger className="bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+                <Select
+                  value={form.item_type}
+                  onValueChange={(v) => setForm({ ...form, item_type: v as "produto" | "servico" })}
+                >
+                  <SelectTrigger className="bg-admin-bg border-admin-border">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="produto">Produto</SelectItem>
                     <SelectItem value="servico">Serviço</SelectItem>
@@ -410,11 +599,24 @@ export function PdvItensTab() {
               </div>
               <div className="space-y-1.5">
                 <Label>Categoria</Label>
-                <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
-                  <SelectTrigger className="bg-admin-bg border-admin-border"><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                <Select
+                  value={form.category_id || NO_CATEGORY_VALUE}
+                  onValueChange={(v) =>
+                    setForm({ ...form, category_id: v === NO_CATEGORY_VALUE ? "" : v })
+                  }
+                >
+                  <SelectTrigger className="bg-admin-bg border-admin-border">
+                    <SelectValue placeholder="Selecione…" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {categories.filter((c) => c.is_active || c.id === form.category_id).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.emoji ? `${c.emoji} ` : ""}{c.name}</SelectItem>
+                    <SelectItem value={NO_CATEGORY_VALUE} disabled>
+                      Selecione uma categoria
+                    </SelectItem>
+                    {formCategoryOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.emoji ? `${c.emoji} ` : ""}
+                        {c.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -427,7 +629,12 @@ export function PdvItensTab() {
                   type="number"
                   step="0.01"
                   value={(form.price_eur_cents / 100).toFixed(2)}
-                  onChange={(e) => setForm({ ...form, price_eur_cents: Math.round(parseFloat(e.target.value || "0") * 100) })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      price_eur_cents: Math.round(parseFloat(e.target.value || "0") * 100),
+                    })
+                  }
                   className="bg-admin-bg border-admin-border"
                 />
               </div>
@@ -438,14 +645,30 @@ export function PdvItensTab() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label>Controlar estoque</Label>
-                    <p className="text-[11px] text-admin-ink-muted mt-0.5">Quando ativo, vendas dão baixa automática.</p>
+                    <p className="text-[11px] text-admin-ink-muted mt-0.5">
+                      Quando ativo, vendas dão baixa automática.
+                    </p>
                   </div>
-                  <Switch checked={form.track_stock} onCheckedChange={(v) => setForm({ ...form, track_stock: v })} />
+                  <Switch
+                    checked={form.track_stock}
+                    onCheckedChange={(v) => setForm({ ...form, track_stock: v })}
+                  />
                 </div>
                 {form.track_stock && (
                   <div className="space-y-1.5">
                     <Label>Estoque mínimo (alerta)</Label>
-                    <Input type="number" min={0} value={form.stock_min_quantity} onChange={(e) => setForm({ ...form, stock_min_quantity: parseInt(e.target.value || "0", 10) })} className="bg-admin-bg border-admin-border" />
+                    <Input
+                      type="number"
+                      min={0}
+                      value={form.stock_min_quantity}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          stock_min_quantity: parseInt(e.target.value || "0", 10),
+                        })
+                      }
+                      className="bg-admin-bg border-admin-border"
+                    />
                   </div>
                 )}
               </div>
@@ -454,17 +677,35 @@ export function PdvItensTab() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Ordem</Label>
-                <Input type="number" value={form.position} onChange={(e) => setForm({ ...form, position: parseInt(e.target.value || "0", 10) })} className="bg-admin-bg border-admin-border" />
+                <Input
+                  type="number"
+                  value={form.position}
+                  onChange={(e) =>
+                    setForm({ ...form, position: parseInt(e.target.value || "0", 10) })
+                  }
+                  className="bg-admin-bg border-admin-border"
+                />
               </div>
               <div className="flex items-end justify-between rounded-lg border border-admin-border p-3">
                 <Label>Ativo</Label>
-                <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
+                <Switch
+                  checked={form.is_active}
+                  onCheckedChange={(v) => setForm({ ...form, is_active: v })}
+                />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={save} disabled={saving || !form.name.trim() || !form.category_id} className="bg-admin-accent text-white">Salvar</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={save}
+              disabled={saving || !form.name.trim() || !form.category_id}
+              className="bg-admin-accent text-white"
+            >
+              Salvar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -472,7 +713,9 @@ export function PdvItensTab() {
       <CategoriesManagerModal open={categoriesOpen} onOpenChange={setCategoriesOpen} />
       <StockMovementsDialog
         open={!!stockProduct}
-        onOpenChange={(v) => { if (!v) setStockProduct(null); }}
+        onOpenChange={(v) => {
+          if (!v) setStockProduct(null);
+        }}
         product={stockProduct}
       />
     </BentoCard>
