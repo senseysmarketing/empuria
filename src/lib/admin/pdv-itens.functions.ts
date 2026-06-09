@@ -31,7 +31,12 @@ export const listPdvItems = createServerFn({ method: "GET" })
 
 const itemSchema = z.object({
   name: z.string().trim().min(1).max(160),
-  slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9_-]+$/, "Use apenas letras minúsculas, números, - ou _"),
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(160)
+    .regex(/^[a-z0-9_-]+$/, "Use apenas letras minúsculas, números, - ou _"),
   price_cents: z.number().int().min(0).max(10_000_000),
   price_eur_cents: z.number().int().min(0).max(10_000_000).default(0),
   price_brl_cents: z.number().int().min(0).max(10_000_000).default(0),
@@ -46,7 +51,40 @@ const itemSchema = z.object({
 
 function friendlyItemError(error: { code?: string; message: string }): Error {
   if (error.code === "23505") return new Error("Já existe um item com este nome.");
+  if (error.code === "23503") {
+    return new Error("Categoria, usuario ou referencia vinculada ao item nao foi encontrada.");
+  }
+  if (error.code === "428C9") {
+    return new Error("Um campo calculado do estoque nao pode ser editado diretamente.");
+  }
   return new Error(error.message);
+}
+
+async function writePdvItemAudit(payload: {
+  actor_id: string;
+  action: string;
+  entity_id: string;
+  old_data?: unknown;
+  new_data?: unknown;
+}) {
+  const { error } = await supabaseAdmin.from("audit_logs").insert({
+    actor_id: payload.actor_id,
+    action: payload.action,
+    module: "pdv_itens",
+    entity_type: "product",
+    entity_id: payload.entity_id,
+    old_data: payload.old_data as never,
+    new_data: payload.new_data as never,
+  });
+  if (error) {
+    console.error("[pdv-itens] audit_logs insert failed", {
+      action: payload.action,
+      entity_id: payload.entity_id,
+      actor_id: payload.actor_id,
+      code: error.code,
+      message: error.message,
+    });
+  }
 }
 
 export const createPdvItem = createServerFn({ method: "POST" })
@@ -60,11 +98,9 @@ export const createPdvItem = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw friendlyItemError(error);
-    await supabaseAdmin.from("audit_logs").insert({
+    await writePdvItemAudit({
       actor_id: context.userId,
       action: "pdv_item.created",
-      module: "pdv_itens",
-      entity_type: "product",
       entity_id: row.id,
       new_data: data,
     });
@@ -76,18 +112,20 @@ export const updatePdvItem = createServerFn({ method: "POST" })
   .inputValidator((d) => itemSchema.partial().extend({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { id, ...patch } = data;
-    const { data: old } = await supabaseAdmin.from("products").select("*").eq("id", id).maybeSingle();
+    const { data: old } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
     const finalPatch = { ...patch } as typeof patch & { category?: LegacyEnum };
     if (patch.category_id) {
       finalPatch.category = await resolveLegacyEnum(patch.category_id);
     }
     const { error } = await supabaseAdmin.from("products").update(finalPatch).eq("id", id);
     if (error) throw friendlyItemError(error);
-    await supabaseAdmin.from("audit_logs").insert({
+    await writePdvItemAudit({
       actor_id: context.userId,
       action: "pdv_item.updated",
-      module: "pdv_itens",
-      entity_type: "product",
       entity_id: id,
       old_data: old as never,
       new_data: patch as never,
@@ -101,11 +139,9 @@ export const deletePdvItem = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { error } = await supabaseAdmin.from("products").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
-    await supabaseAdmin.from("audit_logs").insert({
+    await writePdvItemAudit({
       actor_id: context.userId,
       action: "pdv_item.deleted",
-      module: "pdv_itens",
-      entity_type: "product",
       entity_id: data.id,
     });
     return { ok: true };
