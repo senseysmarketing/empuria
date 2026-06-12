@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 import appCss from "../styles.css?url";
+import { installGlobalErrorReporter } from "@/lib/client-error-reporter";
 
 function NotFoundComponent() {
   return (
@@ -132,6 +133,7 @@ function AuthStateSync() {
   const router = useRouter();
   const queryClient = useQueryClient();
   useEffect(() => {
+    installGlobalErrorReporter();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
