@@ -131,15 +131,20 @@ function PdvItensTabContent() {
   const remove = useServerFn(deletePdvItem);
   const qc = useQueryClient();
 
-  const { data: items = [], isLoading } = useQuery({
+  const itemsQuery = useQuery({
     queryKey: ["pdv-itens"],
     queryFn: () => fetchList(),
+    retry: 1,
   });
-
-  const { data: categories = [] } = useQuery({
+  const categoriesQuery = useQuery({
     queryKey: ["pdv-categories"],
     queryFn: () => fetchCategories(),
+    retry: 1,
   });
+  const items = Array.isArray(itemsQuery.data) ? itemsQuery.data : [];
+  const categories = Array.isArray(categoriesQuery.data) ? categoriesQuery.data : [];
+  const isLoading = itemsQuery.isLoading || categoriesQuery.isLoading;
+  const loadError = itemsQuery.error ?? categoriesQuery.error;
 
   const activeCategories = useMemo(() => categories.filter((c) => c.is_active), [categories]);
 
