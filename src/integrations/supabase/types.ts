@@ -322,6 +322,48 @@ export type Database = {
         }
         Relationships: []
       }
+      client_error_logs: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          extra: Json | null
+          id: string
+          message: string
+          scope: string
+          stack: string | null
+          url: string | null
+          user_agent: string | null
+          user_id: string | null
+          user_label: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          extra?: Json | null
+          id?: string
+          message: string
+          scope: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          user_label?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          extra?: Json | null
+          id?: string
+          message?: string
+          scope?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          user_label?: string | null
+        }
+        Relationships: []
+      }
       club_benefits: {
         Row: {
           category: Database["public"]["Enums"]["product_category"] | null

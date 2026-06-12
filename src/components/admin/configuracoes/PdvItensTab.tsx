@@ -1,4 +1,4 @@
-import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BentoCard } from "@/components/admin/BentoCard";
@@ -61,7 +61,12 @@ const emptyForm = {
 
 const NO_CATEGORY_VALUE = "__none";
 
-class PdvItensErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+import { reportError } from "@/lib/client-error-reporter";
+
+class PdvItensErrorBoundary extends Component<
+  { children: ReactNode; onReset?: () => void },
+  { error: Error | null }
+> {
   state: { error: Error | null } = { error: null };
 
   static getDerivedStateFromError(error: Error) {
@@ -70,20 +75,29 @@ class PdvItensErrorBoundary extends Component<{ children: ReactNode }, { error: 
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[PdvItensTab] render crash", error, info);
+    reportError("PdvItensTab.render", error, { componentStack: info.componentStack });
   }
 
   render() {
     if (this.state.error) {
+      const msg = this.state.error.message || "Erro desconhecido";
       return (
         <BentoCard padded>
           <div className="space-y-3">
             <h3 className="font-display text-lg text-admin-ink">Erro ao carregar itens do PDV</h3>
             <p className="text-sm text-admin-ink-muted">
-              A lista de itens encontrou um dado inesperado. Tente recarregar esta aba.
+              A lista de itens encontrou um dado inesperado. Detalhes técnicos abaixo — uma cópia foi
+              enviada automaticamente para a equipe.
             </p>
+            <pre className="text-[11px] bg-admin-bg p-2 rounded border border-admin-border overflow-auto max-h-32 whitespace-pre-wrap">
+              {msg}
+            </pre>
             <Button
               type="button"
-              onClick={() => this.setState({ error: null })}
+              onClick={() => {
+                this.setState({ error: null });
+                this.props.onReset?.();
+              }}
               className="bg-admin-accent text-white"
             >
               Tentar de novo
@@ -97,8 +111,13 @@ class PdvItensErrorBoundary extends Component<{ children: ReactNode }, { error: 
 }
 
 export function PdvItensTab() {
+  const qc = useQueryClient();
+  const handleReset = () => {
+    qc.invalidateQueries({ queryKey: ["pdv-itens"] });
+    qc.invalidateQueries({ queryKey: ["pdv-categories"] });
+  };
   return (
-    <PdvItensErrorBoundary>
+    <PdvItensErrorBoundary onReset={handleReset}>
       <PdvItensTabContent />
     </PdvItensErrorBoundary>
   );
@@ -112,15 +131,36 @@ function PdvItensTabContent() {
   const remove = useServerFn(deletePdvItem);
   const qc = useQueryClient();
 
-  const { data: items = [], isLoading } = useQuery({
+  const itemsQuery = useQuery({
     queryKey: ["pdv-itens"],
     queryFn: () => fetchList(),
+    retry: 1,
   });
-
-  const { data: categories = [] } = useQuery({
+  const categoriesQuery = useQuery({
     queryKey: ["pdv-categories"],
     queryFn: () => fetchCategories(),
+    retry: 1,
   });
+  const items = Array.isArray(itemsQuery.data) ? itemsQuery.data : [];
+  const categories = Array.isArray(categoriesQuery.data) ? categoriesQuery.data : [];
+  const isLoading = itemsQuery.isLoading || categoriesQuery.isLoading;
+  const loadError = itemsQuery.error ?? categoriesQuery.error;
+
+  const reportedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!loadError) {
+      reportedErrorRef.current = null;
+      return;
+    }
+    const key = loadError instanceof Error ? loadError.message : String(loadError);
+    if (reportedErrorRef.current === key) return;
+    reportedErrorRef.current = key;
+    reportError("PdvItensTab.query", loadError, {
+      itemsError: itemsQuery.error instanceof Error ? itemsQuery.error.message : null,
+      categoriesError:
+        categoriesQuery.error instanceof Error ? categoriesQuery.error.message : null,
+    });
+  }, [loadError, itemsQuery.error, categoriesQuery.error]);
 
   const activeCategories = useMemo(() => categories.filter((c) => c.is_active), [categories]);
 
@@ -372,6 +412,25 @@ function PdvItensTabContent() {
 
       {isLoading ? (
         <div className="p-8 text-center text-admin-ink-muted text-sm">Carregando…</div>
+      ) : loadError ? (
+        <div className="p-6 space-y-3">
+          <h4 className="font-display text-base text-admin-ink">Erro ao carregar itens do PDV</h4>
+          <p className="text-sm text-admin-ink-muted">
+            Não conseguimos buscar os dados agora. Uma cópia do erro foi enviada para a equipe.
+          </p>
+          <pre className="text-[11px] bg-admin-bg p-2 rounded border border-admin-border overflow-auto max-h-32 whitespace-pre-wrap">
+            {loadError instanceof Error ? loadError.message : String(loadError)}
+          </pre>
+          <Button
+            onClick={() => {
+              itemsQuery.refetch();
+              categoriesQuery.refetch();
+            }}
+            className="bg-admin-accent text-white"
+          >
+            Tentar de novo
+          </Button>
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
