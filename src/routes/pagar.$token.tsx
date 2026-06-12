@@ -62,8 +62,8 @@ declare global {
   }
 }
 
-function money(cents: number, currency = "BRL") {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(cents / 100);
+function money(cents: number, currency = "EUR") {
+  return new Intl.NumberFormat("pt-PT", { style: "currency", currency }).format(cents / 100);
 }
 
 function onlyDigits(value: string) {
