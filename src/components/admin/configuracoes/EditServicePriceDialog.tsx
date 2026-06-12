@@ -260,15 +260,16 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
 
           {/* Preço */}
           <div className="space-y-2">
-            <Label>Valor cobrado no site (BRL)</Label>
-            <div className="grid grid-cols-[1fr_84px] gap-2">
+            <Label>Valor cobrado no site (EUR)</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-admin-ink-muted">€</span>
               <Input
                 inputMode="decimal"
                 value={priceInput}
                 onChange={(e) => setPriceInput(e.target.value)}
                 placeholder="0,00"
+                className="pl-7"
               />
-              <Input value="BRL" readOnly />
             </div>
           </div>
 
