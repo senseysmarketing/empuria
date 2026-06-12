@@ -52,7 +52,7 @@ export const updateServicePrice = createServerFn({ method: "POST" })
         description: z.string().trim().max(4000).nullable().optional(),
         image_url: z.string().trim().max(800).nullable().optional(),
         online_price_cents: z.number().int().min(0),
-        online_currency: z.enum(["BRL", "EUR", "USD"]).default("BRL"),
+        online_currency: z.literal("EUR").default("EUR"),
         display_price_note: z.string().trim().max(180).nullable().optional(),
         is_active: z.boolean(),
         requires_slot: z.boolean(),
