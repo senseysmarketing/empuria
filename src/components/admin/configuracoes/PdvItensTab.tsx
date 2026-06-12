@@ -61,7 +61,12 @@ const emptyForm = {
 
 const NO_CATEGORY_VALUE = "__none";
 
-class PdvItensErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+import { reportError } from "@/lib/client-error-reporter";
+
+class PdvItensErrorBoundary extends Component<
+  { children: ReactNode; onReset?: () => void },
+  { error: Error | null }
+> {
   state: { error: Error | null } = { error: null };
 
   static getDerivedStateFromError(error: Error) {
@@ -70,20 +75,29 @@ class PdvItensErrorBoundary extends Component<{ children: ReactNode }, { error: 
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[PdvItensTab] render crash", error, info);
+    reportError("PdvItensTab.render", error, { componentStack: info.componentStack });
   }
 
   render() {
     if (this.state.error) {
+      const msg = this.state.error.message || "Erro desconhecido";
       return (
         <BentoCard padded>
           <div className="space-y-3">
             <h3 className="font-display text-lg text-admin-ink">Erro ao carregar itens do PDV</h3>
             <p className="text-sm text-admin-ink-muted">
-              A lista de itens encontrou um dado inesperado. Tente recarregar esta aba.
+              A lista de itens encontrou um dado inesperado. Detalhes técnicos abaixo — uma cópia foi
+              enviada automaticamente para a equipe.
             </p>
+            <pre className="text-[11px] bg-admin-bg p-2 rounded border border-admin-border overflow-auto max-h-32 whitespace-pre-wrap">
+              {msg}
+            </pre>
             <Button
               type="button"
-              onClick={() => this.setState({ error: null })}
+              onClick={() => {
+                this.setState({ error: null });
+                this.props.onReset?.();
+              }}
               className="bg-admin-accent text-white"
             >
               Tentar de novo
@@ -97,8 +111,13 @@ class PdvItensErrorBoundary extends Component<{ children: ReactNode }, { error: 
 }
 
 export function PdvItensTab() {
+  const qc = useQueryClient();
+  const handleReset = () => {
+    qc.invalidateQueries({ queryKey: ["pdv-itens"] });
+    qc.invalidateQueries({ queryKey: ["pdv-categories"] });
+  };
   return (
-    <PdvItensErrorBoundary>
+    <PdvItensErrorBoundary onReset={handleReset}>
       <PdvItensTabContent />
     </PdvItensErrorBoundary>
   );
