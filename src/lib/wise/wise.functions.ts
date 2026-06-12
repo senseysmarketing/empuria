@@ -21,17 +21,28 @@ const db = supabaseAdmin as unknown as {
   rpc: (fn: string, args?: Record<string, unknown>) => Promise<any>;
 };
 
+export type WiseWebhookSubscription = {
+  key: "balances#credit" | "transfers#state-change" | "transfers#active-cases" | string;
+  enabled: boolean;
+};
+
 export type WiseSetting = {
   is_enabled: boolean;
   wise_environment: WiseEnvironment;
   wise_api_token: string | null;
   wise_profile_id: string | null;
+  wise_profile_name: string | null;
+  wise_profile_type: string | null;
   wise_balance_id_eur: string | null;
+  wise_balance_currency: string | null;
   wise_beneficiary_name: string | null;
+  wise_beneficiary_address: string | null;
   wise_iban: string | null;
   wise_bic: string | null;
+  wise_bank_address: string | null;
   wise_default_payment_url: string | null;
   wise_webhook_public_key: string | null;
+  wise_webhook_subscriptions: WiseWebhookSubscription[];
   wise_last_event_at: string | null;
   wise_confirmation_mode: string;
 };
@@ -51,26 +62,35 @@ async function loadSetting(): Promise<WiseSetting> {
   const { data } = await db
     .from("integration_settings")
     .select(
-      "is_enabled,wise_environment,wise_api_token,wise_profile_id,wise_balance_id_eur,wise_beneficiary_name,wise_iban,wise_bic,wise_default_payment_url,wise_webhook_public_key,wise_last_event_at,wise_confirmation_mode",
+      "is_enabled,wise_environment,wise_api_token,wise_profile_id,wise_profile_name,wise_profile_type,wise_balance_id_eur,wise_balance_currency,wise_beneficiary_name,wise_beneficiary_address,wise_iban,wise_bic,wise_bank_address,wise_default_payment_url,wise_webhook_public_key,wise_webhook_subscriptions,wise_last_event_at,wise_confirmation_mode",
     )
     .eq("provider", "wise")
     .maybeSingle();
   const row = (data ?? null) as Partial<WiseSetting> | null;
   return {
     is_enabled: !!row?.is_enabled,
-    wise_environment: (row?.wise_environment as WiseEnvironment) ?? "sandbox",
+    wise_environment: (row?.wise_environment as WiseEnvironment) ?? "live",
     wise_api_token: row?.wise_api_token ?? null,
     wise_profile_id: row?.wise_profile_id ?? null,
+    wise_profile_name: row?.wise_profile_name ?? null,
+    wise_profile_type: row?.wise_profile_type ?? null,
     wise_balance_id_eur: row?.wise_balance_id_eur ?? null,
+    wise_balance_currency: row?.wise_balance_currency ?? "EUR",
     wise_beneficiary_name: row?.wise_beneficiary_name ?? null,
+    wise_beneficiary_address: row?.wise_beneficiary_address ?? null,
     wise_iban: row?.wise_iban ?? null,
     wise_bic: row?.wise_bic ?? null,
+    wise_bank_address: row?.wise_bank_address ?? null,
     wise_default_payment_url: row?.wise_default_payment_url ?? null,
     wise_webhook_public_key: row?.wise_webhook_public_key ?? null,
+    wise_webhook_subscriptions: Array.isArray(row?.wise_webhook_subscriptions)
+      ? (row?.wise_webhook_subscriptions as WiseWebhookSubscription[])
+      : [],
     wise_last_event_at: row?.wise_last_event_at ?? null,
     wise_confirmation_mode: row?.wise_confirmation_mode ?? "webhook_and_manual",
   };
 }
+
 
 export const getWiseAdminOverview = createServerFn({ method: "POST" })
   .middleware([requireStaff])
