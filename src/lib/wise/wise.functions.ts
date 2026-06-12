@@ -115,17 +115,27 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
     };
   });
 
+const webhookSubSchema = z.object({
+  key: z.string().trim().min(1).max(60),
+  enabled: z.boolean(),
+});
+
 const saveSchema = z.object({
   is_enabled: z.boolean(),
-  wise_environment: z.enum(["sandbox", "live"]),
   wise_api_token: z.string().trim().min(1).max(500).nullable(),
   wise_profile_id: z.string().trim().max(60).nullable(),
+  wise_profile_name: z.string().trim().max(200).nullable(),
+  wise_profile_type: z.string().trim().max(40).nullable(),
   wise_balance_id_eur: z.string().trim().max(60).nullable(),
+  wise_balance_currency: z.string().trim().max(8).nullable(),
   wise_beneficiary_name: z.string().trim().max(120).nullable(),
+  wise_beneficiary_address: z.string().trim().max(300).nullable(),
   wise_iban: z.string().trim().max(60).nullable(),
   wise_bic: z.string().trim().max(20).nullable(),
+  wise_bank_address: z.string().trim().max(300).nullable(),
   wise_default_payment_url: z.string().trim().url().max(500).nullable(),
   wise_webhook_public_key: z.string().trim().max(4000).nullable(),
+  wise_webhook_subscriptions: z.array(webhookSubSchema).max(10).default([]),
   wise_confirmation_mode: z.enum(["webhook_only", "manual_only", "webhook_and_manual"]),
 });
 
@@ -140,15 +150,21 @@ export const saveWiseSettings = createServerFn({ method: "POST" })
       .from("integration_settings")
       .update({
         is_enabled: data.is_enabled,
-        wise_environment: data.wise_environment,
+        wise_environment: "live",
         wise_api_token: tokenToWrite,
         wise_profile_id: data.wise_profile_id,
+        wise_profile_name: data.wise_profile_name,
+        wise_profile_type: data.wise_profile_type,
         wise_balance_id_eur: data.wise_balance_id_eur,
+        wise_balance_currency: data.wise_balance_currency ?? "EUR",
         wise_beneficiary_name: data.wise_beneficiary_name,
+        wise_beneficiary_address: data.wise_beneficiary_address,
         wise_iban: data.wise_iban,
         wise_bic: data.wise_bic,
+        wise_bank_address: data.wise_bank_address,
         wise_default_payment_url: data.wise_default_payment_url,
         wise_webhook_public_key: data.wise_webhook_public_key,
+        wise_webhook_subscriptions: data.wise_webhook_subscriptions,
         wise_confirmation_mode: data.wise_confirmation_mode,
       })
       .eq("provider", "wise");
@@ -156,21 +172,97 @@ export const saveWiseSettings = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Test the API token (or an override token) and return profiles. */
 export const testWiseConnection = createServerFn({ method: "POST" })
   .middleware([requireStaff])
-  .handler(async () => {
+  .inputValidator((d) =>
+    z.object({ token: z.string().trim().min(10).max(500).optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ data }) => {
     const setting = await loadSetting();
-    const token = tokenFromSettingOrEnv(setting);
-    if (!token) return { ok: false, message: "Token Wise nao configurado." };
-    const client: WiseClientOptions = { token, environment: setting.wise_environment };
+    const token = data.token ?? tokenFromSettingOrEnv(setting);
+    if (!token) return { ok: false, message: "Token Wise nao configurado.", profiles: [] as Array<{ id: string; type: string; name: string | null }> };
+    const client: WiseClientOptions = { token, environment: "live" };
     const res = await listWiseProfiles(client);
-    if (!res.ok) return { ok: false, message: res.error };
+    if (!res.ok) return { ok: false, message: res.error, profiles: [] as Array<{ id: string; type: string; name: string | null }> };
     return {
       ok: true,
       message: `Wise OK · ${res.data.length} perfil(s) encontrado(s).`,
-      profiles: res.data.map((p) => ({ id: p.id, type: p.type, name: p.fullName ?? null })),
+      profiles: res.data.map((p) => ({ id: String(p.id), type: p.type, name: p.fullName ?? null })),
     };
   });
+
+/** List balances (saldos) of a given profile. */
+export const listWiseProfileBalances = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z
+      .object({
+        profileId: z.string().trim().min(1).max(60),
+        token: z.string().trim().min(10).max(500).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const setting = await loadSetting();
+    const token = data.token ?? tokenFromSettingOrEnv(setting);
+    if (!token) return { ok: false, message: "Token Wise nao configurado.", balances: [] as Array<{ id: string; currency: string; name: string | null }> };
+    const res = await listWiseBalances({ token, environment: "live" }, data.profileId);
+    if (!res.ok) return { ok: false, message: res.error, balances: [] as Array<{ id: string; currency: string; name: string | null }> };
+    return {
+      ok: true,
+      message: `Wise OK · ${res.data.length} saldo(s) encontrado(s).`,
+      balances: res.data.map((b) => ({ id: String(b.id), currency: b.currency, name: b.name ?? null })),
+    };
+  });
+
+/** Fetch EUR bank account details (IBAN/BIC/beneficiary/bank address) for a profile. */
+export const fetchWiseEurBankDetails = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z
+      .object({
+        profileId: z.string().trim().min(1).max(60),
+        token: z.string().trim().min(10).max(500).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const setting = await loadSetting();
+    const token = data.token ?? tokenFromSettingOrEnv(setting);
+    if (!token) return { ok: false, message: "Token Wise nao configurado.", details: null };
+    const res = await listWiseAccountDetails({ token, environment: "live" }, data.profileId);
+    if (!res.ok) return { ok: false, message: res.error, details: null };
+    const eur = (res.data ?? []).find((a) => String(a.currency ?? "").toUpperCase() === "EUR");
+    if (!eur || !eur.bankDetails) {
+      return { ok: false, message: "Conta EUR sem dados bancarios disponiveis via API. Preencha manualmente.", details: null };
+    }
+    const b = eur.bankDetails;
+    const bankAddr = b.bankAddress
+      ? [b.bankAddress.addressFirstLine, b.bankAddress.city, b.bankAddress.postCode, b.bankAddress.country]
+          .filter(Boolean)
+          .join(", ")
+      : null;
+    const benAddr = b.address
+      ? [b.address.addressFirstLine, b.address.city, b.address.postCode, b.address.country]
+          .filter(Boolean)
+          .join(", ")
+      : null;
+    return {
+      ok: true,
+      message: "Dados bancarios EUR carregados.",
+      details: {
+        iban: b.iban ?? null,
+        bic: b.bic ?? b.swift ?? null,
+        beneficiaryName: b.accountHolderName ?? null,
+        beneficiaryAddress: benAddr,
+        bankName: b.bankName ?? null,
+        bankAddress: bankAddr,
+      },
+    };
+  });
+
+
 
 /* ============================================================
    Internal: called by checkout to mint a Wise payment for an order.
