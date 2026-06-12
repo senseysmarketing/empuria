@@ -412,6 +412,25 @@ function PdvItensTabContent() {
 
       {isLoading ? (
         <div className="p-8 text-center text-admin-ink-muted text-sm">Carregando…</div>
+      ) : loadError ? (
+        <div className="p-6 space-y-3">
+          <h4 className="font-display text-base text-admin-ink">Erro ao carregar itens do PDV</h4>
+          <p className="text-sm text-admin-ink-muted">
+            Não conseguimos buscar os dados agora. Uma cópia do erro foi enviada para a equipe.
+          </p>
+          <pre className="text-[11px] bg-admin-bg p-2 rounded border border-admin-border overflow-auto max-h-32 whitespace-pre-wrap">
+            {loadError instanceof Error ? loadError.message : String(loadError)}
+          </pre>
+          <Button
+            onClick={() => {
+              itemsQuery.refetch();
+              categoriesQuery.refetch();
+            }}
+            className="bg-admin-accent text-white"
+          >
+            Tentar de novo
+          </Button>
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
