@@ -6,10 +6,13 @@ import { requireStaff } from "@/lib/admin/auth";
 import {
   createWisePaymentLink,
   getWisePaymentLink,
+  listWiseAccountDetails,
+  listWiseBalances,
   listWiseProfiles,
   type WiseClientOptions,
   type WiseEnvironment,
 } from "./wise-api.server";
+
 
 const db = supabaseAdmin as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
