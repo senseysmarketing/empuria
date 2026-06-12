@@ -38,12 +38,23 @@ type WisePayload = {
 };
 
 function pickReference(p: WisePayload): string | null {
-  if (typeof p.reference === "string") return p.reference;
-  if (p.data && typeof (p.data as Record<string, unknown>).reference === "string") {
-    return (p.data as Record<string, unknown>).reference as string;
+  const candidates: unknown[] = [
+    p.reference,
+    (p.data as Record<string, unknown> | undefined)?.reference,
+    (p.data as Record<string, unknown> | undefined)?.description,
+    (p.data as Record<string, unknown> | undefined)?.transaction_reference,
+    (p.data as Record<string, unknown> | undefined)?.merchant_reference,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string") {
+      const match = c.match(/EMP-\d{3,}/i);
+      if (match) return match[0].toUpperCase();
+      if (c.trim()) return c.trim();
+    }
   }
   return null;
 }
+
 
 function pickAmountCents(p: WisePayload): number | null {
   const a =
