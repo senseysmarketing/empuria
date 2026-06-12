@@ -66,6 +66,47 @@ export async function listWiseProfiles(client: WiseClientOptions) {
   return wiseFetch<WiseProfile[]>(client, "/v2/profiles", { method: "GET" });
 }
 
+export type WiseBalance = {
+  id: number | string;
+  currency: string;
+  type?: string;
+  name?: string | null;
+  amount?: { value?: number; currency?: string } | null;
+};
+
+export async function listWiseBalances(client: WiseClientOptions, profileId: string | number) {
+  return wiseFetch<WiseBalance[]>(
+    client,
+    `/v4/profiles/${profileId}/balances?types=STANDARD`,
+    { method: "GET" },
+  );
+}
+
+export type WiseAccountDetail = {
+  id?: number | string;
+  currency?: string;
+  bankDetails?: {
+    iban?: string | null;
+    bic?: string | null;
+    swift?: string | null;
+    accountNumber?: string | null;
+    bankName?: string | null;
+    bankAddress?: { addressFirstLine?: string | null; city?: string | null; country?: string | null; postCode?: string | null } | null;
+    accountHolderName?: string | null;
+    address?: { addressFirstLine?: string | null; city?: string | null; country?: string | null; postCode?: string | null } | null;
+  } | null;
+  title?: string | null;
+};
+
+export async function listWiseAccountDetails(client: WiseClientOptions, profileId: string | number) {
+  return wiseFetch<WiseAccountDetail[]>(
+    client,
+    `/v1/profiles/${profileId}/account-details`,
+    { method: "GET" },
+  );
+}
+
+
 export type WisePaymentLinkPayload = {
   amount: number; // major units, e.g. 199.50
   currency: string; // ISO 4217, e.g. "EUR"
