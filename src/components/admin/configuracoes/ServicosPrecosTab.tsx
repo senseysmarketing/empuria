@@ -150,7 +150,7 @@ export function ServicosPrecosTab() {
                       </div>
                     </td>
                     <td className="p-3 text-right tabular-nums">
-                      <div className="text-admin-ink">{money(cents, "BRL")}</div>
+                      <div className="text-admin-ink">{money(cents, "EUR")}</div>
                       {showZeroWarn && (
                         <div className="mt-0.5 text-[10px] text-amber-600">
                           Valor zerado
