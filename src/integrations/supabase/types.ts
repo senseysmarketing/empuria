@@ -2137,7 +2137,10 @@ export type Database = {
           webhook_secret: string | null
           whatsapp_group_url: string | null
           wise_api_token: string | null
+          wise_balance_currency: string | null
           wise_balance_id_eur: string | null
+          wise_bank_address: string | null
+          wise_beneficiary_address: string | null
           wise_beneficiary_name: string | null
           wise_bic: string | null
           wise_confirmation_mode: string | null
@@ -2146,7 +2149,10 @@ export type Database = {
           wise_iban: string | null
           wise_last_event_at: string | null
           wise_profile_id: string | null
+          wise_profile_name: string | null
+          wise_profile_type: string | null
           wise_webhook_public_key: string | null
+          wise_webhook_subscriptions: Json
         }
         Insert: {
           access_token?: string | null
@@ -2178,7 +2184,10 @@ export type Database = {
           webhook_secret?: string | null
           whatsapp_group_url?: string | null
           wise_api_token?: string | null
+          wise_balance_currency?: string | null
           wise_balance_id_eur?: string | null
+          wise_bank_address?: string | null
+          wise_beneficiary_address?: string | null
           wise_beneficiary_name?: string | null
           wise_bic?: string | null
           wise_confirmation_mode?: string | null
@@ -2187,7 +2196,10 @@ export type Database = {
           wise_iban?: string | null
           wise_last_event_at?: string | null
           wise_profile_id?: string | null
+          wise_profile_name?: string | null
+          wise_profile_type?: string | null
           wise_webhook_public_key?: string | null
+          wise_webhook_subscriptions?: Json
         }
         Update: {
           access_token?: string | null
@@ -2219,7 +2231,10 @@ export type Database = {
           webhook_secret?: string | null
           whatsapp_group_url?: string | null
           wise_api_token?: string | null
+          wise_balance_currency?: string | null
           wise_balance_id_eur?: string | null
+          wise_bank_address?: string | null
+          wise_beneficiary_address?: string | null
           wise_beneficiary_name?: string | null
           wise_bic?: string | null
           wise_confirmation_mode?: string | null
@@ -2228,7 +2243,10 @@ export type Database = {
           wise_iban?: string | null
           wise_last_event_at?: string | null
           wise_profile_id?: string | null
+          wise_profile_name?: string | null
+          wise_profile_type?: string | null
           wise_webhook_public_key?: string | null
+          wise_webhook_subscriptions?: Json
         }
         Relationships: []
       }
