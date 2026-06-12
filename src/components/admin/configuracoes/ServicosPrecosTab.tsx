@@ -14,8 +14,8 @@ import { getServiceImage } from "@/lib/service-images";
 import { Pencil, Search } from "lucide-react";
 import { EditServicePriceDialog, type ServiceRow } from "./EditServicePriceDialog";
 
-function money(cents: number, currency = "BRL") {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(cents / 100);
+function money(cents: number, currency = "EUR") {
+  return new Intl.NumberFormat("pt-PT", { style: "currency", currency }).format(cents / 100);
 }
 
 function rulesSummary(s: ServiceRow): string {
