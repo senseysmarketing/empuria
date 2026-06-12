@@ -145,7 +145,7 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
           description: description.trim() || null,
           image_url: imageUrl,
           online_price_cents: cents,
-          online_currency: "BRL",
+          online_currency: "EUR",
           display_price_note: note.trim() || null,
           is_active: isActive,
           requires_slot: requiresSlot,
