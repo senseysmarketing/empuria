@@ -14,8 +14,8 @@ import { getServiceImage } from "@/lib/service-images";
 import { Pencil, Search } from "lucide-react";
 import { EditServicePriceDialog, type ServiceRow } from "./EditServicePriceDialog";
 
-function money(cents: number, currency = "BRL") {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(cents / 100);
+function money(cents: number, currency = "EUR") {
+  return new Intl.NumberFormat("pt-PT", { style: "currency", currency }).format(cents / 100);
 }
 
 function rulesSummary(s: ServiceRow): string {
@@ -150,7 +150,7 @@ export function ServicosPrecosTab() {
                       </div>
                     </td>
                     <td className="p-3 text-right tabular-nums">
-                      <div className="text-admin-ink">{money(cents, "BRL")}</div>
+                      <div className="text-admin-ink">{money(cents, "EUR")}</div>
                       {showZeroWarn && (
                         <div className="mt-0.5 text-[10px] text-amber-600">
                           Valor zerado

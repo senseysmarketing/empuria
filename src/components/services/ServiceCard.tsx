@@ -27,7 +27,7 @@ export type PublicService = {
 function formatPrice(service: PublicService) {
   const cents = service.online_price_cents ?? service.price_cents;
   const currency = service.online_currency ?? service.currency;
-  return new Intl.NumberFormat("pt-BR", {
+  return new Intl.NumberFormat("pt-PT", {
     style: "currency",
     currency,
     maximumFractionDigits: 0,

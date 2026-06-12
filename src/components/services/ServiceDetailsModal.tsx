@@ -51,7 +51,7 @@ export function ServiceDetailsModal<T extends DetailedService>({
 }) {
   if (!service) return null;
   const Icon = ICONS[service.kind] ?? MapPin;
-  const price = new Intl.NumberFormat("pt-BR", {
+  const price = new Intl.NumberFormat("pt-PT", {
     style: "currency",
     currency: service.online_currency ?? service.currency,
   }).format((service.online_price_cents ?? service.price_cents) / 100);
