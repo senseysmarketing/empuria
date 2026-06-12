@@ -146,6 +146,22 @@ function PdvItensTabContent() {
   const isLoading = itemsQuery.isLoading || categoriesQuery.isLoading;
   const loadError = itemsQuery.error ?? categoriesQuery.error;
 
+  const reportedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!loadError) {
+      reportedErrorRef.current = null;
+      return;
+    }
+    const key = loadError instanceof Error ? loadError.message : String(loadError);
+    if (reportedErrorRef.current === key) return;
+    reportedErrorRef.current = key;
+    reportError("PdvItensTab.query", loadError, {
+      itemsError: itemsQuery.error instanceof Error ? itemsQuery.error.message : null,
+      categoriesError:
+        categoriesQuery.error instanceof Error ? categoriesQuery.error.message : null,
+    });
+  }, [loadError, itemsQuery.error, categoriesQuery.error]);
+
   const activeCategories = useMemo(() => categories.filter((c) => c.is_active), [categories]);
 
   const [editing, setEditing] = useState<Item | null>(null);
