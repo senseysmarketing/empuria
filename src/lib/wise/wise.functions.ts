@@ -318,9 +318,12 @@ export async function createWisePaymentForOrder(args: {
 
   const token = tokenFromSettingOrEnv(setting);
   const profileId = setting.wise_profile_id;
-  const manualOnly = setting.wise_confirmation_mode === "manual_only" || !token || !profileId;
+  const balanceId = setting.wise_balance_id_eur;
+  const manualOnlyMode = setting.wise_confirmation_mode === "manual_only";
 
-  if (!existing && !manualOnly && token && profileId) {
+  let apiError: { status: number; error: string; body: unknown } | null = null;
+
+  if (!existing && !manualOnlyMode && token && profileId) {
     const client: WiseClientOptions = { token, environment: setting.wise_environment };
     const description = (args.description ?? "Instituto Empuria").slice(0, 100);
     raw_request = {
@@ -328,25 +331,30 @@ export async function createWisePaymentForOrder(args: {
       currency: args.currency,
       reference: reference.slice(0, 35),
       description,
+      balanceId,
     };
-    const created = await createWisePaymentLink(client, profileId, {
+    const created = await createWisePaymentRequest(client, profileId, {
       amount: args.amountCents / 100,
       currency: args.currency,
       reference: reference.slice(0, 35),
       description,
+      balanceId,
       metadata: { order_id: args.orderId, reference },
     });
     if (!created.ok) {
-      // Fallback to manual mode rather than blocking the user.
-      raw_response = { error: created.error, body: created.body as unknown };
+      apiError = { status: created.status, error: created.error, body: created.body };
+      raw_response = { error: created.error, status: created.status, body: created.body as unknown };
     } else {
       raw_response = created.data as unknown as Record<string, unknown>;
-      paymentUrl =
-        (created.data.paymentUrl as string | undefined) ??
-        (created.data.url as string | undefined) ??
-        null;
+      paymentUrl = pickHostedUrl(created.data);
     }
   }
+
+  // Fallback chain: configured default link → null (IBAN-only UX)
+  if (!paymentUrl) {
+    paymentUrl = setting.wise_default_payment_url ?? null;
+  }
+  const manualOnly = !paymentUrl;
 
   if (!existing) {
     const { data: inserted, error } = await db
@@ -369,6 +377,7 @@ export async function createWisePaymentForOrder(args: {
     if (error) throw new Error(error.message);
     wisePaymentId = inserted.id as string;
   }
+
 
   // Update order to wise/EUR
   await db
