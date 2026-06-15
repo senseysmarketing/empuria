@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Banknote, CheckCircle2, ChevronDown, Copy, Download, Loader2 } from "lucide-react";
+import { AlertTriangle, Banknote, CheckCircle2, ChevronDown, Copy, Download, Loader2, Zap } from "lucide-react";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
   listWiseProfileBalances,
   saveWiseSettings,
   testWiseConnection,
+  testWisePaymentCreation,
   type WiseSetting,
   type WiseWebhookSubscription,
 } from "@/lib/wise/wise.functions";
@@ -84,6 +85,7 @@ export function WiseIntegrationCard() {
   const testFn = useServerFn(testWiseConnection);
   const balancesFn = useServerFn(listWiseProfileBalances);
   const bankFn = useServerFn(fetchWiseEurBankDetails);
+  const testPaymentFn = useServerFn(testWisePaymentCreation);
 
   const [open, setOpen] = useState(false);
   const [enabled, setEnabled] = useState(false);
