@@ -273,6 +273,22 @@ export function WiseIntegrationCard() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar Wise"),
   });
 
+  const testPaymentMutation = useMutation({
+    mutationFn: () => testPaymentFn(),
+    onSuccess: (r) => {
+      if (r.ok && r.link) {
+        toast.success("Link Wise gerado! Abrindo em nova aba...");
+        window.open(r.link, "_blank", "noopener");
+      } else if (r.ok) {
+        toast.message(r.message);
+      } else {
+        toast.error(r.message);
+      }
+      q.refetch();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar pagamento"),
+  });
+
   const webhookUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/api/public/webhooks/wise`
