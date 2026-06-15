@@ -489,7 +489,7 @@ export const refreshWisePaymentStatus = createServerFn({ method: "POST" })
       const setting = await loadSetting();
       const token = tokenFromSettingOrEnv(setting);
       if (token && setting.wise_profile_id) {
-        const res = await getWisePaymentLink(
+        const res = await getWisePaymentRequest(
           { token, environment: setting.wise_environment },
           setting.wise_profile_id,
           payment.wise_payment_link_id as string,
