@@ -337,12 +337,44 @@ export function WiseIntegrationCard() {
                       : "nao configurado"
                 }
               />
+              <Row
+                label="Link automatico"
+                value={
+                  q.data?.lastApiSuccessAt
+                    ? "OK"
+                    : q.data?.lastApiError
+                      ? `falha · ${q.data.lastApiError.status ?? "?"}`
+                      : "nao testado"
+                }
+              />
             </>
+          )}
+          {q.data?.lastApiError && (
+            <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="break-all">
+                Ultimo erro da API: {q.data.lastApiError.message}
+              </span>
+            </div>
           )}
         </div>
         <div className="mt-auto flex flex-wrap gap-2 pt-5">
           <Button type="button" size="sm" onClick={() => setOpen(true)}>
             Configurar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={testPaymentMutation.isPending || !setting?.wise_api_token || !setting?.wise_profile_id}
+            onClick={() => testPaymentMutation.mutate()}
+          >
+            {testPaymentMutation.isPending ? (
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Zap className="mr-2 h-3.5 w-3.5" />
+            )}
+            Testar criacao de pagamento
           </Button>
         </div>
       </BentoCard>
