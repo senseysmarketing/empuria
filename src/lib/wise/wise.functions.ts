@@ -378,8 +378,6 @@ export async function createWisePaymentForOrder(args: {
   const balanceId = setting.wise_balance_id_eur;
   const manualOnlyMode = setting.wise_confirmation_mode === "manual_only";
 
-  let apiError: { status: number; error: string; body: unknown } | null = null;
-
   if (!existing && !manualOnlyMode && token && profileId) {
     const client: WiseClientOptions = { token, environment: setting.wise_environment };
     const description = (args.description ?? "Instituto Empuria").slice(0, 100);
@@ -399,7 +397,7 @@ export async function createWisePaymentForOrder(args: {
       metadata: { order_id: args.orderId, reference },
     });
     if (!created.ok) {
-      apiError = { status: created.status, error: created.error, body: created.body };
+      console.error("[wise] payment-request failed", created.status, created.error);
       raw_response = { error: created.error, status: created.status, body: created.body as unknown };
     } else {
       raw_response = created.data as unknown as Record<string, unknown>;
