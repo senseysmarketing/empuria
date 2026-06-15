@@ -38,12 +38,16 @@ type WisePayload = {
 };
 
 function pickReference(p: WisePayload): string | null {
+  const data = p.data as Record<string, unknown> | undefined;
+  const resource = data?.resource as Record<string, unknown> | undefined;
   const candidates: unknown[] = [
     p.reference,
-    (p.data as Record<string, unknown> | undefined)?.reference,
-    (p.data as Record<string, unknown> | undefined)?.description,
-    (p.data as Record<string, unknown> | undefined)?.transaction_reference,
-    (p.data as Record<string, unknown> | undefined)?.merchant_reference,
+    data?.reference,
+    data?.description,
+    data?.transaction_reference,
+    data?.merchant_reference,
+    resource?.reference,
+    resource?.description,
   ];
   for (const c of candidates) {
     if (typeof c === "string") {
@@ -55,24 +59,37 @@ function pickReference(p: WisePayload): string | null {
   return null;
 }
 
-
 function pickAmountCents(p: WisePayload): number | null {
-  const a =
-    typeof p.amount === "number"
-      ? p.amount
-      : typeof (p.data as Record<string, unknown> | undefined)?.amount === "number"
-        ? ((p.data as Record<string, unknown>).amount as number)
-        : null;
-  return a !== null ? Math.round(a * 100) : null;
+  const data = p.data as Record<string, unknown> | undefined;
+  const resource = data?.resource as Record<string, unknown> | undefined;
+  // amount may appear as number or as { value, currency }
+  const candidates: unknown[] = [
+    p.amount,
+    data?.amount,
+    resource?.amount,
+    (data?.amount as Record<string, unknown> | undefined)?.value,
+    (resource?.amount as Record<string, unknown> | undefined)?.value,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "number" && Number.isFinite(c)) return Math.round(c * 100);
+  }
+  return null;
 }
 
 function pickCurrency(p: WisePayload): string | null {
-  return (
-    (typeof p.currency === "string" && p.currency) ||
-    (typeof (p.data as Record<string, unknown> | undefined)?.currency === "string"
-      ? ((p.data as Record<string, unknown>).currency as string)
-      : null)
-  );
+  const data = p.data as Record<string, unknown> | undefined;
+  const resource = data?.resource as Record<string, unknown> | undefined;
+  const candidates: unknown[] = [
+    p.currency,
+    data?.currency,
+    resource?.currency,
+    (data?.amount as Record<string, unknown> | undefined)?.currency,
+    (resource?.amount as Record<string, unknown> | undefined)?.currency,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim().toUpperCase();
+  }
+  return null;
 }
 
 export const Route = createFileRoute("/api/public/webhooks/wise")({
