@@ -104,17 +104,74 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
       .limit(20);
     const { data: payments } = await db
       .from("wise_payments")
-      .select("id,order_id,external_reference,status,amount_cents,currency,wise_payment_link_url,paid_at,created_at")
+      .select("id,order_id,external_reference,status,amount_cents,currency,wise_payment_link_url,paid_at,created_at,raw_response")
       .order("created_at", { ascending: false })
       .limit(20);
+
+    // Find latest API error from raw_response.error
+    let lastApiError: { message: string; status: number | null; at: string } | null = null;
+    let lastApiSuccessAt: string | null = null;
+    for (const p of payments ?? []) {
+      const raw = (p.raw_response ?? {}) as Record<string, unknown>;
+      if (!lastApiSuccessAt && p.wise_payment_link_url) lastApiSuccessAt = p.created_at as string;
+      if (!lastApiError && typeof raw.error === "string") {
+        lastApiError = {
+          message: raw.error as string,
+          status: (raw.status as number | undefined) ?? null,
+          at: p.created_at as string,
+        };
+      }
+      if (lastApiError && lastApiSuccessAt) break;
+    }
+
     return {
       setting: maskedSetting(setting),
       events: events ?? [],
-      payments: payments ?? [],
+      payments: (payments ?? []).map((p) => ({ ...p, raw_response: undefined })),
       webhookUrl: "/api/public/webhooks/wise",
       hasEnvToken: !!process.env.WISE_API_TOKEN,
+      lastApiError,
+      lastApiSuccessAt,
     };
   });
+
+/** Admin: try to create a real €1.00 payment-request to validate the API end-to-end. */
+export const testWisePaymentCreation = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .handler(async () => {
+    const setting = await loadSetting();
+    const token = tokenFromSettingOrEnv(setting);
+    if (!token) return { ok: false, message: "Token Wise nao configurado.", link: null as string | null };
+    if (!setting.wise_profile_id) return { ok: false, message: "Profile Wise nao selecionado.", link: null };
+    const ref = `EMP-TEST-${Date.now().toString().slice(-6)}`;
+    const res = await createWisePaymentRequest(
+      { token, environment: setting.wise_environment },
+      setting.wise_profile_id,
+      {
+        amount: 1.0,
+        currency: "EUR",
+        reference: ref.slice(0, 35),
+        description: "Empuria - teste de integracao Wise (1 EUR)",
+        balanceId: setting.wise_balance_id_eur,
+        metadata: { test: "true" },
+      },
+    );
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: `Wise respondeu ${res.status}: ${res.error}`,
+        link: null as string | null,
+      };
+    }
+    const link = pickHostedUrl(res.data);
+    return {
+      ok: true,
+      message: link ? "Link hospedado gerado com sucesso." : "API aceitou mas nao retornou link hospedado.",
+      link,
+      reference: ref,
+    };
+  });
+
 
 const webhookSubSchema = z.object({
   key: z.string().trim().min(1).max(60),
