@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Banknote, CheckCircle2, ChevronDown, Copy, Download, Loader2 } from "lucide-react";
+import { AlertTriangle, Banknote, CheckCircle2, ChevronDown, Copy, Download, Loader2, Zap } from "lucide-react";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
   listWiseProfileBalances,
   saveWiseSettings,
   testWiseConnection,
+  testWisePaymentCreation,
   type WiseSetting,
   type WiseWebhookSubscription,
 } from "@/lib/wise/wise.functions";
@@ -84,6 +85,7 @@ export function WiseIntegrationCard() {
   const testFn = useServerFn(testWiseConnection);
   const balancesFn = useServerFn(listWiseProfileBalances);
   const bankFn = useServerFn(fetchWiseEurBankDetails);
+  const testPaymentFn = useServerFn(testWisePaymentCreation);
 
   const [open, setOpen] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -271,6 +273,22 @@ export function WiseIntegrationCard() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar Wise"),
   });
 
+  const testPaymentMutation = useMutation({
+    mutationFn: () => testPaymentFn(),
+    onSuccess: (r) => {
+      if (r.ok && r.link) {
+        toast.success("Link Wise gerado! Abrindo em nova aba...");
+        window.open(r.link, "_blank", "noopener");
+      } else if (r.ok) {
+        toast.message(r.message);
+      } else {
+        toast.error(r.message);
+      }
+      q.refetch();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar pagamento"),
+  });
+
   const webhookUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/api/public/webhooks/wise`
@@ -319,12 +337,44 @@ export function WiseIntegrationCard() {
                       : "nao configurado"
                 }
               />
+              <Row
+                label="Link automatico"
+                value={
+                  q.data?.lastApiSuccessAt
+                    ? "OK"
+                    : q.data?.lastApiError
+                      ? `falha · ${q.data.lastApiError.status ?? "?"}`
+                      : "nao testado"
+                }
+              />
             </>
+          )}
+          {q.data?.lastApiError && (
+            <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="break-all">
+                Ultimo erro da API: {q.data.lastApiError.message}
+              </span>
+            </div>
           )}
         </div>
         <div className="mt-auto flex flex-wrap gap-2 pt-5">
           <Button type="button" size="sm" onClick={() => setOpen(true)}>
             Configurar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={testPaymentMutation.isPending || !setting?.wise_api_token || !setting?.wise_profile_id}
+            onClick={() => testPaymentMutation.mutate()}
+          >
+            {testPaymentMutation.isPending ? (
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Zap className="mr-2 h-3.5 w-3.5" />
+            )}
+            Testar criacao de pagamento
           </Button>
         </div>
       </BentoCard>

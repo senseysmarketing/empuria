@@ -107,21 +107,23 @@ export async function listWiseAccountDetails(client: WiseClientOptions, profileI
 }
 
 
-export type WisePaymentLinkPayload = {
+export type WisePaymentRequestPayload = {
   amount: number; // major units, e.g. 199.50
-  currency: string; // ISO 4217, e.g. "EUR"
+  currency: string; // ISO 4217
   description?: string;
-  reference?: string; // shown to payer, max 35 chars
-  redirectUrl?: string;
+  reference?: string; // shown to payer/statement, max 35 chars
+  balanceId?: string | number | null;
+  payerEmailMessage?: string;
   metadata?: Record<string, string>;
 };
 
-export type WisePaymentLinkResponse = {
+export type WisePaymentRequestResponse = {
   id: string;
-  status: string;
+  status?: string;
+  link?: string;
   paymentUrl?: string;
   url?: string;
-  amount?: number;
+  amount?: { value?: number; currency?: string } | number;
   currency?: string;
   reference?: string;
   description?: string;
@@ -129,40 +131,82 @@ export type WisePaymentLinkResponse = {
 };
 
 /**
- * Creates a Wise Payment Link for the given profile.
- * Wise's modern endpoint is POST /v3/profiles/{profileId}/payment-links.
+ * Creates a Wise Payment Request (hosted checkout link). Tries the modern v2
+ * endpoint first; falls back to alternate paths some Business accounts use.
+ * Returns the wiseFetch error envelope so callers can decide to fall back.
  */
-export async function createWisePaymentLink(
+export async function createWisePaymentRequest(
   client: WiseClientOptions,
   profileId: string | number,
-  payload: WisePaymentLinkPayload,
+  payload: WisePaymentRequestPayload,
 ) {
-  const body = {
+  const body: Record<string, unknown> = {
     amount: { value: payload.amount, currency: payload.currency },
     description: payload.description ?? null,
     reference: payload.reference ?? null,
-    redirectUrl: payload.redirectUrl ?? null,
+    payerEmailMessage: payload.payerEmailMessage ?? null,
     metadata: payload.metadata ?? {},
   };
-  return wiseFetch<WisePaymentLinkResponse>(
-    client,
-    `/v3/profiles/${profileId}/payment-links`,
-    { method: "POST", body: JSON.stringify(body) },
-  );
+  if (payload.balanceId) body.balanceId = payload.balanceId;
+
+  const paths = [
+    `/v2/profiles/${profileId}/payment-requests`,
+    `/v1/profiles/${profileId}/payment-requests`,
+    `/v2/business/${profileId}/payment-requests`,
+  ];
+  let lastError: { status: number; error: string; body: unknown } | null = null;
+  for (const path of paths) {
+    const res = await wiseFetch<WisePaymentRequestResponse>(client, path, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return res;
+    lastError = { status: res.status, error: res.error, body: res.body };
+    // Only keep trying on 404 (path missing). Other errors stop the cascade.
+    if (res.status !== 404) break;
+  }
+  return {
+    ok: false as const,
+    status: lastError?.status ?? 0,
+    error: lastError?.error ?? "unknown",
+    body: lastError?.body,
+  };
 }
 
-/**
- * Fetch the current status of a Wise payment link.
- */
-export async function getWisePaymentLink(
+export async function getWisePaymentRequest(
   client: WiseClientOptions,
   profileId: string | number,
-  linkId: string,
+  id: string,
 ) {
-  return wiseFetch<WisePaymentLinkResponse>(
-    client,
-    `/v3/profiles/${profileId}/payment-links/${linkId}`,
-    { method: "GET" },
+  const paths = [
+    `/v2/profiles/${profileId}/payment-requests/${id}`,
+    `/v1/profiles/${profileId}/payment-requests/${id}`,
+    `/v2/business/${profileId}/payment-requests/${id}`,
+  ];
+  let lastError: { status: number; error: string; body: unknown } | null = null;
+  for (const path of paths) {
+    const res = await wiseFetch<WisePaymentRequestResponse>(client, path, { method: "GET" });
+    if (res.ok) return res;
+    lastError = { status: res.status, error: res.error, body: res.body };
+    if (res.status !== 404) break;
+  }
+  return {
+    ok: false as const,
+    status: lastError?.status ?? 0,
+    error: lastError?.error ?? "unknown",
+    body: lastError?.body,
+  };
+}
+
+export function pickHostedUrl(
+  data: WisePaymentRequestResponse | undefined | null,
+): string | null {
+  if (!data) return null;
+  return (
+    (data.link as string | undefined) ??
+    (data.paymentUrl as string | undefined) ??
+    (data.url as string | undefined) ??
+    null
   );
 }
 

@@ -3,7 +3,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Copy, ExternalLink, Loader2, Wallet } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
 import { refreshWisePaymentStatus } from "@/lib/wise/wise.functions";
 
@@ -41,16 +48,23 @@ export function WisePaymentPanel({
 }: Props) {
   const refresh = useServerFn(refreshWisePaymentStatus);
   const [approved, setApproved] = useState(false);
+  const [wiseStatus, setWiseStatus] = useState<string>("waiting_payment");
+  const [bankOpen, setBankOpen] = useState(!paymentUrl); // open by default only when no Wise URL
 
   const checkMutation = useMutation({
     mutationFn: () => refresh({ data: { orderId } }),
     onSuccess: (r) => {
+      setWiseStatus(r.wiseStatus ?? "waiting_payment");
       if (r.paymentStatus === "aprovado") {
         setApproved(true);
         toast.success("Pagamento confirmado!");
         onApproved?.();
+      } else if (r.wiseStatus === "underpaid") {
+        toast.warning("Recebemos um valor menor que o esperado. Equipe ja foi notificada.");
+      } else if (r.wiseStatus === "overpaid") {
+        toast.warning("Recebemos um valor maior que o esperado. Equipe ja foi notificada.");
       } else {
-        toast.info("Ainda nao confirmado.");
+        toast.info("Ainda nao localizamos seu pagamento. Pode levar alguns minutos.");
       }
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao verificar"),
@@ -66,6 +80,7 @@ export function WisePaymentPanel({
       count += 1;
       try {
         const r = await refresh({ data: { orderId } });
+        setWiseStatus(r.wiseStatus ?? "waiting_payment");
         if (r.paymentStatus === "aprovado") {
           setApproved(true);
           toast.success("Pagamento confirmado!");
@@ -93,11 +108,19 @@ export function WisePaymentPanel({
     );
   }
 
+  const hasBank = !!(iban || bic);
+  const statusBanner =
+    wiseStatus === "underpaid"
+      ? { tone: "amber", text: "Recebemos um valor menor que o esperado. Aguarde nossa equipe." }
+      : wiseStatus === "overpaid"
+        ? { tone: "amber", text: "Recebemos um valor maior que o esperado. Aguarde nossa equipe." }
+        : null;
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-border bg-muted/30 p-4 text-center">
         <div className="font-display text-[11px] uppercase tracking-widest text-brown-deep/60">
-          Total a pagar (Wise)
+          Total a pagar
         </div>
         <div className="mt-1 font-display text-3xl text-orange-brand">
           {money(amountCents, currency)}
@@ -107,31 +130,71 @@ export function WisePaymentPanel({
         </div>
       </div>
 
-      {paymentUrl ? (
-        <a href={paymentUrl} target="_blank" rel="noopener noreferrer">
-          <Button className="w-full bg-orange-brand text-offwhite hover:bg-red-brand">
-            <Wallet className="mr-2 h-4 w-4" /> Pagar com Wise
-            <ExternalLink className="ml-2 h-3.5 w-3.5" />
-          </Button>
-        </a>
-      ) : null}
+      {statusBanner && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-800">
+          {statusBanner.text}
+        </div>
+      )}
 
-      {(iban || bic) && (
-        <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm">
-          <div className="font-display text-[11px] uppercase tracking-widest text-brown-deep/60">
-            Ou faca uma transferencia bancaria
-          </div>
-          {beneficiaryName && (
-            <Row label="Beneficiario" value={beneficiaryName} onCopy={() => copy(beneficiaryName)} />
-          )}
-          {iban && <Row label="IBAN" value={iban} onCopy={() => copy(iban)} mono />}
-          {bic && <Row label="BIC/SWIFT" value={bic} onCopy={() => copy(bic)} mono />}
-          <Row label="Valor" value={money(amountCents, currency)} onCopy={() => copy(String(amountCents / 100))} />
-          <Row label="Referencia" value={reference} onCopy={() => copy(reference)} mono />
-          <p className="mt-3 text-[11px] text-brown-deep/60">
-            Inclua a referencia <strong>{reference}</strong> na transferencia para conciliacao
-            automatica.
+      {paymentUrl ? (
+        <>
+          <a href={paymentUrl} target="_blank" rel="noopener noreferrer" className="block">
+            <Button
+              size="lg"
+              className="h-12 w-full bg-orange-brand text-base text-offwhite hover:bg-red-brand"
+            >
+              <Wallet className="mr-2 h-5 w-5" /> Pagar com Wise
+              <ExternalLink className="ml-2 h-4 w-4" />
+            </Button>
+          </a>
+          <p className="text-center text-xs text-brown-deep/60">
+            Voce sera direcionado para a Wise. Use a referencia <strong>{reference}</strong> para
+            identificarmos seu pagamento.
           </p>
+        </>
+      ) : hasBank ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-center text-xs text-amber-800">
+          Pagamento por transferencia bancaria em EUR. Use os dados abaixo.
+        </div>
+      ) : (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-center text-xs text-red-800">
+          Pagamento Wise indisponivel no momento. Entre em contato com a equipe.
+        </div>
+      )}
+
+      {hasBank && (
+        <div className="rounded-lg border border-dashed border-border bg-muted/20">
+          <button
+            type="button"
+            onClick={() => setBankOpen((v) => !v)}
+            className="flex w-full items-center justify-between p-4 text-left"
+          >
+            <span className="font-display text-[11px] uppercase tracking-widest text-brown-deep/70">
+              {paymentUrl ? "Ou faca uma transferencia bancaria" : "Dados bancarios EUR"}
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 text-brown-deep/60 transition ${bankOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {bankOpen && (
+            <div className="border-t border-border/60 px-4 pb-4 pt-2 text-sm">
+              {beneficiaryName && (
+                <Row label="Beneficiario" value={beneficiaryName} onCopy={() => copy(beneficiaryName)} />
+              )}
+              {iban && <Row label="IBAN" value={iban} onCopy={() => copy(iban)} mono />}
+              {bic && <Row label="BIC/SWIFT" value={bic} onCopy={() => copy(bic)} mono />}
+              <Row
+                label="Valor"
+                value={money(amountCents, currency)}
+                onCopy={() => copy(String(amountCents / 100))}
+              />
+              <Row label="Referencia" value={reference} onCopy={() => copy(reference)} mono />
+              <p className="mt-3 text-[11px] text-brown-deep/60">
+                Inclua a referencia <strong>{reference}</strong> na transferencia para conciliacao
+                automatica.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
