@@ -127,7 +127,7 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
     return {
       setting: maskedSetting(setting),
       events: events ?? [],
-      payments: (payments ?? []).map((p) => ({ ...p, raw_response: undefined })),
+      payments: (payments ?? []).map((p: Record<string, unknown>) => ({ ...p, raw_response: undefined })),
       webhookUrl: "/api/public/webhooks/wise",
       hasEnvToken: !!process.env.WISE_API_TOKEN,
       lastApiError,
