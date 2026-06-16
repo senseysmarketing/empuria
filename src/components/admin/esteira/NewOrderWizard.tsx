@@ -192,8 +192,10 @@ export function NewOrderWizard({
   const submit = async () => {
     if (!canSubmit || !customer || submitting) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const effectiveMethod: PaymentMethod = isFree ? "gratuito" : method;
+      const trimmedReason = reason.trim();
       const created = await createOrder({
         data: {
           user_id: customer.id,
@@ -204,7 +206,9 @@ export function NewOrderWizard({
           amount_cents: amountCents,
           payment_method: effectiveMethod,
           reason:
-            effectiveMethod === "manual" || effectiveMethod === "dinheiro" ? reason : undefined,
+            effectiveMethod === "manual" || effectiveMethod === "dinheiro"
+              ? trimmedReason
+              : undefined,
           notes: notes || undefined,
         },
       });
@@ -238,7 +242,10 @@ export function NewOrderWizard({
       toast.success("Pedido criado");
       onCreated();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro");
+      const msg = e instanceof Error ? e.message : "Erro ao criar pedido";
+      console.error("[NewOrderWizard] createOrder failed:", e);
+      setSubmitError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
