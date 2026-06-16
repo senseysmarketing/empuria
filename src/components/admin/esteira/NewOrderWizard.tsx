@@ -538,44 +538,18 @@ export function NewOrderWizard({
                     ainda pode pagar por IBAN/BIC abaixo.
                   </div>
                 )}
-                {createdOrder.reference && (
-                  <div>
-                    <Label>Referência (obrigatória no pagamento)</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        readOnly
-                        value={createdOrder.reference}
-                        className="font-mono text-xs"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => copy(createdOrder.reference!, "Referência")}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {createdOrder.iban && (
-                  <div className="border rounded p-3 text-sm space-y-1">
-                    <div className="font-medium">Transferência manual (fallback)</div>
-                    {createdOrder.beneficiaryName && (
-                      <div>
-                        <span className="text-muted-foreground">Beneficiário:</span>{" "}
-                        {createdOrder.beneficiaryName}
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-muted-foreground">IBAN:</span>{" "}
-                      <span className="font-mono">{createdOrder.iban}</span>
-                    </div>
-                    {createdOrder.bic && (
-                      <div>
-                        <span className="text-muted-foreground">BIC:</span>{" "}
-                        <span className="font-mono">{createdOrder.bic}</span>
-                      </div>
-                    )}
-                  </div>
+                {(createdOrder.iban || createdOrder.bic || createdOrder.beneficiaryName || createdOrder.reference) && (
+                  <BankTransferCollapsible
+                    defaultOpen={!createdOrder.paymentUrl}
+                    beneficiaryName={createdOrder.beneficiaryName}
+                    iban={createdOrder.iban}
+                    bic={createdOrder.bic}
+                    amountLabel={fmtEUR.format(amountCents / 100)}
+                    amountRaw={(amountCents / 100).toFixed(2)}
+                    reference={createdOrder.reference}
+                    hasWiseUrl={!!createdOrder.paymentUrl}
+                    onCopy={copy}
+                  />
                 )}
               </div>
             )}
