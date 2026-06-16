@@ -108,18 +108,27 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(20);
 
-    // Find latest API error from raw_response.error
+    const hasFallbackUrl = !!setting.wise_default_payment_url;
+
+    // Find latest API error from raw_response.error.
+    // If a Quick Pay fallback URL is configured, the API's 404 is *expected*
+    // (Wise's public API does not expose Quick Pay link creation) — don't surface it as an error.
     let lastApiError: { message: string; status: number | null; at: string } | null = null;
     let lastApiSuccessAt: string | null = null;
     for (const p of payments ?? []) {
       const raw = (p.raw_response ?? {}) as Record<string, unknown>;
-      if (!lastApiSuccessAt && p.wise_payment_link_url) lastApiSuccessAt = p.created_at as string;
+      if (!lastApiSuccessAt && p.wise_payment_link_url && !raw.error) {
+        lastApiSuccessAt = p.created_at as string;
+      }
       if (!lastApiError && typeof raw.error === "string") {
-        lastApiError = {
-          message: raw.error as string,
-          status: (raw.status as number | undefined) ?? null,
-          at: p.created_at as string,
-        };
+        const status = (raw.status as number | undefined) ?? null;
+        if (!(hasFallbackUrl && status === 404)) {
+          lastApiError = {
+            message: raw.error as string,
+            status,
+            at: p.created_at as string,
+          };
+        }
       }
       if (lastApiError && lastApiSuccessAt) break;
     }
@@ -132,6 +141,7 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
       hasEnvToken: !!process.env.WISE_API_TOKEN,
       lastApiError,
       lastApiSuccessAt,
+      hasFallbackUrl,
     };
   });
 
