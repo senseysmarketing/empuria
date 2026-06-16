@@ -366,7 +366,7 @@ export function WiseIntegrationCard() {
             type="button"
             size="sm"
             variant="outline"
-            disabled={testPaymentMutation.isPending || !setting?.wise_api_token || !setting?.wise_profile_id}
+            disabled={testPaymentMutation.isPending || !setting?.wise_default_payment_url}
             onClick={() => testPaymentMutation.mutate()}
           >
             {testPaymentMutation.isPending ? (
@@ -374,8 +374,9 @@ export function WiseIntegrationCard() {
             ) : (
               <Zap className="mr-2 h-3.5 w-3.5" />
             )}
-            Testar criacao de pagamento
+            Testar link Quick Pay
           </Button>
+
         </div>
       </BentoCard>
 
