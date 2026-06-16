@@ -134,6 +134,19 @@ export function NewOrderWizard({
     }
   };
 
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      runSearch();
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
   const createCust = async () => {
     if (!newCust.full_name || !newCust.email || !newCust.phone) {
       toast.error("Nome, e-mail e telefone sao obrigatorios");
