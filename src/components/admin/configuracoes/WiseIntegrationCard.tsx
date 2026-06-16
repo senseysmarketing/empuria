@@ -577,14 +577,16 @@ export function WiseIntegrationCard() {
                 <Field label="Link Quick Pay (recomendado · principal)">
                   <Input
                     type="url"
-                    placeholder="https://wise.com/pay/me/..."
+                    inputMode="url"
+                    placeholder="https://wise.com/pay/business/empuriahub"
                     value={fallbackUrl}
                     onChange={(e) => setFallbackUrl(e.target.value)}
                   />
                   <p className="text-[11px] leading-snug text-admin-ink-muted">
-                    Wise → Solicitar pagamento → Criar link reutilizavel em EUR. Cole o
-                    {" "}<span className="font-mono">https://wise.com/pay/me/...</span> aqui.
-                    Esse e o caminho oficial — a API publica da Wise nao expoe geracao de link.
+                    Cole o link Quick Pay reutilizavel (ex.:{" "}
+                    <span className="font-mono">https://wise.com/pay/business/empuriahub</span>).
+                    Se esquecer o <span className="font-mono">https://</span>, normalizamos
+                    automaticamente. O Empuria adiciona valor, moeda e referencia EMP-XXXX em cada pedido.
                   </p>
                 </Field>
               </div>
