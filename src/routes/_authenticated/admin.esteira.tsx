@@ -240,31 +240,17 @@ function EsteiraPage() {
   };
 
   const doGenLink = async (o: Order) => {
-    const cur = (o.payment_currency ?? o.currency ?? "EUR").toUpperCase();
-    if (cur !== "BRL") {
-      setLinkModal({
-        order: o,
-        loading: false,
-        reference: null,
-        paymentUrl: null,
-        error:
-          "Mercado Pago só processa em Reais (BRL). Edite o pedido para usar moeda BRL antes de gerar o link.",
-      });
-      return;
-    }
     setLinkModal({ order: o, loading: true, reference: null, paymentUrl: null, error: null });
     try {
       const r = await genLink({ data: { id: o.id } });
-      const url =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/portal/servicos?order=${o.id}`
-          : null;
       setLinkModal({
         order: o,
         loading: false,
         reference: r.reference ?? `EMP-${o.id}`,
-        paymentUrl: url,
-        error: null,
+        paymentUrl: r.paymentUrl ?? null,
+        error: r.paymentUrl
+          ? null
+          : "Sem link Wise disponível. Configure o Quick Pay nas configurações de integração.",
       });
       refresh();
     } catch (e) {
