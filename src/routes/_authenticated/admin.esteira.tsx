@@ -151,6 +151,15 @@ function EsteiraPage() {
     paymentUrl: string | null;
     error: string | null;
   } | null>(null);
+  const [bankModal, setBankModal] = useState<{
+    order: Order;
+    loading: boolean;
+    error: string | null;
+    reference: string | null;
+    iban: string | null;
+    bic: string | null;
+    beneficiaryName: string | null;
+  } | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
