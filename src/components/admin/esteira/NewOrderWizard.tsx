@@ -85,6 +85,7 @@ export function NewOrderWizard({
   const [notes, setNotes] = useState("");
   const [confirmFree, setConfirmFree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<{
     id: string;
     reference: string | null;
@@ -117,6 +118,7 @@ export function NewOrderWizard({
       setNotes("");
       setConfirmFree(false);
       setSubmitting(false);
+      setSubmitError(null);
       setCreatedOrder(null);
     }
   }, [open]);
@@ -178,18 +180,22 @@ export function NewOrderWizard({
     if (!isFree && method === "gratuito") setMethod("wise");
   }, [isFree]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const reasonRequired = method === "manual" || method === "dinheiro";
+  const reasonOk = !reasonRequired || reason.trim().length >= 3;
   const canSubmit =
     customer &&
     (serviceMode === "cadastrado" ? !!service : customTitle.length >= 2) &&
     amount !== "" &&
     (!isFree || confirmFree) &&
-    ((method !== "manual" && method !== "dinheiro") || reason.length >= 3);
+    reasonOk;
 
   const submit = async () => {
     if (!canSubmit || !customer || submitting) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const effectiveMethod: PaymentMethod = isFree ? "gratuito" : method;
+      const trimmedReason = reason.trim();
       const created = await createOrder({
         data: {
           user_id: customer.id,
@@ -200,7 +206,9 @@ export function NewOrderWizard({
           amount_cents: amountCents,
           payment_method: effectiveMethod,
           reason:
-            effectiveMethod === "manual" || effectiveMethod === "dinheiro" ? reason : undefined,
+            effectiveMethod === "manual" || effectiveMethod === "dinheiro"
+              ? trimmedReason
+              : undefined,
           notes: notes || undefined,
         },
       });
@@ -234,7 +242,10 @@ export function NewOrderWizard({
       toast.success("Pedido criado");
       onCreated();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro");
+      const msg = e instanceof Error ? e.message : "Erro ao criar pedido";
+      console.error("[NewOrderWizard] createOrder failed:", e);
+      setSubmitError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -455,7 +466,17 @@ export function NewOrderWizard({
             {method === "manual" && (
               <div>
                 <Label>Motivo do pagamento manual *</Label>
-                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+                <Textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={2}
+                  placeholder="Ex.: Pago por transferência já confirmada"
+                />
+                {!reasonOk && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Informe pelo menos 3 caracteres para criar como pago manualmente.
+                  </p>
+                )}
               </div>
             )}
 
@@ -468,6 +489,11 @@ export function NewOrderWizard({
                   rows={2}
                   placeholder="Ex.: Recebido em mãos por Fulano em 16/06"
                 />
+                {!reasonOk && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Informe pelo menos 3 caracteres descrevendo o recebimento.
+                  </p>
+                )}
               </div>
             )}
 
@@ -567,6 +593,12 @@ export function NewOrderWizard({
                 Pedido criado como pendente. Você pode gerar a cobrança Wise depois pela esteira.
               </div>
             )}
+          </div>
+        )}
+
+        {step === 3 && submitError && (
+          <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+            <strong>Não foi possível criar o pedido:</strong> {submitError}
           </div>
         )}
 
