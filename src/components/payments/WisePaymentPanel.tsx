@@ -148,8 +148,7 @@ export function WisePaymentPanel({
             </Button>
           </a>
           <p className="text-center text-xs text-brown-deep/60">
-            Voce sera direcionado para a Wise. Use a referencia <strong>{reference}</strong> para
-            identificarmos seu pagamento.
+            Voce sera direcionado para a Wise.
           </p>
         </>
       ) : hasBank ? (
