@@ -590,13 +590,18 @@ export function WiseIntegrationCard() {
                     onChange={(e) => setBeneficiaryAddress(e.target.value)}
                   />
                 </Field>
-                <Field label="Link Wise fallback (opcional)">
+                <Field label="Link Quick Pay (recomendado · principal)">
                   <Input
                     type="url"
                     placeholder="https://wise.com/pay/me/..."
                     value={fallbackUrl}
                     onChange={(e) => setFallbackUrl(e.target.value)}
                   />
+                  <p className="text-[11px] leading-snug text-admin-ink-muted">
+                    Wise → Solicitar pagamento → Criar link reutilizavel em EUR. Cole o
+                    {" "}<span className="font-mono">https://wise.com/pay/me/...</span> aqui.
+                    Esse e o caminho oficial — a API publica da Wise nao expoe geracao de link.
+                  </p>
                 </Field>
               </div>
             </Step>
