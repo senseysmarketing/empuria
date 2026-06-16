@@ -373,55 +373,28 @@ export async function createWisePaymentForOrder(args: {
       (refRpc?.data as string | null) ?? `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
   }
 
-  const token = tokenFromSettingOrEnv(setting);
-  const profileId = setting.wise_profile_id;
-  const balanceId = setting.wise_balance_id_eur;
-  const manualOnlyMode = setting.wise_confirmation_mode === "manual_only";
-
-  if (!existing && !manualOnlyMode && token && profileId) {
-    const client: WiseClientOptions = { token, environment: setting.wise_environment };
-    const description = (args.description ?? "Instituto Empuria").slice(0, 100);
-    raw_request = {
-      amount: args.amountCents / 100,
-      currency: args.currency,
-      reference: reference.slice(0, 35),
-      description,
-      balanceId,
-    };
-    const created = await createWisePaymentRequest(client, profileId, {
-      amount: args.amountCents / 100,
-      currency: args.currency,
-      reference: reference.slice(0, 35),
-      description,
-      balanceId,
-      metadata: { order_id: args.orderId, reference },
-    });
-    if (!created.ok) {
-      console.error("[wise] payment-request failed", created.status, created.error);
-      // Only persist as an "error" when there is no Quick Pay fallback configured.
-      // Wise's public API does not expose Quick Pay creation, so a 404 here is expected.
-      if (!setting.wise_default_payment_url) {
-        raw_response = { error: created.error, status: created.status, body: created.body as unknown };
-      } else {
-        raw_response = { fallback: "quick_pay", api_status: created.status };
-      }
-    } else {
-      raw_response = created.data as unknown as Record<string, unknown>;
-      paymentUrl = pickHostedUrl(created.data);
-    }
-  }
-
-  // Fallback to configured Quick Pay link. Append amount/currency so the
-  // payer lands on the Wise page with the right value pre-filled. The
-  // EMP-XXXX reference is shown on the order page for the payer to copy
-  // into Wise's "reference / message" field.
+  // Wise's public API does NOT expose Quick Pay creation. Official path:
+  // a reusable Quick Pay link configured by the admin + ?currency&amount&description
+  // query params per order. The EMP-XXXX reference becomes the description so
+  // the payer sees it pre-filled on Wise's payment screen.
   if (!paymentUrl && setting.wise_default_payment_url) {
     paymentUrl = appendQuickPayParams(setting.wise_default_payment_url, {
       amount: args.amountCents / 100,
       currency: args.currency,
+      description: reference,
     });
   }
+  if (!existing) {
+    raw_request = {
+      amount: args.amountCents / 100,
+      currency: args.currency,
+      reference,
+      description: args.description,
+      quick_pay_base: setting.wise_default_payment_url,
+    };
+  }
   const manualOnly = !paymentUrl;
+
 
   if (!existing) {
     const { data: inserted, error } = await db
