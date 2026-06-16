@@ -518,37 +518,16 @@ export const refreshWisePaymentStatus = createServerFn({ method: "POST" })
 
     const { data: payment } = await db
       .from("wise_payments")
-      .select("id,status,wise_payment_link_id")
+      .select("id,status")
       .eq("order_id", data.orderId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    // Optional: sync from Wise API
-    if (payment?.wise_payment_link_id) {
-      const setting = await loadSetting();
-      const token = tokenFromSettingOrEnv(setting);
-      if (token && setting.wise_profile_id) {
-        const res = await getWisePaymentRequest(
-          { token, environment: setting.wise_environment },
-          setting.wise_profile_id,
-          payment.wise_payment_link_id as string,
-        );
-        if (res.ok) {
-          const status = String(res.data.status ?? "").toLowerCase();
-          if (status === "paid" || status === "claimed" || status === "completed") {
-            await db
-              .from("wise_payments")
-              .update({ status: "paid", paid_at: new Date().toISOString(), raw_webhook: res.data })
-              .eq("id", payment.id);
-            await db
-              .from("orders")
-              .update({ payment_status: "aprovado", paid_at: new Date().toISOString() })
-              .eq("id", data.orderId);
-          }
-        }
-      }
-    }
+    // Approval is driven exclusively by the `balances#credit` webhook or
+    // manual conciliation in /admin/wise-conciliacao. There is no public
+    // Wise API to poll for hosted-link status.
+
 
     const { data: latest } = await db
       .from("orders")
