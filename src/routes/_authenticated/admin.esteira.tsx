@@ -9,7 +9,7 @@ import {
   markOrderPaidManual,
   cancelOrder,
   refundOrder,
-  generatePaymentLink,
+  generateWisePaymentForOrder,
 } from "@/lib/admin/esteira.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,6 @@ import {
   ShoppingCart,
   Clock,
   Loader2,
-  TrendingUp,
   Euro,
   Search,
   ChevronLeft,
@@ -62,6 +61,9 @@ import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
 export const Route = createFileRoute("/_authenticated/admin/esteira")({
   component: EsteiraPage,
 });
+
+const eurFormatter = new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" });
+const formatEur = (cents: number | null | undefined) => eurFormatter.format((cents ?? 0) / 100);
 
 const STATUS_COLOR: Record<string, string> = {
   pendente: "bg-amber-100 text-amber-900",
@@ -124,7 +126,7 @@ function EsteiraPage() {
   const markManual = useServerFn(markOrderPaidManual);
   const cancel = useServerFn(cancelOrder);
   const refund = useServerFn(refundOrder);
-  const genLink = useServerFn(generatePaymentLink);
+  const genLink = useServerFn(generateWisePaymentForOrder);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
@@ -204,15 +206,12 @@ function EsteiraPage() {
         o.payment_status === "pendente" &&
         new Date(o.created_at).getTime() < Date.now() - 1000 * 60 * 60 * 48,
     ).length;
-    let brl = 0;
     let eur = 0;
     for (const o of orders) {
       if (o.payment_status !== "aprovado") continue;
-      const cents = o.amount_cents ?? 0;
-      if ((o.currency ?? "EUR") === "BRL") brl += cents;
-      else eur += cents;
+      eur += o.amount_cents ?? 0;
     }
-    return { todayCount, waiting, paidToday, inExec, late, brl, eur };
+    return { todayCount, waiting, paidToday, inExec, late, eur };
   }, [orders]);
 
   const showVoucher = async (code: string) => {
@@ -241,31 +240,17 @@ function EsteiraPage() {
   };
 
   const doGenLink = async (o: Order) => {
-    const cur = (o.payment_currency ?? o.currency ?? "EUR").toUpperCase();
-    if (cur !== "BRL") {
-      setLinkModal({
-        order: o,
-        loading: false,
-        reference: null,
-        paymentUrl: null,
-        error:
-          "Mercado Pago só processa em Reais (BRL). Edite o pedido para usar moeda BRL antes de gerar o link.",
-      });
-      return;
-    }
     setLinkModal({ order: o, loading: true, reference: null, paymentUrl: null, error: null });
     try {
       const r = await genLink({ data: { id: o.id } });
-      const url =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/portal/servicos?order=${o.id}`
-          : null;
       setLinkModal({
         order: o,
         loading: false,
         reference: r.reference ?? `EMP-${o.id}`,
-        paymentUrl: url,
-        error: null,
+        paymentUrl: r.paymentUrl ?? null,
+        error: r.paymentUrl
+          ? null
+          : "Sem link Wise disponível. Configure o Quick Pay nas configurações de integração.",
       });
       refresh();
     } catch (e) {
@@ -321,14 +306,13 @@ function EsteiraPage() {
       </header>
 
       {canViewFinancials && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <AdminStatCard label="Pedidos hoje" value={summary.todayCount} icon={ShoppingCart} tone="blue" />
           <AdminStatCard label="Aguardando pagamento" value={summary.waiting} icon={Clock} tone="amber" />
           <AdminStatCard label="Pagos hoje" value={summary.paidToday} icon={CheckCircle2} tone="green" />
           <AdminStatCard label="Em execução" value={summary.inExec} icon={Loader2} tone="blue" />
           <AdminStatCard label="Atrasados" value={summary.late} icon={AlertTriangle} tone="red" />
-          <AdminStatCard label="Receita BRL" value={`R$ ${(summary.brl / 100).toFixed(2)}`} icon={TrendingUp} tone="green" />
-          <AdminStatCard label="Receita EUR" value={`€ ${(summary.eur / 100).toFixed(2)}`} icon={Euro} tone="neutral" />
+          <AdminStatCard label="Receita" value={formatEur(summary.eur)} icon={Euro} tone="green" />
         </div>
       )}
 
@@ -412,32 +396,7 @@ function EsteiraPage() {
                     <td className="p-3 text-admin-ink-soft">{o.service_title}</td>
                     {canViewFinancials && (
                       <td className="p-3 text-right tabular-nums">
-                        {(() => {
-                          const cur = o.currency ?? "EUR";
-                          const payCur = o.payment_currency ?? cur;
-                          const payCents = o.payment_amount_cents ?? o.amount_cents ?? 0;
-                          if (cur === "BRL") {
-                            return <div>R$ {((o.amount_cents ?? 0) / 100).toFixed(2)}</div>;
-                          }
-                          if (payCur === "BRL") {
-                            return (
-                              <div>
-                                <div>R$ {(payCents / 100).toFixed(2)}</div>
-                                <div className="text-[10px] text-muted-foreground">
-                                  ({cur === "EUR" ? "€" : cur} {((o.amount_cents ?? 0) / 100).toFixed(2)})
-                                </div>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div>
-                              <div className="text-admin-ink-muted">R$ —</div>
-                              <div className="text-[10px] text-muted-foreground">
-                                {cur === "EUR" ? "€" : cur} {((o.amount_cents ?? 0) / 100).toFixed(2)}
-                              </div>
-                            </div>
-                          );
-                        })()}
+                        {formatEur(o.amount_cents)}
                       </td>
                     )}
                     <td className="p-3" onClick={(e) => e.stopPropagation()}>
@@ -618,7 +577,7 @@ function EsteiraPage() {
       <Dialog open={!!linkModal} onOpenChange={(o) => !o && setLinkModal(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Link de pagamento Mercado Pago</DialogTitle>
+            <DialogTitle>Link de pagamento Wise</DialogTitle>
           </DialogHeader>
           {linkModal && (
             <div className="space-y-3 text-sm">
@@ -649,7 +608,7 @@ function EsteiraPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Envie ao cliente. Ele conclui o pagamento (Pix/Boleto) pelo portal.
+                    Envie ao cliente. Ele conclui o pagamento via Wise (EUR).
                   </p>
                 </div>
               )}
@@ -690,25 +649,14 @@ function EsteiraPage() {
               <Row label="Conta vinculada" value={selected.user_id ? "sim" : "não — pedido não aparece no portal"} />
               {canViewFinancials && (
                 <>
-                  <Row
-                    label="Valor comercial"
-                    value={`${selected.currency ?? "EUR"} ${((selected.amount_cents ?? 0) / 100).toFixed(2)}`}
-                  />
-                  <Row
-                    label="Valor cobrança"
-                    value={
-                      selected.payment_amount_cents != null
-                        ? `${selected.payment_currency ?? "—"} ${(selected.payment_amount_cents / 100).toFixed(2)}`
-                        : "—"
-                    }
-                  />
+                  <Row label="Valor" value={formatEur(selected.amount_cents)} />
                   <Row label="Método" value={selected.payment_method ?? "—"} />
                 </>
               )}
               <Row label="Pagamento" value={selected.payment_status} />
               <Row label="Execução" value={selected.delivery_status ?? "—"} />
               <Row label="Voucher" value={selected.voucher_code ?? "—"} />
-              <Row label="Referência MP" value={selected.payment_provider_reference ?? "—"} />
+              <Row label="Referência pagamento" value={selected.payment_provider_reference ?? "—"} />
               {selected.notes && <Row label="Notas" value={selected.notes} />}
               <p className="text-xs text-muted-foreground border-t pt-3">
                 Aba de Agenda / Documentos / Histórico chega quando a migração de campos for aplicada.
