@@ -162,7 +162,7 @@ const fullOrderSchema = z.object({
   service_id: z.string().uuid().nullable().optional(),
   service_title: z.string().trim().min(2).max(160),
   amount_cents: z.number().int().min(0),
-  payment_method: z.enum(["wise", "manual", "gratuito", "pendente"]).default("wise"),
+  payment_method: z.enum(["wise", "manual", "dinheiro", "gratuito", "pendente"]).default("wise"),
   reason: z.string().trim().max(280).optional(),
   notes: z.string().trim().max(500).optional(),
   slot_id: z.string().uuid().nullable().optional(),
@@ -175,18 +175,23 @@ export const createOrderFull = createServerFn({ method: "POST" })
     if (!context.isAdmin && data.amount_cents > 0) {
       throw new Error("Apenas admins podem criar pedidos com valor");
     }
-    if (data.payment_method === "manual" && !context.isAdmin) {
-      throw new Error("Apenas admins podem marcar pagamento manual");
+    if ((data.payment_method === "manual" || data.payment_method === "dinheiro") && !context.isAdmin) {
+      throw new Error("Apenas admins podem registrar pagamento manual ou em dinheiro");
     }
     if (data.payment_method === "manual" && !data.reason) {
       throw new Error("Informe o motivo do pagamento manual");
+    }
+    if (data.payment_method === "dinheiro" && !data.reason) {
+      throw new Error("Informe a observação do recebimento em dinheiro");
     }
     if (data.amount_cents === 0 && data.payment_method !== "gratuito") {
       throw new Error("Pedido com valor zero exige confirmação como gratuito");
     }
 
     const payment_status =
-      data.payment_method === "gratuito" || data.payment_method === "manual"
+      data.payment_method === "gratuito" ||
+      data.payment_method === "manual" ||
+      data.payment_method === "dinheiro"
         ? "aprovado"
         : "pendente";
 
@@ -232,9 +237,11 @@ export const createOrderFull = createServerFn({ method: "POST" })
           ? "order.create.gratuito"
           : data.payment_method === "manual"
             ? "order.create.manual_paid"
-            : data.payment_method === "wise"
-              ? "order.create.wise"
-              : "order.create",
+            : data.payment_method === "dinheiro"
+              ? "order.create.dinheiro"
+              : data.payment_method === "wise"
+                ? "order.create.wise"
+                : "order.create",
       new_data: {
         amount_cents: data.amount_cents,
         currency: "EUR",
