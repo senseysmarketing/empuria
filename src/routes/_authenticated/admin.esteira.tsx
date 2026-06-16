@@ -396,32 +396,7 @@ function EsteiraPage() {
                     <td className="p-3 text-admin-ink-soft">{o.service_title}</td>
                     {canViewFinancials && (
                       <td className="p-3 text-right tabular-nums">
-                        {(() => {
-                          const cur = o.currency ?? "EUR";
-                          const payCur = o.payment_currency ?? cur;
-                          const payCents = o.payment_amount_cents ?? o.amount_cents ?? 0;
-                          if (cur === "BRL") {
-                            return <div>R$ {((o.amount_cents ?? 0) / 100).toFixed(2)}</div>;
-                          }
-                          if (payCur === "BRL") {
-                            return (
-                              <div>
-                                <div>R$ {(payCents / 100).toFixed(2)}</div>
-                                <div className="text-[10px] text-muted-foreground">
-                                  ({cur === "EUR" ? "€" : cur} {((o.amount_cents ?? 0) / 100).toFixed(2)})
-                                </div>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div>
-                              <div className="text-admin-ink-muted">R$ —</div>
-                              <div className="text-[10px] text-muted-foreground">
-                                {cur === "EUR" ? "€" : cur} {((o.amount_cents ?? 0) / 100).toFixed(2)}
-                              </div>
-                            </div>
-                          );
-                        })()}
+                        {formatEur(o.amount_cents)}
                       </td>
                     )}
                     <td className="p-3" onClick={(e) => e.stopPropagation()}>
