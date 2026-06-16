@@ -185,11 +185,9 @@ export const createOrderFull = createServerFn({ method: "POST" })
     }
 
     const payment_status =
-      data.payment_method === "gratuito"
+      data.payment_method === "gratuito" || data.payment_method === "manual"
         ? "aprovado"
-        : data.payment_method === "manual"
-          ? "aprovado"
-          : data.payment_status;
+        : "pendente";
 
     const voucher =
       payment_status === "aprovado" ? `EMP-${Date.now().toString(36).toUpperCase()}` : null;
@@ -201,16 +199,16 @@ export const createOrderFull = createServerFn({ method: "POST" })
       service_id: data.service_id ?? null,
       service_title: data.service_title,
       amount_cents: data.amount_cents,
-      currency: data.currency,
+      currency: "EUR",
       slot_id: data.slot_id ?? null,
       notes: data.notes ?? null,
       payment_status,
       payment_method: data.payment_method,
-      payment_currency: data.payment_currency ?? data.currency,
-      payment_amount_cents: data.payment_amount_cents ?? data.amount_cents,
-      fx_rate: data.fx_rate ?? null,
-      fx_source: data.fx_rate ? "manual" : null,
-      fx_locked_at: data.fx_rate ? new Date().toISOString() : null,
+      payment_currency: "EUR",
+      payment_amount_cents: data.amount_cents,
+      fx_rate: null,
+      fx_source: null,
+      fx_locked_at: null,
       paid_at: payment_status === "aprovado" ? new Date().toISOString() : null,
       voucher_code: voucher,
     };
@@ -233,10 +231,12 @@ export const createOrderFull = createServerFn({ method: "POST" })
           ? "order.create.gratuito"
           : data.payment_method === "manual"
             ? "order.create.manual_paid"
-            : "order.create",
+            : data.payment_method === "wise"
+              ? "order.create.wise"
+              : "order.create",
       new_data: {
         amount_cents: data.amount_cents,
-        currency: data.currency,
+        currency: "EUR",
         payment_method: data.payment_method,
         reason: data.reason ?? null,
       },
