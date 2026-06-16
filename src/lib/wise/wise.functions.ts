@@ -191,7 +191,26 @@ const saveSchema = z.object({
   wise_iban: z.string().trim().max(60).nullable(),
   wise_bic: z.string().trim().max(20).nullable(),
   wise_bank_address: z.string().trim().max(300).nullable(),
-  wise_default_payment_url: z.string().trim().url().max(500).nullable(),
+  wise_default_payment_url: z
+    .string()
+    .trim()
+    .max(500)
+    .nullable()
+    .transform((v) => {
+      if (!v) return null;
+      const withScheme = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+      return withScheme.replace(/\/+$/, "");
+    })
+    .pipe(
+      z
+        .string()
+        .url()
+        .nullable()
+        .refine(
+          (u) => u === null || /^https:\/\/([a-z0-9-]+\.)*wise\.com\//i.test(u),
+          { message: "Use um link wise.com (ex.: https://wise.com/pay/business/empuriahub)" },
+        ),
+    ),
   wise_webhook_public_key: z.string().trim().max(4000).nullable(),
   wise_webhook_subscriptions: z.array(webhookSubSchema).max(10).default([]),
   wise_confirmation_mode: z.enum(["webhook_only", "manual_only", "webhook_and_manual"]),
