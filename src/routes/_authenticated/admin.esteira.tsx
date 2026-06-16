@@ -275,6 +275,41 @@ function EsteiraPage() {
     }
   };
 
+  const doBankTransfer = async (o: Order) => {
+    setBankModal({
+      order: o,
+      loading: true,
+      error: null,
+      reference: null,
+      iban: null,
+      bic: null,
+      beneficiaryName: null,
+    });
+    try {
+      const r = await genLink({ data: { id: o.id } });
+      setBankModal({
+        order: o,
+        loading: false,
+        error: r.iban || r.bic ? null : "Dados bancários Wise não configurados.",
+        reference: r.reference ?? `EMP-${o.id}`,
+        iban: r.iban ?? null,
+        bic: r.bic ?? null,
+        beneficiaryName: r.beneficiaryName ?? null,
+      });
+      refresh();
+    } catch (e) {
+      setBankModal({
+        order: o,
+        loading: false,
+        error: e instanceof Error ? e.message : "Erro ao carregar dados bancários",
+        reference: null,
+        iban: null,
+        bic: null,
+        beneficiaryName: null,
+      });
+    }
+  };
+
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copiado`);
