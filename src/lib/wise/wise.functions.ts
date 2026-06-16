@@ -120,46 +120,24 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
       .limit(20);
     const { data: payments } = await db
       .from("wise_payments")
-      .select("id,order_id,external_reference,status,amount_cents,currency,wise_payment_link_url,paid_at,created_at,raw_response")
+      .select("id,order_id,external_reference,status,amount_cents,currency,wise_payment_link_url,paid_at,created_at")
       .order("created_at", { ascending: false })
       .limit(20);
 
     const hasFallbackUrl = !!setting.wise_default_payment_url;
 
-    // Find latest API error from raw_response.error.
-    // If a Quick Pay fallback URL is configured, the API's 404 is *expected*
-    // (Wise's public API does not expose Quick Pay link creation) — don't surface it as an error.
-    let lastApiError: { message: string; status: number | null; at: string } | null = null;
-    let lastApiSuccessAt: string | null = null;
-    for (const p of payments ?? []) {
-      const raw = (p.raw_response ?? {}) as Record<string, unknown>;
-      if (!lastApiSuccessAt && p.wise_payment_link_url && !raw.error) {
-        lastApiSuccessAt = p.created_at as string;
-      }
-      if (!lastApiError && typeof raw.error === "string") {
-        const status = (raw.status as number | undefined) ?? null;
-        if (!(hasFallbackUrl && status === 404)) {
-          lastApiError = {
-            message: raw.error as string,
-            status,
-            at: p.created_at as string,
-          };
-        }
-      }
-      if (lastApiError && lastApiSuccessAt) break;
-    }
-
     return {
       setting: maskedSetting(setting),
       events: events ?? [],
-      payments: (payments ?? []).map((p: Record<string, unknown>) => ({ ...p, raw_response: undefined })),
+      payments: payments ?? [],
       webhookUrl: "/api/public/webhooks/wise",
       hasEnvToken: !!process.env.WISE_API_TOKEN,
-      lastApiError,
-      lastApiSuccessAt,
+      lastApiError: null as { message: string; status: number | null; at: string } | null,
+      lastApiSuccessAt: null as string | null,
       hasFallbackUrl,
     };
   });
+
 
 /** Admin: try to create a real €1.00 payment-request to validate the API end-to-end. */
 export const testWisePaymentCreation = createServerFn({ method: "POST" })
