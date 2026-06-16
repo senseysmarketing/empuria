@@ -52,6 +52,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Landmark,
 } from "lucide-react";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
@@ -148,6 +149,15 @@ function EsteiraPage() {
     reference: string | null;
     paymentUrl: string | null;
     error: string | null;
+  } | null>(null);
+  const [bankModal, setBankModal] = useState<{
+    order: Order;
+    loading: boolean;
+    error: string | null;
+    reference: string | null;
+    iban: string | null;
+    bic: string | null;
+    beneficiaryName: string | null;
   } | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
@@ -260,6 +270,41 @@ function EsteiraPage() {
         reference: null,
         paymentUrl: null,
         error: e instanceof Error ? e.message : "Erro ao gerar link",
+      });
+    }
+  };
+
+  const doBankTransfer = async (o: Order) => {
+    setBankModal({
+      order: o,
+      loading: true,
+      error: null,
+      reference: null,
+      iban: null,
+      bic: null,
+      beneficiaryName: null,
+    });
+    try {
+      const r = await genLink({ data: { id: o.id } });
+      setBankModal({
+        order: o,
+        loading: false,
+        error: r.iban || r.bic ? null : "Dados bancários Wise não configurados.",
+        reference: r.reference ?? `EMP-${o.id}`,
+        iban: r.iban ?? null,
+        bic: r.bic ?? null,
+        beneficiaryName: r.beneficiaryName ?? null,
+      });
+      refresh();
+    } catch (e) {
+      setBankModal({
+        order: o,
+        loading: false,
+        error: e instanceof Error ? e.message : "Erro ao carregar dados bancários",
+        reference: null,
+        iban: null,
+        bic: null,
+        beneficiaryName: null,
       });
     }
   };
@@ -445,9 +490,16 @@ function EsteiraPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => doGenLink(o)}>
-                            <Link2 className="h-4 w-4 mr-2" /> Gerar link de pagamento
-                          </DropdownMenuItem>
+                          {o.payment_status !== "aprovado" && (
+                            <DropdownMenuItem onClick={() => doGenLink(o)}>
+                              <Link2 className="h-4 w-4 mr-2" /> Gerar link de pagamento
+                            </DropdownMenuItem>
+                          )}
+                          {o.payment_status !== "aprovado" && (
+                            <DropdownMenuItem onClick={() => doBankTransfer(o)}>
+                              <Landmark className="h-4 w-4 mr-2" /> Transferência bancária
+                            </DropdownMenuItem>
+                          )}
                           {o.payment_provider_reference && (
                             <DropdownMenuItem
                               onClick={() => {
@@ -620,6 +672,95 @@ function EsteiraPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!bankModal} onOpenChange={(o) => !o && setBankModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dados para transferência bancária</DialogTitle>
+          </DialogHeader>
+          {bankModal && (
+            <div className="space-y-3 text-sm">
+              <div className="text-xs text-muted-foreground">
+                Pedido · {bankModal.order.customer_name} · {bankModal.order.service_title}
+              </div>
+              {bankModal.loading && (
+                <div className="text-muted-foreground">Preparando dados...</div>
+              )}
+              {bankModal.error && (
+                <div className="border border-amber-300 bg-amber-50 rounded p-3 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
+                  <div>{bankModal.error}</div>
+                </div>
+              )}
+              {!bankModal.loading && (bankModal.iban || bankModal.bic) && (
+                <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-2">
+                  {bankModal.beneficiaryName && (
+                    <BankRow
+                      label="Beneficiário"
+                      value={bankModal.beneficiaryName}
+                      onCopy={() => copy(bankModal.beneficiaryName!, "Beneficiário")}
+                    />
+                  )}
+                  {bankModal.iban && (
+                    <BankRow
+                      label="IBAN"
+                      value={bankModal.iban}
+                      mono
+                      onCopy={() => copy(bankModal.iban!, "IBAN")}
+                    />
+                  )}
+                  {bankModal.bic && (
+                    <BankRow
+                      label="BIC/SWIFT"
+                      value={bankModal.bic}
+                      mono
+                      onCopy={() => copy(bankModal.bic!, "BIC")}
+                    />
+                  )}
+                  <BankRow
+                    label="Valor"
+                    value={new Intl.NumberFormat("pt-PT", {
+                      style: "currency",
+                      currency: bankModal.order.payment_currency ?? bankModal.order.currency ?? "EUR",
+                    }).format(
+                      ((bankModal.order.payment_amount_cents ?? bankModal.order.amount_cents ?? 0) /
+                        100),
+                    )}
+                    onCopy={() =>
+                      copy(
+                        (
+                          (bankModal.order.payment_amount_cents ??
+                            bankModal.order.amount_cents ??
+                            0) / 100
+                        ).toFixed(2),
+                        "Valor",
+                      )
+                    }
+                  />
+                  {bankModal.reference && (
+                    <BankRow
+                      label="Referência"
+                      value={bankModal.reference}
+                      mono
+                      onCopy={() => copy(bankModal.reference!, "Referência")}
+                    />
+                  )}
+                  {bankModal.reference && (
+                    <p className="text-[11px] text-muted-foreground pt-1">
+                      Inclua a referência <strong>{bankModal.reference}</strong> na transferência
+                      para conciliação automática.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setBankModal(null)}>Fechar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog
         open={!!selected}
         onOpenChange={(o) => !o && setSelected(null)}
@@ -689,6 +830,37 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between gap-3 border-b last:border-0 py-1.5">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-admin-ink text-right">{value}</span>
+    </div>
+  );
+}
+
+function BankRow({
+  label,
+  value,
+  onCopy,
+  mono,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <div className="font-display text-[10px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </div>
+        <div className={`break-all text-sm ${mono ? "font-mono" : ""}`}>{value}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onCopy}
+        className="mt-3 shrink-0 text-admin-accent"
+        aria-label="Copiar"
+      >
+        <Copy className="h-4 w-4" />
+      </button>
     </div>
   );
 }
