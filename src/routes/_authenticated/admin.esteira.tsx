@@ -673,6 +673,95 @@ function EsteiraPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!bankModal} onOpenChange={(o) => !o && setBankModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dados para transferência bancária</DialogTitle>
+          </DialogHeader>
+          {bankModal && (
+            <div className="space-y-3 text-sm">
+              <div className="text-xs text-muted-foreground">
+                Pedido · {bankModal.order.customer_name} · {bankModal.order.service_title}
+              </div>
+              {bankModal.loading && (
+                <div className="text-muted-foreground">Preparando dados...</div>
+              )}
+              {bankModal.error && (
+                <div className="border border-amber-300 bg-amber-50 rounded p-3 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
+                  <div>{bankModal.error}</div>
+                </div>
+              )}
+              {!bankModal.loading && (bankModal.iban || bankModal.bic) && (
+                <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-2">
+                  {bankModal.beneficiaryName && (
+                    <BankRow
+                      label="Beneficiário"
+                      value={bankModal.beneficiaryName}
+                      onCopy={() => copy(bankModal.beneficiaryName!, "Beneficiário")}
+                    />
+                  )}
+                  {bankModal.iban && (
+                    <BankRow
+                      label="IBAN"
+                      value={bankModal.iban}
+                      mono
+                      onCopy={() => copy(bankModal.iban!, "IBAN")}
+                    />
+                  )}
+                  {bankModal.bic && (
+                    <BankRow
+                      label="BIC/SWIFT"
+                      value={bankModal.bic}
+                      mono
+                      onCopy={() => copy(bankModal.bic!, "BIC")}
+                    />
+                  )}
+                  <BankRow
+                    label="Valor"
+                    value={new Intl.NumberFormat("pt-PT", {
+                      style: "currency",
+                      currency: bankModal.order.payment_currency ?? bankModal.order.currency ?? "EUR",
+                    }).format(
+                      ((bankModal.order.payment_amount_cents ?? bankModal.order.amount_cents ?? 0) /
+                        100),
+                    )}
+                    onCopy={() =>
+                      copy(
+                        (
+                          (bankModal.order.payment_amount_cents ??
+                            bankModal.order.amount_cents ??
+                            0) / 100
+                        ).toFixed(2),
+                        "Valor",
+                      )
+                    }
+                  />
+                  {bankModal.reference && (
+                    <BankRow
+                      label="Referência"
+                      value={bankModal.reference}
+                      mono
+                      onCopy={() => copy(bankModal.reference!, "Referência")}
+                    />
+                  )}
+                  {bankModal.reference && (
+                    <p className="text-[11px] text-muted-foreground pt-1">
+                      Inclua a referência <strong>{bankModal.reference}</strong> na transferência
+                      para conciliação automática.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setBankModal(null)}>Fechar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog
         open={!!selected}
         onOpenChange={(o) => !o && setSelected(null)}
