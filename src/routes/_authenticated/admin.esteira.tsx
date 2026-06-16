@@ -612,20 +612,6 @@ function EsteiraPage() {
                   </p>
                 </div>
               )}
-              {linkModal.reference && (
-                <div>
-                  <Label>Referência</Label>
-                  <div className="flex gap-2 mt-1">
-                    <Input readOnly value={linkModal.reference} className="font-mono text-xs" />
-                    <Button
-                      variant="outline"
-                      onClick={() => copy(linkModal.reference!, "Referência")}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
               <div className="flex justify-end pt-2">
                 <Button onClick={() => setLinkModal(null)}>Fechar</Button>
               </div>
