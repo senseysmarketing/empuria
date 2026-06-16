@@ -4,15 +4,13 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireStaff } from "@/lib/admin/auth";
 import {
-  createWisePaymentRequest,
-  getWisePaymentRequest,
-  pickHostedUrl,
   listWiseAccountDetails,
   listWiseBalances,
   listWiseProfiles,
   type WiseClientOptions,
   type WiseEnvironment,
 } from "./wise-api.server";
+
 
 
 const db = supabaseAdmin as unknown as {
@@ -52,21 +50,23 @@ function tokenFromSettingOrEnv(setting: Pick<WiseSetting, "wise_api_token">) {
   return setting.wise_api_token ?? process.env.WISE_API_TOKEN ?? null;
 }
 
-/** Append amount/currency query params to a Wise Quick Pay URL so the
- *  payer lands on the Wise page with the right value pre-filled. */
+/** Append amount/currency/description query params to a Wise Quick Pay URL
+ *  so the payer lands on the Wise page with value + reference pre-filled. */
 function appendQuickPayParams(
   url: string,
-  params: { amount: number; currency: string },
+  params: { amount: number; currency: string; description?: string | null },
 ): string {
   try {
     const u = new URL(url);
     u.searchParams.set("amount", params.amount.toFixed(2));
     u.searchParams.set("currency", params.currency);
+    if (params.description) u.searchParams.set("description", params.description);
     return u.toString();
   } catch {
     return url;
   }
 }
+
 
 function maskedSetting(s: WiseSetting): WiseSetting {
   return {
@@ -120,91 +120,57 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
       .limit(20);
     const { data: payments } = await db
       .from("wise_payments")
-      .select("id,order_id,external_reference,status,amount_cents,currency,wise_payment_link_url,paid_at,created_at,raw_response")
+      .select("id,order_id,external_reference,status,amount_cents,currency,wise_payment_link_url,paid_at,created_at")
       .order("created_at", { ascending: false })
       .limit(20);
 
     const hasFallbackUrl = !!setting.wise_default_payment_url;
 
-    // Find latest API error from raw_response.error.
-    // If a Quick Pay fallback URL is configured, the API's 404 is *expected*
-    // (Wise's public API does not expose Quick Pay link creation) — don't surface it as an error.
-    let lastApiError: { message: string; status: number | null; at: string } | null = null;
-    let lastApiSuccessAt: string | null = null;
-    for (const p of payments ?? []) {
-      const raw = (p.raw_response ?? {}) as Record<string, unknown>;
-      if (!lastApiSuccessAt && p.wise_payment_link_url && !raw.error) {
-        lastApiSuccessAt = p.created_at as string;
-      }
-      if (!lastApiError && typeof raw.error === "string") {
-        const status = (raw.status as number | undefined) ?? null;
-        if (!(hasFallbackUrl && status === 404)) {
-          lastApiError = {
-            message: raw.error as string,
-            status,
-            at: p.created_at as string,
-          };
-        }
-      }
-      if (lastApiError && lastApiSuccessAt) break;
-    }
-
     return {
       setting: maskedSetting(setting),
       events: events ?? [],
-      payments: (payments ?? []).map((p: Record<string, unknown>) => ({ ...p, raw_response: undefined })),
+      payments: payments ?? [],
       webhookUrl: "/api/public/webhooks/wise",
       hasEnvToken: !!process.env.WISE_API_TOKEN,
-      lastApiError,
-      lastApiSuccessAt,
+      lastApiError: null as { message: string; status: number | null; at: string } | null,
+      lastApiSuccessAt: null as string | null,
       hasFallbackUrl,
     };
   });
 
-/** Admin: try to create a real €1.00 payment-request to validate the API end-to-end. */
+
+/** Admin: build a real Quick Pay link with €1,00 + EMP-TEST-XXXXXX to
+ *  validate that the configured reusable link works end-to-end. */
 export const testWisePaymentCreation = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .handler(async () => {
     const setting = await loadSetting();
     const fallbackUrl = setting.wise_default_payment_url ?? null;
-    const token = tokenFromSettingOrEnv(setting);
-    if (!token) {
-      return { ok: false, message: "Token Wise nao configurado.", link: null as string | null, fallbackUrl };
-    }
-    if (!setting.wise_profile_id) {
-      return { ok: false, message: "Profile Wise nao selecionado.", link: null as string | null, fallbackUrl };
-    }
     const ref = `EMP-TEST-${Date.now().toString().slice(-6)}`;
-    const res = await createWisePaymentRequest(
-      { token, environment: setting.wise_environment },
-      setting.wise_profile_id,
-      {
-        amount: 1.0,
-        currency: "EUR",
-        reference: ref.slice(0, 35),
-        description: "Empuria - teste de integracao Wise (1 EUR)",
-        balanceId: setting.wise_balance_id_eur,
-        metadata: { test: "true" },
-      },
-    );
-    if (!res.ok) {
+    if (!fallbackUrl) {
       return {
         ok: false,
-        message: `API Wise respondeu ${res.status}: ${res.error}`,
+        message:
+          "Configure primeiro o Link Quick Pay reutilizavel em Wise → Solicitar pagamento e cole no campo abaixo.",
         link: null as string | null,
         fallbackUrl,
         reference: ref,
       };
     }
-    const link = pickHostedUrl(res.data);
+    const link = appendQuickPayParams(fallbackUrl, {
+      amount: 1.0,
+      currency: "EUR",
+      description: ref,
+    });
     return {
       ok: true,
-      message: link ? "Link hospedado gerado com sucesso." : "API aceitou mas nao retornou link hospedado.",
+      message: "Link Quick Pay gerado com valor + referencia preenchidos.",
       link,
       fallbackUrl,
       reference: ref,
     };
   });
+
 
 
 const webhookSubSchema = z.object({
@@ -407,55 +373,28 @@ export async function createWisePaymentForOrder(args: {
       (refRpc?.data as string | null) ?? `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
   }
 
-  const token = tokenFromSettingOrEnv(setting);
-  const profileId = setting.wise_profile_id;
-  const balanceId = setting.wise_balance_id_eur;
-  const manualOnlyMode = setting.wise_confirmation_mode === "manual_only";
-
-  if (!existing && !manualOnlyMode && token && profileId) {
-    const client: WiseClientOptions = { token, environment: setting.wise_environment };
-    const description = (args.description ?? "Instituto Empuria").slice(0, 100);
-    raw_request = {
-      amount: args.amountCents / 100,
-      currency: args.currency,
-      reference: reference.slice(0, 35),
-      description,
-      balanceId,
-    };
-    const created = await createWisePaymentRequest(client, profileId, {
-      amount: args.amountCents / 100,
-      currency: args.currency,
-      reference: reference.slice(0, 35),
-      description,
-      balanceId,
-      metadata: { order_id: args.orderId, reference },
-    });
-    if (!created.ok) {
-      console.error("[wise] payment-request failed", created.status, created.error);
-      // Only persist as an "error" when there is no Quick Pay fallback configured.
-      // Wise's public API does not expose Quick Pay creation, so a 404 here is expected.
-      if (!setting.wise_default_payment_url) {
-        raw_response = { error: created.error, status: created.status, body: created.body as unknown };
-      } else {
-        raw_response = { fallback: "quick_pay", api_status: created.status };
-      }
-    } else {
-      raw_response = created.data as unknown as Record<string, unknown>;
-      paymentUrl = pickHostedUrl(created.data);
-    }
-  }
-
-  // Fallback to configured Quick Pay link. Append amount/currency so the
-  // payer lands on the Wise page with the right value pre-filled. The
-  // EMP-XXXX reference is shown on the order page for the payer to copy
-  // into Wise's "reference / message" field.
+  // Wise's public API does NOT expose Quick Pay creation. Official path:
+  // a reusable Quick Pay link configured by the admin + ?currency&amount&description
+  // query params per order. The EMP-XXXX reference becomes the description so
+  // the payer sees it pre-filled on Wise's payment screen.
   if (!paymentUrl && setting.wise_default_payment_url) {
     paymentUrl = appendQuickPayParams(setting.wise_default_payment_url, {
       amount: args.amountCents / 100,
       currency: args.currency,
+      description: reference,
     });
   }
+  if (!existing) {
+    raw_request = {
+      amount: args.amountCents / 100,
+      currency: args.currency,
+      reference,
+      description: args.description,
+      quick_pay_base: setting.wise_default_payment_url,
+    };
+  }
   const manualOnly = !paymentUrl;
+
 
   if (!existing) {
     const { data: inserted, error } = await db
@@ -579,37 +518,16 @@ export const refreshWisePaymentStatus = createServerFn({ method: "POST" })
 
     const { data: payment } = await db
       .from("wise_payments")
-      .select("id,status,wise_payment_link_id")
+      .select("id,status")
       .eq("order_id", data.orderId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    // Optional: sync from Wise API
-    if (payment?.wise_payment_link_id) {
-      const setting = await loadSetting();
-      const token = tokenFromSettingOrEnv(setting);
-      if (token && setting.wise_profile_id) {
-        const res = await getWisePaymentRequest(
-          { token, environment: setting.wise_environment },
-          setting.wise_profile_id,
-          payment.wise_payment_link_id as string,
-        );
-        if (res.ok) {
-          const status = String(res.data.status ?? "").toLowerCase();
-          if (status === "paid" || status === "claimed" || status === "completed") {
-            await db
-              .from("wise_payments")
-              .update({ status: "paid", paid_at: new Date().toISOString(), raw_webhook: res.data })
-              .eq("id", payment.id);
-            await db
-              .from("orders")
-              .update({ payment_status: "aprovado", paid_at: new Date().toISOString() })
-              .eq("id", data.orderId);
-          }
-        }
-      }
-    }
+    // Approval is driven exclusively by the `balances#credit` webhook or
+    // manual conciliation in /admin/wise-conciliacao. There is no public
+    // Wise API to poll for hosted-link status.
+
 
     const { data: latest } = await db
       .from("orders")

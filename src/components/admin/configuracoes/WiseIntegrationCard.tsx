@@ -277,17 +277,12 @@ export function WiseIntegrationCard() {
     mutationFn: () => testPaymentFn(),
     onSuccess: (r) => {
       if (r.ok && r.link) {
-        toast.success("Link Wise gerado via API! Abrindo em nova aba...");
+        toast.success(`Link gerado · ref ${r.reference}. Abrindo em nova aba...`);
         window.open(r.link, "_blank", "noopener");
-      } else if (r.fallbackUrl) {
-        // API doesn't expose Quick Pay creation — open the manually configured
-        // Quick Pay link, which is the official Wise flow.
-        toast.success("OK · abrindo Quick Pay manual (caminho oficial Wise)");
-        window.open(r.fallbackUrl, "_blank", "noopener");
       } else {
-        // No fallback configured: tell the user exactly what to do.
         toast.error(
-          "Wise nao expoe API publica para gerar link de pagamento. Configure o Link Quick Pay manualmente.",
+          r.message ??
+            "Configure o Link Quick Pay reutilizavel da Wise antes de testar.",
           { duration: 8000 },
         );
       }
@@ -295,6 +290,7 @@ export function WiseIntegrationCard() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar pagamento"),
   });
+
 
   const webhookUrl =
     typeof window !== "undefined"
@@ -345,35 +341,22 @@ export function WiseIntegrationCard() {
                 }
               />
               <Row
-                label="Link de pagamento"
-                value={
-                  q.data?.lastApiSuccessAt
-                    ? "via API"
-                    : setting?.wise_default_payment_url
-                      ? "Quick Pay (manual)"
-                      : "nao configurado"
-                }
+                label="Link Quick Pay"
+                value={setting?.wise_default_payment_url ? "configurado" : "nao configurado"}
               />
             </>
-          )}
-          {q.data?.lastApiError && !setting?.wise_default_payment_url && (
-            <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span className="break-all">
-                Ultimo erro da API: {q.data.lastApiError.message}
-              </span>
-            </div>
           )}
           {!setting?.wise_default_payment_url && (
             <div className="mt-2 flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-2 text-[11px] text-blue-800">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                A API publica da Wise nao gera link de Quick Pay. Configure um link reutilizavel em
-                <span className="font-semibold"> Wise → Solicitar pagamento</span> e cole no campo
-                <span className="font-semibold"> &quot;Link Quick Pay&quot;</span> abaixo.
+                Cole abaixo o seu <span className="font-semibold">Link Quick Pay reutilizavel</span>{" "}
+                (Wise → Solicitar pagamento → copie o link aberto). O Empuria adiciona valor, moeda
+                e referencia EMP-XXXX automaticamente em cada pedido.
               </span>
             </div>
           )}
+
         </div>
         <div className="mt-auto flex flex-wrap gap-2 pt-5">
           <Button type="button" size="sm" onClick={() => setOpen(true)}>
@@ -383,7 +366,7 @@ export function WiseIntegrationCard() {
             type="button"
             size="sm"
             variant="outline"
-            disabled={testPaymentMutation.isPending || !setting?.wise_api_token || !setting?.wise_profile_id}
+            disabled={testPaymentMutation.isPending || !setting?.wise_default_payment_url}
             onClick={() => testPaymentMutation.mutate()}
           >
             {testPaymentMutation.isPending ? (
@@ -391,8 +374,9 @@ export function WiseIntegrationCard() {
             ) : (
               <Zap className="mr-2 h-3.5 w-3.5" />
             )}
-            Testar criacao de pagamento
+            Testar link Quick Pay
           </Button>
+
         </div>
       </BentoCard>
 
