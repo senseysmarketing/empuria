@@ -4,15 +4,13 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireStaff } from "@/lib/admin/auth";
 import {
-  createWisePaymentRequest,
-  getWisePaymentRequest,
-  pickHostedUrl,
   listWiseAccountDetails,
   listWiseBalances,
   listWiseProfiles,
   type WiseClientOptions,
   type WiseEnvironment,
 } from "./wise-api.server";
+
 
 
 const db = supabaseAdmin as unknown as {
