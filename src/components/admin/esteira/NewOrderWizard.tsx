@@ -50,7 +50,7 @@ type Service = {
 
 const fmtEUR = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "EUR" });
 
-type PaymentMethod = "wise" | "manual" | "pendente" | "gratuito";
+type PaymentMethod = "wise" | "manual" | "dinheiro" | "pendente" | "gratuito";
 
 export function NewOrderWizard({
   open,
@@ -170,7 +170,7 @@ export function NewOrderWizard({
     (serviceMode === "cadastrado" ? !!service : customTitle.length >= 2) &&
     amount !== "" &&
     (!isFree || confirmFree) &&
-    (method !== "manual" || reason.length >= 3);
+    ((method !== "manual" && method !== "dinheiro") || reason.length >= 3);
 
   const submit = async () => {
     if (!canSubmit || !customer || submitting) return;
@@ -186,7 +186,8 @@ export function NewOrderWizard({
           service_title: serviceMode === "cadastrado" ? service!.title : customTitle,
           amount_cents: amountCents,
           payment_method: effectiveMethod,
-          reason: effectiveMethod === "manual" ? reason : undefined,
+          reason:
+            effectiveMethod === "manual" || effectiveMethod === "dinheiro" ? reason : undefined,
           notes: notes || undefined,
         },
       });
@@ -409,6 +410,7 @@ export function NewOrderWizard({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="wise">Gerar cobrança Wise (EUR)</SelectItem>
+                  <SelectItem value="dinheiro">Dinheiro (recebido pessoalmente)</SelectItem>
                   <SelectItem value="manual">Marcar como pago manualmente</SelectItem>
                   <SelectItem value="pendente">
                     Apenas criar pedido (cobrar depois)
@@ -424,6 +426,12 @@ export function NewOrderWizard({
                   valor cai no saldo EUR.
                 </p>
               )}
+              {method === "dinheiro" && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pedido criado já como <strong>pago</strong>. Use a observação abaixo para
+                  registrar quem recebeu e quando.
+                </p>
+              )}
               {method === "pendente" && (
                 <p className="text-xs text-muted-foreground mt-1">
                   O pedido fica pendente. Você pode gerar a cobrança Wise depois pela esteira.
@@ -435,6 +443,18 @@ export function NewOrderWizard({
               <div>
                 <Label>Motivo do pagamento manual *</Label>
                 <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+              </div>
+            )}
+
+            {method === "dinheiro" && (
+              <div>
+                <Label>Observação do recebimento em dinheiro *</Label>
+                <Textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={2}
+                  placeholder="Ex.: Recebido em mãos por Fulano em 16/06"
+                />
               </div>
             )}
 
