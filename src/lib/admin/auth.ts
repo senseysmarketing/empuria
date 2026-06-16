@@ -1,7 +1,7 @@
 // Shared staff/module guards for admin server functions.
 import { createMiddleware } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getUserStaffAccess, userHasModuleAccess } from "./permission-checks";
+import { getUserStaffAccess, userHasModuleAccess, userHasAction } from "./permission-checks";
 
 export const requireStaff = createMiddleware({ type: "function" })
   .middleware([requireSupabaseAuth])
@@ -31,6 +31,20 @@ export function requireAdmin() {
     .middleware([requireStaff])
     .server(async ({ next, context }) => {
       if (!context.isAdmin) throw new Error("Apenas admins podem executar esta ação");
+      return next();
+    });
+}
+
+/**
+ * Allow admins always, or staff that have an explicit action permission row.
+ */
+export function requireStaffOrAction(actionKey: string) {
+  return createMiddleware({ type: "function" })
+    .middleware([requireStaff])
+    .server(async ({ next, context }) => {
+      if (context.isAdmin) return next();
+      const allowed = await userHasAction(context.userId, actionKey);
+      if (!allowed) throw new Error("Sem permissão para esta ação");
       return next();
     });
 }

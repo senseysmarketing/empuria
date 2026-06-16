@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireStaff, requireAdmin } from "./auth";
+import { requireStaff, requireAdmin, requireStaffOrAction } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
 import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
@@ -171,13 +171,7 @@ const fullOrderSchema = z.object({
 export const createOrderFull = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => fullOrderSchema.parse(d))
-  .handler(async ({ data, context }) => {
-    if (!context.isAdmin && data.amount_cents > 0) {
-      throw new Error("Apenas admins podem criar pedidos com valor");
-    }
-    if ((data.payment_method === "manual" || data.payment_method === "dinheiro") && !context.isAdmin) {
-      throw new Error("Apenas admins podem registrar pagamento manual ou em dinheiro");
-    }
+  .handler(async ({ data, context: _context }) => {
     if (data.payment_method === "manual" && !data.reason) {
       throw new Error("Informe o motivo do pagamento manual");
     }
@@ -256,7 +250,7 @@ export const createOrderFull = createServerFn({ method: "POST" })
 // --- Order actions ----------------------------------------------------------
 
 export const markOrderPaidManual = createServerFn({ method: "POST" })
-  .middleware([requireAdmin()])
+  .middleware([requireStaff])
   .inputValidator((d) =>
     z
       .object({
@@ -290,7 +284,7 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
   });
 
 export const cancelOrder = createServerFn({ method: "POST" })
-  .middleware([requireAdmin()])
+  .middleware([requireStaffOrAction("esteira.cancel_order")])
   .inputValidator((d) =>
     z
       .object({
@@ -317,7 +311,7 @@ export const cancelOrder = createServerFn({ method: "POST" })
   });
 
 export const refundOrder = createServerFn({ method: "POST" })
-  .middleware([requireAdmin()])
+  .middleware([requireStaffOrAction("esteira.refund_order")])
   .inputValidator((d) =>
     z
       .object({
@@ -468,7 +462,6 @@ export const generateWisePaymentForOrder = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    if (!context.isAdmin) throw new Error("Apenas admins podem gerar cobrança Wise.");
     const { data: order, error } = await context.supabase
       .from("orders")
       .select(
