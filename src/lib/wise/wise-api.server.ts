@@ -107,108 +107,12 @@ export async function listWiseAccountDetails(client: WiseClientOptions, profileI
 }
 
 
-export type WisePaymentRequestPayload = {
-  amount: number; // major units, e.g. 199.50
-  currency: string; // ISO 4217
-  description?: string;
-  reference?: string; // shown to payer/statement, max 35 chars
-  balanceId?: string | number | null;
-  payerEmailMessage?: string;
-  metadata?: Record<string, string>;
-};
+// NOTE: Wise's public API does NOT expose creation of "Payment Request" /
+// "Quick Pay" hosted links. The official path (confirmed by Wise support)
+// is a single reusable Quick Pay link configured in the Wise dashboard,
+// with `?currency=...&amount=...&description=...` appended per order. See
+// `appendQuickPayParams` in src/lib/wise/wise.functions.ts.
 
-export type WisePaymentRequestResponse = {
-  id: string;
-  status?: string;
-  link?: string;
-  paymentUrl?: string;
-  url?: string;
-  amount?: { value?: number; currency?: string } | number;
-  currency?: string;
-  reference?: string;
-  description?: string;
-  createdAt?: string;
-};
-
-/**
- * Creates a Wise Payment Request (hosted checkout link). Tries the modern v2
- * endpoint first; falls back to alternate paths some Business accounts use.
- * Returns the wiseFetch error envelope so callers can decide to fall back.
- */
-export async function createWisePaymentRequest(
-  client: WiseClientOptions,
-  profileId: string | number,
-  payload: WisePaymentRequestPayload,
-) {
-  const body: Record<string, unknown> = {
-    amount: { value: payload.amount, currency: payload.currency },
-    description: payload.description ?? null,
-    reference: payload.reference ?? null,
-    payerEmailMessage: payload.payerEmailMessage ?? null,
-    metadata: payload.metadata ?? {},
-  };
-  if (payload.balanceId) body.balanceId = payload.balanceId;
-
-  const paths = [
-    `/v2/profiles/${profileId}/payment-requests`,
-    `/v1/profiles/${profileId}/payment-requests`,
-    `/v2/business/${profileId}/payment-requests`,
-  ];
-  let lastError: { status: number; error: string; body: unknown } | null = null;
-  for (const path of paths) {
-    const res = await wiseFetch<WisePaymentRequestResponse>(client, path, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    if (res.ok) return res;
-    lastError = { status: res.status, error: res.error, body: res.body };
-    // Only keep trying on 404 (path missing). Other errors stop the cascade.
-    if (res.status !== 404) break;
-  }
-  return {
-    ok: false as const,
-    status: lastError?.status ?? 0,
-    error: lastError?.error ?? "unknown",
-    body: lastError?.body,
-  };
-}
-
-export async function getWisePaymentRequest(
-  client: WiseClientOptions,
-  profileId: string | number,
-  id: string,
-) {
-  const paths = [
-    `/v2/profiles/${profileId}/payment-requests/${id}`,
-    `/v1/profiles/${profileId}/payment-requests/${id}`,
-    `/v2/business/${profileId}/payment-requests/${id}`,
-  ];
-  let lastError: { status: number; error: string; body: unknown } | null = null;
-  for (const path of paths) {
-    const res = await wiseFetch<WisePaymentRequestResponse>(client, path, { method: "GET" });
-    if (res.ok) return res;
-    lastError = { status: res.status, error: res.error, body: res.body };
-    if (res.status !== 404) break;
-  }
-  return {
-    ok: false as const,
-    status: lastError?.status ?? 0,
-    error: lastError?.error ?? "unknown",
-    body: lastError?.body,
-  };
-}
-
-export function pickHostedUrl(
-  data: WisePaymentRequestResponse | undefined | null,
-): string | null {
-  if (!data) return null;
-  return (
-    (data.link as string | undefined) ??
-    (data.paymentUrl as string | undefined) ??
-    (data.url as string | undefined) ??
-    null
-  );
-}
 
 /**
  * Verify a Wise webhook RSA-SHA256 signature.
