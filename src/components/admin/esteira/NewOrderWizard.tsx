@@ -26,7 +26,7 @@ import {
   searchCustomers,
   createCustomerLite,
   createOrderFull,
-  generatePaymentLink,
+  generateWisePaymentForOrder,
 } from "@/lib/admin/esteira.functions";
 import { useQuery } from "@tanstack/react-query";
 
@@ -48,11 +48,9 @@ type Service = {
   requires_slot: boolean;
 };
 
-const fmtBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const fmtEUR = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "EUR" });
 
-type PaymentMethod = "mercadopago" | "manual" | "gratuito";
-type Currency = "EUR" | "BRL";
+type PaymentMethod = "wise" | "manual" | "pendente" | "gratuito";
 
 export function NewOrderWizard({
   open,
@@ -67,7 +65,7 @@ export function NewOrderWizard({
   const createCustomer = useServerFn(createCustomerLite);
   const fetchServices = useServerFn(listServicesAdmin);
   const createOrder = useServerFn(createOrderFull);
-  const genLink = useServerFn(generatePaymentLink);
+  const genWise = useServerFn(generateWisePaymentForOrder);
 
   const [step, setStep] = useState(1);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -81,12 +79,8 @@ export function NewOrderWizard({
   const [customTitle, setCustomTitle] = useState("");
 
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState<Currency>("EUR");
-  const [payAmount, setPayAmount] = useState("");
-  const [payCurrency, setPayCurrency] = useState<Currency>("BRL");
-  const [fxRate, setFxRate] = useState("");
 
-  const [method, setMethod] = useState<PaymentMethod>("mercadopago");
+  const [method, setMethod] = useState<PaymentMethod>("wise");
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [confirmFree, setConfirmFree] = useState(false);
@@ -95,6 +89,9 @@ export function NewOrderWizard({
     id: string;
     reference: string | null;
     paymentUrl: string | null;
+    iban: string | null;
+    bic: string | null;
+    beneficiaryName: string | null;
     method: PaymentMethod;
   } | null>(null);
 
@@ -115,9 +112,7 @@ export function NewOrderWizard({
       setServiceMode("cadastrado");
       setCustomTitle("");
       setAmount("");
-      setPayAmount("");
-      setFxRate("");
-      setMethod("mercadopago");
+      setMethod("wise");
       setReason("");
       setNotes("");
       setConfirmFree(false);
@@ -157,35 +152,31 @@ export function NewOrderWizard({
     const s = services.find((x) => x.id === id) as Service | undefined;
     if (s) {
       setService(s);
-      const brl = s.online_price_cents ?? 0;
-      if (brl > 0) {
-        setAmount((brl / 100).toFixed(2));
-        setCurrency("BRL");
-      } else {
-        setAmount(((s.price_cents ?? 0) / 100).toFixed(2));
-        setCurrency("EUR");
-      }
+      setAmount(((s.price_cents ?? 0) / 100).toFixed(2));
     }
   };
 
   const amountCents = Math.round(parseFloat(amount || "0") * 100);
-  const payCents = payAmount ? Math.round(parseFloat(payAmount) * 100) : amountCents;
   const isFree = amountCents === 0;
 
-  const mpNeedsBrl = !isFree && method === "mercadopago" && payCurrency !== "BRL";
+  // Auto-switch method when value becomes 0 or > 0
+  useEffect(() => {
+    if (isFree && method !== "gratuito") setMethod("gratuito");
+    if (!isFree && method === "gratuito") setMethod("wise");
+  }, [isFree]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canSubmit =
     customer &&
     (serviceMode === "cadastrado" ? !!service : customTitle.length >= 2) &&
     amount !== "" &&
     (!isFree || confirmFree) &&
-    (method !== "manual" || reason.length >= 3) &&
-    !mpNeedsBrl;
+    (method !== "manual" || reason.length >= 3);
 
   const submit = async () => {
     if (!canSubmit || !customer || submitting) return;
     setSubmitting(true);
     try {
+      const effectiveMethod: PaymentMethod = isFree ? "gratuito" : method;
       const created = await createOrder({
         data: {
           user_id: customer.id,
@@ -194,31 +185,38 @@ export function NewOrderWizard({
           service_id: serviceMode === "cadastrado" ? service?.id : null,
           service_title: serviceMode === "cadastrado" ? service!.title : customTitle,
           amount_cents: amountCents,
-          currency,
-          payment_amount_cents: payCents,
-          payment_currency: payCurrency,
-          fx_rate: fxRate ? parseFloat(fxRate) : undefined,
-          payment_method: isFree ? "gratuito" : method,
-          reason: method === "manual" ? reason : undefined,
+          payment_method: effectiveMethod,
+          reason: effectiveMethod === "manual" ? reason : undefined,
           notes: notes || undefined,
         },
       });
-      const effectiveMethod: PaymentMethod = isFree ? "gratuito" : method;
       let reference: string | null = null;
       let paymentUrl: string | null = null;
-      if (effectiveMethod === "mercadopago") {
+      let iban: string | null = null;
+      let bic: string | null = null;
+      let beneficiaryName: string | null = null;
+      if (effectiveMethod === "wise") {
         try {
-          const baseUrl =
-            typeof window !== "undefined" ? window.location.origin : undefined;
-          const link = await genLink({ data: { id: created.id, baseUrl } });
+          const link = await genWise({ data: { id: created.id } });
           reference = link.reference ?? `EMP-${created.id}`;
-          paymentUrl = link.url ?? null;
+          paymentUrl = link.paymentUrl ?? null;
+          iban = link.iban ?? null;
+          bic = link.bic ?? null;
+          beneficiaryName = link.beneficiaryName ?? null;
         } catch (e) {
-          toast.error(e instanceof Error ? e.message : "Não foi possível preparar o link MP");
+          toast.error(e instanceof Error ? e.message : "Não foi possível gerar o pagamento Wise");
         }
       }
-      setCreatedOrder({ id: created.id, reference, paymentUrl, method: effectiveMethod });
-      setStep(5);
+      setCreatedOrder({
+        id: created.id,
+        reference,
+        paymentUrl,
+        iban,
+        bic,
+        beneficiaryName,
+        method: effectiveMethod,
+      });
+      setStep(4);
       toast.success("Pedido criado");
       onCreated();
     } catch (e) {
@@ -239,7 +237,7 @@ export function NewOrderWizard({
         <DialogHeader>
           <DialogTitle>Novo pedido</DialogTitle>
           <DialogDescription>
-            {step === 5 ? "Conclusão" : `Etapa ${step} de 4 · ${stepLabel(step)}`}
+            {step === 4 ? "Conclusão" : `Etapa ${step} de 3 · ${stepLabel(step)}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -322,110 +320,62 @@ export function NewOrderWizard({
 
         {step === 2 && (
           <div className="space-y-4">
-            <Select value={serviceMode} onValueChange={(v) => setServiceMode(v as never)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cadastrado">Serviço cadastrado</SelectItem>
-                <SelectItem value="avulso">Serviço avulso</SelectItem>
-              </SelectContent>
-            </Select>
-            {serviceMode === "cadastrado" ? (
-              <Select value={service?.id ?? ""} onValueChange={onSelectService}>
+            <div>
+              <Label>Tipo de serviço</Label>
+              <Select value={serviceMode} onValueChange={(v) => setServiceMode(v as never)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Escolha o serviço" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {services.map((s) => {
-                    const brl = (s as Service).online_price_cents ?? 0;
-                    const eur = s.price_cents ?? 0;
-                    const label =
-                      brl > 0
-                        ? `${s.title} · ${fmtBRL.format(brl / 100)}${eur > 0 ? ` (${fmtEUR.format(eur / 100)})` : ""}`
-                        : `${s.title} · ${fmtEUR.format(eur / 100)}`;
-                    return (
-                      <SelectItem key={s.id} value={s.id}>
-                        {label}
-                      </SelectItem>
-                    );
-                  })}
+                  <SelectItem value="cadastrado">Serviço cadastrado</SelectItem>
+                  <SelectItem value="avulso">Serviço avulso</SelectItem>
                 </SelectContent>
               </Select>
-            ) : (
-              <Input
-                placeholder="Título do serviço avulso"
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-              />
-            )}
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Valor comercial</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label>Moeda</Label>
-                <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="BRL">BRL</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Valor cobrança (Mercado Pago)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={payAmount}
-                  placeholder={amount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label>Moeda cobrança</Label>
-                <Select value={payCurrency} onValueChange={(v) => setPayCurrency(v as Currency)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BRL">BRL</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                  </SelectContent>
-                </Select>
-                {method === "mercadopago" && payCurrency !== "BRL" && !isFree && (
-                  <p className="text-xs text-amber-700 mt-1">
-                    Mercado Pago só processa em Reais (BRL). Selecione BRL para gerar o link.
-                  </p>
-                )}
-              </div>
-              {currency !== payCurrency && (
-                <div className="col-span-2">
-                  <Label>Taxa de câmbio (manual)</Label>
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={fxRate}
-                    onChange={(e) => setFxRate(e.target.value)}
-                    placeholder="Ex: 6.00"
-                  />
-                </div>
-              )}
             </div>
+            {serviceMode === "cadastrado" ? (
+              <div>
+                <Label>Serviço</Label>
+                <Select value={service?.id ?? ""} onValueChange={onSelectService}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolha o serviço" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {services.map((s) => {
+                      const eur = s.price_cents ?? 0;
+                      return (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.title} · {fmtEUR.format(eur / 100)}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div>
+                <Label>Título do serviço avulso</Label>
+                <Input
+                  placeholder="Ex: Consulta avulsa"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div>
+              <Label>Valor (EUR)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Todo o sistema opera em EUR. Cobranças online são processadas pela Wise.
+              </p>
+            </div>
+
             {isFree && (
               <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm">
                 <label className="flex items-start gap-2">
@@ -445,7 +395,7 @@ export function NewOrderWizard({
           </div>
         )}
 
-        {step === 4 && (
+        {step === 3 && (
           <div className="space-y-4">
             <div>
               <Label>Forma de pagamento</Label>
@@ -458,46 +408,50 @@ export function NewOrderWizard({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="mercadopago">Gerar link Mercado Pago</SelectItem>
+                  <SelectItem value="wise">Gerar cobrança Wise (EUR)</SelectItem>
                   <SelectItem value="manual">Marcar como pago manualmente</SelectItem>
+                  <SelectItem value="pendente">
+                    Apenas criar pedido (cobrar depois)
+                  </SelectItem>
                   <SelectItem value="gratuito" disabled={!isFree}>
                     Gratuito
                   </SelectItem>
                 </SelectContent>
               </Select>
+              {method === "wise" && !isFree && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Gera link Wise + IBAN/BIC. A reconciliação é automática via webhook quando o
+                  valor cai no saldo EUR.
+                </p>
+              )}
+              {method === "pendente" && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  O pedido fica pendente. Você pode gerar a cobrança Wise depois pela esteira.
+                </p>
+              )}
             </div>
-            {mpNeedsBrl && (
-              <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
-                <div>
-                  <strong>Cobrança precisa estar em BRL.</strong> Mercado Pago só processa em Reais.
-                  Volte para a etapa 3 e ajuste a moeda de cobrança para <strong>BRL</strong>, ou
-                  troque a forma de pagamento.
-                </div>
-              </div>
-            )}
+
             {method === "manual" && (
               <div>
                 <Label>Motivo do pagamento manual *</Label>
                 <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
               </div>
             )}
+
             <div>
               <Label>Notas internas (opcional)</Label>
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
             </div>
+
             <div className="text-xs text-muted-foreground">
               Cliente: <strong>{customer?.full_name}</strong> · Serviço:{" "}
               <strong>{serviceMode === "cadastrado" ? service?.title : customTitle}</strong> ·
-              Valor:{" "}
-              <strong>
-                {currency} {amount}
-              </strong>
+              Valor: <strong>{fmtEUR.format(amountCents / 100)}</strong>
             </div>
           </div>
         )}
 
-        {step === 5 && createdOrder && (
+        {step === 4 && createdOrder && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-4 rounded border border-emerald-200 bg-emerald-50">
               <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
@@ -505,22 +459,28 @@ export function NewOrderWizard({
                 <div className="font-medium text-emerald-900">Pedido criado com sucesso</div>
                 <div className="text-xs text-emerald-800/80">
                   {customer?.full_name} ·{" "}
-                  {serviceMode === "cadastrado" ? service?.title : customTitle}
+                  {serviceMode === "cadastrado" ? service?.title : customTitle} ·{" "}
+                  {fmtEUR.format(amountCents / 100)}
                 </div>
               </div>
             </div>
 
-            {createdOrder.method === "mercadopago" && (
+            {createdOrder.method === "wise" && (
               <div className="space-y-3">
                 <div className="text-sm text-muted-foreground">
-                  Aguardando confirmação do Mercado Pago. O pedido será atualizado automaticamente
-                  quando o pagamento for concluído.
+                  Aguardando confirmação automática via Wise (webhook <em>balances#credit</em>).
+                  O pedido será aprovado assim que o valor cair no saldo EUR com a referência
+                  abaixo.
                 </div>
                 {createdOrder.paymentUrl && (
                   <div>
-                    <Label>Link de pagamento</Label>
+                    <Label>Link de pagamento Wise</Label>
                     <div className="flex gap-2 mt-1">
-                      <Input readOnly value={createdOrder.paymentUrl} className="font-mono text-xs" />
+                      <Input
+                        readOnly
+                        value={createdOrder.paymentUrl}
+                        className="font-mono text-xs"
+                      />
                       <Button
                         variant="outline"
                         onClick={() => copy(createdOrder.paymentUrl!, "Link")}
@@ -534,15 +494,26 @@ export function NewOrderWizard({
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Envie este link ao cliente. Ele concluiu o pagamento (Pix ou cartão) sem precisar fazer login.
+                      Envie ao cliente. O valor e a referência já vão preenchidos.
                     </p>
+                  </div>
+                )}
+                {!createdOrder.paymentUrl && (
+                  <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm">
+                    <strong>Link Wise não configurado.</strong> Configure o "Link Quick Pay" nas{" "}
+                    <em>Configurações → Wise</em> para gerar links automaticamente. O cliente
+                    ainda pode pagar por IBAN/BIC abaixo.
                   </div>
                 )}
                 {createdOrder.reference && (
                   <div>
-                    <Label>Referência Mercado Pago</Label>
+                    <Label>Referência (obrigatória no pagamento)</Label>
                     <div className="flex gap-2 mt-1">
-                      <Input readOnly value={createdOrder.reference} className="font-mono text-xs" />
+                      <Input
+                        readOnly
+                        value={createdOrder.reference}
+                        className="font-mono text-xs"
+                      />
                       <Button
                         variant="outline"
                         onClick={() => copy(createdOrder.reference!, "Referência")}
@@ -552,21 +523,48 @@ export function NewOrderWizard({
                     </div>
                   </div>
                 )}
+                {createdOrder.iban && (
+                  <div className="border rounded p-3 text-sm space-y-1">
+                    <div className="font-medium">Transferência manual (fallback)</div>
+                    {createdOrder.beneficiaryName && (
+                      <div>
+                        <span className="text-muted-foreground">Beneficiário:</span>{" "}
+                        {createdOrder.beneficiaryName}
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-muted-foreground">IBAN:</span>{" "}
+                      <span className="font-mono">{createdOrder.iban}</span>
+                    </div>
+                    {createdOrder.bic && (
+                      <div>
+                        <span className="text-muted-foreground">BIC:</span>{" "}
+                        <span className="font-mono">{createdOrder.bic}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            {createdOrder.method !== "mercadopago" && (
+            {createdOrder.method === "manual" && (
               <div className="text-sm text-muted-foreground">
-                {createdOrder.method === "gratuito"
-                  ? "Pedido registrado como gratuito."
-                  : "Pagamento marcado como recebido manualmente."}
+                Pagamento marcado como recebido manualmente.
+              </div>
+            )}
+            {createdOrder.method === "gratuito" && (
+              <div className="text-sm text-muted-foreground">Pedido registrado como gratuito.</div>
+            )}
+            {createdOrder.method === "pendente" && (
+              <div className="text-sm text-muted-foreground">
+                Pedido criado como pendente. Você pode gerar a cobrança Wise depois pela esteira.
               </div>
             )}
           </div>
         )}
 
         <div className="flex justify-between pt-4 border-t">
-          {step === 5 ? (
+          {step === 4 ? (
             <>
               <span />
               <Button
@@ -585,14 +583,15 @@ export function NewOrderWizard({
               >
                 Voltar
               </Button>
-              {step < 4 ? (
+              {step < 3 ? (
                 <Button
                   onClick={() => setStep((s) => s + 1)}
                   disabled={
                     (step === 1 && !customer) ||
                     (step === 2 &&
-                      (serviceMode === "cadastrado" ? !service : customTitle.length < 2)) ||
-                    (step === 3 && (amount === "" || (isFree && !confirmFree)))
+                      ((serviceMode === "cadastrado" ? !service : customTitle.length < 2) ||
+                        amount === "" ||
+                        (isFree && !confirmFree)))
                   }
                 >
                   Próximo
@@ -615,5 +614,5 @@ export function NewOrderWizard({
 }
 
 function stepLabel(s: number) {
-  return s === 1 ? "Cliente" : s === 2 ? "Serviço" : s === 3 ? "Valor & moeda" : "Pagamento";
+  return s === 1 ? "Cliente" : s === 2 ? "Serviço & valor" : "Pagamento";
 }

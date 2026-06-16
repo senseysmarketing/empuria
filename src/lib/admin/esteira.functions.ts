@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaff, requireAdmin } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
+import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
 
 const ORDER_SELECT_ADMIN = "*";
 const ORDER_SELECT_STAFF =
@@ -161,12 +162,7 @@ const fullOrderSchema = z.object({
   service_id: z.string().uuid().nullable().optional(),
   service_title: z.string().trim().min(2).max(160),
   amount_cents: z.number().int().min(0),
-  currency: z.enum(["EUR", "BRL", "USD"]).default("EUR"),
-  payment_amount_cents: z.number().int().min(0).optional(),
-  payment_currency: z.enum(["EUR", "BRL", "USD"]).optional(),
-  fx_rate: z.number().positive().optional(),
-  payment_method: z.enum(["mercadopago", "manual", "gratuito"]).default("mercadopago"),
-  payment_status: z.enum(["pendente", "aprovado", "recusado", "estornado"]).default("pendente"),
+  payment_method: z.enum(["wise", "manual", "gratuito", "pendente"]).default("wise"),
   reason: z.string().trim().max(280).optional(),
   notes: z.string().trim().max(500).optional(),
   slot_id: z.string().uuid().nullable().optional(),
@@ -190,11 +186,9 @@ export const createOrderFull = createServerFn({ method: "POST" })
     }
 
     const payment_status =
-      data.payment_method === "gratuito"
+      data.payment_method === "gratuito" || data.payment_method === "manual"
         ? "aprovado"
-        : data.payment_method === "manual"
-          ? "aprovado"
-          : data.payment_status;
+        : "pendente";
 
     const voucher =
       payment_status === "aprovado" ? `EMP-${Date.now().toString(36).toUpperCase()}` : null;
@@ -206,16 +200,16 @@ export const createOrderFull = createServerFn({ method: "POST" })
       service_id: data.service_id ?? null,
       service_title: data.service_title,
       amount_cents: data.amount_cents,
-      currency: data.currency,
+      currency: "EUR",
       slot_id: data.slot_id ?? null,
       notes: data.notes ?? null,
       payment_status,
       payment_method: data.payment_method,
-      payment_currency: data.payment_currency ?? data.currency,
-      payment_amount_cents: data.payment_amount_cents ?? data.amount_cents,
-      fx_rate: data.fx_rate ?? null,
-      fx_source: data.fx_rate ? "manual" : null,
-      fx_locked_at: data.fx_rate ? new Date().toISOString() : null,
+      payment_currency: "EUR",
+      payment_amount_cents: data.amount_cents,
+      fx_rate: null,
+      fx_source: null,
+      fx_locked_at: null,
       paid_at: payment_status === "aprovado" ? new Date().toISOString() : null,
       voucher_code: voucher,
     };
@@ -238,10 +232,12 @@ export const createOrderFull = createServerFn({ method: "POST" })
           ? "order.create.gratuito"
           : data.payment_method === "manual"
             ? "order.create.manual_paid"
-            : "order.create",
+            : data.payment_method === "wise"
+              ? "order.create.wise"
+              : "order.create",
       new_data: {
         amount_cents: data.amount_cents,
-        currency: data.currency,
+        currency: "EUR",
         payment_method: data.payment_method,
         reason: data.reason ?? null,
       },
@@ -455,3 +451,50 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
 
 // Kept for backward compatibility with existing modal.
 export const createOrder = createOrderFull;
+
+/**
+ * Admin-side: mint a Wise payment for an order created via the esteira wizard.
+ * Returns the hosted Quick Pay URL (with amount/reference) when available,
+ * plus IBAN/BIC fallback for manual transfer.
+ */
+export const generateWisePaymentForOrder = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    if (!context.isAdmin) throw new Error("Apenas admins podem gerar cobrança Wise.");
+    const { data: order, error } = await context.supabase
+      .from("orders")
+      .select(
+        "id,service_title,amount_cents,currency,payment_amount_cents,payment_currency,customer_email,payment_status",
+      )
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error || !order) throw new Error(error?.message ?? "Pedido não encontrado.");
+    const row = order as unknown as {
+      id: string;
+      service_title: string;
+      amount_cents: number;
+      currency: string | null;
+      payment_amount_cents: number | null;
+      payment_currency: string | null;
+      customer_email: string | null;
+      payment_status: string;
+    };
+    if (row.payment_status === "aprovado") throw new Error("Pedido já está pago.");
+    const result = await createWisePaymentForOrder({
+      orderId: row.id,
+      amountCents: row.payment_amount_cents ?? row.amount_cents,
+      currency: row.payment_currency ?? row.currency ?? "EUR",
+      description: row.service_title,
+      customerEmail: row.customer_email,
+    });
+    await context.supabase
+      .from("orders")
+      .update({
+        payment_provider: "wise",
+        payment_provider_reference: result.reference,
+        external_reference: result.reference,
+      } as never)
+      .eq("id", row.id);
+    return result;
+  });
