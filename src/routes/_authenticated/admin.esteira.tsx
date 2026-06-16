@@ -123,7 +123,7 @@ function EsteiraPage() {
   const markManual = useServerFn(markOrderPaidManual);
   const cancel = useServerFn(cancelOrder);
   const refund = useServerFn(refundOrder);
-  const genLink = useServerFn(generatePaymentLink);
+  const genLink = useServerFn(generateWisePaymentForOrder);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
