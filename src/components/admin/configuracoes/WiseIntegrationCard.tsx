@@ -345,22 +345,32 @@ export function WiseIntegrationCard() {
                 }
               />
               <Row
-                label="Link automatico"
+                label="Link de pagamento"
                 value={
                   q.data?.lastApiSuccessAt
-                    ? "OK"
-                    : q.data?.lastApiError
-                      ? `falha · ${q.data.lastApiError.status ?? "?"}`
-                      : "nao testado"
+                    ? "via API"
+                    : setting?.wise_default_payment_url
+                      ? "Quick Pay (manual)"
+                      : "nao configurado"
                 }
               />
             </>
           )}
-          {q.data?.lastApiError && (
+          {q.data?.lastApiError && !setting?.wise_default_payment_url && (
             <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span className="break-all">
                 Ultimo erro da API: {q.data.lastApiError.message}
+              </span>
+            </div>
+          )}
+          {!setting?.wise_default_payment_url && (
+            <div className="mt-2 flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-2 text-[11px] text-blue-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                A API publica da Wise nao gera link de Quick Pay. Configure um link reutilizavel em
+                <span className="font-semibold"> Wise → Solicitar pagamento</span> e cole no campo
+                <span className="font-semibold"> &quot;Link Quick Pay&quot;</span> abaixo.
               </span>
             </div>
           )}
