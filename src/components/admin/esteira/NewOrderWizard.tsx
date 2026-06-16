@@ -596,6 +596,12 @@ export function NewOrderWizard({
           </div>
         )}
 
+        {step === 3 && submitError && (
+          <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+            <strong>Não foi possível criar o pedido:</strong> {submitError}
+          </div>
+        )}
+
         <div className="flex justify-between pt-4 border-t">
           {step === 4 ? (
             <>
