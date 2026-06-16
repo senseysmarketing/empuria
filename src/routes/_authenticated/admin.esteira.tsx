@@ -834,3 +834,34 @@ function Row({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function BankRow({
+  label,
+  value,
+  onCopy,
+  mono,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <div className="font-display text-[10px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </div>
+        <div className={`break-all text-sm ${mono ? "font-mono" : ""}`}>{value}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onCopy}
+        className="mt-3 shrink-0 text-admin-accent"
+        aria-label="Copiar"
+      >
+        <Copy className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
