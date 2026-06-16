@@ -171,7 +171,7 @@ const fullOrderSchema = z.object({
 export const createOrderFull = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => fullOrderSchema.parse(d))
-  .handler(async ({ data, context: _context }) => {
+  .handler(async ({ data, context }) => {
     if (data.payment_method === "manual" && !data.reason) {
       throw new Error("Informe o motivo do pagamento manual");
     }
