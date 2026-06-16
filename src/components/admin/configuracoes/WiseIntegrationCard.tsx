@@ -277,17 +277,12 @@ export function WiseIntegrationCard() {
     mutationFn: () => testPaymentFn(),
     onSuccess: (r) => {
       if (r.ok && r.link) {
-        toast.success("Link Wise gerado via API! Abrindo em nova aba...");
+        toast.success(`Link gerado · ref ${r.reference}. Abrindo em nova aba...`);
         window.open(r.link, "_blank", "noopener");
-      } else if (r.fallbackUrl) {
-        // API doesn't expose Quick Pay creation — open the manually configured
-        // Quick Pay link, which is the official Wise flow.
-        toast.success("OK · abrindo Quick Pay manual (caminho oficial Wise)");
-        window.open(r.fallbackUrl, "_blank", "noopener");
       } else {
-        // No fallback configured: tell the user exactly what to do.
         toast.error(
-          "Wise nao expoe API publica para gerar link de pagamento. Configure o Link Quick Pay manualmente.",
+          r.message ??
+            "Configure o Link Quick Pay reutilizavel da Wise antes de testar.",
           { duration: 8000 },
         );
       }
@@ -295,6 +290,7 @@ export function WiseIntegrationCard() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar pagamento"),
   });
+
 
   const webhookUrl =
     typeof window !== "undefined"
