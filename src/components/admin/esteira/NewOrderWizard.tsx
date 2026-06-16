@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Search, UserPlus, AlertTriangle, CheckCircle2, Copy, Link2 } from "lucide-react";
+import { Search, UserPlus, AlertTriangle, CheckCircle2, Copy, Link2, ChevronDown } from "lucide-react";
 import { listServicesAdmin } from "@/lib/admin/slots.functions";
 import {
   searchCustomers,
