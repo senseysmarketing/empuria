@@ -577,7 +577,7 @@ function EsteiraPage() {
       <Dialog open={!!linkModal} onOpenChange={(o) => !o && setLinkModal(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Link de pagamento Mercado Pago</DialogTitle>
+            <DialogTitle>Link de pagamento Wise</DialogTitle>
           </DialogHeader>
           {linkModal && (
             <div className="space-y-3 text-sm">
