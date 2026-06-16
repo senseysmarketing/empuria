@@ -62,6 +62,9 @@ export const Route = createFileRoute("/_authenticated/admin/esteira")({
   component: EsteiraPage,
 });
 
+const eurFormatter = new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" });
+const formatEur = (cents: number | null | undefined) => eurFormatter.format((cents ?? 0) / 100);
+
 const STATUS_COLOR: Record<string, string> = {
   pendente: "bg-amber-100 text-amber-900",
   aprovado: "bg-emerald-100 text-emerald-900",
