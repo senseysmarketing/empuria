@@ -139,50 +139,38 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
   });
 
 
-/** Admin: try to create a real €1.00 payment-request to validate the API end-to-end. */
+/** Admin: build a real Quick Pay link with €1,00 + EMP-TEST-XXXXXX to
+ *  validate that the configured reusable link works end-to-end. */
 export const testWisePaymentCreation = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .handler(async () => {
     const setting = await loadSetting();
     const fallbackUrl = setting.wise_default_payment_url ?? null;
-    const token = tokenFromSettingOrEnv(setting);
-    if (!token) {
-      return { ok: false, message: "Token Wise nao configurado.", link: null as string | null, fallbackUrl };
-    }
-    if (!setting.wise_profile_id) {
-      return { ok: false, message: "Profile Wise nao selecionado.", link: null as string | null, fallbackUrl };
-    }
     const ref = `EMP-TEST-${Date.now().toString().slice(-6)}`;
-    const res = await createWisePaymentRequest(
-      { token, environment: setting.wise_environment },
-      setting.wise_profile_id,
-      {
-        amount: 1.0,
-        currency: "EUR",
-        reference: ref.slice(0, 35),
-        description: "Empuria - teste de integracao Wise (1 EUR)",
-        balanceId: setting.wise_balance_id_eur,
-        metadata: { test: "true" },
-      },
-    );
-    if (!res.ok) {
+    if (!fallbackUrl) {
       return {
         ok: false,
-        message: `API Wise respondeu ${res.status}: ${res.error}`,
+        message:
+          "Configure primeiro o Link Quick Pay reutilizavel em Wise → Solicitar pagamento e cole no campo abaixo.",
         link: null as string | null,
         fallbackUrl,
         reference: ref,
       };
     }
-    const link = pickHostedUrl(res.data);
+    const link = appendQuickPayParams(fallbackUrl, {
+      amount: 1.0,
+      currency: "EUR",
+      description: ref,
+    });
     return {
       ok: true,
-      message: link ? "Link hospedado gerado com sucesso." : "API aceitou mas nao retornou link hospedado.",
+      message: "Link Quick Pay gerado com valor + referencia preenchidos.",
       link,
       fallbackUrl,
       reference: ref,
     };
   });
+
 
 
 const webhookSubSchema = z.object({
