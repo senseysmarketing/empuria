@@ -52,6 +52,22 @@ function tokenFromSettingOrEnv(setting: Pick<WiseSetting, "wise_api_token">) {
   return setting.wise_api_token ?? process.env.WISE_API_TOKEN ?? null;
 }
 
+/** Append amount/currency query params to a Wise Quick Pay URL so the
+ *  payer lands on the Wise page with the right value pre-filled. */
+function appendQuickPayParams(
+  url: string,
+  params: { amount: number; currency: string },
+): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set("amount", params.amount.toFixed(2));
+    u.searchParams.set("currency", params.currency);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 function maskedSetting(s: WiseSetting): WiseSetting {
   return {
     ...s,
@@ -108,18 +124,27 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(20);
 
-    // Find latest API error from raw_response.error
+    const hasFallbackUrl = !!setting.wise_default_payment_url;
+
+    // Find latest API error from raw_response.error.
+    // If a Quick Pay fallback URL is configured, the API's 404 is *expected*
+    // (Wise's public API does not expose Quick Pay link creation) — don't surface it as an error.
     let lastApiError: { message: string; status: number | null; at: string } | null = null;
     let lastApiSuccessAt: string | null = null;
     for (const p of payments ?? []) {
       const raw = (p.raw_response ?? {}) as Record<string, unknown>;
-      if (!lastApiSuccessAt && p.wise_payment_link_url) lastApiSuccessAt = p.created_at as string;
+      if (!lastApiSuccessAt && p.wise_payment_link_url && !raw.error) {
+        lastApiSuccessAt = p.created_at as string;
+      }
       if (!lastApiError && typeof raw.error === "string") {
-        lastApiError = {
-          message: raw.error as string,
-          status: (raw.status as number | undefined) ?? null,
-          at: p.created_at as string,
-        };
+        const status = (raw.status as number | undefined) ?? null;
+        if (!(hasFallbackUrl && status === 404)) {
+          lastApiError = {
+            message: raw.error as string,
+            status,
+            at: p.created_at as string,
+          };
+        }
       }
       if (lastApiError && lastApiSuccessAt) break;
     }
@@ -132,6 +157,7 @@ export const getWiseAdminOverview = createServerFn({ method: "POST" })
       hasEnvToken: !!process.env.WISE_API_TOKEN,
       lastApiError,
       lastApiSuccessAt,
+      hasFallbackUrl,
     };
   });
 
@@ -140,9 +166,14 @@ export const testWisePaymentCreation = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .handler(async () => {
     const setting = await loadSetting();
+    const fallbackUrl = setting.wise_default_payment_url ?? null;
     const token = tokenFromSettingOrEnv(setting);
-    if (!token) return { ok: false, message: "Token Wise nao configurado.", link: null as string | null };
-    if (!setting.wise_profile_id) return { ok: false, message: "Profile Wise nao selecionado.", link: null };
+    if (!token) {
+      return { ok: false, message: "Token Wise nao configurado.", link: null as string | null, fallbackUrl };
+    }
+    if (!setting.wise_profile_id) {
+      return { ok: false, message: "Profile Wise nao selecionado.", link: null as string | null, fallbackUrl };
+    }
     const ref = `EMP-TEST-${Date.now().toString().slice(-6)}`;
     const res = await createWisePaymentRequest(
       { token, environment: setting.wise_environment },
@@ -159,8 +190,10 @@ export const testWisePaymentCreation = createServerFn({ method: "POST" })
     if (!res.ok) {
       return {
         ok: false,
-        message: `Wise respondeu ${res.status}: ${res.error}`,
+        message: `API Wise respondeu ${res.status}: ${res.error}`,
         link: null as string | null,
+        fallbackUrl,
+        reference: ref,
       };
     }
     const link = pickHostedUrl(res.data);
@@ -168,6 +201,7 @@ export const testWisePaymentCreation = createServerFn({ method: "POST" })
       ok: true,
       message: link ? "Link hospedado gerado com sucesso." : "API aceitou mas nao retornou link hospedado.",
       link,
+      fallbackUrl,
       reference: ref,
     };
   });
@@ -398,16 +432,28 @@ export async function createWisePaymentForOrder(args: {
     });
     if (!created.ok) {
       console.error("[wise] payment-request failed", created.status, created.error);
-      raw_response = { error: created.error, status: created.status, body: created.body as unknown };
+      // Only persist as an "error" when there is no Quick Pay fallback configured.
+      // Wise's public API does not expose Quick Pay creation, so a 404 here is expected.
+      if (!setting.wise_default_payment_url) {
+        raw_response = { error: created.error, status: created.status, body: created.body as unknown };
+      } else {
+        raw_response = { fallback: "quick_pay", api_status: created.status };
+      }
     } else {
       raw_response = created.data as unknown as Record<string, unknown>;
       paymentUrl = pickHostedUrl(created.data);
     }
   }
 
-  // Fallback chain: configured default link → null (IBAN-only UX)
-  if (!paymentUrl) {
-    paymentUrl = setting.wise_default_payment_url ?? null;
+  // Fallback to configured Quick Pay link. Append amount/currency so the
+  // payer lands on the Wise page with the right value pre-filled. The
+  // EMP-XXXX reference is shown on the order page for the payer to copy
+  // into Wise's "reference / message" field.
+  if (!paymentUrl && setting.wise_default_payment_url) {
+    paymentUrl = appendQuickPayParams(setting.wise_default_payment_url, {
+      amount: args.amountCents / 100,
+      currency: args.currency,
+    });
   }
   const manualOnly = !paymentUrl;
 

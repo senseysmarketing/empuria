@@ -277,12 +277,19 @@ export function WiseIntegrationCard() {
     mutationFn: () => testPaymentFn(),
     onSuccess: (r) => {
       if (r.ok && r.link) {
-        toast.success("Link Wise gerado! Abrindo em nova aba...");
+        toast.success("Link Wise gerado via API! Abrindo em nova aba...");
         window.open(r.link, "_blank", "noopener");
-      } else if (r.ok) {
-        toast.message(r.message);
+      } else if (r.fallbackUrl) {
+        // API doesn't expose Quick Pay creation — open the manually configured
+        // Quick Pay link, which is the official Wise flow.
+        toast.success("OK · abrindo Quick Pay manual (caminho oficial Wise)");
+        window.open(r.fallbackUrl, "_blank", "noopener");
       } else {
-        toast.error(r.message);
+        // No fallback configured: tell the user exactly what to do.
+        toast.error(
+          "Wise nao expoe API publica para gerar link de pagamento. Configure o Link Quick Pay manualmente.",
+          { duration: 8000 },
+        );
       }
       q.refetch();
     },
@@ -338,22 +345,32 @@ export function WiseIntegrationCard() {
                 }
               />
               <Row
-                label="Link automatico"
+                label="Link de pagamento"
                 value={
                   q.data?.lastApiSuccessAt
-                    ? "OK"
-                    : q.data?.lastApiError
-                      ? `falha · ${q.data.lastApiError.status ?? "?"}`
-                      : "nao testado"
+                    ? "via API"
+                    : setting?.wise_default_payment_url
+                      ? "Quick Pay (manual)"
+                      : "nao configurado"
                 }
               />
             </>
           )}
-          {q.data?.lastApiError && (
+          {q.data?.lastApiError && !setting?.wise_default_payment_url && (
             <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span className="break-all">
                 Ultimo erro da API: {q.data.lastApiError.message}
+              </span>
+            </div>
+          )}
+          {!setting?.wise_default_payment_url && (
+            <div className="mt-2 flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-2 text-[11px] text-blue-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                A API publica da Wise nao gera link de Quick Pay. Configure um link reutilizavel em
+                <span className="font-semibold"> Wise → Solicitar pagamento</span> e cole no campo
+                <span className="font-semibold"> &quot;Link Quick Pay&quot;</span> abaixo.
               </span>
             </div>
           )}
@@ -573,13 +590,18 @@ export function WiseIntegrationCard() {
                     onChange={(e) => setBeneficiaryAddress(e.target.value)}
                   />
                 </Field>
-                <Field label="Link Wise fallback (opcional)">
+                <Field label="Link Quick Pay (recomendado · principal)">
                   <Input
                     type="url"
                     placeholder="https://wise.com/pay/me/..."
                     value={fallbackUrl}
                     onChange={(e) => setFallbackUrl(e.target.value)}
                   />
+                  <p className="text-[11px] leading-snug text-admin-ink-muted">
+                    Wise → Solicitar pagamento → Criar link reutilizavel em EUR. Cole o
+                    {" "}<span className="font-mono">https://wise.com/pay/me/...</span> aqui.
+                    Esse e o caminho oficial — a API publica da Wise nao expoe geracao de link.
+                  </p>
                 </Field>
               </div>
             </Step>
