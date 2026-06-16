@@ -649,25 +649,14 @@ function EsteiraPage() {
               <Row label="Conta vinculada" value={selected.user_id ? "sim" : "não — pedido não aparece no portal"} />
               {canViewFinancials && (
                 <>
-                  <Row
-                    label="Valor comercial"
-                    value={`${selected.currency ?? "EUR"} ${((selected.amount_cents ?? 0) / 100).toFixed(2)}`}
-                  />
-                  <Row
-                    label="Valor cobrança"
-                    value={
-                      selected.payment_amount_cents != null
-                        ? `${selected.payment_currency ?? "—"} ${(selected.payment_amount_cents / 100).toFixed(2)}`
-                        : "—"
-                    }
-                  />
+                  <Row label="Valor" value={formatEur(selected.amount_cents)} />
                   <Row label="Método" value={selected.payment_method ?? "—"} />
                 </>
               )}
               <Row label="Pagamento" value={selected.payment_status} />
               <Row label="Execução" value={selected.delivery_status ?? "—"} />
               <Row label="Voucher" value={selected.voucher_code ?? "—"} />
-              <Row label="Referência MP" value={selected.payment_provider_reference ?? "—"} />
+              <Row label="Referência pagamento" value={selected.payment_provider_reference ?? "—"} />
               {selected.notes && <Row label="Notas" value={selected.notes} />}
               <p className="text-xs text-muted-foreground border-t pt-3">
                 Aba de Agenda / Documentos / Histórico chega quando a migração de campos for aplicada.
