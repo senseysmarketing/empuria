@@ -118,6 +118,7 @@ export function NewOrderWizard({
       setNotes("");
       setConfirmFree(false);
       setSubmitting(false);
+      setSubmitError(null);
       setCreatedOrder(null);
     }
   }, [open]);
