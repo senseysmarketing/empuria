@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaff, requireAdmin } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
+import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
 
 const ORDER_SELECT_ADMIN = "*";
 const ORDER_SELECT_STAFF =
