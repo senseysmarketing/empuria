@@ -48,7 +48,6 @@ import {
   ShoppingCart,
   Clock,
   Loader2,
-  TrendingUp,
   Euro,
   Search,
   ChevronLeft,
