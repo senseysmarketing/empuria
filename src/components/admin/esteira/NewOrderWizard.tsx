@@ -178,12 +178,14 @@ export function NewOrderWizard({
     if (!isFree && method === "gratuito") setMethod("wise");
   }, [isFree]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const reasonRequired = method === "manual" || method === "dinheiro";
+  const reasonOk = !reasonRequired || reason.trim().length >= 3;
   const canSubmit =
     customer &&
     (serviceMode === "cadastrado" ? !!service : customTitle.length >= 2) &&
     amount !== "" &&
     (!isFree || confirmFree) &&
-    ((method !== "manual" && method !== "dinheiro") || reason.length >= 3);
+    reasonOk;
 
   const submit = async () => {
     if (!canSubmit || !customer || submitting) return;
