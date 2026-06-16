@@ -416,16 +416,28 @@ export async function createWisePaymentForOrder(args: {
     });
     if (!created.ok) {
       console.error("[wise] payment-request failed", created.status, created.error);
-      raw_response = { error: created.error, status: created.status, body: created.body as unknown };
+      // Only persist as an "error" when there is no Quick Pay fallback configured.
+      // Wise's public API does not expose Quick Pay creation, so a 404 here is expected.
+      if (!setting.wise_default_payment_url) {
+        raw_response = { error: created.error, status: created.status, body: created.body as unknown };
+      } else {
+        raw_response = { fallback: "quick_pay", api_status: created.status };
+      }
     } else {
       raw_response = created.data as unknown as Record<string, unknown>;
       paymentUrl = pickHostedUrl(created.data);
     }
   }
 
-  // Fallback chain: configured default link → null (IBAN-only UX)
-  if (!paymentUrl) {
-    paymentUrl = setting.wise_default_payment_url ?? null;
+  // Fallback to configured Quick Pay link. Append amount/currency so the
+  // payer lands on the Wise page with the right value pre-filled. The
+  // EMP-XXXX reference is shown on the order page for the payer to copy
+  // into Wise's "reference / message" field.
+  if (!paymentUrl && setting.wise_default_payment_url) {
+    paymentUrl = appendQuickPayParams(setting.wise_default_payment_url, {
+      amount: args.amountCents / 100,
+      currency: args.currency,
+    });
   }
   const manualOnly = !paymentUrl;
 
