@@ -9,7 +9,7 @@ import {
   markOrderPaidManual,
   cancelOrder,
   refundOrder,
-  generatePaymentLink,
+  generateWisePaymentForOrder,
 } from "@/lib/admin/esteira.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
