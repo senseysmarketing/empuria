@@ -57,6 +57,7 @@ import {
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useActionAccess } from "@/hooks/use-action-access";
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
 
 export const Route = createFileRoute("/_authenticated/admin/esteira")({
