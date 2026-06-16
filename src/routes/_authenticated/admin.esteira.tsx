@@ -608,7 +608,7 @@ function EsteiraPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Envie ao cliente. Ele conclui o pagamento (Pix/Boleto) pelo portal.
+                    Envie ao cliente. Ele conclui o pagamento via Wise (EUR).
                   </p>
                 </div>
               )}
