@@ -150,9 +150,14 @@ export const testWisePaymentCreation = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .handler(async () => {
     const setting = await loadSetting();
+    const fallbackUrl = setting.wise_default_payment_url ?? null;
     const token = tokenFromSettingOrEnv(setting);
-    if (!token) return { ok: false, message: "Token Wise nao configurado.", link: null as string | null };
-    if (!setting.wise_profile_id) return { ok: false, message: "Profile Wise nao selecionado.", link: null };
+    if (!token) {
+      return { ok: false, message: "Token Wise nao configurado.", link: null as string | null, fallbackUrl };
+    }
+    if (!setting.wise_profile_id) {
+      return { ok: false, message: "Profile Wise nao selecionado.", link: null as string | null, fallbackUrl };
+    }
     const ref = `EMP-TEST-${Date.now().toString().slice(-6)}`;
     const res = await createWisePaymentRequest(
       { token, environment: setting.wise_environment },
@@ -169,8 +174,10 @@ export const testWisePaymentCreation = createServerFn({ method: "POST" })
     if (!res.ok) {
       return {
         ok: false,
-        message: `Wise respondeu ${res.status}: ${res.error}`,
+        message: `API Wise respondeu ${res.status}: ${res.error}`,
         link: null as string | null,
+        fallbackUrl,
+        reference: ref,
       };
     }
     const link = pickHostedUrl(res.data);
@@ -178,6 +185,7 @@ export const testWisePaymentCreation = createServerFn({ method: "POST" })
       ok: true,
       message: link ? "Link hospedado gerado com sucesso." : "API aceitou mas nao retornou link hospedado.",
       link,
+      fallbackUrl,
       reference: ref,
     };
   });
