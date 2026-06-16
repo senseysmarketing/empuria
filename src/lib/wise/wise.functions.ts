@@ -50,21 +50,23 @@ function tokenFromSettingOrEnv(setting: Pick<WiseSetting, "wise_api_token">) {
   return setting.wise_api_token ?? process.env.WISE_API_TOKEN ?? null;
 }
 
-/** Append amount/currency query params to a Wise Quick Pay URL so the
- *  payer lands on the Wise page with the right value pre-filled. */
+/** Append amount/currency/description query params to a Wise Quick Pay URL
+ *  so the payer lands on the Wise page with value + reference pre-filled. */
 function appendQuickPayParams(
   url: string,
-  params: { amount: number; currency: string },
+  params: { amount: number; currency: string; description?: string | null },
 ): string {
   try {
     const u = new URL(url);
     u.searchParams.set("amount", params.amount.toFixed(2));
     u.searchParams.set("currency", params.currency);
+    if (params.description) u.searchParams.set("description", params.description);
     return u.toString();
   } catch {
     return url;
   }
 }
+
 
 function maskedSetting(s: WiseSetting): WiseSetting {
   return {
