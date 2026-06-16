@@ -57,6 +57,7 @@ import {
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useActionAccess } from "@/hooks/use-action-access";
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
 
 export const Route = createFileRoute("/_authenticated/admin/esteira")({
@@ -122,6 +123,7 @@ type Order = {
 
 function EsteiraPage() {
   const { isAdmin } = useCurrentUser();
+  const { can: canAction } = useActionAccess();
   const fetchOrders = useServerFn(listOrders);
   const update = useServerFn(updateOrder);
   const markManual = useServerFn(markOrderPaidManual);
@@ -510,7 +512,7 @@ function EsteiraPage() {
                               <Copy className="h-4 w-4 mr-2" /> Copiar referência
                             </DropdownMenuItem>
                           )}
-                          {isAdmin && o.payment_status !== "aprovado" && (
+                          {o.payment_status !== "aprovado" && (
                             <DropdownMenuItem
                               onClick={() => {
                                 setActionPrompt({ kind: "manual", order: o });
@@ -526,25 +528,25 @@ function EsteiraPage() {
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
-                          {isAdmin && (
-                            <>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setActionPrompt({ kind: "cancel", order: o });
-                                  setReasonInput("");
-                                }}
-                              >
-                                <Ban className="h-4 w-4 mr-2" /> Cancelar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setActionPrompt({ kind: "refund", order: o });
-                                  setReasonInput("");
-                                }}
-                              >
-                                <RotateCcw className="h-4 w-4 mr-2" /> Estornar
-                              </DropdownMenuItem>
-                            </>
+                          {canAction("esteira.cancel_order") && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setActionPrompt({ kind: "cancel", order: o });
+                                setReasonInput("");
+                              }}
+                            >
+                              <Ban className="h-4 w-4 mr-2" /> Cancelar
+                            </DropdownMenuItem>
+                          )}
+                          {canAction("esteira.refund_order") && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setActionPrompt({ kind: "refund", order: o });
+                                setReasonInput("");
+                              }}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-2" /> Estornar
+                            </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>

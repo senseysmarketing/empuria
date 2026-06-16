@@ -52,6 +52,8 @@ export const ALL_ACTIONS = [
   "crm.automations.pause",
   "crm.automations.logs",
   "crm.automations.cancel_pending_action",
+  "esteira.cancel_order",
+  "esteira.refund_order",
 ] as const;
 export type ActionKey = (typeof ALL_ACTIONS)[number];
 
@@ -65,6 +67,8 @@ export const ACTION_LABELS: Record<ActionKey, string> = {
   "crm.automations.pause": "Pausar automacoes do CRM",
   "crm.automations.logs": "Ver logs de automacoes do CRM",
   "crm.automations.cancel_pending_action": "Cancelar envios pendentes do CRM",
+  "esteira.cancel_order": "Cancelar pedido da esteira",
+  "esteira.refund_order": "Estornar pedido da esteira",
 };
 
 /** Returns the modules the current user can access. Admins get all. */

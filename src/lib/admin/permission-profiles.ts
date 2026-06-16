@@ -91,6 +91,16 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
         label: "Cancelar comanda",
         description: "Permite cancelar uma comanda inteira e liberar as reservas de estoque.",
       },
+      {
+        key: "esteira.cancel_order",
+        label: "Cancelar pedido da esteira",
+        description: "Permite cancelar pedidos criados na esteira (opcional).",
+      },
+      {
+        key: "esteira.refund_order",
+        label: "Estornar pedido da esteira",
+        description: "Permite estornar pedidos pagos na esteira (opcional).",
+      },
     ],
   },
   {
