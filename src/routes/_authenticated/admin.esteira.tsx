@@ -203,15 +203,12 @@ function EsteiraPage() {
         o.payment_status === "pendente" &&
         new Date(o.created_at).getTime() < Date.now() - 1000 * 60 * 60 * 48,
     ).length;
-    let brl = 0;
     let eur = 0;
     for (const o of orders) {
       if (o.payment_status !== "aprovado") continue;
-      const cents = o.amount_cents ?? 0;
-      if ((o.currency ?? "EUR") === "BRL") brl += cents;
-      else eur += cents;
+      eur += o.amount_cents ?? 0;
     }
-    return { todayCount, waiting, paidToday, inExec, late, brl, eur };
+    return { todayCount, waiting, paidToday, inExec, late, eur };
   }, [orders]);
 
   const showVoucher = async (code: string) => {
