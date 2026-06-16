@@ -466,7 +466,17 @@ export function NewOrderWizard({
             {method === "manual" && (
               <div>
                 <Label>Motivo do pagamento manual *</Label>
-                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+                <Textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={2}
+                  placeholder="Ex.: Pago por transferência já confirmada"
+                />
+                {!reasonOk && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Informe pelo menos 3 caracteres para criar como pago manualmente.
+                  </p>
+                )}
               </div>
             )}
 
@@ -479,6 +489,11 @@ export function NewOrderWizard({
                   rows={2}
                   placeholder="Ex.: Recebido em mãos por Fulano em 16/06"
                 />
+                {!reasonOk && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Informe pelo menos 3 caracteres descrevendo o recebimento.
+                  </p>
+                )}
               </div>
             )}
 
