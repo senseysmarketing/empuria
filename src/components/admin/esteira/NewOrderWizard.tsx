@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Search, UserPlus, AlertTriangle, CheckCircle2, Copy, Link2 } from "lucide-react";
+import { Search, UserPlus, AlertTriangle, CheckCircle2, Copy, Link2, ChevronDown } from "lucide-react";
 import { listServicesAdmin } from "@/lib/admin/slots.functions";
 import {
   searchCustomers,
@@ -538,44 +538,18 @@ export function NewOrderWizard({
                     ainda pode pagar por IBAN/BIC abaixo.
                   </div>
                 )}
-                {createdOrder.reference && (
-                  <div>
-                    <Label>Referência (obrigatória no pagamento)</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        readOnly
-                        value={createdOrder.reference}
-                        className="font-mono text-xs"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => copy(createdOrder.reference!, "Referência")}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {createdOrder.iban && (
-                  <div className="border rounded p-3 text-sm space-y-1">
-                    <div className="font-medium">Transferência manual (fallback)</div>
-                    {createdOrder.beneficiaryName && (
-                      <div>
-                        <span className="text-muted-foreground">Beneficiário:</span>{" "}
-                        {createdOrder.beneficiaryName}
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-muted-foreground">IBAN:</span>{" "}
-                      <span className="font-mono">{createdOrder.iban}</span>
-                    </div>
-                    {createdOrder.bic && (
-                      <div>
-                        <span className="text-muted-foreground">BIC:</span>{" "}
-                        <span className="font-mono">{createdOrder.bic}</span>
-                      </div>
-                    )}
-                  </div>
+                {(createdOrder.iban || createdOrder.bic || createdOrder.beneficiaryName || createdOrder.reference) && (
+                  <BankTransferCollapsible
+                    defaultOpen={!createdOrder.paymentUrl}
+                    beneficiaryName={createdOrder.beneficiaryName}
+                    iban={createdOrder.iban}
+                    bic={createdOrder.bic}
+                    amountLabel={fmtEUR.format(amountCents / 100)}
+                    amountRaw={(amountCents / 100).toFixed(2)}
+                    reference={createdOrder.reference}
+                    hasWiseUrl={!!createdOrder.paymentUrl}
+                    onCopy={copy}
+                  />
                 )}
               </div>
             )}
@@ -648,4 +622,93 @@ export function NewOrderWizard({
 
 function stepLabel(s: number) {
   return s === 1 ? "Cliente" : s === 2 ? "Serviço & valor" : "Pagamento";
+}
+
+function BankTransferCollapsible({
+  defaultOpen,
+  beneficiaryName,
+  iban,
+  bic,
+  amountLabel,
+  amountRaw,
+  reference,
+  hasWiseUrl,
+  onCopy,
+}: {
+  defaultOpen: boolean;
+  beneficiaryName: string | null;
+  iban: string | null;
+  bic: string | null;
+  amountLabel: string;
+  amountRaw: string;
+  reference: string | null;
+  hasWiseUrl: boolean;
+  onCopy: (text: string, label: string) => void;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-muted/20">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between p-4 text-left"
+      >
+        <span className="font-display text-[11px] uppercase tracking-widest text-muted-foreground">
+          {hasWiseUrl ? "Ou faça uma transferência bancária" : "Dados bancários EUR"}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="border-t border-border/60 px-4 pb-4 pt-2 text-sm">
+          {beneficiaryName && (
+            <BankRow label="Beneficiário" value={beneficiaryName} onCopy={() => onCopy(beneficiaryName, "Beneficiário")} />
+          )}
+          {iban && <BankRow label="IBAN" value={iban} onCopy={() => onCopy(iban, "IBAN")} mono />}
+          {bic && <BankRow label="BIC/SWIFT" value={bic} onCopy={() => onCopy(bic, "BIC")} mono />}
+          <BankRow label="Valor" value={amountLabel} onCopy={() => onCopy(amountRaw, "Valor")} />
+          {reference && (
+            <BankRow label="Referência" value={reference} onCopy={() => onCopy(reference, "Referência")} mono />
+          )}
+          {reference && (
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Inclua a referência <strong>{reference}</strong> na transferência para conciliação automática.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BankRow({
+  label,
+  value,
+  onCopy,
+  mono,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+  mono?: boolean;
+}) {
+  return (
+    <div className="mt-2 flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <Label className="font-display text-[10px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </Label>
+        <div className={`break-all text-sm ${mono ? "font-mono" : ""}`}>{value}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onCopy}
+        className="mt-4 shrink-0 text-admin-accent"
+        aria-label="Copiar"
+      >
+        <Copy className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
