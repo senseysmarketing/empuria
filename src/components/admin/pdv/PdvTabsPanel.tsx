@@ -1026,6 +1026,132 @@ export function PdvTabsPanel() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={wiseModal !== null} onOpenChange={(open) => !open && setWiseModal(null)}>
+        <DialogContent className="sm:max-w-md border-amber-500/40 bg-admin-bg text-admin-ink">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-display">
+              <QrCode className="h-5 w-5 text-amber-500" />
+              Pagamento Wise gerado
+            </DialogTitle>
+            <DialogDescription>
+              Compartilhe o link com o cliente. A comanda fica bloqueada ate o pagamento ser
+              confirmado pelo webhook ou voce verificar manualmente.
+            </DialogDescription>
+          </DialogHeader>
+          {wiseModal && (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-admin-border bg-admin-bg/60 p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-admin-ink-muted">Comanda</span>
+                  <span className="font-mono">{wiseModal.tabCode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-admin-ink-muted">Cliente</span>
+                  <span className="text-right">{wiseModal.customerName ?? "-"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-admin-ink-muted">Referência</span>
+                  <span className="font-mono text-xs">{wiseModal.reference}</span>
+                </div>
+                <div className="flex justify-between border-t border-admin-border pt-2">
+                  <span className="text-xs uppercase tracking-widest text-admin-ink-muted">
+                    Total
+                  </span>
+                  <span className="font-display text-xl text-amber-600">
+                    {money(wiseModal.amountCents)}
+                  </span>
+                </div>
+              </div>
+
+              {wiseModal.paymentUrl ? (
+                <>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        if (wiseModal.paymentUrl) {
+                          navigator.clipboard.writeText(wiseModal.paymentUrl);
+                          toast.success("Link copiado.");
+                        }
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copiar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        if (wiseModal.paymentUrl)
+                          window.open(wiseModal.paymentUrl, "_blank", "noopener");
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Abrir Wise
+                    </Button>
+                  </div>
+                  {wiseModal.customerPhone && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        const phone = (wiseModal.customerPhone ?? "").replace(/\D/g, "");
+                        const msg = encodeURIComponent(
+                          `Ola ${wiseModal.customerName ?? ""}! Segue o link para pagamento Wise (${money(
+                            wiseModal.amountCents,
+                          )}) - referencia ${wiseModal.reference}: ${wiseModal.paymentUrl}`,
+                        );
+                        window.open(`https://wa.me/${phone}?text=${msg}`, "_blank", "noopener");
+                      }}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Enviar por WhatsApp
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
+                  Link Wise nao configurado. Configure em Configuracoes &gt; Wise para gerar o link
+                  automaticamente.
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2 border-t border-admin-border">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={recheckWiseMut.isPending}
+                  onClick={() => recheckWiseMut.mutate(wiseModal.attemptId)}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Verificar agora
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-red-brand/40 text-red-brand hover:bg-red-brand/10"
+                  disabled={cancelWiseMut.isPending}
+                  onClick={() =>
+                    cancelWiseMut.mutate({
+                      attemptId: wiseModal.attemptId,
+                      reason: "Reaberta para edicao",
+                    })
+                  }
+                >
+                  <XCircle className="h-4 w-4" />
+                  Cancelar/Reabrir
+                </Button>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" className="w-full" onClick={() => setWiseModal(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={successInfo !== null}
         onOpenChange={(open) => {
