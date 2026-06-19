@@ -4,8 +4,8 @@ import { requireModule } from "./auth";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-export type PdvTabStatus = "aberta" | "fechada" | "cancelada";
-export type PdvTabPaymentMethod = "dinheiro" | "cartao" | "pix";
+export type PdvTabStatus = "aberta" | "fechada" | "cancelada" | "aguardando_pagamento";
+export type PdvTabPaymentMethod = "dinheiro" | "transferencia" | "wise";
 
 export type PdvTabRecord = {
   id: string;
@@ -111,7 +111,7 @@ const closeSchema = z.object({
     type: z.enum(["none", "amount", "percent"]),
     value: z.number().min(0).max(100000),
   }),
-  paymentMethod: z.enum(["dinheiro", "cartao", "pix"]),
+  paymentMethod: z.enum(["dinheiro", "transferencia"]),
   notes: z.string().trim().max(500).optional(),
 });
 

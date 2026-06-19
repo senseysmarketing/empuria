@@ -3,15 +3,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import confetti from "canvas-confetti";
 import {
+  AlertTriangle,
   Banknote,
   CheckCircle2,
   Clock,
+  Copy,
   CreditCard,
+  ExternalLink,
   Loader2,
+  MessageCircle,
   Minus,
   Plus,
   QrCode,
   ReceiptText,
+  RefreshCw,
   Search,
   UserPlus,
   X,
@@ -65,14 +70,21 @@ import {
   type PdvTabPaymentMethod,
   type PdvTabWithRelations,
 } from "@/lib/admin/pdv-tabs.functions";
+import {
+  cancelPdvWiseAttempt,
+  listPdvAwaitingPayments,
+  recheckPdvWiseAttempt,
+  requestPdvWisePayment,
+  type PdvWiseAttempt,
+} from "@/lib/admin/pdv-wise.functions";
 import { cn } from "@/lib/utils";
 
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
 
 const PAYMENT_LABEL: Record<PdvTabPaymentMethod, string> = {
-  pix: "Pix",
-  cartao: "Cartão",
   dinheiro: "Dinheiro",
+  transferencia: "Transferência bancária",
+  wise: "Wise",
 };
 
 function fireConfetti() {
@@ -144,6 +156,10 @@ export function PdvTabsPanel() {
   const cancelItem = useServerFn(cancelPdvTabItem);
   const closeTab = useServerFn(closePdvTab);
   const cancelTabFn = useServerFn(cancelPdvTab);
+  const requestWise = useServerFn(requestPdvWisePayment);
+  const cancelWise = useServerFn(cancelPdvWiseAttempt);
+  const recheckWise = useServerFn(recheckPdvWiseAttempt);
+  const fetchAwaiting = useServerFn(listPdvAwaitingPayments);
 
   const [search, setSearch] = useState("");
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
@@ -159,12 +175,27 @@ export function PdvTabsPanel() {
   const [cancelTabTarget, setCancelTabTarget] = useState<PdvTabWithRelations | null>(null);
   const [reason, setReason] = useState("");
   const [discount, setDiscount] = useState<DiscountState>({ type: "none", value: 0 });
-  const [paymentMethod, setPaymentMethod] = useState<PdvTabPaymentMethod>("pix");
+  const [paymentMethod, setPaymentMethod] = useState<PdvTabPaymentMethod>("dinheiro");
   const [notes, setNotes] = useState("");
+  const [wiseModal, setWiseModal] = useState<{
+    attemptId: string;
+    reference: string;
+    amountCents: number;
+    paymentUrl: string | null;
+    customerName: string | null;
+    customerPhone: string | null;
+    tabCode: string;
+  } | null>(null);
 
   const tabsQ = useQuery({
     queryKey: ["pdv-tabs-workspace"],
     queryFn: () => fetchTabs(),
+  });
+
+  const awaitingQ = useQuery({
+    queryKey: ["pdv-awaiting-payments"],
+    queryFn: () => fetchAwaiting(),
+    refetchInterval: 15000,
   });
 
   const catalogQ = useQuery({
@@ -177,6 +208,7 @@ export function PdvTabsPanel() {
     qc.invalidateQueries({ queryKey: ["pdv-catalog"] });
     qc.invalidateQueries({ queryKey: ["pdv-sales-history"] });
     qc.invalidateQueries({ queryKey: ["pdv-cashiers"] });
+    qc.invalidateQueries({ queryKey: ["pdv-awaiting-payments"] });
   };
 
   const openMut = useMutation({
@@ -246,7 +278,7 @@ export function PdvTabsPanel() {
       setCloseDialogOpen(false);
       setSelectedTabId(null);
       setDiscount({ type: "none", value: 0 });
-      setPaymentMethod("pix");
+      setPaymentMethod("dinheiro");
       setNotes("");
       invalidate();
       fireConfetti();
@@ -270,7 +302,73 @@ export function PdvTabsPanel() {
       toast.error(error instanceof Error ? error.message : "Erro ao cancelar comanda"),
   });
 
-  // Defesa contra bug do Radix que pode deixar pointer-events: none no body
+  const requestWiseMut = useMutation({
+    mutationFn: (tabId: string) =>
+      requestWise({
+        data: {
+          tabId,
+          discount,
+          notes: notes || undefined,
+        },
+      }),
+    onSuccess: (result, tabId) => {
+      const tab = tabs.find((t) => t.id === tabId);
+      setWiseModal({
+        attemptId: result.attemptId,
+        reference: result.reference,
+        amountCents: result.amountEurCents,
+        paymentUrl: result.paymentUrl,
+        customerName: result.customerName,
+        customerPhone: result.customerPhone,
+        tabCode: tab?.tab_code ?? "",
+      });
+      setCloseDialogOpen(false);
+      setDiscount({ type: "none", value: 0 });
+      setNotes("");
+      setPaymentMethod("dinheiro");
+      invalidate();
+      if (result.manualOnly) {
+        toast.warning("Link Wise nao configurado. Configure em Configuracoes > Wise.");
+      } else {
+        toast.success("Link Wise gerado.");
+      }
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao gerar link Wise"),
+  });
+
+  const cancelWiseMut = useMutation({
+    mutationFn: ({ attemptId, reason }: { attemptId: string; reason: string }) =>
+      cancelWise({ data: { attemptId, reason } }),
+    onSuccess: () => {
+      toast.success("Cobranca cancelada. Comanda reaberta.");
+      setWiseModal(null);
+      invalidate();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao cancelar cobranca"),
+  });
+
+  const recheckWiseMut = useMutation({
+    mutationFn: (attemptId: string) => recheckWise({ data: { attemptId } }),
+    onSuccess: (data) => {
+      if (data.status === "paid") {
+        toast.success("Pagamento confirmado!");
+        setWiseModal(null);
+        fireConfetti();
+      } else if (data.status === "pending_conciliation") {
+        toast.warning("Pagamento divergente, em conciliacao.");
+      } else if (data.status === "cancelled") {
+        toast.info("Cobranca cancelada.");
+        setWiseModal(null);
+      } else {
+        toast.info("Ainda aguardando pagamento.");
+      }
+      invalidate();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao verificar"),
+  });
   useEffect(() => {
     if (
       !openCustomerDialog &&
@@ -334,7 +432,14 @@ export function PdvTabsPanel() {
     qtyMut.isPending ||
     cancelItemMut.isPending ||
     closeMut.isPending ||
-    cancelTabMut.isPending;
+    cancelTabMut.isPending ||
+    requestWiseMut.isPending;
+  const awaitingAttempts = (awaitingQ.data ?? []) as PdvWiseAttempt[];
+  const tabCodeById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const tab of tabs) map.set(tab.id, tab.tab_code);
+    return map;
+  }, [tabs]);
 
   return (
     <div className="space-y-4">
@@ -437,6 +542,77 @@ export function PdvTabsPanel() {
           )}
         </div>
       </BentoCard>
+
+      {awaitingAttempts.length > 0 && (
+        <BentoCard padded={false}>
+          <div className="p-5 border-b border-amber-500/40 bg-amber-500/5 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <h2 className="font-display text-lg text-admin-ink">
+              Comandas aguardando pagamento Wise
+            </h2>
+            <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/15">
+              {awaitingAttempts.length}
+            </Badge>
+          </div>
+          <div className="p-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {awaitingAttempts.map((att) => (
+              <div
+                key={att.id}
+                className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <Badge className="bg-amber-500/20 text-amber-700 hover:bg-amber-500/20">
+                    {tabCodeById.get(att.tab_id) ?? att.reference}
+                  </Badge>
+                  <span className="text-[11px] text-admin-ink-muted">
+                    {shortTime(att.created_at)}
+                  </span>
+                </div>
+                <p className="font-display text-sm text-admin-ink truncate">
+                  {att.customer_name_snapshot ?? "Cliente"}
+                </p>
+                <p className="text-[11px] font-mono text-admin-ink-muted truncate">
+                  {att.reference}
+                </p>
+                <div className="font-display text-xl text-amber-600 tabular-nums">
+                  {money(att.amount_eur_cents)}
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() =>
+                      setWiseModal({
+                        attemptId: att.id,
+                        reference: att.reference,
+                        amountCents: att.amount_eur_cents,
+                        paymentUrl: att.payment_url,
+                        customerName: att.customer_name_snapshot,
+                        customerPhone: att.customer_phone_snapshot,
+                        tabCode: tabCodeById.get(att.tab_id) ?? "",
+                      })
+                    }
+                  >
+                    Abrir
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    disabled={recheckWiseMut.isPending}
+                    onClick={() => recheckWiseMut.mutate(att.id)}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Verificar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </BentoCard>
+      )}
+
 
       {selectedTab && (
         <div className="grid grid-cols-12 gap-4">
@@ -622,7 +798,7 @@ export function PdvTabsPanel() {
                   onClick={() => {
                     setSelectedTabId(selectedTab.id);
                     setDiscount({ type: "none", value: 0 });
-                    setPaymentMethod("pix");
+                    setPaymentMethod("dinheiro");
                     setNotes("");
                     setCloseDialogOpen(true);
                   }}
@@ -735,21 +911,21 @@ export function PdvTabsPanel() {
               </Button>
               <Button
                 type="button"
-                variant={paymentMethod === "cartao" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("cartao")}
-                className={cn(paymentMethod === "cartao" && "bg-admin-accent text-white")}
+                variant={paymentMethod === "transferencia" ? "default" : "outline"}
+                onClick={() => setPaymentMethod("transferencia")}
+                className={cn(paymentMethod === "transferencia" && "bg-admin-accent text-white")}
               >
                 <CreditCard className="h-4 w-4" />
-                Cartao
+                Transferência
               </Button>
               <Button
                 type="button"
-                variant={paymentMethod === "pix" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("pix")}
-                className={cn(paymentMethod === "pix" && "bg-admin-accent text-white")}
+                variant={paymentMethod === "wise" ? "default" : "outline"}
+                onClick={() => setPaymentMethod("wise")}
+                className={cn(paymentMethod === "wise" && "bg-amber-500 text-white")}
               >
                 <QrCode className="h-4 w-4" />
-                Pix
+                Wise
               </Button>
             </div>
 
@@ -787,11 +963,23 @@ export function PdvTabsPanel() {
               disabled={isBusy || !selectedTab}
               onClick={(event) => {
                 event.preventDefault();
-                if (selectedTab) closeMut.mutate(selectedTab.id);
+                if (!selectedTab) return;
+                if (paymentMethod === "wise") {
+                  requestWiseMut.mutate(selectedTab.id);
+                } else {
+                  closeMut.mutate(selectedTab.id);
+                }
               }}
-              className="bg-admin-accent text-white"
+              className={cn(
+                "text-white",
+                paymentMethod === "wise" ? "bg-amber-500 hover:bg-amber-500/90" : "bg-admin-accent",
+              )}
             >
-              {closeMut.isPending ? "Fechando..." : "Confirmar fechamento"}
+              {closeMut.isPending || requestWiseMut.isPending
+                ? "Processando..."
+                : paymentMethod === "wise"
+                  ? "Gerar link Wise"
+                  : "Confirmar fechamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -837,6 +1025,132 @@ export function PdvTabsPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={wiseModal !== null} onOpenChange={(open) => !open && setWiseModal(null)}>
+        <DialogContent className="sm:max-w-md border-amber-500/40 bg-admin-bg text-admin-ink">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-display">
+              <QrCode className="h-5 w-5 text-amber-500" />
+              Pagamento Wise gerado
+            </DialogTitle>
+            <DialogDescription>
+              Compartilhe o link com o cliente. A comanda fica bloqueada ate o pagamento ser
+              confirmado pelo webhook ou voce verificar manualmente.
+            </DialogDescription>
+          </DialogHeader>
+          {wiseModal && (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-admin-border bg-admin-bg/60 p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-admin-ink-muted">Comanda</span>
+                  <span className="font-mono">{wiseModal.tabCode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-admin-ink-muted">Cliente</span>
+                  <span className="text-right">{wiseModal.customerName ?? "-"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-admin-ink-muted">Referência</span>
+                  <span className="font-mono text-xs">{wiseModal.reference}</span>
+                </div>
+                <div className="flex justify-between border-t border-admin-border pt-2">
+                  <span className="text-xs uppercase tracking-widest text-admin-ink-muted">
+                    Total
+                  </span>
+                  <span className="font-display text-xl text-amber-600">
+                    {money(wiseModal.amountCents)}
+                  </span>
+                </div>
+              </div>
+
+              {wiseModal.paymentUrl ? (
+                <>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        if (wiseModal.paymentUrl) {
+                          navigator.clipboard.writeText(wiseModal.paymentUrl);
+                          toast.success("Link copiado.");
+                        }
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copiar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        if (wiseModal.paymentUrl)
+                          window.open(wiseModal.paymentUrl, "_blank", "noopener");
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Abrir Wise
+                    </Button>
+                  </div>
+                  {wiseModal.customerPhone && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        const phone = (wiseModal.customerPhone ?? "").replace(/\D/g, "");
+                        const msg = encodeURIComponent(
+                          `Ola ${wiseModal.customerName ?? ""}! Segue o link para pagamento Wise (${money(
+                            wiseModal.amountCents,
+                          )}) - referencia ${wiseModal.reference}: ${wiseModal.paymentUrl}`,
+                        );
+                        window.open(`https://wa.me/${phone}?text=${msg}`, "_blank", "noopener");
+                      }}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Enviar por WhatsApp
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
+                  Link Wise nao configurado. Configure em Configuracoes &gt; Wise para gerar o link
+                  automaticamente.
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2 border-t border-admin-border">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={recheckWiseMut.isPending}
+                  onClick={() => recheckWiseMut.mutate(wiseModal.attemptId)}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Verificar agora
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-red-brand/40 text-red-brand hover:bg-red-brand/10"
+                  disabled={cancelWiseMut.isPending}
+                  onClick={() =>
+                    cancelWiseMut.mutate({
+                      attemptId: wiseModal.attemptId,
+                      reason: "Reaberta para edicao",
+                    })
+                  }
+                >
+                  <XCircle className="h-4 w-4" />
+                  Cancelar/Reabrir
+                </Button>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" className="w-full" onClick={() => setWiseModal(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={successInfo !== null}
