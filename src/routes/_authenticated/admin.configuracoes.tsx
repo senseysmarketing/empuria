@@ -94,6 +94,12 @@ function ConfiguracoesPage() {
             <Plug className="h-4 w-4" /> Integrações
           </TabsTrigger>
           <TabsTrigger
+            value="conciliacoes-wise"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <ShieldAlert className="h-4 w-4" /> Conciliações Wise
+          </TabsTrigger>
+          <TabsTrigger
             value="equipe"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
