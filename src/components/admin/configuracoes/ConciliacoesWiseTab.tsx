@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -177,13 +177,21 @@ export function ConciliacoesWiseTab() {
   const [filter, setFilter] = useState<FilterKey>("attention");
   const [search, setSearch] = useState("");
   const [openRow, setOpenRow] = useState<WiseEventRow | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const q = useQuery({
     queryKey: ["wise-events-conciliacoes"],
     queryFn: () => list({ data: { limit: 200 } }),
   });
 
-  const events = (q.data?.events ?? []) as WiseEventRow[];
+  const rawEvents = (q.data?.events ?? []) as WiseEventRow[];
+  // Mostrar apenas eventos com valor (balances#credit, payment-link#payment-received).
+  // Os demais (transfers#state-change etc.) não trazem dados suficientes para conciliar.
+  const events = useMemo(
+    () => rawEvents.filter((e) => pickAmount(e.payload) != null),
+    [rawEvents],
+  );
 
   const filtered = useMemo(() => {
     const bySearch = (e: WiseEventRow) => {
@@ -249,6 +257,15 @@ export function ConciliacoesWiseTab() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageRows = filtered.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
     <div className="space-y-5">
@@ -326,7 +343,7 @@ export function ConciliacoesWiseTab() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e) => {
+              {pageRows.map((e) => {
                 const ref = pickRef(e.payload);
                 const amount = pickAmount(e.payload);
                 const currency = pickCurrency(e.payload);
@@ -383,6 +400,33 @@ export function ConciliacoesWiseTab() {
               })}
             </tbody>
           </table>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-admin-border px-3 py-2 text-xs text-admin-ink-muted">
+            <span>
+              Mostrando {filtered.length === 0 ? 0 : pageStart + 1}–
+              {Math.min(pageStart + PAGE_SIZE, filtered.length)} de {filtered.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              <span>
+                Página {safePage} de {totalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Próxima
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
