@@ -302,7 +302,73 @@ export function PdvTabsPanel() {
       toast.error(error instanceof Error ? error.message : "Erro ao cancelar comanda"),
   });
 
-  // Defesa contra bug do Radix que pode deixar pointer-events: none no body
+  const requestWiseMut = useMutation({
+    mutationFn: (tabId: string) =>
+      requestWise({
+        data: {
+          tabId,
+          discount,
+          notes: notes || undefined,
+        },
+      }),
+    onSuccess: (result, tabId) => {
+      const tab = tabs.find((t) => t.id === tabId);
+      setWiseModal({
+        attemptId: result.attemptId,
+        reference: result.reference,
+        amountCents: result.amountEurCents,
+        paymentUrl: result.paymentUrl,
+        customerName: result.customerName,
+        customerPhone: result.customerPhone,
+        tabCode: tab?.tab_code ?? "",
+      });
+      setCloseDialogOpen(false);
+      setDiscount({ type: "none", value: 0 });
+      setNotes("");
+      setPaymentMethod("dinheiro");
+      invalidate();
+      if (result.manualOnly) {
+        toast.warning("Link Wise nao configurado. Configure em Configuracoes > Wise.");
+      } else {
+        toast.success("Link Wise gerado.");
+      }
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao gerar link Wise"),
+  });
+
+  const cancelWiseMut = useMutation({
+    mutationFn: ({ attemptId, reason }: { attemptId: string; reason: string }) =>
+      cancelWise({ data: { attemptId, reason } }),
+    onSuccess: () => {
+      toast.success("Cobranca cancelada. Comanda reaberta.");
+      setWiseModal(null);
+      invalidate();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao cancelar cobranca"),
+  });
+
+  const recheckWiseMut = useMutation({
+    mutationFn: (attemptId: string) => recheckWise({ data: { attemptId } }),
+    onSuccess: (data) => {
+      if (data.status === "paid") {
+        toast.success("Pagamento confirmado!");
+        setWiseModal(null);
+        fireConfetti();
+      } else if (data.status === "pending_conciliation") {
+        toast.warning("Pagamento divergente, em conciliacao.");
+      } else if (data.status === "cancelled") {
+        toast.info("Cobranca cancelada.");
+        setWiseModal(null);
+      } else {
+        toast.info("Ainda aguardando pagamento.");
+      }
+      invalidate();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao verificar"),
+  });
   useEffect(() => {
     if (
       !openCustomerDialog &&
