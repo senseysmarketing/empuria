@@ -615,19 +615,31 @@ export function PdvTabsPanel() {
       {selectedTab && (
         <div className="grid grid-cols-12 gap-4">
           <BentoCard className="col-span-12 lg:col-span-8" padded>
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
                 <h3 className="font-display text-lg text-admin-ink">Adicionar consumo</h3>
                 <p className="text-xs text-admin-ink-muted">
                   Cada clique salva o item e reserva estoque imediatamente.
                 </p>
               </div>
-              {catalogQ.isFetching && (
-                <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />
-              )}
+              <div className="flex items-center gap-2">
+                {catalogQ.isFetching && (
+                  <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />
+                )}
+                <div className="relative w-60">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-admin-ink-muted" />
+                  <Input
+                    value={catalogSearch}
+                    onChange={(e) => setCatalogSearch(e.target.value)}
+                    placeholder="Buscar item..."
+                    className="pl-9 h-9 bg-admin-bg border-admin-border"
+                  />
+                </div>
+              </div>
             </div>
             <SaleCatalogGrid
               items={(catalogQ.data ?? []) as unknown as PdvCatalogItem[]}
+              search={catalogSearch}
               pendingProductId={
                 addMut.isPending
                   ? addMut.variables?.id ?? null
