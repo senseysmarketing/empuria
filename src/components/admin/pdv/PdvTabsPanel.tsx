@@ -545,70 +545,68 @@ export function PdvTabsPanel() {
 
       {awaitingAttempts.length > 0 && (
         <BentoCard padded={false}>
-          <div className="p-5 border-b border-amber-500/40 bg-amber-500/5 flex items-center gap-2">
+          <div className="px-4 py-3 border-b border-amber-500/40 bg-amber-500/5 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <h2 className="font-display text-lg text-admin-ink">
+            <h2 className="font-display text-sm text-admin-ink">
               Comandas aguardando pagamento Wise
             </h2>
             <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/15">
               {awaitingAttempts.length}
             </Badge>
           </div>
-          <div className="p-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {awaitingAttempts.map((att) => (
-              <div
-                key={att.id}
-                className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <Badge className="bg-amber-500/20 text-amber-700 hover:bg-amber-500/20">
-                    {tabCodeById.get(att.tab_id) ?? att.reference}
-                  </Badge>
-                  <span className="text-[11px] text-admin-ink-muted">
+          <div className="divide-y divide-admin-border">
+            {awaitingAttempts.map((att) => {
+              const code = tabCodeById.get(att.tab_id) ?? att.reference;
+              return (
+                <div
+                  key={att.id}
+                  className="px-4 py-2 flex items-center gap-3 hover:bg-amber-500/5"
+                >
+                  <span className="font-mono text-[11px] text-amber-700 bg-amber-500/15 rounded px-1.5 py-0.5 shrink-0">
+                    {code}
+                  </span>
+                  <span className="text-sm text-admin-ink truncate flex-1 min-w-0">
+                    {att.customer_name_snapshot ?? "Cliente"}
+                  </span>
+                  <span className="text-[11px] text-admin-ink-muted tabular-nums hidden sm:inline">
                     {shortTime(att.created_at)}
                   </span>
+                  <span className="font-display text-sm text-amber-600 tabular-nums shrink-0 w-20 text-right">
+                    {money(att.amount_eur_cents)}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs px-2"
+                      onClick={() =>
+                        setWiseModal({
+                          attemptId: att.id,
+                          reference: att.reference,
+                          amountCents: att.amount_eur_cents,
+                          paymentUrl: att.payment_url,
+                          customerName: att.customer_name_snapshot,
+                          customerPhone: att.customer_phone_snapshot,
+                          tabCode: tabCodeById.get(att.tab_id) ?? "",
+                        })
+                      }
+                    >
+                      Abrir
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      title="Verificar pagamento"
+                      disabled={recheckWiseMut.isPending}
+                      onClick={() => recheckWiseMut.mutate(att.id)}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-                <p className="font-display text-sm text-admin-ink truncate">
-                  {att.customer_name_snapshot ?? "Cliente"}
-                </p>
-                <p className="text-[11px] font-mono text-admin-ink-muted truncate">
-                  {att.reference}
-                </p>
-                <div className="font-display text-xl text-amber-600 tabular-nums">
-                  {money(att.amount_eur_cents)}
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs"
-                    onClick={() =>
-                      setWiseModal({
-                        attemptId: att.id,
-                        reference: att.reference,
-                        amountCents: att.amount_eur_cents,
-                        paymentUrl: att.payment_url,
-                        customerName: att.customer_name_snapshot,
-                        customerPhone: att.customer_phone_snapshot,
-                        tabCode: tabCodeById.get(att.tab_id) ?? "",
-                      })
-                    }
-                  >
-                    Abrir
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs"
-                    disabled={recheckWiseMut.isPending}
-                    onClick={() => recheckWiseMut.mutate(att.id)}
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                    Verificar
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </BentoCard>
       )}
