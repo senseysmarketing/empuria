@@ -114,7 +114,7 @@ export function HistoricoTab({ filters }: { filters: ReportFilters }) {
           <div className="relative md:flex-1 md:min-w-[260px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-admin-ink-muted" />
             <Input
-              placeholder="Buscar por referência, cliente, email..."
+              placeholder="Buscar por referência ou cliente..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="pl-9 bg-admin-bg"
