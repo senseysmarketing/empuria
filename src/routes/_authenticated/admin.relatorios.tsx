@@ -69,7 +69,7 @@ import { useState } from "react";
 
 const searchSchema = z.object({
   tab: fallback(
-    z.enum(["visao", "vendas", "pdv", "servicos", "eventos", "clube", "crm"]),
+    z.enum(["visao", "historico", "vendas", "pdv", "servicos", "eventos", "clube", "crm"]),
     "visao",
   ).default("visao"),
   period: fallback(z.enum(["today", "7d", "30d", "month", "last_month", "custom"]), "30d").default(
@@ -102,6 +102,7 @@ function normalizeSearch(search: Partial<SearchSchema>): SearchSchema {
     origin: search.origin,
   };
 }
+
 
 // ---------- Helpers ----------
 
