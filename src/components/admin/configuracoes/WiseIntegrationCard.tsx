@@ -370,7 +370,6 @@ export function WiseIntegrationCard() {
             variant="outline"
             onClick={() => setEventsOpen(true)}
           >
-            <Inbox className="mr-2 h-3.5 w-3.5" />
             Ver eventos
           </Button>
 
