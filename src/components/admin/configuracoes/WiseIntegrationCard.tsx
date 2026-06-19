@@ -377,6 +377,8 @@ export function WiseIntegrationCard() {
         </div>
       </BentoCard>
 
+      <WiseEventsModal open={eventsOpen} onOpenChange={setEventsOpen} />
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto border-admin-border bg-admin-surface text-admin-ink sm:max-w-3xl">
           <DialogHeader>
