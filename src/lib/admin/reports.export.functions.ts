@@ -12,6 +12,8 @@ import {
   getReportsEventos,
   getReportsClube,
   getReportsCrm,
+  getReportsHistorico,
+  historicoFiltersSchema,
 } from "./reports.functions";
 
 const TAB_LABEL: Record<string, string> = {
@@ -22,12 +24,14 @@ const TAB_LABEL: Record<string, string> = {
   eventos: "Eventos",
   clube: "Clube do Imigrante",
   crm: "CRM & SLA",
+  historico: "Histórico de Pedidos",
 };
 
 const exportSchema = z.object({
-  tab: z.enum(["visao", "vendas", "pdv", "servicos", "eventos", "clube", "crm"]),
+  tab: z.enum(["visao", "vendas", "pdv", "servicos", "eventos", "clube", "crm", "historico"]),
   filters: reportFiltersSchema,
 });
+
 
 function money(cents: number) {
   return (cents ?? 0) / 100;
