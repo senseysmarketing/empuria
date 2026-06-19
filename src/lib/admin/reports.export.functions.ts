@@ -456,3 +456,59 @@ export const exportReportXlsx = createServerFn({ method: "POST" })
       base64,
     };
   });
+
+async function buildHistoricoXlsx(wb: ExcelJS.Workbook, filters: z.infer<typeof reportFiltersSchema>) {
+  // Pull all rows (max page size 200, loop pages)
+  const all: Awaited<ReturnType<typeof getReportsHistorico>>["rows"] = [];
+  let page = 1;
+  const pageSize = 200;
+  let total = 0;
+  let totalAmount = 0;
+  for (;;) {
+    const f = historicoFiltersSchema.parse({ ...filters, source: "all", page, pageSize });
+    const res = await getReportsHistorico({ data: f });
+    all.push(...res.rows);
+    total = res.total;
+    totalAmount = res.totalAmount;
+    if (all.length >= res.total || res.rows.length === 0) break;
+    page++;
+    if (page > 50) break;
+  }
+  const range = (() => {
+    // re-derive via overview filter parse (just use original filters' from/to if present)
+    return { start: filters.from ?? "", end: filters.to ?? "" };
+  })();
+  addFiltersSheet(wb, "historico", filters, range);
+
+  const ws = wb.addWorksheet("Histórico");
+  ws.columns = [
+    { header: "Data", key: "date", width: 18 },
+    { header: "Origem", key: "source", width: 10 },
+    { header: "Referência", key: "ref", width: 22 },
+    { header: "Cliente", key: "name", width: 28 },
+    { header: "Email", key: "email", width: 28 },
+    { header: "Descrição", key: "desc", width: 28 },
+    { header: "Status", key: "status", width: 12 },
+    { header: "Método", key: "method", width: 14 },
+    { header: "Moeda", key: "currency", width: 8 },
+    { header: "Valor", key: "amount", width: 14 },
+  ];
+  ws.getRow(1).font = { bold: true };
+  for (const r of all) {
+    ws.addRow({
+      date: new Date(r.created_at).toLocaleString("pt-BR"),
+      source: r.source === "pdv" ? "PDV" : "Esteira",
+      ref: r.ref,
+      name: r.customer_name ?? "",
+      email: r.customer_email ?? "",
+      desc: r.description,
+      status: r.status,
+      method: r.payment_method ?? "",
+      currency: r.currency,
+      amount: money(r.total_cents),
+    });
+  }
+  ws.addRow({});
+  ws.addRow({ ref: "TOTAL", amount: money(totalAmount) }).font = { bold: true };
+  ws.addRow({ ref: "Registros", amount: total });
+}
