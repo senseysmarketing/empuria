@@ -258,6 +258,15 @@ export function ConciliacoesWiseTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
   });
 
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageRows = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
