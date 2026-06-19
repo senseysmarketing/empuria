@@ -18,7 +18,7 @@ export type WiseEventRow = {
   state: string | null;
   matched_order_code: string | null;
   matched_pdv_reference: string | null;
-  payload: Record<string, unknown>;
+  payload_json: string;
 };
 
 function pickReference(p: Record<string, unknown>): string | null {
@@ -162,7 +162,7 @@ export const listWiseEvents = createServerFn({ method: "GET" })
         matched_pdv_reference: r.matched_payment_id
           ? pdvMap.get(r.matched_payment_id as string) ?? null
           : null,
-        payload,
+        payload_json: JSON.stringify(payload),
       };
     });
   });

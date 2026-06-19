@@ -239,7 +239,7 @@ export function WiseEventsModal({
                               <div><span className="text-admin-ink-muted">Notas:</span> {e.notes ?? "—"}</div>
                             </div>
                             <pre className="text-[11px] bg-admin-surface-2 border border-admin-border rounded p-2 overflow-x-auto max-h-64">
-{JSON.stringify(e.payload, null, 2)}
+{(() => { try { return JSON.stringify(JSON.parse(e.payload_json), null, 2); } catch { return e.payload_json; } })()}
                             </pre>
                           </td>
                         </tr>
