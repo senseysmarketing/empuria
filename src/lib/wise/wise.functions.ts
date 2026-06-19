@@ -696,6 +696,170 @@ export const manuallyApproveWisePayment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/* List orders + PDV tabs awaiting Wise payment (for manual matching). */
+export const listOpenPaymentTargets = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z
+      .object({
+        search: z.string().trim().max(120).optional(),
+        kind: z.enum(["all", "orders", "pdv"]).default("all"),
+        limit: z.number().int().min(1).max(100).default(40),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const search = data.search ?? "";
+    const limit = data.limit;
+
+    let orders: Array<Record<string, unknown>> = [];
+    let pdvAttempts: Array<Record<string, unknown>> = [];
+
+    if (data.kind === "all" || data.kind === "orders") {
+      let q = db
+        .from("orders")
+        .select(
+          "id,external_reference,service_title,customer_name,customer_email,payment_amount_cents,payment_currency,amount_cents,currency,payment_status,payment_provider,created_at",
+        )
+        .eq("payment_provider", "wise")
+        .neq("payment_status", "aprovado")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (search) {
+        q = q.or(
+          `external_reference.ilike.%${search}%,customer_name.ilike.%${search}%,customer_email.ilike.%${search}%,service_title.ilike.%${search}%`,
+        );
+      }
+      const { data: rows } = await q;
+      orders = rows ?? [];
+    }
+
+    if (data.kind === "all" || data.kind === "pdv") {
+      let q = db
+        .from("pdv_payment_attempts")
+        .select(
+          "id,tab_id,reference,amount_eur_cents,currency,status,customer_name_snapshot,customer_phone_snapshot,created_at",
+        )
+        .eq("provider", "wise")
+        .eq("status", "waiting_payment")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (search) {
+        q = q.or(
+          `reference.ilike.%${search}%,customer_name_snapshot.ilike.%${search}%,customer_phone_snapshot.ilike.%${search}%`,
+        );
+      }
+      const { data: rows } = await q;
+      pdvAttempts = rows ?? [];
+    }
+
+    return { orders, pdvAttempts };
+  });
+
+/* Manually link a Wise event to a PDV payment attempt and confirm it via RPC. */
+export const manuallyMatchWisePdvAttempt = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z
+      .object({
+        eventId: z.string().uuid(),
+        attemptId: z.string().uuid(),
+        notes: z.string().trim().max(500).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: ev } = await db
+      .from("wise_events")
+      .select("id,match_status,payload")
+      .eq("id", data.eventId)
+      .maybeSingle();
+    if (!ev) throw new Error("Evento Wise não encontrado.");
+    if (["auto_matched", "manual_matched", "pdv_matched"].includes(ev.match_status)) {
+      throw new Error("Evento já conciliado.");
+    }
+
+    const { data: attempt } = await db
+      .from("pdv_payment_attempts")
+      .select("id,reference,amount_eur_cents,currency,status")
+      .eq("id", data.attemptId)
+      .maybeSingle();
+    if (!attempt) throw new Error("Tentativa PDV não encontrada.");
+
+    // Already paid → mark as duplicate, do not reprocess.
+    if (attempt.status === "paid") {
+      await db
+        .from("wise_events")
+        .update({
+          match_status: "duplicate",
+          processed_at: new Date().toISOString(),
+          notes: data.notes ?? "Tentativa PDV já estava paga (duplicidade)",
+        })
+        .eq("id", data.eventId);
+      await db.from("audit_logs").insert({
+        actor_id: context.userId,
+        module: "configuracoes",
+        entity_type: "wise_event",
+        entity_id: data.eventId,
+        action: "wise_event.duplicate_pdv",
+        new_data: { attempt_id: data.attemptId },
+      });
+      return { ok: true, duplicate: true };
+    }
+
+    const { data: rpcRes } = await db.rpc("pdv_confirm_wise_payment", {
+      p_reference: attempt.reference,
+      p_amount_cents: attempt.amount_eur_cents,
+      p_currency: "EUR",
+      p_raw: { manual: true, event_id: data.eventId, by: context.userId },
+    });
+    const res = (rpcRes ?? {}) as { matched?: boolean; sale_id?: string };
+
+    await db
+      .from("wise_events")
+      .update({
+        match_status: res.matched ? "pdv_matched" : "manual_matched",
+        processed_at: new Date().toISOString(),
+        notes: data.notes ?? `Conciliação manual para ${attempt.reference}`,
+      })
+      .eq("id", data.eventId);
+
+    await db.from("audit_logs").insert({
+      actor_id: context.userId,
+      module: "configuracoes",
+      entity_type: "wise_event",
+      entity_id: data.eventId,
+      action: "wise_event.manually_matched_pdv",
+      new_data: { attempt_id: data.attemptId, reference: attempt.reference, rpc: res },
+    });
+    return { ok: true, sale_id: res.sale_id ?? null };
+  });
+
+/* Mark a Wise event as duplicate (no further action). */
+export const markWiseEventDuplicate = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((d) =>
+    z.object({ eventId: z.string().uuid(), notes: z.string().trim().max(500).optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await db
+      .from("wise_events")
+      .update({
+        match_status: "duplicate",
+        processed_at: new Date().toISOString(),
+        notes: data.notes ?? "Marcado como duplicado",
+      })
+      .eq("id", data.eventId);
+    await db.from("audit_logs").insert({
+      actor_id: context.userId,
+      module: "configuracoes",
+      entity_type: "wise_event",
+      entity_id: data.eventId,
+      action: "wise_event.marked_duplicate",
+    });
+    return { ok: true };
+  });
+
 /* Used by the authenticated checkout flow to mint a wise payment. */
 export const createWiseCheckoutPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
