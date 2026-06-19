@@ -246,7 +246,7 @@ export function PdvTabsPanel() {
       setCloseDialogOpen(false);
       setSelectedTabId(null);
       setDiscount({ type: "none", value: 0 });
-      setPaymentMethod("pix");
+      setPaymentMethod("dinheiro");
       setNotes("");
       invalidate();
       fireConfetti();
