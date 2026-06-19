@@ -2725,6 +2725,117 @@ export type Database = {
           },
         ]
       }
+      pdv_payment_attempts: {
+        Row: {
+          amount_brl_cents: number
+          amount_eur_cents: number
+          attempt_index: number
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          created_by: string
+          currency: string
+          customer_name_snapshot: string | null
+          customer_phone_snapshot: string | null
+          discount_brl_cents: number
+          discount_eur_cents: number
+          discount_type: string
+          discount_value: number
+          id: string
+          notes: string | null
+          paid_at: string | null
+          payment_url: string | null
+          provider: string
+          raw_request: Json
+          raw_webhook: Json | null
+          reference: string
+          sale_id: string | null
+          status: string
+          subtotal_brl_cents: number
+          subtotal_eur_cents: number
+          tab_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_brl_cents?: number
+          amount_eur_cents: number
+          attempt_index?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          created_by: string
+          currency?: string
+          customer_name_snapshot?: string | null
+          customer_phone_snapshot?: string | null
+          discount_brl_cents?: number
+          discount_eur_cents?: number
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_url?: string | null
+          provider?: string
+          raw_request?: Json
+          raw_webhook?: Json | null
+          reference: string
+          sale_id?: string | null
+          status?: string
+          subtotal_brl_cents?: number
+          subtotal_eur_cents?: number
+          tab_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_brl_cents?: number
+          amount_eur_cents?: number
+          attempt_index?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          created_by?: string
+          currency?: string
+          customer_name_snapshot?: string | null
+          customer_phone_snapshot?: string | null
+          discount_brl_cents?: number
+          discount_eur_cents?: number
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_url?: string | null
+          provider?: string
+          raw_request?: Json
+          raw_webhook?: Json | null
+          reference?: string
+          sale_id?: string | null
+          status?: string
+          subtotal_brl_cents?: number
+          subtotal_eur_cents?: number
+          tab_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdv_payment_attempts_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "pdv_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdv_payment_attempts_tab_id_fkey"
+            columns: ["tab_id"]
+            isOneToOne: false
+            referencedRelation: "pdv_tabs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pdv_sale_code_counters: {
         Row: {
           next_value: number
@@ -2979,6 +3090,8 @@ export type Database = {
       }
       pdv_tabs: {
         Row: {
+          active_payment_attempt_id: string | null
+          awaiting_payment_at: string | null
           cancel_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
@@ -2994,6 +3107,8 @@ export type Database = {
           notes: string | null
           opened_at: string
           opened_by: string
+          payment_method: string | null
+          pending_sale_snapshot: Json | null
           sale_id: string | null
           status: string
           subtotal_brl_cents: number
@@ -3004,6 +3119,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_payment_attempt_id?: string | null
+          awaiting_payment_at?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -3019,6 +3136,8 @@ export type Database = {
           notes?: string | null
           opened_at?: string
           opened_by: string
+          payment_method?: string | null
+          pending_sale_snapshot?: Json | null
           sale_id?: string | null
           status?: string
           subtotal_brl_cents?: number
@@ -3029,6 +3148,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_payment_attempt_id?: string | null
+          awaiting_payment_at?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -3044,6 +3165,8 @@ export type Database = {
           notes?: string | null
           opened_at?: string
           opened_by?: string
+          payment_method?: string | null
+          pending_sale_snapshot?: Json | null
           sale_id?: string | null
           status?: string
           subtotal_brl_cents?: number
@@ -3822,6 +3945,10 @@ export type Database = {
         Args: { p_actor_id: string; p_item_id: string; p_reason: string }
         Returns: undefined
       }
+      pdv_cancel_wise_attempt: {
+        Args: { p_actor_id: string; p_attempt_id: string; p_reason: string }
+        Returns: undefined
+      }
       pdv_close_sale: {
         Args: {
           p_cashier_id: string
@@ -3845,10 +3972,30 @@ export type Database = {
         }
         Returns: string
       }
+      pdv_confirm_wise_payment: {
+        Args: {
+          p_amount_cents: number
+          p_currency: string
+          p_raw: Json
+          p_reference: string
+        }
+        Returns: Json
+      }
       pdv_next_sale_code: { Args: { p_closed_at?: string }; Returns: string }
       pdv_next_tab_code: { Args: { p_at?: string }; Returns: string }
       pdv_open_tab: {
         Args: { p_customer_id: string; p_notes?: string; p_opened_by: string }
+        Returns: Json
+      }
+      pdv_request_wise_payment: {
+        Args: {
+          p_actor_id: string
+          p_discount_type: string
+          p_discount_value: number
+          p_notes?: string
+          p_payment_url: string
+          p_tab_id: string
+        }
         Returns: Json
       }
       pdv_update_tab_item_qty: {
