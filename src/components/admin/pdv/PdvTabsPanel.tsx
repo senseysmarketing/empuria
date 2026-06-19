@@ -735,21 +735,21 @@ export function PdvTabsPanel() {
               </Button>
               <Button
                 type="button"
-                variant={paymentMethod === "cartao" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("cartao")}
-                className={cn(paymentMethod === "cartao" && "bg-admin-accent text-white")}
+                variant={paymentMethod === "transferencia" ? "default" : "outline"}
+                onClick={() => setPaymentMethod("transferencia")}
+                className={cn(paymentMethod === "transferencia" && "bg-admin-accent text-white")}
               >
                 <CreditCard className="h-4 w-4" />
-                Cartao
+                Transferência
               </Button>
               <Button
                 type="button"
-                variant={paymentMethod === "pix" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("pix")}
-                className={cn(paymentMethod === "pix" && "bg-admin-accent text-white")}
+                variant={paymentMethod === "wise" ? "default" : "outline"}
+                onClick={() => setPaymentMethod("wise")}
+                className={cn(paymentMethod === "wise" && "bg-amber-500 text-white")}
               >
                 <QrCode className="h-4 w-4" />
-                Pix
+                Wise
               </Button>
             </div>
 
