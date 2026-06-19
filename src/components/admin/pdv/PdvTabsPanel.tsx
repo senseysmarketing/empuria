@@ -159,7 +159,7 @@ export function PdvTabsPanel() {
   const [cancelTabTarget, setCancelTabTarget] = useState<PdvTabWithRelations | null>(null);
   const [reason, setReason] = useState("");
   const [discount, setDiscount] = useState<DiscountState>({ type: "none", value: 0 });
-  const [paymentMethod, setPaymentMethod] = useState<PdvTabPaymentMethod>("pix");
+  const [paymentMethod, setPaymentMethod] = useState<PdvTabPaymentMethod>("dinheiro");
   const [notes, setNotes] = useState("");
 
   const tabsQ = useQuery({
