@@ -208,6 +208,7 @@ export function PdvTabsPanel() {
     qc.invalidateQueries({ queryKey: ["pdv-catalog"] });
     qc.invalidateQueries({ queryKey: ["pdv-sales-history"] });
     qc.invalidateQueries({ queryKey: ["pdv-cashiers"] });
+    qc.invalidateQueries({ queryKey: ["pdv-awaiting-payments"] });
   };
 
   const openMut = useMutation({
