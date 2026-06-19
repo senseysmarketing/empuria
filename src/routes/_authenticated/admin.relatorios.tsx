@@ -40,6 +40,8 @@ import {
   YAxis,
 } from "recharts";
 import { BentoCard } from "@/components/admin/BentoCard";
+import { HistoricoTab } from "@/components/admin/relatorios/HistoricoTab";
+
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
@@ -69,7 +71,7 @@ import { useState } from "react";
 
 const searchSchema = z.object({
   tab: fallback(
-    z.enum(["visao", "vendas", "pdv", "servicos", "eventos", "clube", "crm"]),
+    z.enum(["visao", "historico", "vendas", "pdv", "servicos", "eventos", "clube", "crm"]),
     "visao",
   ).default("visao"),
   period: fallback(z.enum(["today", "7d", "30d", "month", "last_month", "custom"]), "30d").default(
@@ -102,6 +104,7 @@ function normalizeSearch(search: Partial<SearchSchema>): SearchSchema {
     origin: search.origin,
   };
 }
+
 
 // ---------- Helpers ----------
 
@@ -177,7 +180,10 @@ function RelatoriosPage() {
             </p>
           </div>
         </div>
-        <ExportButtons tab={search.tab} filters={filters} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <CompareSelect search={search} navigate={navigate} />
+          <ExportButtons tab={search.tab} filters={filters} />
+        </div>
       </header>
 
       <GlobalFiltersBar search={search} navigate={navigate} />
@@ -199,6 +205,7 @@ function RelatoriosPage() {
         <TabsList className="bg-admin-surface border border-admin-border">
           {[
             { v: "visao", l: "Visão Geral" },
+            { v: "historico", l: "Histórico de Pedidos" },
             { v: "vendas", l: "Vendas & Financeiro" },
             { v: "pdv", l: "PDV & Estoque" },
             { v: "servicos", l: "Serviços & Agenda" },
@@ -216,9 +223,14 @@ function RelatoriosPage() {
           ))}
         </TabsList>
 
+
         <TabsContent value="visao" className="mt-0">
           <VisaoGeralTab filters={filters} />
         </TabsContent>
+        <TabsContent value="historico" className="mt-0">
+          <HistoricoTab filters={filters} />
+        </TabsContent>
+
         <TabsContent value="vendas" className="mt-0">
           <VendasTab filters={filters} />
         </TabsContent>
@@ -244,6 +256,38 @@ function RelatoriosPage() {
 
 // ---------- Filters bar ----------
 
+function CompareSelect({
+  search,
+  navigate,
+}: {
+  search: z.infer<typeof searchSchema>;
+  navigate: ReturnType<typeof useNavigate>;
+}) {
+  const upd = (v: string) =>
+    navigate({
+      to: "/admin/relatorios",
+      search: (prev: Partial<SearchSchema>) => ({
+        ...normalizeSearch(prev as Partial<SearchSchema>),
+        compare: v as SearchSchema["compare"],
+      }),
+      replace: true,
+    });
+  return (
+    <Select value={search.compare} onValueChange={upd}>
+      <SelectTrigger className="h-9 w-[220px] bg-admin-surface border-admin-border">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {Object.entries(COMPARE_LABEL).map(([k, l]) => (
+          <SelectItem key={k} value={k}>
+            Comparar: {l}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function GlobalFiltersBar({
   search,
   navigate,
@@ -260,9 +304,9 @@ function GlobalFiltersBar({
 
   return (
     <BentoCard padded>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[180px_220px_160px_160px_1fr]">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <Select value={search.period} onValueChange={(v) => upd({ period: v as never })}>
-          <SelectTrigger className="bg-admin-bg">
+          <SelectTrigger className="bg-admin-bg w-full md:w-[200px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -274,48 +318,8 @@ function GlobalFiltersBar({
           </SelectContent>
         </Select>
 
-        <Select value={search.compare} onValueChange={(v) => upd({ compare: v as never })}>
-          <SelectTrigger className="bg-admin-bg">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(COMPARE_LABEL).map(([k, l]) => (
-              <SelectItem key={k} value={k}>
-                {l}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={search.currency} onValueChange={(v) => upd({ currency: v as never })}>
-          <SelectTrigger className="bg-admin-bg">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="EUR">EUR</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={search.origin ?? "all"}
-          onValueChange={(v) => upd({ origin: v === "all" ? undefined : v })}
-        >
-          <SelectTrigger className="bg-admin-bg">
-            <SelectValue placeholder="Origem" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas origens</SelectItem>
-            <SelectItem value="pdv">PDV</SelectItem>
-            <SelectItem value="orders">Esteira</SelectItem>
-            <SelectItem value="eventos">Eventos</SelectItem>
-            <SelectItem value="clube">Clube</SelectItem>
-            <SelectItem value="manual">Manual</SelectItem>
-            <SelectItem value="hubla">Hubla</SelectItem>
-          </SelectContent>
-        </Select>
-
         {search.period === "custom" ? (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 md:w-[320px]">
             <Input
               type="date"
               value={search.from ?? ""}
@@ -329,15 +333,16 @@ function GlobalFiltersBar({
               className="bg-admin-bg"
             />
           </div>
-        ) : (
-          <div className="text-xs text-admin-ink-muted self-center">
-            Filtros são salvos na URL — pode compartilhar este link.
-          </div>
-        )}
+        ) : null}
+
+        <div className="text-xs text-admin-ink-muted md:ml-auto">
+          Filtros são salvos na URL — pode compartilhar este link.
+        </div>
       </div>
     </BentoCard>
   );
 }
+
 
 // ---------- Reusable bits ----------
 
@@ -575,19 +580,6 @@ function VisaoGeralTab({ filters }: { filters: ReportFilters }) {
           value={number(c.pdvSales.current)}
           icon={ShoppingCart}
           tone="neutral"
-        />
-        <MetricCard
-          label="Novos leads"
-          value={number(c.newLeads.current)}
-          deltaPct={c.newLeads.deltaPct}
-          icon={Sparkles}
-          tone="amber"
-        />
-        <MetricCard
-          label="Novos membros do Clube"
-          value={number(c.newClubMembers.current)}
-          icon={Users}
-          tone="green"
         />
         <MetricCard
           label="Ingressos vendidos"
