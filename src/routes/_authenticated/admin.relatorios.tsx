@@ -225,6 +225,10 @@ function RelatoriosPage() {
         <TabsContent value="visao" className="mt-0">
           <VisaoGeralTab filters={filters} />
         </TabsContent>
+        <TabsContent value="historico" className="mt-0">
+          <HistoricoTab filters={filters} />
+        </TabsContent>
+
         <TabsContent value="vendas" className="mt-0">
           <VendasTab filters={filters} />
         </TabsContent>
