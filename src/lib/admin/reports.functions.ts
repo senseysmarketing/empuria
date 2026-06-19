@@ -1552,16 +1552,33 @@ export type HistoricoRow = {
 
 function normalizeOrderStatus(s: string | null | undefined): string {
   if (!s) return "pending";
-  if (s === "approved" || s === "paid") return "paid";
-  if (s === "cancelled" || s === "rejected" || s === "refunded") return "cancelled";
+  const v = s.toLowerCase();
+  if (v === "approved" || v === "paid" || v === "aprovado" || v === "pago") return "paid";
+  if (
+    v === "cancelled" ||
+    v === "canceled" ||
+    v === "rejected" ||
+    v === "refunded" ||
+    v === "cancelado" ||
+    v === "cancelada" ||
+    v === "recusado" ||
+    v === "reembolsado"
+  )
+    return "cancelled";
   return "pending";
 }
 
 function normalizePdvStatus(s: string | null | undefined): string {
-  if (s === "voided") return "voided";
-  if (s === "closed" || s === "paid") return "paid";
+  if (!s) return "pending";
+  const v = s.toLowerCase();
+  if (v === "voided" || v === "anulada" || v === "anulado") return "voided";
+  if (v === "closed" || v === "paid" || v === "concluida" || v === "concluída" || v === "pago")
+    return "paid";
+  if (v === "cancelled" || v === "canceled" || v === "cancelada" || v === "cancelado")
+    return "cancelled";
   return "pending";
 }
+
 
 export const getReportsHistorico = createServerFn({ method: "POST" })
   .middleware([requireModule("relatorios")])
@@ -1620,16 +1637,15 @@ export const getReportsHistorico = createServerFn({ method: "POST" })
             .filter((x): x is string => !!x),
         ),
       );
-      const customerMap = new Map<string, { name: string | null; email: string | null }>();
+      const customerMap = new Map<string, { name: string | null }>();
       if (customerIds.length > 0) {
         const { data: profs } = await db
           .from("profiles")
-          .select("id,full_name,email")
+          .select("id,full_name")
           .in("id", customerIds);
         for (const p of (profs ?? []) as Record<string, unknown>[]) {
           customerMap.set(String(p.id), {
             name: (p.full_name as string) ?? null,
-            email: (p.email as string) ?? null,
           });
         }
       }
@@ -1641,13 +1657,14 @@ export const getReportsHistorico = createServerFn({ method: "POST" })
           ref: (s.sale_code as string) ?? String(s.id).slice(0, 8),
           created_at: String(s.closed_at ?? s.created_at),
           customer_name: cust?.name ?? null,
-          customer_email: cust?.email ?? null,
+          customer_email: null,
           description: "Venda PDV",
           total_cents: Number(s.total_eur_cents ?? 0),
           currency: "EUR",
           status: normalizePdvStatus(s.status as string),
           payment_method: (s.payment_method as string) ?? null,
         });
+
       }
     }
 
