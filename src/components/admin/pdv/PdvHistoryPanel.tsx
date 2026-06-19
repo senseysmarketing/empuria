@@ -224,6 +224,8 @@ export function PdvHistoryPanel() {
                 <SelectItem value="dinheiro">Dinheiro</SelectItem>
                 <SelectItem value="cartao">Cartão</SelectItem>
                 <SelectItem value="pix">Pix</SelectItem>
+                <SelectItem value="wise">Wise</SelectItem>
+                <SelectItem value="transferencia">Transferência</SelectItem>
               </SelectContent>
             </Select>
 
