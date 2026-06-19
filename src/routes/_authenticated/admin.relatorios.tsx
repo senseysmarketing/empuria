@@ -580,19 +580,6 @@ function VisaoGeralTab({ filters }: { filters: ReportFilters }) {
           tone="neutral"
         />
         <MetricCard
-          label="Novos leads"
-          value={number(c.newLeads.current)}
-          deltaPct={c.newLeads.deltaPct}
-          icon={Sparkles}
-          tone="amber"
-        />
-        <MetricCard
-          label="Novos membros do Clube"
-          value={number(c.newClubMembers.current)}
-          icon={Users}
-          tone="green"
-        />
-        <MetricCard
           label="Ingressos vendidos"
           value={number(c.eventTickets.current)}
           icon={TicketIcon}
