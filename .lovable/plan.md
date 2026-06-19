@@ -1,33 +1,31 @@
-## Mudanças
+## Mudanças (plano revisado)
 
 ### 1. Reordenar abas em `admin.relatorios.tsx`
-Mover **Histórico de Pedidos** para ficar entre **PDV & Estoque** e **Serviços & Agenda**:
-
-```
-Visão Geral | Vendas & Financeiro | PDV & Estoque | Histórico de Pedidos | Serviços & Agenda | Eventos | Clube | CRM & SLA
-```
+Mover **Histórico de Pedidos** para ficar entre **PDV & Estoque** e **Serviços & Agenda**.
 
 ### 2. Corrigir nome do cliente nas vendas PDV
-**Causa raiz:** em `reports.functions.ts` (~linha 1627), o select usa `id,full_name,email` na tabela `profiles`, mas a coluna `email` não existe. PostgREST devolve erro, `profs` vira `null` e o `customerMap` fica vazio — por isso toda linha PDV mostra "—" no cliente.
+**Causa raiz:** em `reports.functions.ts` (~linha 1627), o select usa `id,full_name,email` na tabela `profiles`, mas a coluna `email` **não existe** (confirmado via DB). O PostgREST retorna erro, `profs` vira `null` e o `customerMap` fica vazio — toda linha PDV mostra "—".
 
-**Fix:** trocar para `select("id,full_name")` e não retornar mais `email`.
+**Fix:** trocar para `select("id,full_name")` e parar de popular `customer_email` no row do PDV.
 
-### 3. Mostrar apenas pedidos concluídos/pagos
-Hoje o histórico inclui pedidos pendentes/cancelados (por isso aparece tudo como "Pendente"). Filtrar no server (`getReportsHistorico`) para que só entrem entradas efetivamente pagas/concluídas:
+### 3. Corrigir status "Pendente" em todas as linhas
+**Causa raiz:** os normalizadores estão em inglês, mas o banco grava em português:
+- `pdv_sales.status` → valores reais: `concluida`, `cancelada` (e variações). `normalizePdvStatus` só reconhece `closed`/`paid`/`voided`, então cai no fallback `pending`.
+- `orders.payment_status` → valores reais: `aprovado`, `pendente`. `normalizeOrderStatus` só reconhece `approved`/`paid`, então `aprovado` também vira `pending`.
 
-- **Esteira (`orders`)**: filtrar por `payment_status IN ('paid','approved','completed','succeeded')` (status que `normalizeOrderStatus` mapeia para `paid`).
-- **PDV (`pdv_sales`)**: filtrar por `status = 'concluida'` (única que mapeia para `paid`).
+**Fix em `reports.functions.ts`:**
+- `normalizeOrderStatus`: aceitar também `aprovado` → `paid`; `cancelado`/`recusado`/`reembolsado` → `cancelled`; `pendente` → `pending`. Manter os valores em inglês existentes para compatibilidade.
+- `normalizePdvStatus`: aceitar `concluida` → `paid`; `cancelada` → `cancelled`; `anulada` → `voided`. Manter os existentes.
 
-Resultado: a coluna Status sempre exibirá **Pago/Concluído**. Como fica redundante, podemos manter a coluna por consistência visual, mas com badge verde fixo.
+Manter os filtros de status como estão (todos visíveis, sem alterações na UI desta parte).
 
 ### 4. Remover coluna de email em `HistoricoTab.tsx`
 - Remover o `<div>` com `customer_email` abaixo do nome — cliente em uma linha só.
-- Simplificar placeholder do search para "Buscar por referência ou cliente…".
-- Remover o filtro "Todos status" do topo (não faz mais sentido — só há um status).
+- Simplificar placeholder de busca para "Buscar por referência ou cliente…".
 
 ### Arquivos afetados
 - `src/routes/_authenticated/admin.relatorios.tsx` — reordenar abas.
-- `src/lib/admin/reports.functions.ts` — corrigir select de `profiles` + filtrar somente pagos/concluídos.
-- `src/components/admin/relatorios/HistoricoTab.tsx` — remover linha de email, remover filtro de status, ajustar placeholder.
+- `src/lib/admin/reports.functions.ts` — corrigir select de `profiles` + ajustar os dois normalizadores de status.
+- `src/components/admin/relatorios/HistoricoTab.tsx` — remover linha de email, ajustar placeholder.
 
-Fora de escopo: outras abas, mudanças no XLSX export (continua exportando o mesmo conjunto agora já filtrado).
+Fora de escopo: filtros da UI, export XLSX (continua usando os mesmos dados, agora com status corretos).
