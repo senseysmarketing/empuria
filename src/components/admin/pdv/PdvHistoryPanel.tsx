@@ -76,8 +76,10 @@ function dateTime(value: string | null | undefined) {
 }
 
 function paymentLabel(value: string) {
-  if (value === "cartao") return "Cartao";
+  if (value === "cartao") return "Cartão";
   if (value === "pix") return "Pix";
+  if (value === "wise") return "Wise";
+  if (value === "transferencia") return "Transferência";
   return "Dinheiro";
 }
 
