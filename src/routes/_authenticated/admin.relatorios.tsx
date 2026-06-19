@@ -40,6 +40,8 @@ import {
   YAxis,
 } from "recharts";
 import { BentoCard } from "@/components/admin/BentoCard";
+import { HistoricoTab } from "@/components/admin/relatorios/HistoricoTab";
+
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
