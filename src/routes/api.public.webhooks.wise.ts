@@ -5,6 +5,8 @@ import { verifyWiseWebhookSignature } from "@/lib/wise/wise-api.server";
 const db = supabaseAdmin as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rpc: (fn: string, args?: Record<string, unknown>) => Promise<any>;
 };
 
 async function loadSetting() {
