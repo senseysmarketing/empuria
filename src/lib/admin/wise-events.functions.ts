@@ -18,7 +18,7 @@ export type WiseEventRow = {
   state: string | null;
   matched_order_code: string | null;
   matched_pdv_reference: string | null;
-  payload: unknown;
+  payload: Record<string, unknown>;
 };
 
 function pickReference(p: Record<string, unknown>): string | null {
