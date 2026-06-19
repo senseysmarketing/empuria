@@ -343,7 +343,7 @@ export function ConciliacoesWiseTab() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e) => {
+              {pageRows.map((e) => {
                 const ref = pickRef(e.payload);
                 const amount = pickAmount(e.payload);
                 const currency = pickCurrency(e.payload);
