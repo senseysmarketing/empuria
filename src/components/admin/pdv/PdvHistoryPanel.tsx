@@ -46,7 +46,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type Period = "hoje" | "ontem" | "7d" | "mes" | "custom" | "todos";
-type Payment = "todos" | "dinheiro" | "cartao" | "pix";
+type Payment = "todos" | "dinheiro" | "cartao" | "pix" | "wise" | "transferencia";
 type Status = "todos" | "concluida" | "cancelada";
 type PdvSaleDetail = {
   sale: PdvSaleRecord | null;
@@ -76,8 +76,10 @@ function dateTime(value: string | null | undefined) {
 }
 
 function paymentLabel(value: string) {
-  if (value === "cartao") return "Cartao";
+  if (value === "cartao") return "Cartão";
   if (value === "pix") return "Pix";
+  if (value === "wise") return "Wise";
+  if (value === "transferencia") return "Transferência";
   return "Dinheiro";
 }
 
@@ -222,6 +224,8 @@ export function PdvHistoryPanel() {
                 <SelectItem value="dinheiro">Dinheiro</SelectItem>
                 <SelectItem value="cartao">Cartão</SelectItem>
                 <SelectItem value="pix">Pix</SelectItem>
+                <SelectItem value="wise">Wise</SelectItem>
+                <SelectItem value="transferencia">Transferência</SelectItem>
               </SelectContent>
             </Select>
 

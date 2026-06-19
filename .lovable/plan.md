@@ -1,43 +1,31 @@
-## Objetivo
-Disparar um POST simulado para o endpoint `/api/public/webhooks/wise` da URL publicada, replicando o formato de um evento `payment-link#payment-received` da Wise, com `reference = PDV-2606190002-A1` e `amount = 3.00 EUR`, para validar:
+## Problema
+A baixa via webhook Wise já grava `payment_method = 'wise'` em `pdv_sales` e `pdv_tabs` (RPC `pdv_confirm_wise_payment`, migration `20260619153858_…`). Porém os mapas de rótulos no frontend não conhecem `'wise'`, então a UI faz fallback para "Dinheiro":
 
-1. Recebimento do evento pelo handler
-2. Match da referência via RPC `pdv_confirm_wise_payment`
-3. Baixa automática da comanda PDV (sale + estoque + financeiro)
-4. Registro do evento em `wise_events` com `match_status = pdv_matched`
-5. Exibição correta no modal "Ver eventos Wise"
+- `src/components/admin/pdv/PdvHistoryPanel.tsx` (linha 78–82): `paymentLabel()` só trata `cartao`/`pix`, qualquer outro retorna "Dinheiro".
+- `src/lib/admin/reports.functions.ts` (linha 495–503): `PAYMENT_LABEL` não inclui `wise`.
 
-## Passos
+Resultado: vendas pagas via link Wise aparecem como "Dinheiro" no histórico do PDV e nos Relatórios.
 
-1. **Disparo do webhook** via `invoke-server-function`:
-   - `POST https://empuria.lovable.app/api/public/webhooks/wise`
-   - Header: `X-Delivery-Id: sim-pdv-2606190002-a1-<timestamp>` (idempotência)
-   - Body JSON simulando payload `payment-link#payment-received`:
-     ```json
-     {
-       "event_type": "payment-link#payment-received",
-       "data": {
-         "reference": "PDV-2606190002-A1",
-         "amount": 3.00,
-         "currency": "EUR",
-         "occurred_at": "2026-06-19T16:00:00Z"
-       }
-     }
-     ```
-   - Como `wise_webhook_public_key` é NULL, o handler aceita o evento (signature_valid=false não bloqueia quando não há chave).
+## Ajustes
 
-2. **Verificação no banco** (via `read_query`):
-   - `wise_events`: 1 nova linha com `event_type=payment-link#payment-received`, `match_status=pdv_matched`, `processed_at` preenchido
-   - `pdv_payment_attempts WHERE reference='PDV-2606190002-A1'`: status alterado de `waiting_payment` para `paid` (ou equivalente)
-   - `pdv_sales` / `pdv_sale_items`: venda finalizada, baixa de estoque registrada
-   - `finance_transactions`: lançamento de receita criado
+1. **`PdvHistoryPanel.tsx`** — reescrever `paymentLabel` para reconhecer também `wise` ("Wise") e `transferencia` ("Transferência"), mantendo `dinheiro` como default seguro:
+   ```ts
+   if (value === "cartao") return "Cartão";
+   if (value === "pix") return "PIX";
+   if (value === "wise") return "Wise";
+   if (value === "transferencia") return "Transferência";
+   return "Dinheiro";
+   ```
+   Também adicionar opção "Wise" no filtro `<Select>` de pagamento (linha 222) e ampliar o tipo `Payment` correspondente para incluir `"wise"`.
 
-3. **Validação na UI**:
-   - Abrir modal "Ver eventos" em Configurações → Wise e confirmar que o novo evento aparece com badge "PDV casado" + valor 3,00 € + referência destacada
-   - Voltar ao PDV e confirmar que `PDV-2606190002-A1` saiu da lista "Comandas aguardando pagamento Wise"
+2. **`reports.functions.ts`** — acrescentar `wise: "Wise"` ao mapa `PAYMENT_LABEL` para que a quebra por forma de pagamento nos relatórios mostre "Wise".
 
-4. **Logs**: se algo falhar, consultar `server-function-logs` do endpoint e logs Postgres para diagnosticar a RPC.
+## Verificação após implementar
 
-## Observações
-- Nenhuma mudança de código é necessária — é apenas um teste de integração end-to-end usando o fluxo já implementado.
-- O evento ficará marcado como `signature_valid=false` (esperado em sandbox sem chave pública configurada).
+- Histórico do PDV: a venda `PDV-20260619-0002` (já paga pelo teste de webhook) passa a exibir "Wise" na coluna Pagamento.
+- Filtro do histórico ganha a opção "Wise".
+- Relatórios → quebra por forma de pagamento: o agregado da venda Wise aparece rotulado como "Wise" (não mais como string crua nem como "Dinheiro").
+- Nada muda no backend nem no fluxo de baixa — a RPC já está correta desde a migration de 19/06.
+
+## Fora do escopo
+- Não recriar/alterar vendas antigas que tenham sido fechadas manualmente como "dinheiro" antes da existência do fluxo Wise.

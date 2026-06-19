@@ -496,6 +496,7 @@ const PAYMENT_LABEL: Record<string, string> = {
   dinheiro: "Dinheiro",
   cartao: "Cartão",
   pix: "PIX",
+  wise: "Wise",
   mbway: "MB WAY",
   multibanco: "Multibanco",
   transferencia: "Transferência",
