@@ -162,6 +162,7 @@ export function PdvTabsPanel() {
   const fetchAwaiting = useServerFn(listPdvAwaitingPayments);
 
   const [search, setSearch] = useState("");
+  const [catalogSearch, setCatalogSearch] = useState("");
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [openCustomerDialog, setOpenCustomerDialog] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
