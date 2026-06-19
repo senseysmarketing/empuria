@@ -149,44 +149,62 @@ export const Route = createFileRoute("/api/public/webhooks/wise")({
 
         let matchedPaymentId: string | null = null;
         let matchedOrderId: string | null = null;
-        let matchStatus: "auto_matched" | "pending" | "underpaid" | "overpaid" = "pending";
+        let matchStatus:
+          | "auto_matched"
+          | "pending"
+          | "underpaid"
+          | "overpaid"
+          | "pdv_matched"
+          | "pdv_pending" = "pending";
 
         if (reference) {
-          const { data: payment } = await db
-            .from("wise_payments")
-            .select("id,order_id,amount_cents,currency,status")
-            .eq("external_reference", reference)
-            .maybeSingle();
-          if (payment) {
-            matchedPaymentId = payment.id as string;
-            matchedOrderId = payment.order_id as string;
-            const sameCurrency =
-              !currency || String(currency).toUpperCase() === String(payment.currency).toUpperCase();
-            if (sameCurrency && amountCents !== null) {
-              if (amountCents === payment.amount_cents) matchStatus = "auto_matched";
-              else if (amountCents < payment.amount_cents) matchStatus = "underpaid";
-              else matchStatus = "overpaid";
-            } else if (sameCurrency) {
-              matchStatus = "auto_matched";
-            }
-            if (matchStatus === "auto_matched") {
-              await db
-                .from("wise_payments")
-                .update({
-                  status: "paid",
-                  paid_at: new Date().toISOString(),
-                  raw_webhook: payload,
-                })
-                .eq("id", payment.id);
-              await db
-                .from("orders")
-                .update({ payment_status: "aprovado", paid_at: new Date().toISOString() })
-                .eq("id", payment.order_id);
-            } else if (matchStatus === "underpaid" || matchStatus === "overpaid") {
-              await db
-                .from("wise_payments")
-                .update({ status: matchStatus, raw_webhook: payload })
-                .eq("id", payment.id);
+          const isPdvRef = /^PDV-[A-Z0-9]+-A\d+$/i.test(reference);
+          if (isPdvRef) {
+            const { data: rpcRes } = await db.rpc("pdv_confirm_wise_payment", {
+              p_reference: reference,
+              p_amount_cents: amountCents,
+              p_currency: currency,
+              p_raw: payload,
+            });
+            const res = (rpcRes ?? {}) as { matched?: boolean; sale_id?: string };
+            matchStatus = res.matched ? "pdv_matched" : "pdv_pending";
+          } else {
+            const { data: payment } = await db
+              .from("wise_payments")
+              .select("id,order_id,amount_cents,currency,status")
+              .eq("external_reference", reference)
+              .maybeSingle();
+            if (payment) {
+              matchedPaymentId = payment.id as string;
+              matchedOrderId = payment.order_id as string;
+              const sameCurrency =
+                !currency || String(currency).toUpperCase() === String(payment.currency).toUpperCase();
+              if (sameCurrency && amountCents !== null) {
+                if (amountCents === payment.amount_cents) matchStatus = "auto_matched";
+                else if (amountCents < payment.amount_cents) matchStatus = "underpaid";
+                else matchStatus = "overpaid";
+              } else if (sameCurrency) {
+                matchStatus = "auto_matched";
+              }
+              if (matchStatus === "auto_matched") {
+                await db
+                  .from("wise_payments")
+                  .update({
+                    status: "paid",
+                    paid_at: new Date().toISOString(),
+                    raw_webhook: payload,
+                  })
+                  .eq("id", payment.id);
+                await db
+                  .from("orders")
+                  .update({ payment_status: "aprovado", paid_at: new Date().toISOString() })
+                  .eq("id", payment.order_id);
+              } else if (matchStatus === "underpaid" || matchStatus === "overpaid") {
+                await db
+                  .from("wise_payments")
+                  .update({ status: matchStatus, raw_webhook: payload })
+                  .eq("id", payment.id);
+              }
             }
           }
         }
