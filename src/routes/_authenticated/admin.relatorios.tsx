@@ -178,7 +178,10 @@ function RelatoriosPage() {
             </p>
           </div>
         </div>
-        <ExportButtons tab={search.tab} filters={filters} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <CompareSelect search={search} navigate={navigate} />
+          <ExportButtons tab={search.tab} filters={filters} />
+        </div>
       </header>
 
       <GlobalFiltersBar search={search} navigate={navigate} />
@@ -200,6 +203,7 @@ function RelatoriosPage() {
         <TabsList className="bg-admin-surface border border-admin-border">
           {[
             { v: "visao", l: "Visão Geral" },
+            { v: "historico", l: "Histórico de Pedidos" },
             { v: "vendas", l: "Vendas & Financeiro" },
             { v: "pdv", l: "PDV & Estoque" },
             { v: "servicos", l: "Serviços & Agenda" },
@@ -216,6 +220,7 @@ function RelatoriosPage() {
             </TabsTrigger>
           ))}
         </TabsList>
+
 
         <TabsContent value="visao" className="mt-0">
           <VisaoGeralTab filters={filters} />
