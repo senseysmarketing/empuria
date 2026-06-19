@@ -240,13 +240,9 @@ export function HistoricoTab({ filters }: { filters: ReportFilters }) {
                       </td>
                       <td className="py-2 pr-4 font-mono text-xs">{r.ref}</td>
                       <td className="py-2 pr-4">
-                        <div className="flex flex-col">
-                          <span className="text-admin-ink">{r.customer_name ?? "—"}</span>
-                          {r.customer_email && (
-                            <span className="text-xs text-admin-ink-muted">{r.customer_email}</span>
-                          )}
-                        </div>
+                        <span className="text-admin-ink">{r.customer_name ?? "—"}</span>
                       </td>
+
                       <td className="py-2 pr-4 text-admin-ink-muted max-w-[260px] truncate">
                         {r.description}
                       </td>
