@@ -177,10 +177,25 @@ export function PdvTabsPanel() {
   const [discount, setDiscount] = useState<DiscountState>({ type: "none", value: 0 });
   const [paymentMethod, setPaymentMethod] = useState<PdvTabPaymentMethod>("dinheiro");
   const [notes, setNotes] = useState("");
+  const [wiseModal, setWiseModal] = useState<{
+    attemptId: string;
+    reference: string;
+    amountCents: number;
+    paymentUrl: string | null;
+    customerName: string | null;
+    customerPhone: string | null;
+    tabCode: string;
+  } | null>(null);
 
   const tabsQ = useQuery({
     queryKey: ["pdv-tabs-workspace"],
     queryFn: () => fetchTabs(),
+  });
+
+  const awaitingQ = useQuery({
+    queryKey: ["pdv-awaiting-payments"],
+    queryFn: () => fetchAwaiting(),
+    refetchInterval: 15000,
   });
 
   const catalogQ = useQuery({
