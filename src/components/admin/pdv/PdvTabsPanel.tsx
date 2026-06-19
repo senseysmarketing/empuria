@@ -622,7 +622,7 @@ export function PdvTabsPanel() {
                   onClick={() => {
                     setSelectedTabId(selectedTab.id);
                     setDiscount({ type: "none", value: 0 });
-                    setPaymentMethod("pix");
+                    setPaymentMethod("dinheiro");
                     setNotes("");
                     setCloseDialogOpen(true);
                   }}
