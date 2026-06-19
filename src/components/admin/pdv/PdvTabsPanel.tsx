@@ -432,7 +432,14 @@ export function PdvTabsPanel() {
     qtyMut.isPending ||
     cancelItemMut.isPending ||
     closeMut.isPending ||
-    cancelTabMut.isPending;
+    cancelTabMut.isPending ||
+    requestWiseMut.isPending;
+  const awaitingAttempts = (awaitingQ.data ?? []) as PdvWiseAttempt[];
+  const tabCodeById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const tab of tabs) map.set(tab.id, tab.tab_code);
+    return map;
+  }, [tabs]);
 
   return (
     <div className="space-y-4">
