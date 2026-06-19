@@ -142,6 +142,13 @@ function ConfiguracoesPage() {
             <RestrictedAreaCard message="Apenas membros com acesso a Configurações podem ver as integrações." />
           )}
         </TabsContent>
+        <TabsContent value="conciliacoes-wise" className="mt-6">
+          {isLoading ? null : isAdmin || can("conciliacoes_wise") ? (
+            <ConciliacoesWiseTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso ao módulo Conciliações Wise podem tratar pendências de pagamentos." />
+          )}
+        </TabsContent>
         <TabsContent value="equipe" className="mt-6">
           {isAdmin ? (
             <EquipePermissoesTab />
