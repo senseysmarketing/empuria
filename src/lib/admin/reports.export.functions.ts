@@ -441,7 +441,11 @@ export const exportReportXlsx = createServerFn({ method: "POST" })
       case "crm":
         await buildCrmXlsx(wb, data.filters);
         break;
+      case "historico":
+        await buildHistoricoXlsx(wb, data.filters);
+        break;
     }
+
 
     const buf = await wb.xlsx.writeBuffer();
     const base64 = Buffer.from(buf as ArrayBuffer).toString("base64");
