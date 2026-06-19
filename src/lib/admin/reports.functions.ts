@@ -1521,3 +1521,169 @@ export const getReportsCrm = createServerFn({ method: "POST" })
       ownerRanking,
     };
   });
+
+// ---------- HISTÓRICO DE PEDIDOS ----------
+
+export const historicoFiltersSchema = reportFiltersSchema.extend({
+  source: z.enum(["all", "esteira", "pdv"]).default("all"),
+  status: z.string().optional(), // paid/pending/cancelled/voided
+  search: z.string().optional(),
+  sortBy: z.enum(["date", "amount"]).default("date"),
+  sortDir: z.enum(["asc", "desc"]).default("desc"),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(5).max(200).default(20),
+});
+
+export type HistoricoFilters = z.infer<typeof historicoFiltersSchema>;
+
+export type HistoricoRow = {
+  source: "esteira" | "pdv";
+  id: string;
+  ref: string;
+  created_at: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  description: string;
+  total_cents: number;
+  currency: string;
+  status: string;
+  payment_method: string | null;
+};
+
+function normalizeOrderStatus(s: string | null | undefined): string {
+  if (!s) return "pending";
+  if (s === "approved" || s === "paid") return "paid";
+  if (s === "cancelled" || s === "rejected" || s === "refunded") return "cancelled";
+  return "pending";
+}
+
+function normalizePdvStatus(s: string | null | undefined): string {
+  if (s === "voided") return "voided";
+  if (s === "closed" || s === "paid") return "paid";
+  return "pending";
+}
+
+export const getReportsHistorico = createServerFn({ method: "POST" })
+  .middleware([requireModule("relatorios")])
+  .inputValidator((d) => historicoFiltersSchema.parse(d))
+  .handler(async ({ data }) => {
+    const range = resolveRange(data);
+    const startTs = range.start + "T00:00:00";
+    const endTs = range.end + "T23:59:59";
+
+    const rows: HistoricoRow[] = [];
+
+    if (data.source !== "pdv") {
+      const { data: orders } = await db
+        .from("orders")
+        .select(
+          "id,created_at,customer_name,customer_email,service_title,amount_cents,currency,payment_status,payment_method,external_reference,payment_provider_reference",
+        )
+        .gte("created_at", startTs)
+        .lte("created_at", endTs)
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      for (const o of (orders ?? []) as Record<string, unknown>[]) {
+        rows.push({
+          source: "esteira",
+          id: String(o.id),
+          ref:
+            (o.external_reference as string) ||
+            (o.payment_provider_reference as string) ||
+            String(o.id).slice(0, 8),
+          created_at: String(o.created_at),
+          customer_name: (o.customer_name as string) ?? null,
+          customer_email: (o.customer_email as string) ?? null,
+          description: (o.service_title as string) ?? "Pedido",
+          total_cents: Number(o.amount_cents ?? 0),
+          currency: (o.currency as string) ?? "EUR",
+          status: normalizeOrderStatus(o.payment_status as string),
+          payment_method: (o.payment_method as string) ?? null,
+        });
+      }
+    }
+
+    if (data.source !== "esteira") {
+      const { data: sales } = await db
+        .from("pdv_sales")
+        .select(
+          "id,created_at,closed_at,sale_code,customer_id,total_eur_cents,payment_method,status",
+        )
+        .gte("created_at", startTs)
+        .lte("created_at", endTs)
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      const customerIds = Array.from(
+        new Set(
+          ((sales ?? []) as Record<string, unknown>[])
+            .map((s) => s.customer_id as string | null)
+            .filter((x): x is string => !!x),
+        ),
+      );
+      const customerMap = new Map<string, { name: string | null; email: string | null }>();
+      if (customerIds.length > 0) {
+        const { data: profs } = await db
+          .from("profiles")
+          .select("id,full_name,email")
+          .in("id", customerIds);
+        for (const p of (profs ?? []) as Record<string, unknown>[]) {
+          customerMap.set(String(p.id), {
+            name: (p.full_name as string) ?? null,
+            email: (p.email as string) ?? null,
+          });
+        }
+      }
+      for (const s of (sales ?? []) as Record<string, unknown>[]) {
+        const cust = s.customer_id ? customerMap.get(String(s.customer_id)) : undefined;
+        rows.push({
+          source: "pdv",
+          id: String(s.id),
+          ref: (s.sale_code as string) ?? String(s.id).slice(0, 8),
+          created_at: String(s.closed_at ?? s.created_at),
+          customer_name: cust?.name ?? null,
+          customer_email: cust?.email ?? null,
+          description: "Venda PDV",
+          total_cents: Number(s.total_eur_cents ?? 0),
+          currency: "EUR",
+          status: normalizePdvStatus(s.status as string),
+          payment_method: (s.payment_method as string) ?? null,
+        });
+      }
+    }
+
+    // Filters
+    let filtered = rows;
+    if (data.status) {
+      filtered = filtered.filter((r) => r.status === data.status);
+    }
+    if (data.search && data.search.trim()) {
+      const q = data.search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (r) =>
+          r.ref.toLowerCase().includes(q) ||
+          (r.customer_name ?? "").toLowerCase().includes(q) ||
+          (r.customer_email ?? "").toLowerCase().includes(q) ||
+          r.description.toLowerCase().includes(q),
+      );
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      const dir = data.sortDir === "asc" ? 1 : -1;
+      if (data.sortBy === "amount") return (a.total_cents - b.total_cents) * dir;
+      return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir;
+    });
+
+    const total = filtered.length;
+    const totalAmount = filtered.reduce((s, r) => s + r.total_cents, 0);
+    const start = (data.page - 1) * data.pageSize;
+    const pageRows = filtered.slice(start, start + data.pageSize);
+
+    return {
+      rows: pageRows,
+      total,
+      totalAmount,
+      page: data.page,
+      pageSize: data.pageSize,
+    };
+  });
