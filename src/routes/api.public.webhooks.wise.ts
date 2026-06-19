@@ -51,8 +51,10 @@ function pickReference(p: WisePayload): string | null {
   ];
   for (const c of candidates) {
     if (typeof c === "string") {
-      const match = c.match(/EMP-\d{3,}/i);
-      if (match) return match[0].toUpperCase();
+      const pdvMatch = c.match(/PDV-[A-Z0-9]+-A\d+/i);
+      if (pdvMatch) return pdvMatch[0].toUpperCase();
+      const empMatch = c.match(/EMP-\d{3,}/i);
+      if (empMatch) return empMatch[0].toUpperCase();
       if (c.trim()) return c.trim();
     }
   }
