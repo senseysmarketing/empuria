@@ -205,9 +205,9 @@ function RelatoriosPage() {
         <TabsList className="bg-admin-surface border border-admin-border">
           {[
             { v: "visao", l: "Visão Geral" },
-            { v: "historico", l: "Histórico de Pedidos" },
             { v: "vendas", l: "Vendas & Financeiro" },
             { v: "pdv", l: "PDV & Estoque" },
+            { v: "historico", l: "Histórico de Pedidos" },
             { v: "servicos", l: "Serviços & Agenda" },
             { v: "eventos", l: "Eventos" },
             { v: "clube", l: "Clube" },
