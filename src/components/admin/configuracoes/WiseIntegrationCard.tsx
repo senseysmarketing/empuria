@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { AlertTriangle, Banknote, CheckCircle2, ChevronDown, Copy, Download, Loader2, Zap } from "lucide-react";
+import { AlertTriangle, Banknote, CheckCircle2, ChevronDown, Copy, Download, Inbox, Loader2, Zap } from "lucide-react";
+import { WiseEventsModal } from "./WiseEventsModal";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,7 @@ export function WiseIntegrationCard() {
   const testPaymentFn = useServerFn(testWisePaymentCreation);
 
   const [open, setOpen] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [mode, setMode] = useState<"webhook_only" | "manual_only" | "webhook_and_manual">(
     "webhook_and_manual",
@@ -366,19 +368,16 @@ export function WiseIntegrationCard() {
             type="button"
             size="sm"
             variant="outline"
-            disabled={testPaymentMutation.isPending || !setting?.wise_default_payment_url}
-            onClick={() => testPaymentMutation.mutate()}
+            onClick={() => setEventsOpen(true)}
           >
-            {testPaymentMutation.isPending ? (
-              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Zap className="mr-2 h-3.5 w-3.5" />
-            )}
-            Testar link Quick Pay
+            <Inbox className="mr-2 h-3.5 w-3.5" />
+            Ver eventos
           </Button>
 
         </div>
       </BentoCard>
+
+      <WiseEventsModal open={eventsOpen} onOpenChange={setEventsOpen} />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto border-admin-border bg-admin-surface text-admin-ink sm:max-w-3xl">

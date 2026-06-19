@@ -1,25 +1,30 @@
-## Mudanças (apenas UI)
+## Substituir "Testar link Quick Pay" por "Ver eventos" + modal
 
-### 1. Comandas aguardando pagamento Wise — mais compactas
-Em `src/components/admin/pdv/PdvTabsPanel.tsx`, na seção "Comandas aguardando pagamento Wise":
-- Trocar grid atual por linhas compactas (uma linha por comanda) em vez de cards grandes.
-- Layout por item (altura ~40px): `[ref PDV-...A1] · [nome cliente] · [hora] · [total €] · botões "Abrir" e "Verificar" (icon-only com tooltip)`.
-- Manter borda âmbar sutil no container, sem ocupar a largura toda em card grande.
-- Em telas estreitas, empilhar nome+ref e manter ações à direita.
+### 1. Backend — nova server function
+Criar `listWiseEvents` em `src/lib/admin/wise-events.functions.ts` (protegida por `requireSupabaseAuth` + checagem de admin/módulo financeiro):
+- SELECT em `wise_events` ordenado por `created_at DESC`, limite 100.
+- Retorna: `id`, `event_id`, `event_type`, `signature_valid`, `match_status`, `matched_payment_id`, `matched_order_id`, `processed_at`, `created_at`, `notes`, e campos derivados extraídos de `payload`: `reference`, `amount`, `currency`, `state` (mesma lógica de `pickReference`/`pickAmountCents`/`pickCurrency` do webhook).
+- Para `matched_order_id`, fazer lookup em `orders` para mostrar `code`/cliente; para `matched_payment_id`, tentar achar `pdv_payment_attempts.reference` quando o `match_status` começar com `pdv_`.
 
-### 2. "Adicionar consumo" — busca no header + paginação
-Em `src/components/admin/pdv/SaleCartPanel.tsx` (header do bloco) e `src/components/admin/pdv/SaleCatalogGrid.tsx` (grid):
+### 2. UI — `WiseIntegrationCard.tsx`
+- Trocar o botão "Testar link Quick Pay" por **"Ver eventos"** (ícone `Activity` ou `Inbox`).
+- Manter o handler `testQuickPay` existente acessível dentro do modal de configuração se já estiver lá; remover só o botão do card principal.
+- Ao clicar, abre `WiseEventsModal`.
 
-**Header**
-- Mesma linha do título "Adicionar consumo": adicionar `<Input>` com ícone de lupa, placeholder "Buscar item...", largura ~240px, alinhado à direita.
-- Estado `search` controlado no painel pai; passado para o grid já filtrado (case-insensitive, por `name`).
+### 3. Novo componente `WiseEventsModal.tsx`
+- Dialog largo (max-w-4xl) com:
+  - Header: "Eventos Wise recebidos" + contador total + botão refresh.
+  - Filtros simples: select de `match_status` (todos / `auto_matched` / `pdv_matched` / `pending` / `underpaid` / `overpaid` / `pdv_pending` / `ignored`) e input de busca por reference.
+  - Tabela responsiva com colunas: **Quando** (hora relativa + data tooltip), **Tipo** (`event_type`), **Referência** (mono), **Valor** (`amount currency`), **Status** (badge colorido), **Match** (link curto quando casou: código da venda/PDV), **Assinatura** (badge verde/cinza).
+  - Linha expansível mostrando o `payload` JSON formatado e `notes`.
+  - Legenda no rodapé explicando os status (auto_matched = casou automaticamente; pending = recebido mas sem referência reconhecível — normal para pagamentos vindos de fora; pdv_matched = baixa do PDV efetivada; etc.).
 
-**Paginação**
-- Props novas em `SaleCatalogGrid`: `pageSize` (default 24) e controle interno de página atual (`useState`).
-- Quando há busca ativa, paginar sobre o resultado filtrado; sem busca, sobre o catálogo completo.
-- Agrupamento por categoria continua, mas aplicado **dentro da página atual** (mais simples e previsível com muitos itens).
-- Rodapé do grid com componente `Pagination` (shadcn já disponível em `src/components/ui/pagination.tsx`): Prev / números (com ellipsis) / Next + contador "Mostrando X–Y de Z".
-- Resetar página para 1 sempre que `search` mudar.
+### Status colors
+- `auto_matched` / `pdv_matched` → verde
+- `pending` / `pdv_pending` → âmbar
+- `underpaid` / `overpaid` → laranja
+- `ignored` → cinza
 
 ### Fora de escopo
-Sem mudanças no backend, RPCs, webhook Wise, lógica de estoque, ou no fluxo de fechamento de comanda. Apenas refino visual e ergonomia do catálogo.
+- Não muda webhook, RPCs, nem o fluxo de baixa.
+- Não remove a opção de testar Quick Pay de dentro do diálogo "Configurar" (só some do card principal).
