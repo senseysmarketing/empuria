@@ -400,6 +400,33 @@ export function ConciliacoesWiseTab() {
               })}
             </tbody>
           </table>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-admin-border px-3 py-2 text-xs text-admin-ink-muted">
+            <span>
+              Mostrando {filtered.length === 0 ? 0 : pageStart + 1}–
+              {Math.min(pageStart + PAGE_SIZE, filtered.length)} de {filtered.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              <span>
+                Página {safePage} de {totalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Próxima
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
