@@ -70,6 +70,13 @@ import {
   type PdvTabPaymentMethod,
   type PdvTabWithRelations,
 } from "@/lib/admin/pdv-tabs.functions";
+import {
+  cancelPdvWiseAttempt,
+  listPdvAwaitingPayments,
+  recheckPdvWiseAttempt,
+  requestPdvWisePayment,
+  type PdvWiseAttempt,
+} from "@/lib/admin/pdv-wise.functions";
 import { cn } from "@/lib/utils";
 
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
