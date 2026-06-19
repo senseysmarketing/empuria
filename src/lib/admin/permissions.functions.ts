@@ -21,6 +21,7 @@ export const ALL_MODULES = [
   "automacoes",
   "logs",
   "relatorios",
+  "conciliacoes_wise",
 ] as const;
 export type ModuleKey = (typeof ALL_MODULES)[number];
 
@@ -40,6 +41,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   automacoes: "Automações",
   logs: "Logs & Auditoria",
   relatorios: "Relatórios",
+  conciliacoes_wise: "Conciliações Wise",
 };
 
 export const ALL_ACTIONS = [
