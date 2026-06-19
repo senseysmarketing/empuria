@@ -156,6 +156,10 @@ export function PdvTabsPanel() {
   const cancelItem = useServerFn(cancelPdvTabItem);
   const closeTab = useServerFn(closePdvTab);
   const cancelTabFn = useServerFn(cancelPdvTab);
+  const requestWise = useServerFn(requestPdvWisePayment);
+  const cancelWise = useServerFn(cancelPdvWiseAttempt);
+  const recheckWise = useServerFn(recheckPdvWiseAttempt);
+  const fetchAwaiting = useServerFn(listPdvAwaitingPayments);
 
   const [search, setSearch] = useState("");
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
