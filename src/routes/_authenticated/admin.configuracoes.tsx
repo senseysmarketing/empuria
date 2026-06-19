@@ -3,7 +3,7 @@ import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Settings, User, Plug, Users, Zap, FileText, Tags, Crown } from "lucide-react";
+import { Settings, User, Plug, Users, Zap, FileText, Tags, Crown, ShieldAlert } from "lucide-react";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import { PerfilContaTab } from "@/components/admin/configuracoes/PerfilContaTab";
 import { IntegracoesTab } from "@/components/admin/configuracoes/IntegracoesTab";
@@ -12,11 +12,13 @@ import { ServicosPrecosTab } from "@/components/admin/configuracoes/ServicosPrec
 import { AutomacoesPanel } from "@/components/admin/AutomacoesPanel";
 import { LogsAuditoriaTab } from "@/components/admin/configuracoes/LogsAuditoriaTab";
 import { ClubeAdminTab } from "@/components/admin/configuracoes/ClubeAdminTab";
+import { ConciliacoesWiseTab } from "@/components/admin/configuracoes/ConciliacoesWiseTab";
 import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
 
 const TABS = [
   "perfil",
   "integracoes",
+  "conciliacoes-wise",
   "equipe",
   "clube",
   "servicos-precos",
@@ -92,6 +94,12 @@ function ConfiguracoesPage() {
             <Plug className="h-4 w-4" /> Integrações
           </TabsTrigger>
           <TabsTrigger
+            value="conciliacoes-wise"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <ShieldAlert className="h-4 w-4" /> Conciliações Wise
+          </TabsTrigger>
+          <TabsTrigger
             value="equipe"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
@@ -132,6 +140,13 @@ function ConfiguracoesPage() {
             <IntegracoesTab />
           ) : (
             <RestrictedAreaCard message="Apenas membros com acesso a Configurações podem ver as integrações." />
+          )}
+        </TabsContent>
+        <TabsContent value="conciliacoes-wise" className="mt-6">
+          {isLoading ? null : isAdmin || can("conciliacoes_wise") ? (
+            <ConciliacoesWiseTab />
+          ) : (
+            <RestrictedAreaCard message="Apenas membros com acesso ao módulo Conciliações Wise podem tratar pendências de pagamentos." />
           )}
         </TabsContent>
         <TabsContent value="equipe" className="mt-6">
