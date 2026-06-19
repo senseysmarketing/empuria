@@ -177,13 +177,21 @@ export function ConciliacoesWiseTab() {
   const [filter, setFilter] = useState<FilterKey>("attention");
   const [search, setSearch] = useState("");
   const [openRow, setOpenRow] = useState<WiseEventRow | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const q = useQuery({
     queryKey: ["wise-events-conciliacoes"],
     queryFn: () => list({ data: { limit: 200 } }),
   });
 
-  const events = (q.data?.events ?? []) as WiseEventRow[];
+  const rawEvents = (q.data?.events ?? []) as WiseEventRow[];
+  // Mostrar apenas eventos com valor (balances#credit, payment-link#payment-received).
+  // Os demais (transfers#state-change etc.) não trazem dados suficientes para conciliar.
+  const events = useMemo(
+    () => rawEvents.filter((e) => pickAmount(e.payload) != null),
+    [rawEvents],
+  );
 
   const filtered = useMemo(() => {
     const bySearch = (e: WiseEventRow) => {
