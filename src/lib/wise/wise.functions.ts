@@ -712,8 +712,10 @@ export const listOpenPaymentTargets = createServerFn({ method: "POST" })
     const search = data.search ?? "";
     const limit = data.limit;
 
-    let orders: Array<Record<string, unknown>> = [];
-    let pdvAttempts: Array<Record<string, unknown>> = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let orders: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let pdvAttempts: any[] = [];
 
     if (data.kind === "all" || data.kind === "orders") {
       let q = db
