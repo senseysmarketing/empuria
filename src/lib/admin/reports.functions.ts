@@ -1552,16 +1552,33 @@ export type HistoricoRow = {
 
 function normalizeOrderStatus(s: string | null | undefined): string {
   if (!s) return "pending";
-  if (s === "approved" || s === "paid") return "paid";
-  if (s === "cancelled" || s === "rejected" || s === "refunded") return "cancelled";
+  const v = s.toLowerCase();
+  if (v === "approved" || v === "paid" || v === "aprovado" || v === "pago") return "paid";
+  if (
+    v === "cancelled" ||
+    v === "canceled" ||
+    v === "rejected" ||
+    v === "refunded" ||
+    v === "cancelado" ||
+    v === "cancelada" ||
+    v === "recusado" ||
+    v === "reembolsado"
+  )
+    return "cancelled";
   return "pending";
 }
 
 function normalizePdvStatus(s: string | null | undefined): string {
-  if (s === "voided") return "voided";
-  if (s === "closed" || s === "paid") return "paid";
+  if (!s) return "pending";
+  const v = s.toLowerCase();
+  if (v === "voided" || v === "anulada" || v === "anulado") return "voided";
+  if (v === "closed" || v === "paid" || v === "concluida" || v === "concluída" || v === "pago")
+    return "paid";
+  if (v === "cancelled" || v === "canceled" || v === "cancelada" || v === "cancelado")
+    return "cancelled";
   return "pending";
 }
+
 
 export const getReportsHistorico = createServerFn({ method: "POST" })
   .middleware([requireModule("relatorios")])
