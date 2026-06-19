@@ -70,9 +70,9 @@ import { cn } from "@/lib/utils";
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
 
 const PAYMENT_LABEL: Record<PdvTabPaymentMethod, string> = {
-  pix: "Pix",
-  cartao: "Cartão",
   dinheiro: "Dinheiro",
+  transferencia: "Transferência bancária",
+  wise: "Wise",
 };
 
 function fireConfetti() {
