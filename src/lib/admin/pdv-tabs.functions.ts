@@ -4,8 +4,8 @@ import { requireModule } from "./auth";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-export type PdvTabStatus = "aberta" | "fechada" | "cancelada";
-export type PdvTabPaymentMethod = "dinheiro" | "cartao" | "pix";
+export type PdvTabStatus = "aberta" | "fechada" | "cancelada" | "aguardando_pagamento";
+export type PdvTabPaymentMethod = "dinheiro" | "transferencia" | "wise";
 
 export type PdvTabRecord = {
   id: string;
