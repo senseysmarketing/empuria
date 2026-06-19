@@ -892,11 +892,23 @@ export function PdvTabsPanel() {
               disabled={isBusy || !selectedTab}
               onClick={(event) => {
                 event.preventDefault();
-                if (selectedTab) closeMut.mutate(selectedTab.id);
+                if (!selectedTab) return;
+                if (paymentMethod === "wise") {
+                  requestWiseMut.mutate(selectedTab.id);
+                } else {
+                  closeMut.mutate(selectedTab.id);
+                }
               }}
-              className="bg-admin-accent text-white"
+              className={cn(
+                "text-white",
+                paymentMethod === "wise" ? "bg-amber-500 hover:bg-amber-500/90" : "bg-admin-accent",
+              )}
             >
-              {closeMut.isPending ? "Fechando..." : "Confirmar fechamento"}
+              {closeMut.isPending || requestWiseMut.isPending
+                ? "Processando..."
+                : paymentMethod === "wise"
+                  ? "Gerar link Wise"
+                  : "Confirmar fechamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
