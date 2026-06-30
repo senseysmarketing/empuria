@@ -161,8 +161,8 @@ export async function createOrReuseManualCustomer(input: {
   return {
     user_id: user.id,
     email,
-    full_name: input.fullName,
-    phone,
+    full_name: effectiveFullName,
+    phone: effectivePhone,
     created,
     password_setup_required: passwordSetupRequired,
   };
