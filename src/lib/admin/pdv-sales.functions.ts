@@ -454,16 +454,28 @@ export const voidPdvSale = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
-    if (!context.isAdmin) {
-      const allowed = await userHasAction(context.userId, "pdv.void_sale");
-      if (!allowed) throw new Error("Sem permissão para anular vendas.");
-    }
-    const { error } = await supabaseAdmin.rpc("pdv_void_sale", {
-      p_sale_id: data.saleId,
-      p_admin_id: context.userId,
-      p_reason: data.reason,
-    });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "sale.void",
+        actorId: context.userId,
+        saleId: data.saleId,
+        route: "pdv.voidSale",
+        params: data,
+      },
+      async () => {
+        if (!context.isAdmin) {
+          const allowed = await userHasAction(context.userId, "pdv.void_sale");
+          if (!allowed) throw new Error("Sem permissão para anular vendas.");
+        }
+        const { error } = await supabaseAdmin.rpc("pdv_void_sale", {
+          p_sale_id: data.saleId,
+          p_admin_id: context.userId,
+          p_reason: data.reason,
+        });
+        if (error) throw new Error(error.message);
+        return { ok: true };
+      },
+    ),
+  );
+
