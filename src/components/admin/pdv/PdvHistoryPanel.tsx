@@ -263,6 +263,17 @@ export function PdvHistoryPanel() {
               <span className="text-xs text-admin-ink-muted tabular-nums">
                 {rows.length} de {total} {total === 1 ? "venda" : "vendas"}
               </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 ml-1 gap-1.5"
+                onClick={handleExport}
+                disabled={exporting}
+                title="Exportar resultados com os filtros aplicados"
+              >
+                {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+                Exportar Excel
+              </Button>
             </div>
           </div>
 
@@ -284,6 +295,7 @@ export function PdvHistoryPanel() {
                 <SelectItem value="ontem">Ontem</SelectItem>
                 <SelectItem value="7d">Últimos 7 dias</SelectItem>
                 <SelectItem value="mes">Este mês</SelectItem>
+                <SelectItem value="mes_anterior">Mês anterior</SelectItem>
                 <SelectItem value="custom">Personalizado</SelectItem>
                 <SelectItem value="todos">Todos</SelectItem>
               </SelectContent>
@@ -321,6 +333,43 @@ export function PdvHistoryPanel() {
                 ))}
               </SelectContent>
             </Select>
+
+            <MultiSelectPopover
+              label="Categorias"
+              icon={<Filter className="h-3.5 w-3.5" />}
+              options={categories.map((c) => ({ value: c.id, label: `${c.emoji ?? ""} ${c.name}`.trim() }))}
+              selected={categoryIds}
+              onChange={(ids) => { setCategoryIds(ids); resetPage(); }}
+              emptyHint="Carregando…"
+            />
+
+            <MultiSelectPopover
+              label="Itens"
+              icon={<Filter className="h-3.5 w-3.5" />}
+              options={productsFiltered.map((p) => ({ value: p.id, label: `${p.emoji ?? ""} ${p.name}`.trim() }))}
+              selected={productIds}
+              onChange={(ids) => { setProductIds(ids); resetPage(); }}
+              emptyHint={categoryIds.length ? "Nenhum item nessas categorias" : "Carregando…"}
+            />
+
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-admin-ink-muted">€</span>
+              <Input
+                value={minTotal}
+                onChange={(e) => { setMinTotal(e.target.value); resetPage(); }}
+                placeholder="mín"
+                className="w-[80px] h-9 bg-admin-bg border-admin-border"
+                inputMode="decimal"
+              />
+              <span className="text-admin-ink-muted text-xs">–</span>
+              <Input
+                value={maxTotal}
+                onChange={(e) => { setMaxTotal(e.target.value); resetPage(); }}
+                placeholder="máx"
+                className="w-[80px] h-9 bg-admin-bg border-admin-border"
+                inputMode="decimal"
+              />
+            </div>
           </div>
 
           {period === "custom" && (
