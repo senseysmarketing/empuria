@@ -3004,6 +3004,7 @@ export type Database = {
           customer_id: string
           customer_name_snapshot: string | null
           customer_phone_snapshot: string | null
+          customer_snapshot_source: string | null
           discount_brl_cents: number
           discount_eur_cents: number
           discount_type: string
@@ -3029,6 +3030,7 @@ export type Database = {
           customer_id: string
           customer_name_snapshot?: string | null
           customer_phone_snapshot?: string | null
+          customer_snapshot_source?: string | null
           discount_brl_cents?: number
           discount_eur_cents?: number
           discount_type?: string
@@ -3054,6 +3056,7 @@ export type Database = {
           customer_id?: string
           customer_name_snapshot?: string | null
           customer_phone_snapshot?: string | null
+          customer_snapshot_source?: string | null
           discount_brl_cents?: number
           discount_eur_cents?: number
           discount_type?: string
@@ -3199,6 +3202,7 @@ export type Database = {
           customer_id: string
           customer_name_snapshot: string | null
           customer_phone_snapshot: string | null
+          customer_snapshot_source: string | null
           discount_brl_cents: number
           discount_eur_cents: number
           discount_type: string
@@ -3230,6 +3234,7 @@ export type Database = {
           customer_id: string
           customer_name_snapshot?: string | null
           customer_phone_snapshot?: string | null
+          customer_snapshot_source?: string | null
           discount_brl_cents?: number
           discount_eur_cents?: number
           discount_type?: string
@@ -3261,6 +3266,7 @@ export type Database = {
           customer_id?: string
           customer_name_snapshot?: string | null
           customer_phone_snapshot?: string | null
+          customer_snapshot_source?: string | null
           discount_brl_cents?: number
           discount_eur_cents?: number
           discount_type?: string
