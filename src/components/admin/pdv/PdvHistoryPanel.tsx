@@ -492,8 +492,8 @@ function SaleDetailsContent({
       <div className="grid gap-3 md:grid-cols-4">
         <DetailTile
           label="Cliente"
-          value={detail.customer?.full_name ?? "Sem nome"}
-          sub={detail.customer?.phone}
+          value={sale.customer_name_snapshot ?? detail.customer?.full_name ?? "Sem nome"}
+          sub={sale.customer_phone_snapshot ?? detail.customer?.phone}
         />
         <DetailTile label="Operador" value={detail.cashier?.full_name ?? "Operador"} />
         <DetailTile
