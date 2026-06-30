@@ -81,68 +81,72 @@ async function hydrateNames(input: PdvActivityLogInput): Promise<{
     actorName: null as string | null,
   };
   try {
-    const lookups: Promise<unknown>[] = [];
+    const tasks: Array<Promise<void>> = [];
+    const run = (p: PromiseLike<void>) => {
+      tasks.push(Promise.resolve(p).catch(() => undefined));
+    };
+
     if (!out.customerName && input.customerId) {
-      lookups.push(
-        supabaseAdmin
-          .from("profiles")
-          .select("full_name")
-          .eq("id", input.customerId)
-          .maybeSingle()
-          .then((r: { data: { full_name: string } | null }) => {
-            if (r.data?.full_name) out.customerName = r.data.full_name;
-          }),
+      run(
+        (async () => {
+          const r = await supabaseAdmin
+            .from("profiles")
+            .select("full_name")
+            .eq("id", input.customerId!)
+            .maybeSingle();
+          if (r.data?.full_name) out.customerName = r.data.full_name;
+        })(),
       );
     }
     if (!out.productName && input.productId) {
-      lookups.push(
-        supabaseAdmin
-          .from("products")
-          .select("name")
-          .eq("id", input.productId)
-          .maybeSingle()
-          .then((r: { data: { name: string } | null }) => {
-            if (r.data?.name) out.productName = r.data.name;
-          }),
+      run(
+        (async () => {
+          const r = await supabaseAdmin
+            .from("products")
+            .select("name")
+            .eq("id", input.productId!)
+            .maybeSingle();
+          if (r.data?.name) out.productName = r.data.name;
+        })(),
       );
     }
     if (!out.tabCode && input.tabId) {
-      lookups.push(
-        supabaseAdmin
-          .from("pdv_tabs")
-          .select("tab_code,customer_id")
-          .eq("id", input.tabId)
-          .maybeSingle()
-          .then((r: { data: { tab_code: string; customer_id: string } | null }) => {
-            if (r.data?.tab_code) out.tabCode = r.data.tab_code;
-          }),
+      run(
+        (async () => {
+          const r = await supabaseAdmin
+            .from("pdv_tabs")
+            .select("tab_code")
+            .eq("id", input.tabId!)
+            .maybeSingle();
+          if (r.data?.tab_code) out.tabCode = r.data.tab_code;
+        })(),
       );
     }
     if (!out.saleCode && input.saleId) {
-      lookups.push(
-        supabaseAdmin
-          .from("pdv_sales")
-          .select("sale_code")
-          .eq("id", input.saleId)
-          .maybeSingle()
-          .then((r: { data: { sale_code: string } | null }) => {
-            if (r.data?.sale_code) out.saleCode = r.data.sale_code;
-          }),
+      run(
+        (async () => {
+          const r = await supabaseAdmin
+            .from("pdv_sales")
+            .select("sale_code")
+            .eq("id", input.saleId!)
+            .maybeSingle();
+          if (r.data?.sale_code) out.saleCode = r.data.sale_code;
+        })(),
       );
     }
     if (input.actorId) {
-      lookups.push(
-        supabaseAdmin
-          .from("profiles")
-          .select("full_name")
-          .eq("id", input.actorId)
-          .maybeSingle()
-          .then((r: { data: { full_name: string } | null }) => {
-            out.actorName = r.data?.full_name ?? null;
-          }),
+      run(
+        (async () => {
+          const r = await supabaseAdmin
+            .from("profiles")
+            .select("full_name")
+            .eq("id", input.actorId!)
+            .maybeSingle();
+          out.actorName = r.data?.full_name ?? null;
+        })(),
       );
     }
-    await Promise.allSettled(lookups);
+    await Promise.allSettled(tasks);
   } catch {
     // intentionally swallow — logger never blocks the main flow
   }
