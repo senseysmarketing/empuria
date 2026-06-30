@@ -33,6 +33,8 @@ export type PdvTabRecord = {
   cancel_reason: string | null;
   created_at: string;
   updated_at: string;
+  customer_name_snapshot: string | null;
+  customer_phone_snapshot: string | null;
 };
 
 export type PdvTabItemRecord = {
