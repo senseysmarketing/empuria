@@ -2725,6 +2725,98 @@ export type Database = {
           },
         ]
       }
+      pdv_activity_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_name: string | null
+          amount_eur_cents: number | null
+          customer_id: string | null
+          customer_name: string | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          occurred_at: string
+          params: Json | null
+          payment_method: string | null
+          product_id: string | null
+          product_name: string | null
+          reference: string | null
+          request_ip: string | null
+          result: Json | null
+          route: string | null
+          sale_code: string | null
+          sale_id: string | null
+          source: string
+          status: string
+          tab_code: string | null
+          tab_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_name?: string | null
+          amount_eur_cents?: number | null
+          customer_id?: string | null
+          customer_name?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          occurred_at?: string
+          params?: Json | null
+          payment_method?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          reference?: string | null
+          request_ip?: string | null
+          result?: Json | null
+          route?: string | null
+          sale_code?: string | null
+          sale_id?: string | null
+          source?: string
+          status?: string
+          tab_code?: string | null
+          tab_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          amount_eur_cents?: number | null
+          customer_id?: string | null
+          customer_name?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          occurred_at?: string
+          params?: Json | null
+          payment_method?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          reference?: string | null
+          request_ip?: string | null
+          result?: Json | null
+          route?: string | null
+          sale_code?: string | null
+          sale_id?: string | null
+          source?: string
+          status?: string
+          tab_code?: string | null
+          tab_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdv_activity_logs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pdv_payment_attempts: {
         Row: {
           amount_brl_cents: number
