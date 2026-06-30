@@ -5,6 +5,8 @@ import { userHasAction } from "./permission-checks";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { createOrReuseManualCustomer } from "./manual-users";
+import { withPdvLog } from "./pdv-activity-log.server";
+
 
 // ---------- Catálogo ----------
 export const listPdvCatalog = createServerFn({ method: "GET" })
