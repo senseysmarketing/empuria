@@ -41,6 +41,7 @@ import {
 } from "recharts";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { HistoricoTab } from "@/components/admin/relatorios/HistoricoTab";
+import { PdvReportView } from "@/components/admin/relatorios/PdvReportView";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -907,135 +908,7 @@ function RankingList({
 // ---------- PDV & Estoque ----------
 
 function PdvTab({ filters }: { filters: ReportFilters }) {
-  const fetchFn = useServerFn(getReportsPdv);
-  const q = useQuery({
-    queryKey: ["reports-pdv", filters],
-    queryFn: () => fetchFn({ data: filters }),
-  });
-
-  if (q.isLoading) return <LoadingBlock />;
-  if (q.error) return <ErrorBlock error={q.error} />;
-  if (!q.data) return null;
-  const d = q.data;
-  const c = d.cards;
-
-  // PDV opera em EUR como moeda única.
-  const primary: "EUR" = "EUR";
-  const pickMain = (_cents: number, eurCents?: number) => eurCents ?? 0;
-  const pickHint = (_cents: number, _eurCents?: number) => undefined;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-12 gap-4">
-        <MetricCard
-          label="Faturamento PDV"
-          value={money(pickMain(c.revenue.current, c.revenue.currentEur), primary)}
-          hint={pickHint(c.revenue.current, c.revenue.currentEur)}
-          deltaPct={c.revenue.deltaPct}
-          icon={TrendingUp}
-          tone="green"
-        />
-        <MetricCard
-          label="Vendas concluídas"
-          value={number(c.salesCount.current)}
-          deltaPct={c.salesCount.deltaPct}
-          icon={ShoppingCart}
-          tone="blue"
-        />
-        <MetricCard
-          label="Ticket médio"
-          value={money(pickMain(c.ticket.current, c.ticket.currentEur), primary)}
-          hint={pickHint(c.ticket.current, c.ticket.currentEur)}
-          deltaPct={c.ticket.deltaPct}
-          icon={BarChart3}
-          tone="neutral"
-        />
-        <MetricCard
-          label="Itens vendidos"
-          value={number(c.itemsSold.current)}
-          icon={Package}
-          tone="amber"
-        />
-        <MetricCard
-          label="Vendas anuladas"
-          value={number(c.voided.current)}
-          deltaPct={c.voided.deltaPct}
-          icon={AlertTriangle}
-          tone="red"
-        />
-        <MetricCard
-          label="Descontos concedidos"
-          value={money(pickMain(c.discounts.current, c.discounts.currentEur), primary)}
-          hint={pickHint(c.discounts.current, c.discounts.currentEur)}
-          deltaPct={c.discounts.deltaPct}
-          icon={TrendingDown}
-          tone="amber"
-        />
-      </div>
-
-      <div className="grid grid-cols-12 gap-4">
-        <BentoCard title="Top 10 produtos mais vendidos" className="col-span-12 lg:col-span-6">
-          <RankingList
-            rows={d.topProducts.map((p) => ({
-              label: `${p.name} · ${number(p.qty)}un`,
-              value: money(p.revenue, "EUR"),
-              raw: p.qty,
-            }))}
-            empty="Sem vendas no período."
-          />
-        </BentoCard>
-        <BentoCard title="Top operadores" className="col-span-12 lg:col-span-6">
-          <RankingList
-            rows={d.topCashiers.map((c) => ({
-              label: `${c.label} · ${number(c.count)} vendas`,
-              value: money(c.revenue, "EUR"),
-              raw: c.revenue,
-            }))}
-            empty="Sem operadores no período."
-          />
-        </BentoCard>
-        <BentoCard title="Formas de pagamento" className="col-span-12 lg:col-span-6">
-          <RankingList
-            rows={d.paymentMethods.map((p) => ({
-              label: `${p.label} · ${number(p.count)}x`,
-              value: money(p.revenue, "EUR"),
-              raw: p.revenue,
-            }))}
-            empty="Sem pagamentos registrados."
-          />
-        </BentoCard>
-        <BentoCard title="Estoque baixo (≤ 5)" className="col-span-12 lg:col-span-6">
-          {d.lowStock.length === 0 ? (
-            <EmptyState label="Nenhum produto com estoque baixo." />
-          ) : (
-            <ul className="space-y-2">
-              {d.lowStock.map((p: { id: string; name: string; stock_quantity: number }) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between rounded-lg bg-admin-bg px-3 py-2 text-sm"
-                >
-                  <span className="flex items-center gap-2 text-admin-ink truncate">
-                    <Boxes className="h-4 w-4 text-amber-600" />
-                    {p.name}
-                  </span>
-                  <span
-                    className={`font-display tabular-nums ${
-                      p.stock_quantity === 0 ? "text-red-700" : "text-amber-700"
-                    }`}
-                  >
-                    {p.stock_quantity}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </BentoCard>
-        <BentoCard title="Horários de maior venda" className="col-span-12">
-          <HourlySalesChart data={d.hourly} currency="EUR" showEur={false} />
-        </BentoCard>
-      </div>
-    </div>
-  );
+  return <PdvReportView filters={filters} />;
 }
 
 function HourlySalesChart({
