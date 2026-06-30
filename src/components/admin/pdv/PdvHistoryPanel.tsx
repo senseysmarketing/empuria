@@ -1,11 +1,12 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarClock, ChevronLeft, ChevronRight, Eye, Loader2, Lock, RotateCcw, Search, ShieldAlert } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Eye, FileSpreadsheet, Filter, Loader2, Lock, RotateCcw, Search, ShieldAlert, X } from "lucide-react";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -34,6 +37,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   listPdvCashiers,
+  listPdvFilterOptions,
   listPdvSalesHistory,
   getPdvSale,
   voidPdvSale,
@@ -43,9 +47,10 @@ import {
   type PdvSaleRecord,
   type PdvStockMovementRecord,
 } from "@/lib/admin/pdv-sales.functions";
+import { exportPdvHistoryXlsx } from "@/lib/admin/pdv-sales.export.functions";
 import { cn } from "@/lib/utils";
 
-type Period = "hoje" | "ontem" | "7d" | "mes" | "custom" | "todos";
+type Period = "hoje" | "ontem" | "7d" | "mes" | "mes_anterior" | "custom" | "todos";
 type Payment = "todos" | "dinheiro" | "cartao" | "pix" | "wise" | "transferencia";
 type Status = "todos" | "concluida" | "cancelada";
 type PdvSaleDetail = {
@@ -101,8 +106,10 @@ function statusBadge(status: string) {
 export function PdvHistoryPanel() {
   const listHistory = useServerFn(listPdvSalesHistory);
   const fetchCashiers = useServerFn(listPdvCashiers);
+  const fetchOptions = useServerFn(listPdvFilterOptions);
   const fetchSale = useServerFn(getPdvSale);
   const voidSale = useServerFn(voidPdvSale);
+  const exportXlsx = useServerFn(exportPdvHistoryXlsx);
   const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -112,10 +119,18 @@ export function PdvHistoryPanel() {
   const [paymentMethod, setPaymentMethod] = useState<Payment>("todos");
   const [status, setStatus] = useState<Status>("todos");
   const [cashierId, setCashierId] = useState("todos");
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [productIds, setProductIds] = useState<string[]>([]);
+  const [minTotal, setMinTotal] = useState<string>("");
+  const [maxTotal, setMaxTotal] = useState<string>("");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [voidTargetId, setVoidTargetId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
+
+  const parsedMin = minTotal ? Math.round(parseFloat(minTotal.replace(",", ".")) * 100) : undefined;
+  const parsedMax = maxTotal ? Math.round(parseFloat(maxTotal.replace(",", ".")) * 100) : undefined;
 
   const filters = useMemo(
     () => ({
@@ -126,10 +141,31 @@ export function PdvHistoryPanel() {
       paymentMethod,
       status,
       cashierId: cashierId === "todos" ? null : cashierId,
+      categoryIds,
+      productIds,
+      minTotalEurCents: Number.isFinite(parsedMin) ? parsedMin : undefined,
+      maxTotalEurCents: Number.isFinite(parsedMax) ? parsedMax : undefined,
       page,
       pageSize: PAGE_SIZE,
     }),
-    [cashierId, dateFrom, dateTo, page, paymentMethod, period, search, status],
+    [cashierId, categoryIds, dateFrom, dateTo, page, paymentMethod, parsedMax, parsedMin, period, productIds, search, status],
+  );
+
+  const exportFilters = useMemo(
+    () => ({
+      search,
+      period,
+      dateFrom: period === "custom" ? dateFrom || null : null,
+      dateTo: period === "custom" ? dateTo || null : null,
+      paymentMethod,
+      status,
+      cashierId: cashierId === "todos" ? null : cashierId,
+      categoryIds,
+      productIds,
+      minTotalEurCents: Number.isFinite(parsedMin) ? parsedMin : undefined,
+      maxTotalEurCents: Number.isFinite(parsedMax) ? parsedMax : undefined,
+    }),
+    [cashierId, categoryIds, dateFrom, dateTo, paymentMethod, parsedMax, parsedMin, period, productIds, search, status],
   );
 
   const historyQ = useQuery({
@@ -140,6 +176,11 @@ export function PdvHistoryPanel() {
   const cashiersQ = useQuery({
     queryKey: ["pdv-cashiers"],
     queryFn: () => fetchCashiers(),
+  });
+
+  const optionsQ = useQuery({
+    queryKey: ["pdv-filter-options"],
+    queryFn: () => fetchOptions(),
   });
 
   const detailQ = useQuery({
@@ -173,7 +214,38 @@ export function PdvHistoryPanel() {
   const selectedSale = rows.find((sale) => sale.id === selectedSaleId);
   const voidTarget = rows.find((sale) => sale.id === voidTargetId) ?? selectedSale;
 
+  const categories = optionsQ.data?.categories ?? [];
+  const products = optionsQ.data?.products ?? [];
+  const productsFiltered = categoryIds.length
+    ? products.filter((p) => p.category_id && categoryIds.includes(p.category_id))
+    : products;
+
   const resetPage = () => setPage(1);
+
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const res = await exportXlsx({ data: exportFilters });
+      const bin = atob(res.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: res.mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Excel gerado", { description: res.filename });
+    } catch (e) {
+      toast.error("Falha ao exportar", { description: e instanceof Error ? e.message : "Erro" });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -191,6 +263,17 @@ export function PdvHistoryPanel() {
               <span className="text-xs text-admin-ink-muted tabular-nums">
                 {rows.length} de {total} {total === 1 ? "venda" : "vendas"}
               </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 ml-1 gap-1.5"
+                onClick={handleExport}
+                disabled={exporting}
+                title="Exportar resultados com os filtros aplicados"
+              >
+                {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+                Exportar Excel
+              </Button>
             </div>
           </div>
 
@@ -212,6 +295,7 @@ export function PdvHistoryPanel() {
                 <SelectItem value="ontem">Ontem</SelectItem>
                 <SelectItem value="7d">Últimos 7 dias</SelectItem>
                 <SelectItem value="mes">Este mês</SelectItem>
+                <SelectItem value="mes_anterior">Mês anterior</SelectItem>
                 <SelectItem value="custom">Personalizado</SelectItem>
                 <SelectItem value="todos">Todos</SelectItem>
               </SelectContent>
@@ -249,6 +333,43 @@ export function PdvHistoryPanel() {
                 ))}
               </SelectContent>
             </Select>
+
+            <MultiSelectPopover
+              label="Categorias"
+              icon={<Filter className="h-3.5 w-3.5" />}
+              options={categories.map((c) => ({ value: c.id, label: `${c.emoji ?? ""} ${c.name}`.trim() }))}
+              selected={categoryIds}
+              onChange={(ids) => { setCategoryIds(ids); resetPage(); }}
+              emptyHint="Carregando…"
+            />
+
+            <MultiSelectPopover
+              label="Itens"
+              icon={<Filter className="h-3.5 w-3.5" />}
+              options={productsFiltered.map((p) => ({ value: p.id, label: `${p.emoji ?? ""} ${p.name}`.trim() }))}
+              selected={productIds}
+              onChange={(ids) => { setProductIds(ids); resetPage(); }}
+              emptyHint={categoryIds.length ? "Nenhum item nessas categorias" : "Carregando…"}
+            />
+
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-admin-ink-muted">€</span>
+              <Input
+                value={minTotal}
+                onChange={(e) => { setMinTotal(e.target.value); resetPage(); }}
+                placeholder="mín"
+                className="w-[80px] h-9 bg-admin-bg border-admin-border"
+                inputMode="decimal"
+              />
+              <span className="text-admin-ink-muted text-xs">–</span>
+              <Input
+                value={maxTotal}
+                onChange={(e) => { setMaxTotal(e.target.value); resetPage(); }}
+                placeholder="máx"
+                className="w-[80px] h-9 bg-admin-bg border-admin-border"
+                inputMode="decimal"
+              />
+            </div>
           </div>
 
           {period === "custom" && (
@@ -674,3 +795,79 @@ function TimelineLine({
     </div>
   );
 }
+
+function MultiSelectPopover({
+  label,
+  icon,
+  options,
+  selected,
+  onChange,
+  emptyHint,
+}: {
+  label: string;
+  icon?: ReactNode;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  emptyHint?: string;
+}) {
+  const toggle = (val: string) => {
+    if (selected.includes(val)) onChange(selected.filter((v) => v !== val));
+    else onChange([...selected, val]);
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1.5 bg-admin-bg border-admin-border"
+        >
+          {icon}
+          {label}
+          {selected.length > 0 && (
+            <Badge className="ml-1 h-5 rounded-md bg-admin-accent text-white hover:bg-admin-accent">
+              {selected.length}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[260px] p-0 bg-admin-surface border-admin-border" align="start">
+        <div className="flex items-center justify-between border-b border-admin-border p-2">
+          <span className="text-xs font-medium text-admin-ink">{label}</span>
+          {selected.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[11px]"
+              onClick={() => onChange([])}
+            >
+              <X className="h-3 w-3" /> Limpar
+            </Button>
+          )}
+        </div>
+        <ScrollArea className="max-h-[280px]">
+          <div className="p-1">
+            {options.length === 0 ? (
+              <div className="px-2 py-3 text-xs text-admin-ink-muted">{emptyHint ?? "Sem opções"}</div>
+            ) : (
+              options.map((opt) => {
+                const checked = selected.includes(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-admin-bg"
+                  >
+                    <Checkbox checked={checked} onCheckedChange={() => toggle(opt.value)} />
+                    <span className="truncate text-admin-ink">{opt.label}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}
+

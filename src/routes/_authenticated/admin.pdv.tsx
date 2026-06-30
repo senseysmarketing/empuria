@@ -1,16 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Wine, History, Package, ReceiptText } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Wine, History, Package, ReceiptText, BarChart3 } from "lucide-react";
 import { PdvHistoryPanel } from "@/components/admin/pdv/PdvHistoryPanel";
 import { PdvTabsPanel } from "@/components/admin/pdv/PdvTabsPanel";
 import { PdvItensTab } from "@/components/admin/configuracoes/PdvItensTab";
 import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
 import { useModuleAccess } from "@/hooks/use-module-access";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PdvReportView } from "@/components/admin/relatorios/PdvReportView";
+import { BentoCard } from "@/components/admin/BentoCard";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import type { ReportFilters } from "@/lib/admin/reports.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/pdv")({
   component: PdvPage,
 });
+
+type ReportPeriod = ReportFilters["period"];
+type ReportCompare = ReportFilters["compare"];
+
+const PERIOD_LABEL: Record<ReportPeriod, string> = {
+  today: "Hoje",
+  "7d": "Últimos 7 dias",
+  "30d": "Últimos 30 dias",
+  month: "Este mês",
+  last_month: "Mês anterior",
+  custom: "Personalizado",
+};
+
+const COMPARE_LABEL: Record<ReportCompare, string> = {
+  none: "Sem comparação",
+  prev_period: "Período anterior",
+  prev_month: "Mesmo período do mês passado",
+};
 
 function PdvPage() {
   const [tab, setTab] = useState("comandas");
@@ -45,6 +74,12 @@ function PdvPage() {
           >
             <History className="h-4 w-4" /> Historico
           </TabsTrigger>
+          <TabsTrigger
+            value="relatorio"
+            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            <BarChart3 className="h-4 w-4" /> Relatório
+          </TabsTrigger>
           {canItens && (
             <TabsTrigger
               value="itens"
@@ -63,6 +98,10 @@ function PdvPage() {
           <PdvHistoryPanel />
         </TabsContent>
 
+        <TabsContent value="relatorio" className="mt-0">
+          <PdvReportPanel />
+        </TabsContent>
+
         <TabsContent value="itens" className="mt-0">
           {canItens ? (
             <PdvItensTab />
@@ -71,6 +110,67 @@ function PdvPage() {
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function PdvReportPanel() {
+  const [period, setPeriod] = useState<ReportPeriod>("30d");
+  const [compare, setCompare] = useState<ReportCompare>("prev_period");
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
+
+  const filters: ReportFilters = useMemo(
+    () => ({
+      period,
+      compare,
+      currency: "EUR",
+      from: period === "custom" ? from || undefined : undefined,
+      to: period === "custom" ? to || undefined : undefined,
+    }),
+    [period, compare, from, to],
+  );
+
+  return (
+    <div className="space-y-4">
+      <BentoCard padded>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:flex-wrap">
+          <Select value={period} onValueChange={(v) => setPeriod(v as ReportPeriod)}>
+            <SelectTrigger className="bg-admin-bg w-full md:w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.entries(PERIOD_LABEL) as [ReportPeriod, string][]).map(([k, l]) => (
+                <SelectItem key={k} value={k}>{l}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {period === "custom" && (
+            <div className="grid grid-cols-2 gap-2 md:w-[320px]">
+              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-admin-bg" />
+              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-admin-bg" />
+            </div>
+          )}
+
+          <Select value={compare} onValueChange={(v) => setCompare(v as ReportCompare)}>
+            <SelectTrigger className="bg-admin-bg w-full md:w-[260px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.entries(COMPARE_LABEL) as [ReportCompare, string][]).map(([k, l]) => (
+                <SelectItem key={k} value={k}>Comparar: {l}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="text-xs text-admin-ink-muted md:ml-auto">
+            Os dados são exibidos em euros (€).
+          </div>
+        </div>
+      </BentoCard>
+
+      <PdvReportView filters={filters} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireModule } from "./auth";
+import { requireModule, requireAnyModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 // Hubla / dynamic tables not always in generated types.
@@ -506,7 +506,7 @@ const PAYMENT_LABEL: Record<string, string> = {
 const VOIDED_STATUSES = ["anulada", "voided", "cancelada"];
 
 export const getReportsPdv = createServerFn({ method: "POST" })
-  .middleware([requireModule("relatorios")])
+  .middleware([requireAnyModule("relatorios", "pdv")])
   .inputValidator((d) => reportFiltersSchema.parse(d))
   .handler(async ({ data }) => {
     const range = resolveRange(data);

@@ -26,6 +26,25 @@ export function requireModule(moduleKey: string) {
     });
 }
 
+/**
+ * Require access to ANY of the listed modules. Admins always pass.
+ * Use when a single server fn is reusable across surfaces (e.g. PDV report
+ * shown both in /admin/relatorios and /admin/pdv).
+ */
+export function requireAnyModule(...moduleKeys: string[]) {
+  return createMiddleware({ type: "function" })
+    .middleware([requireStaff])
+    .server(async ({ next, context }) => {
+      if (context.isAdmin) return next({ context: { module: moduleKeys[0] } });
+      for (const key of moduleKeys) {
+        if (await userHasModuleAccess(context.userId, key)) {
+          return next({ context: { module: key } });
+        }
+      }
+      throw new Error("MODULE_FORBIDDEN");
+    });
+}
+
 export function requireAdmin() {
   return createMiddleware({ type: "function" })
     .middleware([requireStaff])
