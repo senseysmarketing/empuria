@@ -89,7 +89,7 @@ export const createCustomerQuick = createServerFn({ method: "POST" })
       origin: "pdv",
       actorId: context.userId,
     });
-    return { id: customer.user_id, full_name: customer.full_name, phone: customer.phone };
+    return { id: customer.user_id, full_name: customer.full_name, phone: customer.phone, created: customer.created };
   });
 
 // ---------- Fechar venda (atômico) ----------
