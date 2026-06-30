@@ -304,10 +304,10 @@ export function PdvHistoryPanel() {
                     <td className="p-3 whitespace-nowrap text-xs">{dateTime(sale.closed_at)}</td>
                     <td className="p-3">
                       <div className="max-w-[180px] truncate font-medium text-admin-ink">
-                        {sale.customer?.full_name ?? "Cliente sem nome"}
+                        {sale.customer_name_snapshot ?? sale.customer?.full_name ?? "Cliente sem nome"}
                       </div>
                       <div className="max-w-[180px] truncate text-xs text-admin-ink-muted">
-                        {sale.customer?.phone ?? "-"}
+                        {sale.customer_phone_snapshot ?? sale.customer?.phone ?? "-"}
                       </div>
                     </td>
                     <td className="p-3 max-w-[160px] truncate text-admin-ink-soft">
