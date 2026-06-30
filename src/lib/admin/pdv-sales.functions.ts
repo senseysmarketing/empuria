@@ -89,7 +89,7 @@ export const createCustomerQuick = createServerFn({ method: "POST" })
       origin: "pdv",
       actorId: context.userId,
     });
-    return { id: customer.user_id, full_name: customer.full_name, phone: customer.phone };
+    return { id: customer.user_id, full_name: customer.full_name, phone: customer.phone, created: customer.created };
   });
 
 // ---------- Fechar venda (atômico) ----------
@@ -163,6 +163,8 @@ export type PdvSaleRecord = {
   voided_at: string | null;
   voided_by: string | null;
   void_reason: string | null;
+  customer_name_snapshot: string | null;
+  customer_phone_snapshot: string | null;
 };
 export type PdvSaleItemRecord = {
   id: string;

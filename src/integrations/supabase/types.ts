@@ -3002,6 +3002,8 @@ export type Database = {
           closed_at: string
           created_at: string
           customer_id: string
+          customer_name_snapshot: string | null
+          customer_phone_snapshot: string | null
           discount_brl_cents: number
           discount_eur_cents: number
           discount_type: string
@@ -3025,6 +3027,8 @@ export type Database = {
           closed_at?: string
           created_at?: string
           customer_id: string
+          customer_name_snapshot?: string | null
+          customer_phone_snapshot?: string | null
           discount_brl_cents?: number
           discount_eur_cents?: number
           discount_type?: string
@@ -3048,6 +3052,8 @@ export type Database = {
           closed_at?: string
           created_at?: string
           customer_id?: string
+          customer_name_snapshot?: string | null
+          customer_phone_snapshot?: string | null
           discount_brl_cents?: number
           discount_eur_cents?: number
           discount_type?: string
@@ -3191,6 +3197,8 @@ export type Database = {
           closed_by: string | null
           created_at: string
           customer_id: string
+          customer_name_snapshot: string | null
+          customer_phone_snapshot: string | null
           discount_brl_cents: number
           discount_eur_cents: number
           discount_type: string
@@ -3220,6 +3228,8 @@ export type Database = {
           closed_by?: string | null
           created_at?: string
           customer_id: string
+          customer_name_snapshot?: string | null
+          customer_phone_snapshot?: string | null
           discount_brl_cents?: number
           discount_eur_cents?: number
           discount_type?: string
@@ -3249,6 +3259,8 @@ export type Database = {
           closed_by?: string | null
           created_at?: string
           customer_id?: string
+          customer_name_snapshot?: string | null
+          customer_phone_snapshot?: string | null
           discount_brl_cents?: number
           discount_eur_cents?: number
           discount_type?: string

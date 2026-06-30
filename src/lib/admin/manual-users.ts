@@ -81,13 +81,17 @@ export async function createOrReuseManualCustomer(input: {
   const { data: profile, error: profileError } = await supabaseAdmin
     .from("profiles")
     .select(
-      "id, created_by_admin, password_setup_required, first_access_completed_at, created_by_staff_id, profile_origin",
+      "id, full_name, phone, phone_country_iso, created_by_admin, password_setup_required, first_access_completed_at, created_by_staff_id, profile_origin",
     )
     .eq("id", user.id)
     .maybeSingle();
   if (profileError) throw new Error(profileError.message);
 
-  const current = profile as ProfileAccessState | null;
+  const current = profile as (ProfileAccessState & {
+    full_name?: string | null;
+    phone?: string | null;
+    phone_country_iso?: string | null;
+  }) | null;
   const shouldMarkManual = created || !current || current.created_by_admin === true;
   const passwordSetupRequired = shouldMarkManual
     ? created
@@ -97,11 +101,26 @@ export async function createOrReuseManualCustomer(input: {
         : (current?.password_setup_required ?? true)
     : false;
 
+  // Preserve identity of existing profiles: only set name/phone when criando
+  // um perfil novo. Reutilizar perfil existente nao deve renomear o cliente,
+  // mesmo que a operadora tenha digitado outro nome no PDV — isso causava
+  // sobrescrita retroativa do historico.
+  const preserveExisting = !created && !!current;
+  const effectiveFullName = preserveExisting
+    ? (current?.full_name?.trim() ? current.full_name : input.fullName)
+    : input.fullName;
+  const effectivePhone = preserveExisting
+    ? (current?.phone ?? phone)
+    : phone;
+  const effectivePhoneCountry = preserveExisting
+    ? (current?.phone_country_iso ?? phoneCountry)
+    : phoneCountry;
+
   const profilePatch: ProfileInsert = {
     id: user.id,
-    full_name: input.fullName,
-    phone,
-    phone_country_iso: phoneCountry,
+    full_name: effectiveFullName,
+    phone: effectivePhone,
+    phone_country_iso: effectivePhoneCountry,
     ...(input.isClubMember !== undefined ? { is_club_member: input.isClubMember } : {}),
     ...(input.adminNotes !== undefined ? { admin_notes: input.adminNotes || null } : {}),
     created_by_admin: shouldMarkManual,
@@ -142,8 +161,8 @@ export async function createOrReuseManualCustomer(input: {
   return {
     user_id: user.id,
     email,
-    full_name: input.fullName,
-    phone,
+    full_name: effectiveFullName,
+    phone: effectivePhone,
     created,
     password_setup_required: passwordSetupRequired,
   };

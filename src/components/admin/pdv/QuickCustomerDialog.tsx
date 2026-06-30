@@ -39,7 +39,12 @@ export function QuickCustomerDialog({
     setSaving(true);
     try {
       const res = await create({ data: form });
-      toast.success("Cliente cadastrado. Oriente o primeiro acesso pelo login.");
+      const reused = !res.created || (res.full_name && res.full_name.trim() !== form.fullName.trim());
+      if (reused) {
+        toast.info(`Cliente ja cadastrado como "${res.full_name}". Reutilizando perfil existente para nao alterar o historico.`);
+      } else {
+        toast.success("Cliente cadastrado. Oriente o primeiro acesso pelo login.");
+      }
       reset();
       onOpenChange(false);
       onCreated({

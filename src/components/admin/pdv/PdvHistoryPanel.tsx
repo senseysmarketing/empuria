@@ -304,10 +304,10 @@ export function PdvHistoryPanel() {
                     <td className="p-3 whitespace-nowrap text-xs">{dateTime(sale.closed_at)}</td>
                     <td className="p-3">
                       <div className="max-w-[180px] truncate font-medium text-admin-ink">
-                        {sale.customer?.full_name ?? "Cliente sem nome"}
+                        {sale.customer_name_snapshot ?? sale.customer?.full_name ?? "Cliente sem nome"}
                       </div>
                       <div className="max-w-[180px] truncate text-xs text-admin-ink-muted">
-                        {sale.customer?.phone ?? "-"}
+                        {sale.customer_phone_snapshot ?? sale.customer?.phone ?? "-"}
                       </div>
                     </td>
                     <td className="p-3 max-w-[160px] truncate text-admin-ink-soft">
@@ -445,7 +445,7 @@ export function PdvHistoryPanel() {
             <div className="rounded-lg border border-admin-border bg-admin-bg p-3 text-sm">
               <div className="font-mono text-admin-accent">{voidTarget?.sale_code ?? ""}</div>
               <div className="text-admin-ink-muted">
-                {voidTarget?.customer?.full_name ?? detail?.customer?.full_name ?? "Cliente"}
+                {voidTarget?.customer_name_snapshot ?? voidTarget?.customer?.full_name ?? detail?.sale?.customer_name_snapshot ?? detail?.customer?.full_name ?? "Cliente"}
               </div>
             </div>
             <div className="space-y-1.5">
@@ -492,8 +492,8 @@ function SaleDetailsContent({
       <div className="grid gap-3 md:grid-cols-4">
         <DetailTile
           label="Cliente"
-          value={detail.customer?.full_name ?? "Sem nome"}
-          sub={detail.customer?.phone}
+          value={sale.customer_name_snapshot ?? detail.customer?.full_name ?? "Sem nome"}
+          sub={sale.customer_phone_snapshot ?? detail.customer?.phone}
         />
         <DetailTile label="Operador" value={detail.cashier?.full_name ?? "Operador"} />
         <DetailTile

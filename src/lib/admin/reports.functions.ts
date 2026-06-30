@@ -1624,7 +1624,7 @@ export const getReportsHistorico = createServerFn({ method: "POST" })
       const { data: sales } = await db
         .from("pdv_sales")
         .select(
-          "id,created_at,closed_at,sale_code,customer_id,total_eur_cents,payment_method,status",
+          "id,created_at,closed_at,sale_code,customer_id,total_eur_cents,payment_method,status,customer_name_snapshot,customer_phone_snapshot",
         )
         .gte("created_at", startTs)
         .lte("created_at", endTs)
@@ -1651,12 +1651,13 @@ export const getReportsHistorico = createServerFn({ method: "POST" })
       }
       for (const s of (sales ?? []) as Record<string, unknown>[]) {
         const cust = s.customer_id ? customerMap.get(String(s.customer_id)) : undefined;
+        const snapshotName = (s.customer_name_snapshot as string | null) ?? null;
         rows.push({
           source: "pdv",
           id: String(s.id),
           ref: (s.sale_code as string) ?? String(s.id).slice(0, 8),
           created_at: String(s.closed_at ?? s.created_at),
-          customer_name: cust?.name ?? null,
+          customer_name: snapshotName ?? cust?.name ?? null,
           customer_email: null,
           description: "Venda PDV",
           total_cents: Number(s.total_eur_cents ?? 0),
