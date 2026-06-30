@@ -811,10 +811,14 @@ function MultiSelectPopover({
   onChange: (next: string[]) => void;
   emptyHint?: string;
 }) {
+  const [query, setQuery] = useState("");
   const toggle = (val: string) => {
     if (selected.includes(val)) onChange(selected.filter((v) => v !== val));
     else onChange([...selected, val]);
   };
+  const filtered = query.trim().length
+    ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : options;
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -832,7 +836,7 @@ function MultiSelectPopover({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[260px] p-0 bg-admin-surface border-admin-border" align="start">
+      <PopoverContent className="w-[280px] p-0 bg-admin-surface border-admin-border" align="start">
         <div className="flex items-center justify-between border-b border-admin-border p-2">
           <span className="text-xs font-medium text-admin-ink">{label}</span>
           {selected.length > 0 && (
@@ -846,12 +850,24 @@ function MultiSelectPopover({
             </Button>
           )}
         </div>
-        <ScrollArea className="max-h-[280px]">
+        {options.length > 8 && (
+          <div className="border-b border-admin-border p-2">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar…"
+              className="h-8 bg-admin-bg text-xs"
+            />
+          </div>
+        )}
+        <ScrollArea className="h-[280px]">
           <div className="p-1">
-            {options.length === 0 ? (
-              <div className="px-2 py-3 text-xs text-admin-ink-muted">{emptyHint ?? "Sem opções"}</div>
+            {filtered.length === 0 ? (
+              <div className="px-2 py-3 text-xs text-admin-ink-muted">
+                {options.length === 0 ? (emptyHint ?? "Sem opções") : "Nenhum resultado"}
+              </div>
             ) : (
-              options.map((opt) => {
+              filtered.map((opt) => {
                 const checked = selected.includes(opt.value);
                 return (
                   <label
