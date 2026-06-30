@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { withPdvLog } from "./pdv-activity-log.server";
+
 
 const db = supabaseAdmin as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
