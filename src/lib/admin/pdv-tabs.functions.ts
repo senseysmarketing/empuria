@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireModule } from "./auth";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { withPdvLog } from "./pdv-activity-log.server";
+
 
 export type PdvTabStatus = "aberta" | "fechada" | "cancelada" | "aguardando_pagamento";
 export type PdvTabPaymentMethod = "dinheiro" | "transferencia" | "wise";
@@ -210,88 +212,154 @@ export const listOpenPdvTabsForCustomer = createServerFn({ method: "POST" })
 export const openPdvTab = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => openSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { data: result, error } = await pdvDb.rpc<{
-      tab_id: string;
-      tab_code: string;
-      existing: boolean;
-    }>("pdv_open_tab", {
-      p_customer_id: data.customerId,
-      p_opened_by: context.userId,
-      p_notes: data.notes ?? null,
-    });
-    if (error) throw new Error(error.message);
-    if (!result) throw new Error("Comanda nao retornada pelo banco.");
-    return result;
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "tab.open",
+        actorId: context.userId,
+        customerId: data.customerId,
+        route: "pdv.openTab",
+        params: data,
+      },
+      async () => {
+        const { data: result, error } = await pdvDb.rpc<{
+          tab_id: string;
+          tab_code: string;
+          existing: boolean;
+        }>("pdv_open_tab", {
+          p_customer_id: data.customerId,
+          p_opened_by: context.userId,
+          p_notes: data.notes ?? null,
+        });
+        if (error) throw new Error(error.message);
+        if (!result) throw new Error("Comanda nao retornada pelo banco.");
+        return result;
+      },
+    ),
+  );
 
 export const addPdvTabItem = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => addItemSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { data: itemId, error } = await pdvDb.rpc<string>("pdv_add_tab_item", {
-      p_tab_id: data.tabId,
-      p_product_id: data.productId,
-      p_qty: data.qty,
-      p_actor_id: context.userId,
-    });
-    if (error) throw new Error(error.message);
-    if (!itemId) throw new Error("Item de comanda nao retornado pelo banco.");
-    return { itemId };
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "tab.item.add",
+        actorId: context.userId,
+        tabId: data.tabId,
+        productId: data.productId,
+        route: "pdv.addTabItem",
+        params: data,
+      },
+      async () => {
+        const { data: itemId, error } = await pdvDb.rpc<string>("pdv_add_tab_item", {
+          p_tab_id: data.tabId,
+          p_product_id: data.productId,
+          p_qty: data.qty,
+          p_actor_id: context.userId,
+        });
+        if (error) throw new Error(error.message);
+        if (!itemId) throw new Error("Item de comanda nao retornado pelo banco.");
+        return { itemId };
+      },
+    ),
+  );
 
 export const updatePdvTabItemQty = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => updateQtySchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { error } = await pdvDb.rpc<null>("pdv_update_tab_item_qty", {
-      p_item_id: data.itemId,
-      p_qty: data.qty,
-      p_actor_id: context.userId,
-    });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "tab.item.qty",
+        actorId: context.userId,
+        route: "pdv.updateTabItemQty",
+        params: data,
+      },
+      async () => {
+        const { error } = await pdvDb.rpc<null>("pdv_update_tab_item_qty", {
+          p_item_id: data.itemId,
+          p_qty: data.qty,
+          p_actor_id: context.userId,
+        });
+        if (error) throw new Error(error.message);
+        return { ok: true };
+      },
+    ),
+  );
 
 export const cancelPdvTabItem = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => cancelItemSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { error } = await pdvDb.rpc<null>("pdv_cancel_tab_item", {
-      p_item_id: data.itemId,
-      p_actor_id: context.userId,
-      p_reason: data.reason && data.reason.length >= 3 ? data.reason : "Removido pelo operador",
-    });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "tab.item.cancel",
+        actorId: context.userId,
+        route: "pdv.cancelTabItem",
+        params: data,
+      },
+      async () => {
+        const { error } = await pdvDb.rpc<null>("pdv_cancel_tab_item", {
+          p_item_id: data.itemId,
+          p_actor_id: context.userId,
+          p_reason: data.reason && data.reason.length >= 3 ? data.reason : "Removido pelo operador",
+        });
+        if (error) throw new Error(error.message);
+        return { ok: true };
+      },
+    ),
+  );
 
 export const closePdvTab = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => closeSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { data: saleId, error } = await pdvDb.rpc<string>("pdv_close_tab", {
-      p_tab_id: data.tabId,
-      p_cashier_id: context.userId,
-      p_discount_type: data.discount.type,
-      p_discount_value: data.discount.value,
-      p_payment_method: data.paymentMethod,
-      p_notes: data.notes ?? null,
-    });
-    if (error) throw new Error(error.message);
-    if (!saleId) throw new Error("Venda de comanda nao retornada pelo banco.");
-    return { saleId };
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "tab.close",
+        actorId: context.userId,
+        tabId: data.tabId,
+        paymentMethod: data.paymentMethod,
+        route: "pdv.closeTab",
+        params: data,
+      },
+      async () => {
+        const { data: saleId, error } = await pdvDb.rpc<string>("pdv_close_tab", {
+          p_tab_id: data.tabId,
+          p_cashier_id: context.userId,
+          p_discount_type: data.discount.type,
+          p_discount_value: data.discount.value,
+          p_payment_method: data.paymentMethod,
+          p_notes: data.notes ?? null,
+        });
+        if (error) throw new Error(error.message);
+        if (!saleId) throw new Error("Venda de comanda nao retornada pelo banco.");
+        return { saleId };
+      },
+    ),
+  );
 
 export const cancelPdvTab = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => cancelTabSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { error } = await pdvDb.rpc<null>("pdv_cancel_tab", {
-      p_tab_id: data.tabId,
-      p_actor_id: context.userId,
-      p_reason: data.reason && data.reason.length >= 3 ? data.reason : "Comanda cancelada pelo operador",
-    });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "tab.cancel",
+        actorId: context.userId,
+        tabId: data.tabId,
+        route: "pdv.cancelTab",
+        params: data,
+      },
+      async () => {
+        const { error } = await pdvDb.rpc<null>("pdv_cancel_tab", {
+          p_tab_id: data.tabId,
+          p_actor_id: context.userId,
+          p_reason: data.reason && data.reason.length >= 3 ? data.reason : "Comanda cancelada pelo operador",
+        });
+        if (error) throw new Error(error.message);
+        return { ok: true };
+      },
+    ),
+  );

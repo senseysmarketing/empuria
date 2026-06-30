@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { withPdvLog } from "./pdv-activity-log.server";
+
 
 const db = supabaseAdmin as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,52 +75,61 @@ const requestSchema = z.object({
 export const requestPdvWisePayment = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => requestSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const setting = await loadWiseSetting();
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "wise.request",
+        actorId: context.userId,
+        tabId: data.tabId,
+        paymentMethod: "wise",
+        route: "pdv.requestWisePayment",
+        params: data,
+      },
+      async () => {
+        const setting = await loadWiseSetting();
 
-    // Compute reference first via a "preview" — we need the URL, then send to RPC.
-    // Strategy: call RPC with placeholder URL, retrieve reference, then build URL,
-    // then patch the URL on the attempt.
-    const { data: rpcRes, error } = await db.rpc("pdv_request_wise_payment", {
-      p_tab_id: data.tabId,
-      p_actor_id: context.userId,
-      p_discount_type: data.discount.type,
-      p_discount_value: data.discount.value,
-      p_payment_url: null,
-      p_notes: data.notes ?? null,
-    });
-    if (error) throw new Error(error.message);
+        const { data: rpcRes, error } = await db.rpc("pdv_request_wise_payment", {
+          p_tab_id: data.tabId,
+          p_actor_id: context.userId,
+          p_discount_type: data.discount.type,
+          p_discount_value: data.discount.value,
+          p_payment_url: null,
+          p_notes: data.notes ?? null,
+        });
+        if (error) throw new Error(error.message);
 
-    const reference = rpcRes.reference as string;
-    const amountCents = rpcRes.amount_eur_cents as number;
-    const attemptId = rpcRes.attempt_id as string;
+        const reference = rpcRes.reference as string;
+        const amountCents = rpcRes.amount_eur_cents as number;
+        const attemptId = rpcRes.attempt_id as string;
 
-    const finalUrl = setting.defaultUrl
-      ? appendQuickPayParams(setting.defaultUrl, {
-          amount: amountCents / 100,
-          currency: "EUR",
-          description: reference,
-        })
-      : null;
+        const finalUrl = setting.defaultUrl
+          ? appendQuickPayParams(setting.defaultUrl, {
+              amount: amountCents / 100,
+              currency: "EUR",
+              description: reference,
+            })
+          : null;
 
-    if (finalUrl) {
-      await db
-        .from("pdv_payment_attempts")
-        .update({ payment_url: finalUrl })
-        .eq("id", attemptId);
-    }
+        if (finalUrl) {
+          await db
+            .from("pdv_payment_attempts")
+            .update({ payment_url: finalUrl })
+            .eq("id", attemptId);
+        }
 
-    return {
-      attemptId,
-      reference,
-      amountEurCents: amountCents,
-      amountBrlCents: rpcRes.amount_brl_cents as number,
-      paymentUrl: finalUrl,
-      manualOnly: !finalUrl,
-      customerPhone: (rpcRes.customer_phone as string | null) ?? null,
-      customerName: (rpcRes.customer_name as string | null) ?? null,
-    };
-  });
+        return {
+          attemptId,
+          reference,
+          amountEurCents: amountCents,
+          amountBrlCents: rpcRes.amount_brl_cents as number,
+          paymentUrl: finalUrl,
+          manualOnly: !finalUrl,
+          customerPhone: (rpcRes.customer_phone as string | null) ?? null,
+          customerName: (rpcRes.customer_name as string | null) ?? null,
+        };
+      },
+    ),
+  );
 
 const cancelSchema = z.object({
   attemptId: z.string().uuid(),
@@ -128,15 +139,25 @@ const cancelSchema = z.object({
 export const cancelPdvWiseAttempt = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => cancelSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { error } = await db.rpc("pdv_cancel_wise_attempt", {
-      p_attempt_id: data.attemptId,
-      p_actor_id: context.userId,
-      p_reason: data.reason,
-    });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "wise.cancel",
+        actorId: context.userId,
+        route: "pdv.cancelWiseAttempt",
+        params: data,
+      },
+      async () => {
+        const { error } = await db.rpc("pdv_cancel_wise_attempt", {
+          p_attempt_id: data.attemptId,
+          p_actor_id: context.userId,
+          p_reason: data.reason,
+        });
+        if (error) throw new Error(error.message);
+        return { ok: true };
+      },
+    ),
+  );
 
 const recheckSchema = z.object({ attemptId: z.string().uuid() });
 
