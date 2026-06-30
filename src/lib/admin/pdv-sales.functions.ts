@@ -163,6 +163,8 @@ export type PdvSaleRecord = {
   voided_at: string | null;
   voided_by: string | null;
   void_reason: string | null;
+  customer_name_snapshot: string | null;
+  customer_phone_snapshot: string | null;
 };
 export type PdvSaleItemRecord = {
   id: string;
