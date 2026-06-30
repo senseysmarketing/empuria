@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireModule } from "./auth";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { withPdvLog } from "./pdv-activity-log.server";
+
 
 export type PdvTabStatus = "aberta" | "fechada" | "cancelada" | "aguardando_pagamento";
 export type PdvTabPaymentMethod = "dinheiro" | "transferencia" | "wise";
