@@ -113,7 +113,7 @@ export function PdvHistoryPanel() {
   const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
-  const [period, setPeriod] = useState<Period>("7d");
+  const [period, setPeriod] = useState<Period>("mes");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<Payment>("todos");
@@ -121,16 +121,11 @@ export function PdvHistoryPanel() {
   const [cashierId, setCashierId] = useState("todos");
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [productIds, setProductIds] = useState<string[]>([]);
-  const [minTotal, setMinTotal] = useState<string>("");
-  const [maxTotal, setMaxTotal] = useState<string>("");
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [voidTargetId, setVoidTargetId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
-
-  const parsedMin = minTotal ? Math.round(parseFloat(minTotal.replace(",", ".")) * 100) : undefined;
-  const parsedMax = maxTotal ? Math.round(parseFloat(maxTotal.replace(",", ".")) * 100) : undefined;
 
   const filters = useMemo(
     () => ({
@@ -143,12 +138,10 @@ export function PdvHistoryPanel() {
       cashierId: cashierId === "todos" ? null : cashierId,
       categoryIds,
       productIds,
-      minTotalEurCents: Number.isFinite(parsedMin) ? parsedMin : undefined,
-      maxTotalEurCents: Number.isFinite(parsedMax) ? parsedMax : undefined,
       page,
       pageSize: PAGE_SIZE,
     }),
-    [cashierId, categoryIds, dateFrom, dateTo, page, paymentMethod, parsedMax, parsedMin, period, productIds, search, status],
+    [cashierId, categoryIds, dateFrom, dateTo, page, paymentMethod, period, productIds, search, status],
   );
 
   const exportFilters = useMemo(
@@ -162,10 +155,8 @@ export function PdvHistoryPanel() {
       cashierId: cashierId === "todos" ? null : cashierId,
       categoryIds,
       productIds,
-      minTotalEurCents: Number.isFinite(parsedMin) ? parsedMin : undefined,
-      maxTotalEurCents: Number.isFinite(parsedMax) ? parsedMax : undefined,
     }),
-    [cashierId, categoryIds, dateFrom, dateTo, paymentMethod, parsedMax, parsedMin, period, productIds, search, status],
+    [cashierId, categoryIds, dateFrom, dateTo, paymentMethod, period, productIds, search, status],
   );
 
   const historyQ = useQuery({
@@ -352,24 +343,6 @@ export function PdvHistoryPanel() {
               emptyHint={categoryIds.length ? "Nenhum item nessas categorias" : "Carregando…"}
             />
 
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wider text-admin-ink-muted">€</span>
-              <Input
-                value={minTotal}
-                onChange={(e) => { setMinTotal(e.target.value); resetPage(); }}
-                placeholder="mín"
-                className="w-[80px] h-9 bg-admin-bg border-admin-border"
-                inputMode="decimal"
-              />
-              <span className="text-admin-ink-muted text-xs">–</span>
-              <Input
-                value={maxTotal}
-                onChange={(e) => { setMaxTotal(e.target.value); resetPage(); }}
-                placeholder="máx"
-                className="w-[80px] h-9 bg-admin-bg border-admin-border"
-                inputMode="decimal"
-              />
-            </div>
           </div>
 
           {period === "custom" && (

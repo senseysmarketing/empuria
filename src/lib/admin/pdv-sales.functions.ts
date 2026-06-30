@@ -215,7 +215,7 @@ const currencyCentsSchema = z.number().int().min(0).optional();
 
 const historySchema = z.object({
   search: z.string().trim().max(120).optional().default(""),
-  period: z.enum(["hoje", "ontem", "7d", "mes", "mes_anterior", "custom", "todos"]).optional().default("7d"),
+  period: z.enum(["hoje", "ontem", "7d", "mes", "mes_anterior", "custom", "todos"]).optional().default("mes"),
   dateFrom: z.string().trim().optional().nullable(),
   dateTo: z.string().trim().optional().nullable(),
   paymentMethod: z.enum(["todos", "dinheiro", "cartao", "pix", "wise", "transferencia"]).optional().default("todos"),
