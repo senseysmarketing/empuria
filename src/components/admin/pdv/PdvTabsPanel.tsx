@@ -271,7 +271,7 @@ export function PdvTabsPanel() {
       if (tab) {
         setSuccessInfo({
           tabCode: tab.tab_code,
-          customerName: tab.customer?.full_name ?? "Cliente sem nome",
+          customerName: tab.customer_name_snapshot ?? tab.customer?.full_name ?? "Cliente sem nome",
           totalCents,
           paymentMethod,
         });
@@ -387,8 +387,8 @@ export function PdvTabsPanel() {
     const q = search.trim().toLowerCase();
     if (!q) return tabs;
     return tabs.filter((tab) => {
-      const customer = tab.customer?.full_name ?? "";
-      const phone = tab.customer?.phone ?? "";
+      const customer = tab.customer_name_snapshot ?? tab.customer?.full_name ?? "";
+      const phone = tab.customer_phone_snapshot ?? tab.customer?.phone ?? "";
       return (
         tab.tab_code.toLowerCase().includes(q) ||
         customer.toLowerCase().includes(q) ||
@@ -511,16 +511,16 @@ export function PdvTabsPanel() {
                           </span>
                         </div>
                         <p className="mt-2 truncate font-display text-base text-admin-ink">
-                          {tab.customer?.full_name ?? "Cliente sem nome"}
+                          {tab.customer_name_snapshot ?? tab.customer?.full_name ?? "Cliente sem nome"}
                         </p>
                         <p className="truncate text-xs text-admin-ink-muted">
-                          {tab.customer?.phone ?? "Sem telefone"} · {totals.qty} itens
+                          {tab.customer_phone_snapshot ?? tab.customer?.phone ?? "Sem telefone"} · {totals.qty} itens
                         </p>
                       </div>
                       <Avatar className="h-9 w-9">
                         <AvatarImage src={tab.customer?.avatar_url ?? undefined} />
                         <AvatarFallback className="bg-admin-bg text-[10px]">
-                          {initials(tab.customer?.full_name)}
+                          {initials(tab.customer_name_snapshot ?? tab.customer?.full_name)}
                         </AvatarFallback>
                       </Avatar>
                     </div>
@@ -674,10 +674,10 @@ export function PdvTabsPanel() {
                       {selectedTab.tab_code}
                     </Badge>
                     <h3 className="mt-2 truncate font-display text-xl text-admin-ink">
-                      {selectedTab.customer?.full_name ?? "Cliente sem nome"}
+                      {selectedTab.customer_name_snapshot ?? selectedTab.customer?.full_name ?? "Cliente sem nome"}
                     </h3>
                     <p className="truncate text-xs text-admin-ink-muted">
-                      {selectedTab.customer?.phone ?? "Sem telefone"}
+                      {selectedTab.customer_phone_snapshot ?? selectedTab.customer?.phone ?? "Sem telefone"}
                     </p>
                   </div>
                   {canCancelSelectedTab && (
