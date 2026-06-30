@@ -115,19 +115,32 @@ const closeSchema = z.object({
 export const closePdvSale = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((d) => closeSchema.parse(d))
-  .handler(async ({ data, context }) => {
-    const { data: saleId, error } = await supabaseAdmin.rpc("pdv_close_sale", {
-      p_customer_id: data.customerId,
-      p_cashier_id: context.userId,
-      p_items: data.items.map((i) => ({ product_id: i.productId, qty: i.qty })),
-      p_discount_type: data.discount.type,
-      p_discount_value: data.discount.value,
-      p_payment_method: data.paymentMethod,
-      p_notes: data.notes ?? null,
-    } as never);
-    if (error) throw new Error(error.message);
-    return { saleId: saleId as unknown as string };
-  });
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "sale.close_direct",
+        actorId: context.userId,
+        customerId: data.customerId,
+        paymentMethod: data.paymentMethod,
+        route: "pdv.closeSale",
+        params: data,
+      },
+      async () => {
+        const { data: saleId, error } = await supabaseAdmin.rpc("pdv_close_sale", {
+          p_customer_id: data.customerId,
+          p_cashier_id: context.userId,
+          p_items: data.items.map((i) => ({ product_id: i.productId, qty: i.qty })),
+          p_discount_type: data.discount.type,
+          p_discount_value: data.discount.value,
+          p_payment_method: data.paymentMethod,
+          p_notes: data.notes ?? null,
+        } as never);
+        if (error) throw new Error(error.message);
+        return { saleId: saleId as unknown as string };
+      },
+    ),
+  );
+
 
 export type PdvSaleRecord = {
   id: string;
