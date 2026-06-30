@@ -445,7 +445,7 @@ export function PdvHistoryPanel() {
             <div className="rounded-lg border border-admin-border bg-admin-bg p-3 text-sm">
               <div className="font-mono text-admin-accent">{voidTarget?.sale_code ?? ""}</div>
               <div className="text-admin-ink-muted">
-                {voidTarget?.customer?.full_name ?? detail?.customer?.full_name ?? "Cliente"}
+                {voidTarget?.customer_name_snapshot ?? voidTarget?.customer?.full_name ?? detail?.sale?.customer_name_snapshot ?? detail?.customer?.full_name ?? "Cliente"}
               </div>
             </div>
             <div className="space-y-1.5">
