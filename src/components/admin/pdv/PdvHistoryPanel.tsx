@@ -795,3 +795,79 @@ function TimelineLine({
     </div>
   );
 }
+
+function MultiSelectPopover({
+  label,
+  icon,
+  options,
+  selected,
+  onChange,
+  emptyHint,
+}: {
+  label: string;
+  icon?: ReactNode;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  emptyHint?: string;
+}) {
+  const toggle = (val: string) => {
+    if (selected.includes(val)) onChange(selected.filter((v) => v !== val));
+    else onChange([...selected, val]);
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1.5 bg-admin-bg border-admin-border"
+        >
+          {icon}
+          {label}
+          {selected.length > 0 && (
+            <Badge className="ml-1 h-5 rounded-md bg-admin-accent text-white hover:bg-admin-accent">
+              {selected.length}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[260px] p-0 bg-admin-surface border-admin-border" align="start">
+        <div className="flex items-center justify-between border-b border-admin-border p-2">
+          <span className="text-xs font-medium text-admin-ink">{label}</span>
+          {selected.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-1.5 text-[11px]"
+              onClick={() => onChange([])}
+            >
+              <X className="h-3 w-3" /> Limpar
+            </Button>
+          )}
+        </div>
+        <ScrollArea className="max-h-[280px]">
+          <div className="p-1">
+            {options.length === 0 ? (
+              <div className="px-2 py-3 text-xs text-admin-ink-muted">{emptyHint ?? "Sem opções"}</div>
+            ) : (
+              options.map((opt) => {
+                const checked = selected.includes(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-admin-bg"
+                  >
+                    <Checkbox checked={checked} onCheckedChange={() => toggle(opt.value)} />
+                    <span className="truncate text-admin-ink">{opt.label}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
