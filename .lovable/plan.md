@@ -1,119 +1,48 @@
+## Diagnóstico
 
-## Objetivo
+Não é bug visual — os nomes realmente mudam retroativamente.
 
-Garantir que **toda ação no PDV** — abrir/fechar/cancelar comanda, adicionar/editar/remover item, gerar/cancelar/confirmar Wise, anular venda, fechar venda direta, abrir cliente — gere um registro detalhado e pesquisável no backend, incluindo **tentativas que falharam**. Sem mudança visual no app.
+Verifiquei no banco: várias vendas PDV apontam para o mesmo `customer_id` (`fd3defe9-…`). Hoje esse perfil está como **"Rafael" / +34603677344**. Mas os screenshots mostram o mesmo registro como:
+- **"André" / +34603677344** (Histórico PDV)
+- **"Richard Gabriel" / +34613659080** (Relatórios após nova ação da Luana)
+- **"Rafael"** (estado atual no banco)
 
-## Diagnóstico atual
+Causa raiz em `src/lib/admin/manual-users.ts` → `createOrReuseManualCustomer`, usado pelo `createCustomerQuick` do PDV: quando a operadora cadastra um "novo cliente" no PDV reutilizando um e-mail já existente (ou um e-mail genérico/placeholder), o código faz `upsert` no `profiles` sobrescrevendo `full_name`, `phone` e `phone_country_iso` do perfil antigo. Como `pdv_sales` guarda só `customer_id` (sem snapshot), todas as vendas históricas daquele cliente passam a exibir o nome/telefone novos — daí a sensação de "os nomes ficam trocando".
 
-Hoje já existem registros em `audit_logs` (módulo `pdv`) cobrindo as RPCs principais (`pdv_tab.opened`, `item_added`, `item_qty_updated`, `item_cancelled`, `closed`, `cancelled`, `wise_requested/paid/cancelled`, `pdv_sale.voided`). O que falta:
+## O que vamos fazer
 
-- Logs de **falhas** (RPC negou permissão, estoque insuficiente, RLS bloqueou, etc.) — hoje a exceção sobe e nada é registrado.
-- **Contexto da requisição**: IP, user-agent, rota chamadora, payload bruto enviado pelo frontend.
-- **Snapshot legível** (nome do cliente, do produto, código da comanda, valor) — hoje só temos IDs no `new_data`, dificultando análise.
-- **Eventos de leitura/abertura de telas** críticas (opcional) e **reaberturas/edições silenciosas** (ex.: trocar cliente da comanda, reabrir comanda).
-- Um **índice por ator + data** para responder rapidamente "tudo que a Luana fez no dia X".
+### 1. Snapshot do cliente na venda (correção definitiva)
 
-## Plano
+Migração:
+- `ALTER TABLE pdv_sales ADD COLUMN customer_name_snapshot text, ADD COLUMN customer_phone_snapshot text;`
+- (mesmo em `pdv_tabs` para comandas em aberto)
+- Atualizar a função SQL `pdv_close_sale` para gravar o snapshot a partir do `profiles` no momento do fechamento.
+- Trigger no `pdv_tabs` (INSERT/UPDATE customer_id) preenchendo o snapshot quando vazio.
+- Backfill: preencher snapshots existentes com o `profiles.full_name`/`phone` atual (melhor o que temos agora do que continuar mudando).
 
-### 1. Nova tabela `pdv_activity_logs` (migração)
+### 2. UI passa a usar o snapshot
 
-Criada exclusivamente para PDV, separada de `audit_logs` para não poluir o módulo de auditoria geral e permitir índices específicos. Campos:
+- `src/components/admin/pdv/PdvHistoryPanel.tsx` e `src/lib/admin/pdv-sales.functions.ts` → exibir `customer_name_snapshot ?? customer.full_name`, idem telefone.
+- `src/lib/admin/reports.functions.ts` (aba Histórico de Pedidos) → mesmo fallback para linhas PDV.
+- `src/components/admin/pdv/PdvTabsPanel.tsx` (comandas) → usar snapshot.
 
-```text
-id                uuid pk
-occurred_at       timestamptz default now()
-actor_id          uuid (profiles.id, nullable se sistema)
-actor_name        text snapshot
-action            text  ex: 'tab.open', 'tab.item.add', 'tab.close', 'wise.request', 'wise.confirm', 'sale.void', 'tab.item.remove', 'tab.cancel', 'sale.close_direct'
-status            text  'success' | 'error' | 'denied'
-tab_id            uuid nullable
-tab_code          text snapshot
-sale_id           uuid nullable
-sale_code         text snapshot
-customer_id       uuid nullable
-customer_name     text snapshot
-product_id        uuid nullable
-product_name      text snapshot
-amount_eur_cents  int nullable
-payment_method    text nullable
-reference         text nullable  (PDV-..., wise reference)
-request_ip        text
-user_agent        text
-route             text  rota/origem da chamada (ex: '/admin/pdv', server-fn name)
-params            jsonb payload bruto recebido
-result            jsonb resposta/IDs criados
-error_message     text nullable
-error_code        text nullable
-```
+### 3. Parar de sobrescrever perfis existentes
 
-Índices em `(actor_id, occurred_at desc)`, `(tab_id)`, `(sale_id)`, `(action, occurred_at desc)`. RLS: somente admins podem `SELECT`; `INSERT` via `service_role`.
+Em `src/lib/admin/manual-users.ts`:
+- Se já existe `auth.user` para o email **e** o perfil não foi criado como manual (`created_by_admin = false` ou pertence a um membro real), **não** alterar `full_name` / `phone` / `phone_country_iso`. Só reutilizar o `id` e retornar.
+- Se o perfil é manual e os dados divergem, manter os dados originais por padrão e registrar `audit_logs` com `reuse_conflict`.
+- Adicionar campo opcional `allowProfileUpdate` (default `false` no fluxo do PDV) para que apenas telas de edição explícita possam regravar nome/telefone.
 
-### 2. Helper de logging server-side
+### 4. Aviso no QuickCustomerDialog
 
-Criar `src/lib/admin/pdv-activity-log.server.ts` com:
+`src/components/admin/pdv/QuickCustomerDialog.tsx`: antes de criar, se a busca já trouxer um cliente com o mesmo e-mail/telefone, sugerir selecioná-lo em vez de cadastrar duplicado (evita o cenário que originou o problema).
 
-```ts
-logPdvActivity({ action, status, actorId, request, ...snapshot, params, result, error })
-```
+### 5. Verificação
 
-- Extrai IP/UA de `getRequest()`.
-- Faz lookup leve para preencher nomes (cliente, produto, código) quando só IDs estiverem disponíveis.
-- Tolerante a falha: nunca quebra o fluxo principal (`try/catch` interno, `console.warn` se logger falhar).
+- Rodar query confirmando snapshot preenchido nas 20 vendas existentes.
+- Reabrir histórico do PDV e aba Relatórios → Histórico de Pedidos: nomes devem bater com o estado da venda, não com o perfil atual.
+- Teste manual: criar cliente novo no PDV com e-mail já existente — perfil original não é renomeado.
 
-### 3. Instrumentação dos server functions PDV
+## Observação
 
-Envolver cada handler em `src/lib/admin/pdv-*.functions.ts` com o padrão:
-
-```ts
-try {
-  const result = await rpc(...);
-  await logPdvActivity({ action, status: 'success', ...ctx, result });
-  return result;
-} catch (e) {
-  await logPdvActivity({ action, status: 'error', ...ctx, error_message: e.message });
-  throw e;
-}
-```
-
-Cobertura:
-- `pdv-tabs.functions.ts`: openTab, cancelTab, reopenTab, changeCustomer, addNote.
-- `pdv-itens.functions.ts`: addItem, updateQty, cancelItem.
-- `pdv-sales.functions.ts`: closeTab, closeDirectSale, voidSale.
-- `pdv-wise.functions.ts`: requestWise, cancelWise, recheckWise, manualConfirm.
-- `pdv-customers.functions.ts`: createManualUser, reuseManualUser, searchCustomer (opcional, baixa cardinalidade — apenas em produção real seria muito; **vou pular** searches para não inflar).
-
-### 4. Triggers de segurança no banco
-
-Para garantir que nenhuma ação escape (por exemplo, se algum dia alguém fizer UPDATE direto), adicionar triggers AFTER em:
-- `pdv_tabs` (INSERT, UPDATE de status, DELETE)
-- `pdv_tab_items` (INSERT, UPDATE de qty, UPDATE de cancelled_at)
-- `pdv_sales` (INSERT, UPDATE de status)
-- `pdv_payment_attempts` (INSERT, UPDATE de status)
-
-Os triggers inserem em `pdv_activity_logs` com `actor_id = auth.uid()` quando disponível, `source = 'db_trigger'`. Esses logs complementam (não substituem) os logs do server function, e servem como rede de proteção.
-
-### 5. Backfill leve
-
-Migrar (best-effort) as últimas 90 dias de `audit_logs` (módulo `pdv`) para `pdv_activity_logs` mapeando campos básicos. Sem perda de histórico.
-
-### 6. Sem UI
-
-Nenhuma tela é criada. A consulta é feita via SQL direto (ex.: `SELECT * FROM pdv_activity_logs WHERE actor_id = ... AND occurred_at::date = '2026-06-29' ORDER BY occurred_at`). Se no futuro a Luana ou outro responsável quiser uma tela, fazemos depois.
-
-## Detalhes técnicos relevantes
-
-- O helper roda em `*.server.ts` (não exposto ao cliente) e usa `supabaseAdmin` para inserir.
-- IP é extraído de `request.headers.get('x-forwarded-for')` com fallback.
-- `route` é passado explicitamente em cada chamada para clareza (`'pdv.openTab'`, `'pdv.addItem'`, etc.).
-- Erros conhecidos da RPC (`raise exception 'Sem permissao...'`) são capturados e marcados como `denied` em vez de `error`.
-- Os logs antigos de `audit_logs` continuam existindo — não remover, apenas duplicar daqui para frente.
-
-## Validação após implementação
-
-1. Executar uma sequência completa via Playwright/manual: abrir comanda → adicionar 2 itens → editar qty → remover 1 → tentar fechar com Wise → cancelar Wise → fechar como dinheiro.
-2. `SELECT action, status, occurred_at, tab_code, product_name, error_message FROM pdv_activity_logs ORDER BY occurred_at DESC LIMIT 20;` confirmar 1 linha por ação, com snapshots legíveis.
-3. Tentar uma ação proibida (ex.: usuário sem permissão) e confirmar `status='denied'`.
-
-## Sobre o caso da Luana
-
-Esta instrumentação **a partir de agora** revelará exatamente o que ocorre. Para os "pedidos de barbearia que sumiram", consigo já antecipar a investigação consultando `audit_logs` por ator + período (ex.: a comanda Wise pendente `CMD-20260629-0001` é provavelmente um dos casos). Posso anexar essa consulta ao final da implementação para confrontarmos a versão dela com o que o banco registrou.
+As três visões diferentes que você viu são todas a **mesma venda** apontando para o **mesmo perfil**, que foi reescrito várias vezes. Não há perda de dado financeiro — só de identidade histórica. Após o snapshot, cada venda passa a guardar quem era o cliente naquele momento.
