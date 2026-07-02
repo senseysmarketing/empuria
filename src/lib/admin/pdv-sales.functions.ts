@@ -500,10 +500,8 @@ export const voidPdvSale = createServerFn({ method: "POST" })
         params: data,
       },
       async () => {
-        if (!context.isAdmin) {
-          const allowed = await userHasAction(context.userId, "pdv.void_sale");
-          if (!allowed) throw new Error("Sem permissão para anular vendas.");
-        }
+        // Requer módulo PDV (garantido pelo middleware). Qualquer staff pode anular com motivo auditado.
+
         const { error } = await supabaseAdmin.rpc("pdv_void_sale", {
           p_sale_id: data.saleId,
           p_admin_id: context.userId,
