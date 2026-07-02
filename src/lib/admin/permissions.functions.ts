@@ -182,30 +182,16 @@ export const setStaffActionPermission = createServerFn({ method: "POST" })
     z
       .object({
         user_id: z.string().uuid(),
-        action_key: z.enum(ALL_ACTIONS),
+        action_key: z.string(),
         is_allowed: z.boolean(),
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
-    const { error } = await supabaseAdmin
-      .from("staff_action_permissions")
-      .upsert(
-        { user_id: data.user_id, action_key: data.action_key, is_allowed: data.is_allowed },
-        { onConflict: "user_id,action_key" },
-      );
-    if (error) throw new Error(error.message);
-
-    await supabaseAdmin.from("audit_logs").insert({
-      actor_id: context.userId,
-      action: data.is_allowed ? "action_permission.grant" : "action_permission.revoke",
-      module: "configuracoes",
-      entity_type: "staff_action_permission",
-      entity_id: null,
-      new_data: { user_id: data.user_id, action_key: data.action_key, is_allowed: data.is_allowed },
-    });
+  .handler(async () => {
+    // Ações granulares foram descontinuadas — permissões agora são por módulo.
     return { ok: true };
   });
+
 
 export const createStaffMember = createServerFn({ method: "POST" })
   .middleware([requireAdmin()])
