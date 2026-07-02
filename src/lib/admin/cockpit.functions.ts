@@ -21,6 +21,7 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
         ? supabase.from("orders").select("amount_cents,currency,payment_status")
             .gte("created_at", isoToday).lt("created_at", isoTomorrow)
             .eq("payment_status", "aprovado")
+            .eq("currency", "EUR")
         : Promise.resolve({ data: [] }),
       supabase.from("profiles").select("id", { count: "exact", head: true })
         .eq("is_club_member", true).gte("updated_at", thirtyDaysAgo.toISOString()),
@@ -31,6 +32,7 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
         ? supabase.from("orders").select("created_at,amount_cents")
             .gte("created_at", thirtyDaysAgo.toISOString())
             .eq("payment_status", "aprovado")
+            .eq("currency", "EUR")
         : Promise.resolve({ data: [] }),
       supabase.from("appointments").select("id,starts_at,services(title),profiles(full_name),staff_assignments(staff_id)")
         .gte("starts_at", new Date().toISOString())
@@ -39,10 +41,9 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
         .gte("arrived_at", isoToday).order("arrived_at", { ascending: false }),
     ]);
 
-    const salesTodayByCurrency = { BRL: 0, EUR: 0 };
+    let salesTodayEur = 0;
     for (const o of todayOrders.data ?? []) {
-      const cur = (o.currency === "EUR" ? "EUR" : "BRL") as "BRL" | "EUR";
-      salesTodayByCurrency[cur] += (o.amount_cents ?? 0) / 100;
+      salesTodayEur += (o.amount_cents ?? 0) / 100;
     }
 
     // Bucket by day
@@ -59,7 +60,7 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
     const revenueSeries = Object.entries(buckets).map(([date, value]) => ({ date, value }));
 
     return {
-      salesTodayByCurrency,
+      salesTodayEur,
       canViewFinancials: isAdmin,
       newMembers: monthlyMembers.count ?? 0,
       appointmentsToday: (todayAppts.data ?? []).length,
@@ -68,6 +69,7 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
       revenueSeries: isAdmin ? revenueSeries : [],
       todayArrivals: arrivals.data ?? [],
     };
+
   });
 
 export const getActivityFeed = createServerFn({ method: "GET" })
