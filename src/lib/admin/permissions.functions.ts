@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaff, requireAdmin } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
+import { BASELINE_MODULES } from "./permission-profiles";
 
 
 export const ALL_MODULES = [
@@ -44,34 +45,6 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   conciliacoes_wise: "Conciliações Wise",
 };
 
-export const ALL_ACTIONS = [
-  "pdv.void_sale",
-  "pdv.remove_tab_item",
-  "pdv.cancel_tab",
-  "crm.view_all_leads",
-  "crm.automations.view",
-  "crm.automations.manage",
-  "crm.automations.pause",
-  "crm.automations.logs",
-  "crm.automations.cancel_pending_action",
-  "esteira.cancel_order",
-  "esteira.refund_order",
-] as const;
-export type ActionKey = (typeof ALL_ACTIONS)[number];
-
-export const ACTION_LABELS: Record<ActionKey, string> = {
-  "pdv.void_sale": "Anular venda",
-  "pdv.remove_tab_item": "Remover item de comanda",
-  "pdv.cancel_tab": "Cancelar comanda",
-  "crm.view_all_leads": "Ver todos os leads",
-  "crm.automations.view": "Ver automacoes do CRM",
-  "crm.automations.manage": "Criar e editar automacoes do CRM",
-  "crm.automations.pause": "Pausar automacoes do CRM",
-  "crm.automations.logs": "Ver logs de automacoes do CRM",
-  "crm.automations.cancel_pending_action": "Cancelar envios pendentes do CRM",
-  "esteira.cancel_order": "Cancelar pedido da esteira",
-  "esteira.refund_order": "Estornar pedido da esteira",
-};
 
 /** Returns the modules the current user can access. Admins get all. */
 export const getMyModuleAccess = createServerFn({ method: "GET" })
