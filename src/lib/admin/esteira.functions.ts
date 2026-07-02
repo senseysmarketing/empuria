@@ -311,7 +311,7 @@ export const cancelOrder = createServerFn({ method: "POST" })
   });
 
 export const refundOrder = createServerFn({ method: "POST" })
-  .middleware([requireStaffOrAction("esteira.refund_order")])
+  .middleware([requireModule("esteira")])
   .inputValidator((d) =>
     z
       .object({
