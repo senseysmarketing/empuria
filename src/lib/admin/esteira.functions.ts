@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireStaff, requireAdmin, requireStaffOrAction } from "./auth";
+import { requireStaff, requireAdmin, requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
 import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
