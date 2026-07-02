@@ -39,7 +39,7 @@ function CockpitAdminPage() {
   const feedQ = useQuery({ queryKey: ["activity"], queryFn: () => fetchFeed(), retry: false });
 
   const m = metricsQ.data;
-  const salesLabel = m?.salesTodayByCurrency ? formatSales(m.salesTodayByCurrency) : "R$ 0,00";
+  const salesLabel = eurFmt.format(m?.salesTodayEur ?? 0);
   useTopBarQuickStat(
     m?.canViewFinancials ? { label: "Vendas hoje", value: salesLabel } : null,
   );
