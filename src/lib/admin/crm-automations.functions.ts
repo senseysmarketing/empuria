@@ -4,7 +4,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { requireModule } from "./auth";
-import { userHasAction } from "./permission-checks";
+
 import { sendCrmWhatsappMessageInternal } from "./crm-whatsapp.functions";
 
 const db = supabaseAdmin as any;
