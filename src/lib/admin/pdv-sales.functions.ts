@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireModule } from "./auth";
-import { userHasAction } from "./permission-checks";
+
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { createOrReuseManualCustomer } from "./manual-users";
@@ -389,10 +389,9 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
       counts.set(item.sale_id, current);
     }
 
-    let canVoid = Boolean(context.isAdmin);
-    if (!canVoid) {
-      canVoid = await userHasAction(context.userId, "pdv.void_sale");
-    }
+    // Todo staff com acesso ao módulo PDV pode anular vendas (com motivo auditado).
+    const canVoid = true;
+
 
     return {
       items: sales.map((sale) => ({
@@ -501,10 +500,8 @@ export const voidPdvSale = createServerFn({ method: "POST" })
         params: data,
       },
       async () => {
-        if (!context.isAdmin) {
-          const allowed = await userHasAction(context.userId, "pdv.void_sale");
-          if (!allowed) throw new Error("Sem permissão para anular vendas.");
-        }
+        // Requer módulo PDV (garantido pelo middleware). Qualquer staff pode anular com motivo auditado.
+
         const { error } = await supabaseAdmin.rpc("pdv_void_sale", {
           p_sale_id: data.saleId,
           p_admin_id: context.userId,

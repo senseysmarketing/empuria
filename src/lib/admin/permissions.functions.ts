@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaff, requireAdmin } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
+import { BASELINE_MODULES } from "./permission-profiles";
 
 
 export const ALL_MODULES = [
@@ -44,34 +45,6 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   conciliacoes_wise: "Conciliações Wise",
 };
 
-export const ALL_ACTIONS = [
-  "pdv.void_sale",
-  "pdv.remove_tab_item",
-  "pdv.cancel_tab",
-  "crm.view_all_leads",
-  "crm.automations.view",
-  "crm.automations.manage",
-  "crm.automations.pause",
-  "crm.automations.logs",
-  "crm.automations.cancel_pending_action",
-  "esteira.cancel_order",
-  "esteira.refund_order",
-] as const;
-export type ActionKey = (typeof ALL_ACTIONS)[number];
-
-export const ACTION_LABELS: Record<ActionKey, string> = {
-  "pdv.void_sale": "Anular venda",
-  "pdv.remove_tab_item": "Remover item de comanda",
-  "pdv.cancel_tab": "Cancelar comanda",
-  "crm.view_all_leads": "Ver todos os leads",
-  "crm.automations.view": "Ver automacoes do CRM",
-  "crm.automations.manage": "Criar e editar automacoes do CRM",
-  "crm.automations.pause": "Pausar automacoes do CRM",
-  "crm.automations.logs": "Ver logs de automacoes do CRM",
-  "crm.automations.cancel_pending_action": "Cancelar envios pendentes do CRM",
-  "esteira.cancel_order": "Cancelar pedido da esteira",
-  "esteira.refund_order": "Estornar pedido da esteira",
-};
 
 /** Returns the modules the current user can access. Admins get all. */
 export const getMyModuleAccess = createServerFn({ method: "GET" })
@@ -89,21 +62,13 @@ export const getMyModuleAccess = createServerFn({ method: "GET" })
     return { isAdmin: false, modules: (data ?? []).map((r) => r.module_key) };
   });
 
-/** Returns the action subpermissions for the current user. Admins implicitly have all. */
+/** Returns empty for compatibility. Actions granulares foram removidas — módulo controla tudo. */
 export const getMyActionAccess = createServerFn({ method: "GET" })
   .middleware([requireStaff])
   .handler(async ({ context }) => {
-    if (context.isAdmin) {
-      return { isAdmin: true, actions: [...ALL_ACTIONS] as string[] };
-    }
-    const { data, error } = await supabaseAdmin
-      .from("staff_action_permissions")
-      .select("action_key")
-      .eq("user_id", context.userId)
-      .eq("is_allowed", true);
-    if (error) throw new Error(error.message);
-    return { isAdmin: false, actions: (data ?? []).map((r) => r.action_key) };
+    return { isAdmin: Boolean(context.isAdmin), actions: [] as string[] };
   });
+
 
 /** Admin-only: list staff users + their per-module + per-action permission matrix. */
 export const listStaffWithPermissions = createServerFn({ method: "GET" })
@@ -217,30 +182,16 @@ export const setStaffActionPermission = createServerFn({ method: "POST" })
     z
       .object({
         user_id: z.string().uuid(),
-        action_key: z.enum(ALL_ACTIONS),
+        action_key: z.string(),
         is_allowed: z.boolean(),
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
-    const { error } = await supabaseAdmin
-      .from("staff_action_permissions")
-      .upsert(
-        { user_id: data.user_id, action_key: data.action_key, is_allowed: data.is_allowed },
-        { onConflict: "user_id,action_key" },
-      );
-    if (error) throw new Error(error.message);
-
-    await supabaseAdmin.from("audit_logs").insert({
-      actor_id: context.userId,
-      action: data.is_allowed ? "action_permission.grant" : "action_permission.revoke",
-      module: "configuracoes",
-      entity_type: "staff_action_permission",
-      entity_id: null,
-      new_data: { user_id: data.user_id, action_key: data.action_key, is_allowed: data.is_allowed },
-    });
+  .handler(async () => {
+    // Ações granulares foram descontinuadas — permissões agora são por módulo.
     return { ok: true };
   });
+
 
 export const createStaffMember = createServerFn({ method: "POST" })
   .middleware([requireAdmin()])
@@ -271,16 +222,20 @@ export const createStaffMember = createServerFn({ method: "POST" })
       );
     if (roleError) throw new Error(roleError.message);
 
-    // Auto-grant the base "cockpit" module so every new staff lands on /admin
-    // with the staff cockpit visible by default. Admins ignore this row.
+    // Baseline aberta para novos staff: cockpit, agenda, pdv, esteira, eventos, crm, clube.
     if (data.role === "staff") {
       await supabaseAdmin
         .from("staff_module_permissions")
         .upsert(
-          { user_id: customer.user_id, module_key: "cockpit", is_allowed: true },
+          BASELINE_MODULES.map((module_key) => ({
+            user_id: customer.user_id,
+            module_key,
+            is_allowed: true,
+          })),
           { onConflict: "user_id,module_key" },
         );
     }
+
 
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,

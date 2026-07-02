@@ -57,7 +57,7 @@ import {
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useActionAccess } from "@/hooks/use-action-access";
+
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
 
 export const Route = createFileRoute("/_authenticated/admin/esteira")({
@@ -123,7 +123,9 @@ type Order = {
 
 function EsteiraPage() {
   const { isAdmin } = useCurrentUser();
-  const { can: canAction } = useActionAccess();
+  // Módulo Esteira já é validado pelo middleware — qualquer staff com acesso pode cancelar/estornar.
+  const canAction = (_key: string) => true;
+
   const fetchOrders = useServerFn(listOrders);
   const update = useServerFn(updateOrder);
   const markManual = useServerFn(markOrderPaidManual);

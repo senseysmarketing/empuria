@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireStaff, requireAdmin, requireStaffOrAction } from "./auth";
+import { requireStaff, requireAdmin, requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
 import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
@@ -284,7 +284,7 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
   });
 
 export const cancelOrder = createServerFn({ method: "POST" })
-  .middleware([requireStaffOrAction("esteira.cancel_order")])
+  .middleware([requireModule("esteira")])
   .inputValidator((d) =>
     z
       .object({
@@ -311,7 +311,7 @@ export const cancelOrder = createServerFn({ method: "POST" })
   });
 
 export const refundOrder = createServerFn({ method: "POST" })
-  .middleware([requireStaffOrAction("esteira.refund_order")])
+  .middleware([requireModule("esteira")])
   .inputValidator((d) =>
     z
       .object({

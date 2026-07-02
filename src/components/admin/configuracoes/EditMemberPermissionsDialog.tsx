@@ -9,6 +9,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +23,7 @@ import { toast } from "sonner";
 import {
   MODULE_LABELS,
   setStaffPermission,
-  setStaffActionPermission,
   type ModuleKey,
-  type ActionKey,
 } from "@/lib/admin/permissions.functions";
 import {
   PERMISSION_GROUPS,
@@ -52,12 +56,10 @@ export function EditMemberPermissionsDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const setPerm = useServerFn(setStaffPermission);
-  const setActionPerm = useServerFn(setStaffActionPermission);
   const qc = useQueryClient();
   const isAdmin = member?.role === "admin";
 
   const [selected, setSelected] = useState<Set<ModuleKey>>(new Set());
-  const [selectedActions, setSelectedActions] = useState<Set<ActionKey>>(new Set());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -65,7 +67,6 @@ export function EditMemberPermissionsDialog({
       const base = new Set(member.allowed_modules as ModuleKey[]);
       for (const m of LOCKED_BASE_MODULES) base.add(m);
       setSelected(base);
-      setSelectedActions(new Set((member.allowed_actions ?? []) as ActionKey[]));
     }
   }, [member, open]);
 
@@ -76,10 +77,6 @@ export function EditMemberPermissionsDialog({
 
   const originalModules = useMemo(
     () => new Set((member?.allowed_modules ?? []) as ModuleKey[]),
-    [member],
-  );
-  const originalActions = useMemo(
-    () => new Set((member?.allowed_actions ?? []) as ActionKey[]),
     [member],
   );
 
@@ -93,21 +90,17 @@ export function EditMemberPermissionsDialog({
     });
   };
 
-  const toggleAction = (action: ActionKey, value: boolean) => {
-    setSelectedActions((prev) => {
-      const next = new Set(prev);
-      if (value) next.add(action);
-      else next.delete(action);
-      return next;
-    });
-  };
-
   const applyProfile = (key: ProfileKey) => {
     if (key === "personalizado") return;
     const next = new Set<ModuleKey>(PROFILE_MODULES[key]);
     for (const m of LOCKED_BASE_MODULES) next.add(m);
     setSelected(next);
   };
+
+  const defaultAccordionOpen = useMemo(
+    () => PERMISSION_GROUPS.filter((g) => g.defaultOpen).map((g) => g.key),
+    [],
+  );
 
   const save = async () => {
     if (!member) return;
@@ -116,17 +109,7 @@ export function EditMemberPermissionsDialog({
     for (const m of selected) if (!originalModules.has(m)) toEnable.push(m);
     for (const m of originalModules) if (!selected.has(m)) toDisable.push(m);
 
-    const actionsToEnable: ActionKey[] = [];
-    const actionsToDisable: ActionKey[] = [];
-    for (const a of selectedActions) if (!originalActions.has(a)) actionsToEnable.push(a);
-    for (const a of originalActions) if (!selectedActions.has(a)) actionsToDisable.push(a);
-
-    if (
-      toEnable.length === 0 &&
-      toDisable.length === 0 &&
-      actionsToEnable.length === 0 &&
-      actionsToDisable.length === 0
-    ) {
+    if (toEnable.length === 0 && toDisable.length === 0) {
       toast.info("Nenhuma alteração para salvar.");
       onOpenChange(false);
       return;
@@ -141,17 +124,10 @@ export function EditMemberPermissionsDialog({
         ...toDisable.map((module_key) =>
           setPerm({ data: { user_id: member.id, module_key, is_allowed: false } }),
         ),
-        ...actionsToEnable.map((action_key) =>
-          setActionPerm({ data: { user_id: member.id, action_key, is_allowed: true } }),
-        ),
-        ...actionsToDisable.map((action_key) =>
-          setActionPerm({ data: { user_id: member.id, action_key, is_allowed: false } }),
-        ),
       ]);
       toast.success("Permissões atualizadas");
       qc.invalidateQueries({ queryKey: ["staff-permissions"] });
       qc.invalidateQueries({ queryKey: ["my-module-access"] });
-      qc.invalidateQueries({ queryKey: ["my-action-access"] });
       onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar");
@@ -173,7 +149,7 @@ export function EditMemberPermissionsDialog({
           <DialogDescription>
             {isAdmin
               ? "Admins recebem acesso total automaticamente — nada para configurar."
-              : "Escolha um perfil pronto ou ajuste manualmente os grupos de permissões."}
+              : "Escolha um perfil pronto ou ajuste manualmente por seção."}
           </DialogDescription>
         </DialogHeader>
 
@@ -218,92 +194,82 @@ export function EditMemberPermissionsDialog({
               </p>
             </section>
 
-            <section className="space-y-4">
+            <section className="space-y-2">
               <div className="text-xs uppercase tracking-wider text-admin-ink-muted">
-                Permissões por grupo
+                Permissões por seção
               </div>
-              {PERMISSION_GROUPS.map((group) => (
-                <div
-                  key={group.key}
-                  className={cn(
-                    "rounded-xl border p-4",
-                    group.tone === "sensitive"
-                      ? "border-yellow-brand/30 bg-yellow-brand/5"
-                      : "border-admin-border bg-admin-bg/40",
-                  )}
-                >
-                  <div className="flex items-baseline justify-between gap-2 mb-3">
-                    <div>
-                      <div className="font-display text-sm text-admin-ink">{group.label}</div>
-                      <div className="text-xs text-admin-ink-muted mt-0.5">
-                        {group.description}
-                      </div>
-                    </div>
-                    {group.tone === "sensitive" && (
-                      <Badge
-                        variant="outline"
-                        className="text-[9px] border-yellow-brand/50 text-yellow-brand"
-                      >
-                        Sensível
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    {group.modules.map((m) => {
-                      const locked = LOCKED_BASE_MODULES.includes(m);
-                      const checked = selected.has(m);
-                      return (
-                        <div
-                          key={m}
-                          className="flex items-center justify-between rounded-md border border-admin-border bg-admin-surface px-3 py-2"
-                        >
-                          <div className="flex items-center gap-2 text-sm text-admin-ink">
-                            {locked && <Lock className="h-3.5 w-3.5 text-admin-ink-muted" />}
-                            {MODULE_LABELS[m]}
-                            {locked && (
-                              <span className="text-[10px] text-admin-ink-muted">
-                                (sempre liberado)
-                              </span>
-                            )}
-                          </div>
-                          <Switch
-                            checked={checked}
-                            disabled={locked}
-                            onCheckedChange={(v) => toggle(m, v)}
-                          />
-                        </div>
-                      );
-                    })}
-                    {group.actions?.map((a) => {
-                      const checked = selectedActions.has(a.key);
-                      return (
-                        <div
-                          key={a.key}
-                          className="flex items-center justify-between rounded-md border border-admin-accent/30 bg-admin-accent/5 px-3 py-2"
-                        >
-                          <div className="text-sm text-admin-ink">
-                            <div className="flex items-center gap-2">
-                              {a.label}
-                              <span className="text-[9px] uppercase tracking-wider text-admin-accent">
-                                ação
-                              </span>
+              <Accordion type="multiple" defaultValue={defaultAccordionOpen} className="space-y-2">
+                {PERMISSION_GROUPS.map((group) => {
+                  const enabledCount = group.modules.filter((m) => selected.has(m)).length;
+                  return (
+                    <AccordionItem
+                      key={group.key}
+                      value={group.key}
+                      className={cn(
+                        "rounded-xl border px-4",
+                        group.tone === "sensitive"
+                          ? "border-yellow-brand/40 bg-yellow-brand/5"
+                          : "border-admin-border bg-admin-bg/40",
+                      )}
+                    >
+                      <AccordionTrigger className="hover:no-underline py-3">
+                        <div className="flex flex-1 items-center justify-between gap-3 pr-2">
+                          <div className="text-left">
+                            <div className="font-display text-sm text-admin-ink flex items-center gap-2">
+                              {group.label}
+                              {group.tone === "sensitive" && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] border-yellow-brand/50 text-yellow-brand"
+                                >
+                                  Sensível
+                                </Badge>
+                              )}
                             </div>
-                            {a.description && (
-                              <div className="text-[11px] text-admin-ink-muted mt-0.5">
-                                {a.description}
-                              </div>
-                            )}
+                            <div className="text-xs text-admin-ink-muted mt-0.5 font-normal">
+                              {group.description}
+                            </div>
                           </div>
-                          <Switch
-                            checked={checked}
-                            onCheckedChange={(v) => toggleAction(a.key, v)}
-                          />
+                          <span className="text-[11px] text-admin-ink-muted tabular-nums shrink-0">
+                            {enabledCount}/{group.modules.length}
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-2 pb-3">
+                          {group.modules.map((m) => {
+                            const locked = LOCKED_BASE_MODULES.includes(m);
+                            const checked = selected.has(m);
+                            return (
+                              <div
+                                key={m}
+                                className="flex items-center justify-between rounded-md border border-admin-border bg-admin-surface px-3 py-2"
+                              >
+                                <div className="flex items-center gap-2 text-sm text-admin-ink">
+                                  {locked && (
+                                    <Lock className="h-3.5 w-3.5 text-admin-ink-muted" />
+                                  )}
+                                  {MODULE_LABELS[m]}
+                                  {locked && (
+                                    <span className="text-[10px] text-admin-ink-muted">
+                                      (sempre liberado)
+                                    </span>
+                                  )}
+                                </div>
+                                <Switch
+                                  checked={checked}
+                                  disabled={locked}
+                                  onCheckedChange={(v) => toggle(m, v)}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
             </section>
           </div>
         )}
