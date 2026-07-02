@@ -12,10 +12,10 @@ export function RevenueChart({ data }: { data: { date: string; value: number }[]
             </linearGradient>
           </defs>
           <XAxis dataKey="date" tickFormatter={(v) => v.slice(5)} fontSize={10} stroke="oklch(0.62 0.025 50)" tickLine={false} axisLine={false} />
-          <YAxis fontSize={10} stroke="oklch(0.62 0.025 50)" tickLine={false} axisLine={false} width={40} />
+          <YAxis fontSize={10} stroke="oklch(0.62 0.025 50)" tickLine={false} axisLine={false} width={48} tickFormatter={(v) => `€${v}`} />
           <Tooltip
             contentStyle={{ background: "white", border: "1px solid oklch(0.91 0.008 70)", borderRadius: 12, fontSize: 12 }}
-            formatter={(v) => [`€ ${Number(v).toFixed(2)}`, "Receita"]}
+            formatter={(v) => [new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(Number(v)), "Receita"]}
             labelFormatter={(l) => l}
           />
           <Area type="monotone" dataKey="value" stroke="oklch(0.58 0.18 45)" strokeWidth={2} fill="url(#rev)" />
