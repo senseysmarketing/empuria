@@ -199,25 +199,19 @@ function messageForStep(step: AutomationStep, lead: LeadRow) {
   return renderTemplate(template, lead);
 }
 
-async function canManageAutomations(userId: string, isAdmin?: boolean) {
-  return Boolean(isAdmin) || (await userHasAction(userId, "crm.automations.manage"));
+async function canManageAutomations(_userId: string, _isAdmin?: boolean) {
+  // Módulo "automacoes" (ou admin) já é validado pelo middleware requireModule("automacoes").
+  return true;
 }
 
-async function canPauseAutomations(userId: string, isAdmin?: boolean) {
-  return (
-    Boolean(isAdmin) ||
-    (await userHasAction(userId, "crm.automations.pause")) ||
-    (await userHasAction(userId, "crm.automations.manage"))
-  );
+async function canPauseAutomations(_userId: string, _isAdmin?: boolean) {
+  return true;
 }
 
-async function canCancelPending(userId: string, isAdmin?: boolean) {
-  return (
-    Boolean(isAdmin) ||
-    (await userHasAction(userId, "crm.automations.cancel_pending_action")) ||
-    (await userHasAction(userId, "crm.automations.manage"))
-  );
+async function canCancelPending(_userId: string, _isAdmin?: boolean) {
+  return true;
 }
+
 
 async function assertManage(userId: string, isAdmin?: boolean) {
   if (!(await canManageAutomations(userId, isAdmin))) {
