@@ -62,21 +62,13 @@ export const getMyModuleAccess = createServerFn({ method: "GET" })
     return { isAdmin: false, modules: (data ?? []).map((r) => r.module_key) };
   });
 
-/** Returns the action subpermissions for the current user. Admins implicitly have all. */
+/** Returns empty for compatibility. Actions granulares foram removidas — módulo controla tudo. */
 export const getMyActionAccess = createServerFn({ method: "GET" })
   .middleware([requireStaff])
   .handler(async ({ context }) => {
-    if (context.isAdmin) {
-      return { isAdmin: true, actions: [...ALL_ACTIONS] as string[] };
-    }
-    const { data, error } = await supabaseAdmin
-      .from("staff_action_permissions")
-      .select("action_key")
-      .eq("user_id", context.userId)
-      .eq("is_allowed", true);
-    if (error) throw new Error(error.message);
-    return { isAdmin: false, actions: (data ?? []).map((r) => r.action_key) };
+    return { isAdmin: Boolean(context.isAdmin), actions: [] as string[] };
   });
+
 
 /** Admin-only: list staff users + their per-module + per-action permission matrix. */
 export const listStaffWithPermissions = createServerFn({ method: "GET" })
