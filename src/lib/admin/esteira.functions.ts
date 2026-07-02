@@ -284,7 +284,7 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
   });
 
 export const cancelOrder = createServerFn({ method: "POST" })
-  .middleware([requireStaffOrAction("esteira.cancel_order")])
+  .middleware([requireModule("esteira")])
   .inputValidator((d) =>
     z
       .object({
