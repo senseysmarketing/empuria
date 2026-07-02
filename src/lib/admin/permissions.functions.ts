@@ -222,16 +222,20 @@ export const createStaffMember = createServerFn({ method: "POST" })
       );
     if (roleError) throw new Error(roleError.message);
 
-    // Auto-grant the base "cockpit" module so every new staff lands on /admin
-    // with the staff cockpit visible by default. Admins ignore this row.
+    // Baseline aberta para novos staff: cockpit, agenda, pdv, esteira, eventos, crm, clube.
     if (data.role === "staff") {
       await supabaseAdmin
         .from("staff_module_permissions")
         .upsert(
-          { user_id: customer.user_id, module_key: "cockpit", is_allowed: true },
+          BASELINE_MODULES.map((module_key) => ({
+            user_id: customer.user_id,
+            module_key,
+            is_allowed: true,
+          })),
           { onConflict: "user_id,module_key" },
         );
     }
+
 
     await supabaseAdmin.from("audit_logs").insert({
       actor_id: context.userId,
