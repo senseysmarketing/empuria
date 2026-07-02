@@ -389,10 +389,9 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
       counts.set(item.sale_id, current);
     }
 
-    let canVoid = Boolean(context.isAdmin);
-    if (!canVoid) {
-      canVoid = await userHasAction(context.userId, "pdv.void_sale");
-    }
+    // Todo staff com acesso ao módulo PDV pode anular vendas (com motivo auditado).
+    const canVoid = true;
+
 
     return {
       items: sales.map((sale) => ({
