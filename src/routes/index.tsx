@@ -29,6 +29,7 @@ import {
   Sparkles,
   ArrowRight,
   Check,
+  MessageCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -140,6 +141,18 @@ function HomePage() {
                   className="inline-flex items-center gap-2 border border-yellow-brand/60 text-yellow-brand hover:bg-yellow-brand hover:text-brown px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all"
                 >
                   Conhecer o Instituto Físico
+                </a>
+              </div>
+              <div className="mt-5 flex items-center gap-2 text-offwhite/80 font-body text-sm">
+                <MessageCircle className="w-4 h-4 text-yellow-brand" />
+                <span>Fale no WhatsApp:</span>
+                <a
+                  href="https://wa.me/34627906817"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-yellow-brand hover:text-offwhite underline underline-offset-4 transition"
+                >
+                  +34 627 90 68 17
                 </a>
               </div>
             </Reveal>
