@@ -29,6 +29,7 @@ import {
   Sparkles,
   ArrowRight,
   Check,
+  MessageCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
