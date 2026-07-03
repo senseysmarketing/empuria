@@ -37,8 +37,21 @@ export function SiteFooter() {
               Fale Conosco
             </h4>
             <ul className="space-y-2 font-body text-offwhite/85 text-sm">
-              <li>contato@empuria.es</li>
-              <li>+34 600 000 000</li>
+              <li>
+                <a href="mailto:contato@empuria.es" className="hover:text-yellow-brand transition">
+                  contato@empuria.es
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://wa.me/34627906817"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-yellow-brand transition"
+                >
+                  +34 627 90 68 17
+                </a>
+              </li>
               <li>Seg–Sáb · 10h às 20h</li>
             </ul>
           </div>
