@@ -143,6 +143,18 @@ function HomePage() {
                   Conhecer o Instituto Físico
                 </a>
               </div>
+              <div className="mt-5 flex items-center gap-2 text-offwhite/80 font-body text-sm">
+                <MessageCircle className="w-4 h-4 text-yellow-brand" />
+                <span>Fale no WhatsApp:</span>
+                <a
+                  href="https://wa.me/34627906817"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-yellow-brand hover:text-offwhite underline underline-offset-4 transition"
+                >
+                  +34 627 90 68 17
+                </a>
+              </div>
             </Reveal>
           </div>
 
