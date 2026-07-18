@@ -38,8 +38,8 @@ export function SiteFooter() {
             </h4>
             <ul className="space-y-2 font-body text-offwhite/85 text-sm">
               <li>
-                <a href="mailto:contato@empuria.es" className="hover:text-yellow-brand transition">
-                  contato@empuria.es
+                <a href="mailto:instempuriaes@gmail.com" className="hover:text-yellow-brand transition">
+                  instempuriaes@gmail.com
                 </a>
               </li>
               <li>
@@ -52,7 +52,7 @@ export function SiteFooter() {
                   +34 627 90 68 17
                 </a>
               </li>
-              <li>Seg–Sáb · 10h às 20h</li>
+              <li>Seg–Sex · 12h às 20h</li>
             </ul>
           </div>
         </div>
