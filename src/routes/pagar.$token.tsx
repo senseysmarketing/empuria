@@ -540,8 +540,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         {children}
         <footer className="mt-10 text-center text-[11px] text-brown-deep/40">
           © Instituto Empuria · Suporte:{" "}
-          <a className="underline" href="mailto:contato@empuria.com">
-            contato@empuria.com
+          <a className="underline" href="mailto:instempuriaes@gmail.com">
+            instempuriaes@gmail.com
           </a>
         </footer>
       </div>
