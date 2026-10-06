@@ -9,54 +9,53 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ServicosRouteImport } from './routes/servicos'
-import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ServicosSlugRouteImport } from './routes/servicos.$slug'
-import { Route as PagarTokenRouteImport } from './routes/pagar.$token'
-import { Route as LoginAdminRouteImport } from './routes/login_.admin'
-import { Route as EventoSlugRouteImport } from './routes/evento.$slug'
-import { Route as ClubeSucessoRouteImport } from './routes/clube.sucesso'
-import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
+import { Route as ServicosRouteImport } from './routes/servicos'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
+import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
+import { Route as ClubeSucessoRouteImport } from './routes/clube.sucesso'
+import { Route as EventoSlugRouteImport } from './routes/evento.$slug'
+import { Route as LoginAdminRouteImport } from './routes/login_.admin'
+import { Route as PagarTokenRouteImport } from './routes/pagar.$token'
+import { Route as ServicosSlugRouteImport } from './routes/servicos.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
-import { Route as ApiWebhooksUazapiRouteImport } from './routes/api.webhooks.uazapi'
-import { Route as ApiWebhooksMercadopagoRouteImport } from './routes/api.webhooks.mercadopago'
-import { Route as ApiWebhooksHublaRouteImport } from './routes/api.webhooks.hubla'
-import { Route as ApiCrmAutomationsWorkerRouteImport } from './routes/api.crm-automations.worker'
-import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
-import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
-import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_authenticated/portal.ingressos'
-import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenticated/portal.clube'
-import { Route as AuthenticatedAdminWiseConciliacaoRouteImport } from './routes/_authenticated/admin.wise-conciliacao'
-import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
-import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
-import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
-import { Route as AuthenticatedAdminRelatoriosRouteImport } from './routes/_authenticated/admin.relatorios'
-import { Route as AuthenticatedAdminPdvRouteImport } from './routes/_authenticated/admin.pdv'
-import { Route as AuthenticatedAdminFinanceiroRouteImport } from './routes/_authenticated/admin.financeiro'
-import { Route as AuthenticatedAdminEventosRouteImport } from './routes/_authenticated/admin.eventos'
-import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authenticated/admin.esteira'
-import { Route as AuthenticatedAdminCrmRouteImport } from './routes/_authenticated/admin.crm'
-import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_authenticated/admin.configuracoes'
-import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authenticated/admin.clube'
-import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
-import { Route as AuthenticatedAdminAgendaRouteImport } from './routes/_authenticated/admin.agenda'
 import { Route as AuthenticatedAdminAcessoNegadoRouteImport } from './routes/_authenticated/admin.acesso-negado'
+import { Route as AuthenticatedAdminAgendaRouteImport } from './routes/_authenticated/admin.agenda'
+import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
+import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authenticated/admin.clube'
+import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_authenticated/admin.configuracoes'
+import { Route as AuthenticatedAdminCrmRouteImport } from './routes/_authenticated/admin.crm'
+import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authenticated/admin.esteira'
+import { Route as AuthenticatedAdminEventosRouteImport } from './routes/_authenticated/admin.eventos'
+import { Route as AuthenticatedAdminFinanceiroRouteImport } from './routes/_authenticated/admin.financeiro'
+import { Route as AuthenticatedAdminPdvRouteImport } from './routes/_authenticated/admin.pdv'
+import { Route as AuthenticatedAdminRelatoriosRouteImport } from './routes/_authenticated/admin.relatorios'
+import { Route as AuthenticatedAdminSlotsRouteImport } from './routes/_authenticated/admin.slots'
+import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authenticated/admin.triagem'
+import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
+import { Route as AuthenticatedAdminWiseConciliacaoRouteImport } from './routes/_authenticated/admin.wise-conciliacao'
+import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
+import { Route as AuthenticatedPortalClubeRouteImport } from './routes/_authenticated/portal.clube'
+import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_authenticated/portal.ingressos'
+import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
+import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
+import { Route as ApiCrmAutomationsWorkerRouteImport } from './routes/api.crm-automations.worker'
+import { Route as ApiWebhooksHublaRouteImport } from './routes/api.webhooks.hubla'
+import { Route as ApiWebhooksMercadopagoRouteImport } from './routes/api.webhooks.mercadopago'
+import { Route as ApiWebhooksUazapiRouteImport } from './routes/api.webhooks.uazapi'
 import { Route as ApiPublicWebhooksWiseRouteImport } from './routes/api.public.webhooks.wise'
 import { Route as AuthenticatedPortalClubeCertificadoCodeRouteImport } from './routes/_authenticated/portal.clube.certificado.$code'
 
-const ServicosRoute = ServicosRouteImport.update({
-  id: '/servicos',
-  path: '/servicos',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
-  id: '/redefinir-senha',
-  path: '/redefinir-senha',
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -64,28 +63,29 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ServicosRoute = ServicosRouteImport.update({
+  id: '/servicos',
+  path: '/servicos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ServicosSlugRoute = ServicosSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => ServicosRoute,
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
-const PagarTokenRoute = PagarTokenRouteImport.update({
-  id: '/pagar/$token',
-  path: '/pagar/$token',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedPortalRoute = AuthenticatedPortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
-const LoginAdminRoute = LoginAdminRouteImport.update({
-  id: '/login_/admin',
-  path: '/login/admin',
+const ClubeSucessoRoute = ClubeSucessoRouteImport.update({
+  id: '/clube/sucesso',
+  path: '/clube/sucesso',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventoSlugRoute = EventoSlugRouteImport.update({
@@ -93,147 +93,30 @@ const EventoSlugRoute = EventoSlugRouteImport.update({
   path: '/evento/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClubeSucessoRoute = ClubeSucessoRouteImport.update({
-  id: '/clube/sucesso',
-  path: '/clube/sucesso',
+const LoginAdminRoute = LoginAdminRouteImport.update({
+  id: '/login_/admin',
+  path: '/login/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedPortalRoute = AuthenticatedPortalRouteImport.update({
-  id: '/portal',
-  path: '/portal',
-  getParentRoute: () => AuthenticatedRoute,
+const PagarTokenRoute = PagarTokenRouteImport.update({
+  id: '/pagar/$token',
+  path: '/pagar/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthenticatedRoute,
+const ServicosSlugRoute = ServicosSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => ServicosRoute,
 } as any)
-const AuthenticatedPortalIndexRoute =
-  AuthenticatedPortalIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedPortalRoute,
-  } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
-const ApiWebhooksUazapiRoute = ApiWebhooksUazapiRouteImport.update({
-  id: '/api/webhooks/uazapi',
-  path: '/api/webhooks/uazapi',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWebhooksMercadopagoRoute = ApiWebhooksMercadopagoRouteImport.update({
-  id: '/api/webhooks/mercadopago',
-  path: '/api/webhooks/mercadopago',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWebhooksHublaRoute = ApiWebhooksHublaRouteImport.update({
-  id: '/api/webhooks/hubla',
-  path: '/api/webhooks/hubla',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCrmAutomationsWorkerRoute = ApiCrmAutomationsWorkerRouteImport.update({
-  id: '/api/crm-automations/worker',
-  path: '/api/crm-automations/worker',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedPortalServicosRoute =
-  AuthenticatedPortalServicosRouteImport.update({
-    id: '/servicos',
-    path: '/servicos',
-    getParentRoute: () => AuthenticatedPortalRoute,
-  } as any)
-const AuthenticatedPortalLojaRoute = AuthenticatedPortalLojaRouteImport.update({
-  id: '/loja',
-  path: '/loja',
-  getParentRoute: () => AuthenticatedPortalRoute,
-} as any)
-const AuthenticatedPortalIngressosRoute =
-  AuthenticatedPortalIngressosRouteImport.update({
-    id: '/ingressos',
-    path: '/ingressos',
-    getParentRoute: () => AuthenticatedPortalRoute,
-  } as any)
-const AuthenticatedPortalClubeRoute =
-  AuthenticatedPortalClubeRouteImport.update({
-    id: '/clube',
-    path: '/clube',
-    getParentRoute: () => AuthenticatedPortalRoute,
-  } as any)
-const AuthenticatedAdminWiseConciliacaoRoute =
-  AuthenticatedAdminWiseConciliacaoRouteImport.update({
-    id: '/wise-conciliacao',
-    path: '/wise-conciliacao',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminUsuariosRoute =
-  AuthenticatedAdminUsuariosRouteImport.update({
-    id: '/usuarios',
-    path: '/usuarios',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminTriagemRoute =
-  AuthenticatedAdminTriagemRouteImport.update({
-    id: '/triagem',
-    path: '/triagem',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminSlotsRoute = AuthenticatedAdminSlotsRouteImport.update({
-  id: '/slots',
-  path: '/slots',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const AuthenticatedAdminRelatoriosRoute =
-  AuthenticatedAdminRelatoriosRouteImport.update({
-    id: '/relatorios',
-    path: '/relatorios',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminPdvRoute = AuthenticatedAdminPdvRouteImport.update({
-  id: '/pdv',
-  path: '/pdv',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const AuthenticatedAdminFinanceiroRoute =
-  AuthenticatedAdminFinanceiroRouteImport.update({
-    id: '/financeiro',
-    path: '/financeiro',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminEventosRoute =
-  AuthenticatedAdminEventosRouteImport.update({
-    id: '/eventos',
-    path: '/eventos',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminEsteiraRoute =
-  AuthenticatedAdminEsteiraRouteImport.update({
-    id: '/esteira',
-    path: '/esteira',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminCrmRoute = AuthenticatedAdminCrmRouteImport.update({
-  id: '/crm',
-  path: '/crm',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const AuthenticatedAdminConfiguracoesRoute =
-  AuthenticatedAdminConfiguracoesRouteImport.update({
-    id: '/configuracoes',
-    path: '/configuracoes',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedAdminClubeRoute = AuthenticatedAdminClubeRouteImport.update({
-  id: '/clube',
-  path: '/clube',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
-const AuthenticatedAdminAutomacoesRoute =
-  AuthenticatedAdminAutomacoesRouteImport.update({
-    id: '/automacoes',
-    path: '/automacoes',
+const AuthenticatedAdminAcessoNegadoRoute =
+  AuthenticatedAdminAcessoNegadoRouteImport.update({
+    id: '/acesso-negado',
+    path: '/acesso-negado',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminAgendaRoute =
@@ -242,12 +125,129 @@ const AuthenticatedAdminAgendaRoute =
     path: '/agenda',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-const AuthenticatedAdminAcessoNegadoRoute =
-  AuthenticatedAdminAcessoNegadoRouteImport.update({
-    id: '/acesso-negado',
-    path: '/acesso-negado',
+const AuthenticatedAdminAutomacoesRoute =
+  AuthenticatedAdminAutomacoesRouteImport.update({
+    id: '/automacoes',
+    path: '/automacoes',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminClubeRoute = AuthenticatedAdminClubeRouteImport.update({
+  id: '/clube',
+  path: '/clube',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminConfiguracoesRoute =
+  AuthenticatedAdminConfiguracoesRouteImport.update({
+    id: '/configuracoes',
+    path: '/configuracoes',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminCrmRoute = AuthenticatedAdminCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminEsteiraRoute =
+  AuthenticatedAdminEsteiraRouteImport.update({
+    id: '/esteira',
+    path: '/esteira',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminEventosRoute =
+  AuthenticatedAdminEventosRouteImport.update({
+    id: '/eventos',
+    path: '/eventos',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminFinanceiroRoute =
+  AuthenticatedAdminFinanceiroRouteImport.update({
+    id: '/financeiro',
+    path: '/financeiro',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPdvRoute = AuthenticatedAdminPdvRouteImport.update({
+  id: '/pdv',
+  path: '/pdv',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminRelatoriosRoute =
+  AuthenticatedAdminRelatoriosRouteImport.update({
+    id: '/relatorios',
+    path: '/relatorios',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminSlotsRoute = AuthenticatedAdminSlotsRouteImport.update({
+  id: '/slots',
+  path: '/slots',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminTriagemRoute =
+  AuthenticatedAdminTriagemRouteImport.update({
+    id: '/triagem',
+    path: '/triagem',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminUsuariosRoute =
+  AuthenticatedAdminUsuariosRouteImport.update({
+    id: '/usuarios',
+    path: '/usuarios',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminWiseConciliacaoRoute =
+  AuthenticatedAdminWiseConciliacaoRouteImport.update({
+    id: '/wise-conciliacao',
+    path: '/wise-conciliacao',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedPortalIndexRoute =
+  AuthenticatedPortalIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
+const AuthenticatedPortalClubeRoute =
+  AuthenticatedPortalClubeRouteImport.update({
+    id: '/clube',
+    path: '/clube',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
+const AuthenticatedPortalIngressosRoute =
+  AuthenticatedPortalIngressosRouteImport.update({
+    id: '/ingressos',
+    path: '/ingressos',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
+const AuthenticatedPortalLojaRoute = AuthenticatedPortalLojaRouteImport.update({
+  id: '/loja',
+  path: '/loja',
+  getParentRoute: () => AuthenticatedPortalRoute,
+} as any)
+const AuthenticatedPortalServicosRoute =
+  AuthenticatedPortalServicosRouteImport.update({
+    id: '/servicos',
+    path: '/servicos',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
+const ApiCrmAutomationsWorkerRoute = ApiCrmAutomationsWorkerRouteImport.update({
+  id: '/api/crm-automations/worker',
+  path: '/api/crm-automations/worker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksHublaRoute = ApiWebhooksHublaRouteImport.update({
+  id: '/api/webhooks/hubla',
+  path: '/api/webhooks/hubla',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksMercadopagoRoute = ApiWebhooksMercadopagoRouteImport.update({
+  id: '/api/webhooks/mercadopago',
+  path: '/api/webhooks/mercadopago',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksUazapiRoute = ApiWebhooksUazapiRouteImport.update({
+  id: '/api/webhooks/uazapi',
+  path: '/api/webhooks/uazapi',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWebhooksWiseRoute = ApiPublicWebhooksWiseRouteImport.update({
   id: '/api/public/webhooks/wise',
   path: '/api/public/webhooks/wise',
@@ -521,25 +521,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/servicos': {
-      id: '/servicos'
-      path: '/servicos'
-      fullPath: '/servicos'
-      preLoaderRoute: typeof ServicosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/redefinir-senha': {
-      id: '/redefinir-senha'
-      path: '/redefinir-senha'
-      fullPath: '/redefinir-senha'
-      preLoaderRoute: typeof RedefinirSenhaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -549,32 +535,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/servicos/$slug': {
-      id: '/servicos/$slug'
-      path: '/$slug'
-      fullPath: '/servicos/$slug'
-      preLoaderRoute: typeof ServicosSlugRouteImport
-      parentRoute: typeof ServicosRoute
-    }
-    '/pagar/$token': {
-      id: '/pagar/$token'
-      path: '/pagar/$token'
-      fullPath: '/pagar/$token'
-      preLoaderRoute: typeof PagarTokenRouteImport
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/login_/admin': {
-      id: '/login_/admin'
-      path: '/login/admin'
-      fullPath: '/login/admin'
-      preLoaderRoute: typeof LoginAdminRouteImport
+    '/servicos': {
+      id: '/servicos'
+      path: '/servicos'
+      fullPath: '/servicos'
+      preLoaderRoute: typeof ServicosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/portal': {
+      id: '/_authenticated/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof AuthenticatedPortalRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/clube/sucesso': {
+      id: '/clube/sucesso'
+      path: '/clube/sucesso'
+      fullPath: '/clube/sucesso'
+      preLoaderRoute: typeof ClubeSucessoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/evento/$slug': {
@@ -584,33 +584,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventoSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clube/sucesso': {
-      id: '/clube/sucesso'
-      path: '/clube/sucesso'
-      fullPath: '/clube/sucesso'
-      preLoaderRoute: typeof ClubeSucessoRouteImport
+    '/login_/admin': {
+      id: '/login_/admin'
+      path: '/login/admin'
+      fullPath: '/login/admin'
+      preLoaderRoute: typeof LoginAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/portal': {
-      id: '/_authenticated/portal'
-      path: '/portal'
-      fullPath: '/portal'
-      preLoaderRoute: typeof AuthenticatedPortalRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/pagar/$token': {
+      id: '/pagar/$token'
+      path: '/pagar/$token'
+      fullPath: '/pagar/$token'
+      preLoaderRoute: typeof PagarTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/portal/': {
-      id: '/_authenticated/portal/'
-      path: '/'
-      fullPath: '/portal/'
-      preLoaderRoute: typeof AuthenticatedPortalIndexRouteImport
-      parentRoute: typeof AuthenticatedPortalRoute
+    '/servicos/$slug': {
+      id: '/servicos/$slug'
+      path: '/$slug'
+      fullPath: '/servicos/$slug'
+      preLoaderRoute: typeof ServicosSlugRouteImport
+      parentRoute: typeof ServicosRoute
     }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
@@ -619,151 +612,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/api/webhooks/uazapi': {
-      id: '/api/webhooks/uazapi'
-      path: '/api/webhooks/uazapi'
-      fullPath: '/api/webhooks/uazapi'
-      preLoaderRoute: typeof ApiWebhooksUazapiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/webhooks/mercadopago': {
-      id: '/api/webhooks/mercadopago'
-      path: '/api/webhooks/mercadopago'
-      fullPath: '/api/webhooks/mercadopago'
-      preLoaderRoute: typeof ApiWebhooksMercadopagoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/webhooks/hubla': {
-      id: '/api/webhooks/hubla'
-      path: '/api/webhooks/hubla'
-      fullPath: '/api/webhooks/hubla'
-      preLoaderRoute: typeof ApiWebhooksHublaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/crm-automations/worker': {
-      id: '/api/crm-automations/worker'
-      path: '/api/crm-automations/worker'
-      fullPath: '/api/crm-automations/worker'
-      preLoaderRoute: typeof ApiCrmAutomationsWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/portal/servicos': {
-      id: '/_authenticated/portal/servicos'
-      path: '/servicos'
-      fullPath: '/portal/servicos'
-      preLoaderRoute: typeof AuthenticatedPortalServicosRouteImport
-      parentRoute: typeof AuthenticatedPortalRoute
-    }
-    '/_authenticated/portal/loja': {
-      id: '/_authenticated/portal/loja'
-      path: '/loja'
-      fullPath: '/portal/loja'
-      preLoaderRoute: typeof AuthenticatedPortalLojaRouteImport
-      parentRoute: typeof AuthenticatedPortalRoute
-    }
-    '/_authenticated/portal/ingressos': {
-      id: '/_authenticated/portal/ingressos'
-      path: '/ingressos'
-      fullPath: '/portal/ingressos'
-      preLoaderRoute: typeof AuthenticatedPortalIngressosRouteImport
-      parentRoute: typeof AuthenticatedPortalRoute
-    }
-    '/_authenticated/portal/clube': {
-      id: '/_authenticated/portal/clube'
-      path: '/clube'
-      fullPath: '/portal/clube'
-      preLoaderRoute: typeof AuthenticatedPortalClubeRouteImport
-      parentRoute: typeof AuthenticatedPortalRoute
-    }
-    '/_authenticated/admin/wise-conciliacao': {
-      id: '/_authenticated/admin/wise-conciliacao'
-      path: '/wise-conciliacao'
-      fullPath: '/admin/wise-conciliacao'
-      preLoaderRoute: typeof AuthenticatedAdminWiseConciliacaoRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/usuarios': {
-      id: '/_authenticated/admin/usuarios'
-      path: '/usuarios'
-      fullPath: '/admin/usuarios'
-      preLoaderRoute: typeof AuthenticatedAdminUsuariosRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/triagem': {
-      id: '/_authenticated/admin/triagem'
-      path: '/triagem'
-      fullPath: '/admin/triagem'
-      preLoaderRoute: typeof AuthenticatedAdminTriagemRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/slots': {
-      id: '/_authenticated/admin/slots'
-      path: '/slots'
-      fullPath: '/admin/slots'
-      preLoaderRoute: typeof AuthenticatedAdminSlotsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/relatorios': {
-      id: '/_authenticated/admin/relatorios'
-      path: '/relatorios'
-      fullPath: '/admin/relatorios'
-      preLoaderRoute: typeof AuthenticatedAdminRelatoriosRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/pdv': {
-      id: '/_authenticated/admin/pdv'
-      path: '/pdv'
-      fullPath: '/admin/pdv'
-      preLoaderRoute: typeof AuthenticatedAdminPdvRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/financeiro': {
-      id: '/_authenticated/admin/financeiro'
-      path: '/financeiro'
-      fullPath: '/admin/financeiro'
-      preLoaderRoute: typeof AuthenticatedAdminFinanceiroRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/eventos': {
-      id: '/_authenticated/admin/eventos'
-      path: '/eventos'
-      fullPath: '/admin/eventos'
-      preLoaderRoute: typeof AuthenticatedAdminEventosRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/esteira': {
-      id: '/_authenticated/admin/esteira'
-      path: '/esteira'
-      fullPath: '/admin/esteira'
-      preLoaderRoute: typeof AuthenticatedAdminEsteiraRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/crm': {
-      id: '/_authenticated/admin/crm'
-      path: '/crm'
-      fullPath: '/admin/crm'
-      preLoaderRoute: typeof AuthenticatedAdminCrmRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/configuracoes': {
-      id: '/_authenticated/admin/configuracoes'
-      path: '/configuracoes'
-      fullPath: '/admin/configuracoes'
-      preLoaderRoute: typeof AuthenticatedAdminConfiguracoesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/clube': {
-      id: '/_authenticated/admin/clube'
-      path: '/clube'
-      fullPath: '/admin/clube'
-      preLoaderRoute: typeof AuthenticatedAdminClubeRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/admin/automacoes': {
-      id: '/_authenticated/admin/automacoes'
-      path: '/automacoes'
-      fullPath: '/admin/automacoes'
-      preLoaderRoute: typeof AuthenticatedAdminAutomacoesRouteImport
+    '/_authenticated/admin/acesso-negado': {
+      id: '/_authenticated/admin/acesso-negado'
+      path: '/acesso-negado'
+      fullPath: '/admin/acesso-negado'
+      preLoaderRoute: typeof AuthenticatedAdminAcessoNegadoRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/agenda': {
@@ -773,12 +626,159 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAgendaRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/acesso-negado': {
-      id: '/_authenticated/admin/acesso-negado'
-      path: '/acesso-negado'
-      fullPath: '/admin/acesso-negado'
-      preLoaderRoute: typeof AuthenticatedAdminAcessoNegadoRouteImport
+    '/_authenticated/admin/automacoes': {
+      id: '/_authenticated/admin/automacoes'
+      path: '/automacoes'
+      fullPath: '/admin/automacoes'
+      preLoaderRoute: typeof AuthenticatedAdminAutomacoesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/clube': {
+      id: '/_authenticated/admin/clube'
+      path: '/clube'
+      fullPath: '/admin/clube'
+      preLoaderRoute: typeof AuthenticatedAdminClubeRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/configuracoes': {
+      id: '/_authenticated/admin/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/admin/configuracoes'
+      preLoaderRoute: typeof AuthenticatedAdminConfiguracoesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/crm': {
+      id: '/_authenticated/admin/crm'
+      path: '/crm'
+      fullPath: '/admin/crm'
+      preLoaderRoute: typeof AuthenticatedAdminCrmRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/esteira': {
+      id: '/_authenticated/admin/esteira'
+      path: '/esteira'
+      fullPath: '/admin/esteira'
+      preLoaderRoute: typeof AuthenticatedAdminEsteiraRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/eventos': {
+      id: '/_authenticated/admin/eventos'
+      path: '/eventos'
+      fullPath: '/admin/eventos'
+      preLoaderRoute: typeof AuthenticatedAdminEventosRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/financeiro': {
+      id: '/_authenticated/admin/financeiro'
+      path: '/financeiro'
+      fullPath: '/admin/financeiro'
+      preLoaderRoute: typeof AuthenticatedAdminFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/pdv': {
+      id: '/_authenticated/admin/pdv'
+      path: '/pdv'
+      fullPath: '/admin/pdv'
+      preLoaderRoute: typeof AuthenticatedAdminPdvRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/relatorios': {
+      id: '/_authenticated/admin/relatorios'
+      path: '/relatorios'
+      fullPath: '/admin/relatorios'
+      preLoaderRoute: typeof AuthenticatedAdminRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/slots': {
+      id: '/_authenticated/admin/slots'
+      path: '/slots'
+      fullPath: '/admin/slots'
+      preLoaderRoute: typeof AuthenticatedAdminSlotsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/triagem': {
+      id: '/_authenticated/admin/triagem'
+      path: '/triagem'
+      fullPath: '/admin/triagem'
+      preLoaderRoute: typeof AuthenticatedAdminTriagemRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/usuarios': {
+      id: '/_authenticated/admin/usuarios'
+      path: '/usuarios'
+      fullPath: '/admin/usuarios'
+      preLoaderRoute: typeof AuthenticatedAdminUsuariosRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/wise-conciliacao': {
+      id: '/_authenticated/admin/wise-conciliacao'
+      path: '/wise-conciliacao'
+      fullPath: '/admin/wise-conciliacao'
+      preLoaderRoute: typeof AuthenticatedAdminWiseConciliacaoRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/portal/': {
+      id: '/_authenticated/portal/'
+      path: '/'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof AuthenticatedPortalIndexRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
+    '/_authenticated/portal/clube': {
+      id: '/_authenticated/portal/clube'
+      path: '/clube'
+      fullPath: '/portal/clube'
+      preLoaderRoute: typeof AuthenticatedPortalClubeRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
+    '/_authenticated/portal/ingressos': {
+      id: '/_authenticated/portal/ingressos'
+      path: '/ingressos'
+      fullPath: '/portal/ingressos'
+      preLoaderRoute: typeof AuthenticatedPortalIngressosRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
+    '/_authenticated/portal/loja': {
+      id: '/_authenticated/portal/loja'
+      path: '/loja'
+      fullPath: '/portal/loja'
+      preLoaderRoute: typeof AuthenticatedPortalLojaRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
+    '/_authenticated/portal/servicos': {
+      id: '/_authenticated/portal/servicos'
+      path: '/servicos'
+      fullPath: '/portal/servicos'
+      preLoaderRoute: typeof AuthenticatedPortalServicosRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
+    '/api/crm-automations/worker': {
+      id: '/api/crm-automations/worker'
+      path: '/api/crm-automations/worker'
+      fullPath: '/api/crm-automations/worker'
+      preLoaderRoute: typeof ApiCrmAutomationsWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/hubla': {
+      id: '/api/webhooks/hubla'
+      path: '/api/webhooks/hubla'
+      fullPath: '/api/webhooks/hubla'
+      preLoaderRoute: typeof ApiWebhooksHublaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/mercadopago': {
+      id: '/api/webhooks/mercadopago'
+      path: '/api/webhooks/mercadopago'
+      fullPath: '/api/webhooks/mercadopago'
+      preLoaderRoute: typeof ApiWebhooksMercadopagoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/uazapi': {
+      id: '/api/webhooks/uazapi'
+      path: '/api/webhooks/uazapi'
+      fullPath: '/api/webhooks/uazapi'
+      preLoaderRoute: typeof ApiWebhooksUazapiRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/webhooks/wise': {
       id: '/api/public/webhooks/wise'
