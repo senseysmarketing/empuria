@@ -351,9 +351,12 @@ export function AuthLoginPage({ context, redirect }: { context: LoginContext; re
 
           <div className="mt-8 space-y-3 border-t border-yellow-brand/15 pt-6 text-center text-xs">
             {isAdminLogin ? (
-              <Link to="/login" className="text-offwhite/55 hover:text-yellow-brand">
-                Voltar ao login de membros
-              </Link>
+              <Button asChild variant="outline" className="h-10 border-yellow-brand/35 bg-transparent px-6 font-display text-offwhite/90 shadow-none hover:border-yellow-brand/60 hover:bg-yellow-brand/10 hover:text-offwhite">
+                <Link to="/login">
+                  <Users aria-hidden="true" />
+                  Voltar ao login de membros
+                </Link>
+              </Button>
             ) : (
               <Button asChild variant="outline" className="h-10 border-yellow-brand/35 bg-transparent px-6 font-display text-offwhite/90 shadow-none hover:border-yellow-brand/60 hover:bg-yellow-brand/10 hover:text-offwhite">
                 <Link to="/login/admin">
