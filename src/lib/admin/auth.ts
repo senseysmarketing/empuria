@@ -1,7 +1,7 @@
 // Shared staff/module guards for admin server functions.
 import { createMiddleware } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getUserStaffAccess, userHasModuleAccess, userHasAction } from "./permission-checks";
+import { getUserStaffAccess } from "./permission-checks";
 
 export const requireStaff = createMiddleware({ type: "function" })
   .middleware([requireSupabaseAuth])
@@ -12,22 +12,22 @@ export const requireStaff = createMiddleware({ type: "function" })
   });
 
 /**
- * Require that the current user has access to a specific admin module.
- * Admins always pass. Staff need an explicit allowed row in staff_module_permissions.
+ * Todos os integrantes da equipe acessam os módulos operacionais.
+ * Financeiro/Caixa é a única exceção e permanece exclusivo de admin.
  */
 export function requireModule(moduleKey: string) {
   return createMiddleware({ type: "function" })
     .middleware([requireStaff])
     .server(async ({ next, context }) => {
-      if (context.isAdmin) return next({ context: { module: moduleKey } });
-      const allowed = await userHasModuleAccess(context.userId, moduleKey);
-      if (!allowed) throw new Error("MODULE_FORBIDDEN");
+      if (moduleKey === "financeiro" && !context.isAdmin) {
+        throw new Error("MODULE_FORBIDDEN");
+      }
       return next({ context: { module: moduleKey } });
     });
 }
 
 /**
- * Require access to ANY of the listed modules. Admins always pass.
+ * Require access to ANY of the listed modules.
  * Use when a single server fn is reusable across surfaces (e.g. PDV report
  * shown both in /admin/relatorios and /admin/pdv).
  */
@@ -35,13 +35,12 @@ export function requireAnyModule(...moduleKeys: string[]) {
   return createMiddleware({ type: "function" })
     .middleware([requireStaff])
     .server(async ({ next, context }) => {
-      if (context.isAdmin) return next({ context: { module: moduleKeys[0] } });
-      for (const key of moduleKeys) {
-        if (await userHasModuleAccess(context.userId, key)) {
-          return next({ context: { module: key } });
-        }
+      const module = moduleKeys.find((key) => key !== "financeiro");
+      if (module) {
+        return next({ context: { module } });
       }
-      throw new Error("MODULE_FORBIDDEN");
+      if (!context.isAdmin) throw new Error("MODULE_FORBIDDEN");
+      return next({ context: { module: moduleKeys[0] } });
     });
 }
 
@@ -50,20 +49,6 @@ export function requireAdmin() {
     .middleware([requireStaff])
     .server(async ({ next, context }) => {
       if (!context.isAdmin) throw new Error("Apenas admins podem executar esta ação");
-      return next();
-    });
-}
-
-/**
- * Allow admins always, or staff that have an explicit action permission row.
- */
-export function requireStaffOrAction(actionKey: string) {
-  return createMiddleware({ type: "function" })
-    .middleware([requireStaff])
-    .server(async ({ next, context }) => {
-      if (context.isAdmin) return next();
-      const allowed = await userHasAction(context.userId, actionKey);
-      if (!allowed) throw new Error("Sem permissão para esta ação");
       return next();
     });
 }

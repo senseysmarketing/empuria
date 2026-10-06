@@ -43,8 +43,8 @@ const COMPARE_LABEL: Record<ReportCompare, string> = {
 
 function PdvPage() {
   const [tab, setTab] = useState("comandas");
-  const { can, isAdmin } = useModuleAccess();
-  const canItens = isAdmin || can("pdv_itens");
+  const { can } = useModuleAccess();
+  const canItens = can("pdv_itens");
 
   return (
     <div className="space-y-6">
@@ -54,9 +54,7 @@ function PdvPage() {
         </div>
         <div>
           <h1 className="font-display text-4xl font-bold tracking-tight">PDV Empuria</h1>
-          <p className="text-admin-ink-muted text-sm mt-1">
-            Comandas · Caixa · Instituto
-          </p>
+          <p className="text-admin-ink-muted text-sm mt-1">Comandas · Caixa · Instituto</p>
         </div>
       </header>
 
@@ -141,15 +139,27 @@ function PdvReportPanel() {
             </SelectTrigger>
             <SelectContent>
               {(Object.entries(PERIOD_LABEL) as [ReportPeriod, string][]).map(([k, l]) => (
-                <SelectItem key={k} value={k}>{l}</SelectItem>
+                <SelectItem key={k} value={k}>
+                  {l}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           {period === "custom" && (
             <div className="grid grid-cols-2 gap-2 md:w-[320px]">
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-admin-bg" />
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-admin-bg" />
+              <Input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="bg-admin-bg"
+              />
+              <Input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="bg-admin-bg"
+              />
             </div>
           )}
 
@@ -159,7 +169,9 @@ function PdvReportPanel() {
             </SelectTrigger>
             <SelectContent>
               {(Object.entries(COMPARE_LABEL) as [ReportCompare, string][]).map(([k, l]) => (
-                <SelectItem key={k} value={k}>Comparar: {l}</SelectItem>
+                <SelectItem key={k} value={k}>
+                  Comparar: {l}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

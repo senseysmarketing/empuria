@@ -5,7 +5,6 @@ import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { withPdvLog } from "./pdv-activity-log.server";
 
-
 export type PdvTabStatus = "aberta" | "fechada" | "cancelada" | "aguardando_pagamento";
 export type PdvTabPaymentMethod = "dinheiro" | "transferencia" | "wise";
 
@@ -135,7 +134,7 @@ async function getProfilesByIds(ids: string[]) {
   return new Map((data ?? []).map((profile) => [profile.id, profile as PdvTabProfile]));
 }
 
-async function hydratePdvTabs(tabs: PdvTabRecord[], context: { isAdmin: boolean; userId: string }) {
+async function hydratePdvTabs(tabs: PdvTabRecord[]) {
   const tabIds = tabs.map((tab) => tab.id);
 
   const { data: itemsRaw, error: itemsError } = tabIds.length
@@ -184,7 +183,7 @@ async function hydratePdvTabs(tabs: PdvTabRecord[], context: { isAdmin: boolean;
 
 export const listPdvTabsWorkspace = createServerFn({ method: "GET" })
   .middleware([requireModule("pdv")])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     const { data: tabsRaw, error: tabsError } = await pdvDb
       .from<PdvTabRecord[]>("pdv_tabs")
       .select("*")
@@ -193,13 +192,13 @@ export const listPdvTabsWorkspace = createServerFn({ method: "GET" })
     if (tabsError) throw new Error(tabsError.message);
 
     const tabs = (tabsRaw ?? []) as PdvTabRecord[];
-    return hydratePdvTabs(tabs, context);
+    return hydratePdvTabs(tabs);
   });
 
 export const listOpenPdvTabsForCustomer = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
   .inputValidator((data) => customerTabsSchema.parse(data))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const { data: tabsRaw, error: tabsError } = await pdvDb
       .from<PdvTabRecord[]>("pdv_tabs")
       .select("*")
@@ -208,7 +207,7 @@ export const listOpenPdvTabsForCustomer = createServerFn({ method: "POST" })
       .order("opened_at", { ascending: false });
     if (tabsError) throw new Error(tabsError.message);
 
-    return hydratePdvTabs((tabsRaw ?? []) as PdvTabRecord[], context);
+    return hydratePdvTabs((tabsRaw ?? []) as PdvTabRecord[]);
   });
 
 export const openPdvTab = createServerFn({ method: "POST" })
@@ -358,7 +357,10 @@ export const cancelPdvTab = createServerFn({ method: "POST" })
         const { error } = await pdvDb.rpc<null>("pdv_cancel_tab", {
           p_tab_id: data.tabId,
           p_actor_id: context.userId,
-          p_reason: data.reason && data.reason.length >= 3 ? data.reason : "Comanda cancelada pelo operador",
+          p_reason:
+            data.reason && data.reason.length >= 3
+              ? data.reason
+              : "Comanda cancelada pelo operador",
         });
         if (error) throw new Error(error.message);
         return { ok: true };

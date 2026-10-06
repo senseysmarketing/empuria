@@ -172,7 +172,6 @@ type Workspace = {
   activity: Activity[];
   users: CrmUser[];
   currentUserId: string;
-  isAdmin: boolean;
   whatsappMode: "sugestao" | "automatico" | "desativado";
 };
 
@@ -330,22 +329,23 @@ function CrmPage() {
           <Button onClick={() => setNewLeadOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Novo lead
           </Button>
-          {data.isAdmin && (
-            <>
-              <Button variant="outline" onClick={() => setColumnsOpen(true)} className="gap-2">
-                <Columns3 className="h-4 w-4" /> Colunas
-              </Button>
-              <Button variant="outline" onClick={() => setDistributionOpen(true)} className="gap-2">
-                <Settings2 className="h-4 w-4" /> Distribuicao
-              </Button>
-            </>
-          )}
+          <Button variant="outline" onClick={() => setColumnsOpen(true)} className="gap-2">
+            <Columns3 className="h-4 w-4" /> Colunas
+          </Button>
+          <Button variant="outline" onClick={() => setDistributionOpen(true)} className="gap-2">
+            <Settings2 className="h-4 w-4" /> Distribuicao
+          </Button>
         </div>
       </header>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric icon={UserRound} label="Meus leads" value={metrics.mine} tone="blue" />
-        <Metric icon={CalendarClock} label="Pendencias do CRM" value={metrics.followups} tone="amber" />
+        <Metric
+          icon={CalendarClock}
+          label="Pendencias do CRM"
+          value={metrics.followups}
+          tone="amber"
+        />
         <Metric icon={MessageCircle} label="Mensagens novas" value={metrics.inbox} tone="green" />
         <Metric icon={Clock} label="Leads atrasados" value={metrics.late} tone="red" />
       </section>
@@ -455,7 +455,8 @@ function AutomationsEntryCard() {
               Central de Automações CRM & WhatsApp
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-admin-ink-muted">
-              Crie fluxos de WhatsApp, acompanhe proximos envios, pause automacoes e consulte logs de atendimento.
+              Crie fluxos de WhatsApp, acompanhe proximos envios, pause automacoes e consulte logs
+              de atendimento.
             </p>
           </div>
         </div>

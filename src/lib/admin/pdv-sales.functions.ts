@@ -7,7 +7,6 @@ import type { Json } from "@/integrations/supabase/types";
 import { createOrReuseManualCustomer } from "./manual-users";
 import { withPdvLog } from "./pdv-activity-log.server";
 
-
 // ---------- Catálogo ----------
 export const listPdvCatalog = createServerFn({ method: "GET" })
   .middleware([requireModule("pdv")])
@@ -89,7 +88,12 @@ export const createCustomerQuick = createServerFn({ method: "POST" })
       origin: "pdv",
       actorId: context.userId,
     });
-    return { id: customer.user_id, full_name: customer.full_name, phone: customer.phone, created: customer.created };
+    return {
+      id: customer.user_id,
+      full_name: customer.full_name,
+      phone: customer.phone,
+      created: customer.created,
+    };
   });
 
 // ---------- Fechar venda (atômico) ----------
@@ -140,7 +144,6 @@ export const closePdvSale = createServerFn({ method: "POST" })
       },
     ),
   );
-
 
 export type PdvSaleRecord = {
   id: string;
@@ -215,10 +218,16 @@ const currencyCentsSchema = z.number().int().min(0).optional();
 
 const historySchema = z.object({
   search: z.string().trim().max(120).optional().default(""),
-  period: z.enum(["hoje", "ontem", "7d", "mes", "mes_anterior", "custom", "todos"]).optional().default("mes"),
+  period: z
+    .enum(["hoje", "ontem", "7d", "mes", "mes_anterior", "custom", "todos"])
+    .optional()
+    .default("mes"),
   dateFrom: z.string().trim().optional().nullable(),
   dateTo: z.string().trim().optional().nullable(),
-  paymentMethod: z.enum(["todos", "dinheiro", "cartao", "pix", "wise", "transferencia"]).optional().default("todos"),
+  paymentMethod: z
+    .enum(["todos", "dinheiro", "cartao", "pix", "wise", "transferencia"])
+    .optional()
+    .default("todos"),
   status: z.enum(["todos", "concluida", "cancelada"]).optional().default("todos"),
   cashierId: z.string().uuid().optional().nullable(),
   categoryIds: z.array(z.string().uuid()).optional().default([]),
@@ -312,7 +321,10 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
 
     // Prefilter sale_ids when filtering by category/product.
     let restrictSaleIds: string[] | null = null;
-    if ((data.categoryIds && data.categoryIds.length) || (data.productIds && data.productIds.length)) {
+    if (
+      (data.categoryIds && data.categoryIds.length) ||
+      (data.productIds && data.productIds.length)
+    ) {
       let productIds = data.productIds ?? [];
       if (data.categoryIds?.length) {
         const { data: prodRows, error: prodErr } = await supabaseAdmin
@@ -321,10 +333,12 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
           .in("category_id", data.categoryIds);
         if (prodErr) throw new Error(prodErr.message);
         const catProductIds = (prodRows ?? []).map((p) => p.id);
-        productIds = productIds.length ? productIds.filter((id) => catProductIds.includes(id)) : catProductIds;
+        productIds = productIds.length
+          ? productIds.filter((id) => catProductIds.includes(id))
+          : catProductIds;
       }
       if (!productIds.length) {
-        return { items: [], total: 0, page: data.page, pageSize: data.pageSize, isAdmin: Boolean(context.isAdmin), canVoid: false };
+        return { items: [], total: 0, page: data.page, pageSize: data.pageSize, canVoid: true };
       }
       const { data: saleRows, error: saleErr } = await supabaseAdmin
         .from("pdv_sale_items")
@@ -333,7 +347,7 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
       if (saleErr) throw new Error(saleErr.message);
       restrictSaleIds = [...new Set((saleRows ?? []).map((r) => r.sale_id))];
       if (!restrictSaleIds.length) {
-        return { items: [], total: 0, page: data.page, pageSize: data.pageSize, isAdmin: Boolean(context.isAdmin), canVoid: false };
+        return { items: [], total: 0, page: data.page, pageSize: data.pageSize, canVoid: true };
       }
     }
 
@@ -392,7 +406,6 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
     // Todo staff com acesso ao módulo PDV pode anular vendas (com motivo auditado).
     const canVoid = true;
 
-
     return {
       items: sales.map((sale) => ({
         ...sale,
@@ -405,7 +418,6 @@ export const listPdvSalesHistory = createServerFn({ method: "POST" })
       total: count ?? 0,
       page: data.page,
       pageSize: data.pageSize,
-      isAdmin: Boolean(context.isAdmin),
       canVoid,
     };
   });
@@ -534,5 +546,3 @@ export const listPdvFilterOptions = createServerFn({ method: "GET" })
       products: prodsRes.data ?? [],
     };
   });
-
-

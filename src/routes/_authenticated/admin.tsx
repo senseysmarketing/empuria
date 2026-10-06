@@ -23,7 +23,7 @@ function AdminLayout() {
   }
 
   if (isError) {
-    return <AccessDeniedCard variant="session-expired" />;
+    return <AccessDeniedCard variant="session-expired" context="admin" />;
   }
 
   if (!isStaff) {

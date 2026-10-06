@@ -12,14 +12,15 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TicketScannerDialog } from "@/components/admin/TicketScannerDialog";
 import { Plus, Trash2, Pencil, ExternalLink, X, Upload, Loader2, ImageIcon } from "lucide-react";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { supabase } from "@/integrations/supabase/client";
 
 import { toast } from "sonner";
 
 const COVER_MAX_BYTES = 5 * 1024 * 1024;
 
-function pad2(n: number) { return n.toString().padStart(2, "0"); }
+function pad2(n: number) {
+  return n.toString().padStart(2, "0");
+}
 function toLocalInput(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -70,11 +71,12 @@ const emptyForm = (): FormState => ({
   sales_mode: "simples",
   is_published: false,
   is_home_featured: false,
-  tiers: [{ name: "Padrão", price_cents: 0, capacity: null, benefits: [], position: 0, is_active: true }],
+  tiers: [
+    { name: "Padrão", price_cents: 0, capacity: null, benefits: [], position: 0, is_active: true },
+  ],
 });
 
 function EventsPage() {
-  const { isAdmin } = useCurrentUser();
   const fetchList = useServerFn(listEventsAdmin);
   const save = useServerFn(upsertEvent);
   const del = useServerFn(deleteEvent);
@@ -88,7 +90,10 @@ function EventsPage() {
 
   const { data } = useQuery({ queryKey: ["admin-events"], queryFn: () => fetchList() });
 
-  const openNew = () => { setForm(emptyForm()); setOpen(true); };
+  const openNew = () => {
+    setForm(emptyForm());
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -104,10 +109,13 @@ function EventsPage() {
 
   const openEdit = (eventId: string) => {
     const ev = data?.events.find((e) => e.id === eventId);
-    const tiers = (data?.tiers ?? []).filter((t) => t.event_id === eventId).sort((a, b) => a.position - b.position);
+    const tiers = (data?.tiers ?? [])
+      .filter((t) => t.event_id === eventId)
+      .sort((a, b) => a.position - b.position);
     if (!ev) return;
     setForm({
-      id: ev.id, title: ev.title,
+      id: ev.id,
+      title: ev.title,
       description: ev.description ?? "",
       starts_at: toLocalInput(ev.starts_at),
       ends_at: toLocalInput(ev.ends_at),
@@ -118,9 +126,13 @@ function EventsPage() {
       is_published: ev.is_published,
       is_home_featured: (ev as { is_home_featured?: boolean }).is_home_featured ?? false,
       tiers: tiers.map((t) => ({
-        id: t.id, name: t.name, price_cents: t.price_cents,
-        capacity: t.capacity, benefits: (t.benefits as string[]) ?? [],
-        position: t.position, is_active: t.is_active,
+        id: t.id,
+        name: t.name,
+        price_cents: t.price_cents,
+        capacity: t.capacity,
+        benefits: (t.benefits as string[]) ?? [],
+        position: t.position,
+        is_active: t.is_active,
       })),
     });
     setOpen(true);
@@ -128,8 +140,14 @@ function EventsPage() {
 
   const submit = async () => {
     if (uploadingCover || uploadingCoverV) return;
-    if (!form.title.trim()) { toast.error("Informe o título"); return; }
-    if (!form.starts_at) { toast.error("Informe a data de início"); return; }
+    if (!form.title.trim()) {
+      toast.error("Informe o título");
+      return;
+    }
+    if (!form.starts_at) {
+      toast.error("Informe a data de início");
+      return;
+    }
     try {
       await save({
         data: {
@@ -183,7 +201,8 @@ function EventsPage() {
   };
 
   const handleCoverFile = (file: File | undefined | null) => uploadCover(file, "cover_url");
-  const handleCoverVFile = (file: File | undefined | null) => uploadCover(file, "cover_url_vertical");
+  const handleCoverVFile = (file: File | undefined | null) =>
+    uploadCover(file, "cover_url_vertical");
 
   const onDelete = async (id: string) => {
     if (!confirm("Excluir evento e todos os ingressos?")) return;
@@ -197,10 +216,25 @@ function EventsPage() {
   };
 
   const updateTier = (i: number, patch: Partial<Tier>) => {
-    setForm({ ...form, tiers: form.tiers.map((t, idx) => idx === i ? { ...t, ...patch } : t) });
+    setForm({ ...form, tiers: form.tiers.map((t, idx) => (idx === i ? { ...t, ...patch } : t)) });
   };
-  const addTier = () => setForm({ ...form, tiers: [...form.tiers, { name: "", price_cents: 0, capacity: null, benefits: [], position: form.tiers.length, is_active: true }] });
-  const removeTier = (i: number) => setForm({ ...form, tiers: form.tiers.filter((_, idx) => idx !== i) });
+  const addTier = () =>
+    setForm({
+      ...form,
+      tiers: [
+        ...form.tiers,
+        {
+          name: "",
+          price_cents: 0,
+          capacity: null,
+          benefits: [],
+          position: form.tiers.length,
+          is_active: true,
+        },
+      ],
+    });
+  const removeTier = (i: number) =>
+    setForm({ ...form, tiers: form.tiers.filter((_, idx) => idx !== i) });
 
   return (
     <div className="space-y-6">
@@ -226,7 +260,11 @@ function EventsPage() {
           return (
             <BentoCard key={ev.id} className="col-span-12 md:col-span-6 lg:col-span-4" padded>
               {ev.cover_url && (
-                <img src={ev.cover_url} alt={ev.title} className="w-full h-32 object-cover rounded-lg mb-3" />
+                <img
+                  src={ev.cover_url}
+                  alt={ev.title}
+                  className="w-full h-32 object-cover rounded-lg mb-3"
+                />
               )}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -236,7 +274,9 @@ function EventsPage() {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-display ${ev.is_published ? "bg-green-600/20 text-green-700" : "bg-muted text-admin-ink-muted"}`}>
+                  <span
+                    className={`text-[10px] uppercase px-2 py-0.5 rounded font-display ${ev.is_published ? "bg-green-600/20 text-green-700" : "bg-muted text-admin-ink-muted"}`}
+                  >
                     {ev.is_published ? "Publicado" : "Rascunho"}
                   </span>
                   {(ev as { is_home_featured?: boolean }).is_home_featured && (
@@ -246,17 +286,38 @@ function EventsPage() {
                   )}
                 </div>
               </div>
-              <div className={`mt-3 grid ${isAdmin ? "grid-cols-3" : "grid-cols-2"} gap-2 text-xs`}>
-                <div><div className="text-admin-ink-muted">Vendidos</div><div className="font-display text-admin-ink">{sold}{cap ? `/${cap}` : ""}</div></div>
-                <div><div className="text-admin-ink-muted">Categorias</div><div className="font-display text-admin-ink">{tiers.length}</div></div>
-                {isAdmin && <div><div className="text-admin-ink-muted">Receita</div><div className="font-display text-admin-ink">€{(revenue / 100).toFixed(0)}</div></div>}
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <div className="text-admin-ink-muted">Vendidos</div>
+                  <div className="font-display text-admin-ink">
+                    {sold}
+                    {cap ? `/${cap}` : ""}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-admin-ink-muted">Categorias</div>
+                  <div className="font-display text-admin-ink">{tiers.length}</div>
+                </div>
+                <div>
+                  <div className="text-admin-ink-muted">Receita</div>
+                  <div className="font-display text-admin-ink">€{(revenue / 100).toFixed(0)}</div>
+                </div>
               </div>
               <div className="mt-3 flex gap-1.5">
-                <Button size="sm" variant="outline" onClick={() => openEdit(ev.id)}><Pencil className="h-3 w-3" /></Button>
-                <Button size="sm" variant="outline" asChild>
-                  <a href={`/evento/${ev.slug}`} target="_blank" rel="noreferrer"><ExternalLink className="h-3 w-3" /></a>
+                <Button size="sm" variant="outline" onClick={() => openEdit(ev.id)}>
+                  <Pencil className="h-3 w-3" />
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => onDelete(ev.id)} className="text-red-brand">
+                <Button size="sm" variant="outline" asChild>
+                  <a href={`/evento/${ev.slug}`} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onDelete(ev.id)}
+                  className="text-red-brand"
+                >
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
@@ -271,13 +332,47 @@ function EventsPage() {
             <DialogTitle className="font-display">{form.id ? "Editar" : "Novo"} evento</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div><Label>Título</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-            <div><Label>Descrição</Label><Textarea rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Início</Label><Input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></div>
-              <div><Label>Fim (opcional)</Label><Input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></div>
+            <div>
+              <Label>Título</Label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+              />
             </div>
-            <div><Label>Endereço</Label><Input value={form.location_address} onChange={(e) => setForm({ ...form, location_address: e.target.value })} placeholder="Gran Via, 40, Madrid" /></div>
+            <div>
+              <Label>Descrição</Label>
+              <Textarea
+                rows={5}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Início</Label>
+                <Input
+                  type="datetime-local"
+                  value={form.starts_at}
+                  onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Fim (opcional)</Label>
+                <Input
+                  type="datetime-local"
+                  value={form.ends_at}
+                  onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Endereço</Label>
+              <Input
+                value={form.location_address}
+                onChange={(e) => setForm({ ...form, location_address: e.target.value })}
+                placeholder="Gran Via, 40, Madrid"
+              />
+            </div>
             <div>
               <Label>Capa do evento</Label>
               <input
@@ -298,7 +393,11 @@ function EventsPage() {
                       disabled={uploadingCover}
                       onClick={() => coverInputRef.current?.click()}
                     >
-                      {uploadingCover ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      {uploadingCover ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Upload className="h-3 w-3" />
+                      )}
                       Trocar
                     </Button>
                     <Button
@@ -345,7 +444,11 @@ function EventsPage() {
               />
               {form.cover_url_vertical ? (
                 <div className="mt-2 relative rounded-lg overflow-hidden border border-admin-border max-w-[220px]">
-                  <img src={form.cover_url_vertical} alt="Capa vertical" className="w-full aspect-[4/5] object-cover" />
+                  <img
+                    src={form.cover_url_vertical}
+                    alt="Capa vertical"
+                    className="w-full aspect-[4/5] object-cover"
+                  />
                   <div className="absolute top-2 right-2 flex gap-1.5">
                     <Button
                       type="button"
@@ -354,7 +457,11 @@ function EventsPage() {
                       disabled={uploadingCoverV}
                       onClick={() => coverVInputRef.current?.click()}
                     >
-                      {uploadingCoverV ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      {uploadingCoverV ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Upload className="h-3 w-3" />
+                      )}
                       Trocar
                     </Button>
                     <Button
@@ -386,50 +493,133 @@ function EventsPage() {
                 </button>
               )}
               <p className="text-[11px] text-admin-ink-muted mt-1">
-                Opcional. Usada no mobile e em destaques verticais. Resolução recomendada: 1080×1350 (4:5).
+                Opcional. Usada no mobile e em destaques verticais. Resolução recomendada: 1080×1350
+                (4:5).
               </p>
             </div>
 
             <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex items-center gap-2"><Switch checked={form.sales_mode === "categorias"} onCheckedChange={(v) => setForm({ ...form, sales_mode: v ? "categorias" : "simples" })} /><Label>Múltiplas categorias</Label></div>
-              <div className="flex items-center gap-2"><Switch checked={form.is_published} onCheckedChange={(v) => setForm({ ...form, is_published: v })} /><Label>Publicado</Label></div>
-              <div className="flex items-center gap-2"><Switch checked={form.is_home_featured} onCheckedChange={(v) => setForm({ ...form, is_home_featured: v })} /><Label>Destacar na home</Label></div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.sales_mode === "categorias"}
+                  onCheckedChange={(v) =>
+                    setForm({ ...form, sales_mode: v ? "categorias" : "simples" })
+                  }
+                />
+                <Label>Múltiplas categorias</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.is_published}
+                  onCheckedChange={(v) => setForm({ ...form, is_published: v })}
+                />
+                <Label>Publicado</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.is_home_featured}
+                  onCheckedChange={(v) => setForm({ ...form, is_home_featured: v })}
+                />
+                <Label>Destacar na home</Label>
+              </div>
             </div>
             {form.is_home_featured && (
               <p className="text-[11px] text-orange-brand -mt-2">
-                Ao salvar, este será o único evento em destaque na página inicial — qualquer outro destaque atual será substituído.
+                Ao salvar, este será o único evento em destaque na página inicial — qualquer outro
+                destaque atual será substituído.
               </p>
             )}
 
             <div className="border-t border-admin-border pt-3">
               <div className="flex justify-between items-center mb-2">
-                <Label className="font-display uppercase tracking-wider text-xs">Categorias de ingresso</Label>
+                <Label className="font-display uppercase tracking-wider text-xs">
+                  Categorias de ingresso
+                </Label>
                 {form.sales_mode === "categorias" && (
-                  <Button size="sm" variant="outline" onClick={addTier}><Plus className="h-3 w-3 mr-1" /> Categoria</Button>
+                  <Button size="sm" variant="outline" onClick={addTier}>
+                    <Plus className="h-3 w-3 mr-1" /> Categoria
+                  </Button>
                 )}
               </div>
               <div className="space-y-2">
                 {form.tiers.map((t, i) => (
-                  <div key={i} className="border border-admin-border rounded-lg p-3 space-y-2 bg-admin-surface-2">
+                  <div
+                    key={i}
+                    className="border border-admin-border rounded-lg p-3 space-y-2 bg-admin-surface-2"
+                  >
                     <div className="grid grid-cols-12 gap-2">
-                      <div className="col-span-4"><Label className="text-[10px]">Nome</Label><Input value={t.name} onChange={(e) => updateTier(i, { name: e.target.value })} /></div>
-                      <div className="col-span-3"><Label className="text-[10px]">Preço (€)</Label><Input type="number" step="0.01" value={(t.price_cents / 100).toString()} onChange={(e) => updateTier(i, { price_cents: Math.round(parseFloat(e.target.value || "0") * 100) })} /></div>
-                      <div className="col-span-3"><Label className="text-[10px]">Capacidade</Label><Input type="number" value={t.capacity ?? ""} onChange={(e) => updateTier(i, { capacity: e.target.value ? parseInt(e.target.value) : null })} placeholder="∞" /></div>
+                      <div className="col-span-4">
+                        <Label className="text-[10px]">Nome</Label>
+                        <Input
+                          value={t.name}
+                          onChange={(e) => updateTier(i, { name: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-[10px]">Preço (€)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={(t.price_cents / 100).toString()}
+                          onChange={(e) =>
+                            updateTier(i, {
+                              price_cents: Math.round(parseFloat(e.target.value || "0") * 100),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-[10px]">Capacidade</Label>
+                        <Input
+                          type="number"
+                          value={t.capacity ?? ""}
+                          onChange={(e) =>
+                            updateTier(i, {
+                              capacity: e.target.value ? parseInt(e.target.value) : null,
+                            })
+                          }
+                          placeholder="∞"
+                        />
+                      </div>
                       <div className="col-span-2 flex items-end">
                         {form.tiers.length > 1 && (
-                          <Button size="sm" variant="ghost" onClick={() => removeTier(i)} className="text-red-brand"><X className="h-3 w-3" /></Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removeTier(i)}
+                            className="text-red-brand"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
                         )}
                       </div>
                     </div>
                     <div>
                       <Label className="text-[10px]">Benefícios (separados por vírgula)</Label>
-                      <Input value={t.benefits.join(", ")} onChange={(e) => updateTier(i, { benefits: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+                      <Input
+                        value={t.benefits.join(", ")}
+                        onChange={(e) =>
+                          updateTier(i, {
+                            benefits: e.target.value
+                              .split(",")
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                      />
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <Button size="sm" onClick={submit} disabled={uploadingCover} className="w-full bg-admin-accent hover:bg-admin-accent/90">{uploadingCover ? "Enviando imagem..." : "Salvar"}</Button>
+            <Button
+              size="sm"
+              onClick={submit}
+              disabled={uploadingCover}
+              className="w-full bg-admin-accent hover:bg-admin-accent/90"
+            >
+              {uploadingCover ? "Enviando imagem..." : "Salvar"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
