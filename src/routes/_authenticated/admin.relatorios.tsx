@@ -194,7 +194,7 @@ function RelatoriosPage() {
         onValueChange={(v) =>
           navigate({
             to: "/admin/relatorios",
-            search: (prev: Partial<SearchSchema>) => ({
+            search: (prev) => ({
               ...normalizeSearch(prev as Partial<SearchSchema>),
               tab: v as SearchSchema["tab"],
             }),
@@ -267,7 +267,7 @@ function CompareSelect({
   const upd = (v: string) =>
     navigate({
       to: "/admin/relatorios",
-      search: (prev: Partial<SearchSchema>) => ({
+      search: (prev) => ({
         ...normalizeSearch(prev as Partial<SearchSchema>),
         compare: v as SearchSchema["compare"],
       }),
@@ -299,7 +299,7 @@ function GlobalFiltersBar({
   const upd = (patch: Partial<SearchSchema>) =>
     navigate({
       to: "/admin/relatorios",
-      search: (prev: Partial<SearchSchema>) => ({ ...normalizeSearch(prev as Partial<SearchSchema>), ...patch }),
+      search: (prev) => ({ ...normalizeSearch(prev as Partial<SearchSchema>), ...patch }),
       replace: true,
     });
 
