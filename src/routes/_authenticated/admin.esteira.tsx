@@ -15,12 +15,7 @@ import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,7 +51,6 @@ import {
 } from "lucide-react";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
-import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
 
@@ -106,7 +100,8 @@ type Order = {
   customer_email: string | null;
   service_title: string;
   payment_status: "pendente" | "aprovado" | "recusado" | "estornado";
-  delivery_status?: "aguardando_pagamento" | "aguardando_documentos" | "processando" | "agendado" | "concluido";
+  delivery_status?:
+    "aguardando_pagamento" | "aguardando_documentos" | "processando" | "agendado" | "concluido";
   voucher_code: string | null;
   created_at: string;
   executed_at: string | null;
@@ -118,11 +113,9 @@ type Order = {
   payment_url?: string | null;
   payment_provider_reference?: string | null;
   notes?: string | null;
-  canViewFinancials: boolean;
 };
 
 function EsteiraPage() {
-  const { isAdmin } = useCurrentUser();
   // Módulo Esteira já é validado pelo middleware — qualquer staff com acesso pode cancelar/estornar.
   const canAction = (_key: string) => true;
 
@@ -175,7 +168,8 @@ function EsteiraPage() {
       if (paymentFilter !== "all" && o.payment_status !== paymentFilter) return false;
       if (deliveryFilter !== "all" && o.delivery_status !== deliveryFilter) return false;
       if (q) {
-        const hay = `${o.customer_name} ${o.customer_email ?? ""} ${o.service_title} ${o.voucher_code ?? ""}`.toLowerCase();
+        const hay =
+          `${o.customer_name} ${o.customer_email ?? ""} ${o.service_title} ${o.voucher_code ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -196,19 +190,20 @@ function EsteiraPage() {
     setPage(1);
   };
 
-  const onFilterChange = <T,>(setter: (v: T) => void) => (v: T) => {
-    setter(v);
-    setPage(1);
-  };
+  const onFilterChange =
+    <T,>(setter: (v: T) => void) =>
+    (v: T) => {
+      setter(v);
+      setPage(1);
+    };
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["orders"] });
-  const canViewFinancials = isAdmin;
 
   // Summary tiles
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isToday = (s: string) => new Date(s).getTime() >= today.getTime();
   const summary = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isToday = (value: string) => new Date(value).getTime() >= today.getTime();
     const todayCount = orders.filter((o) => isToday(o.created_at)).length;
     const waiting = orders.filter((o) => o.payment_status === "pendente").length;
     const paidToday = orders.filter(
@@ -232,19 +227,6 @@ function EsteiraPage() {
     const dataUrl = await QRCode.toDataURL(code, { width: 320, margin: 2 });
     setVoucherUrl(dataUrl);
     setVoucherCode(code);
-  };
-
-  const setStatus = async (
-    id: string,
-    status: "pendente" | "aprovado" | "recusado" | "estornado",
-  ) => {
-    try {
-      await update({ data: { id, payment_status: status } });
-      toast.success("Status atualizado");
-      refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro");
-    }
   };
 
   const markExecuted = async (id: string) => {
@@ -354,23 +336,38 @@ function EsteiraPage() {
         </Button>
       </header>
 
-      {canViewFinancials && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <AdminStatCard label="Pedidos hoje" value={summary.todayCount} icon={ShoppingCart} tone="blue" />
-          <AdminStatCard label="Aguardando pagamento" value={summary.waiting} icon={Clock} tone="amber" />
-          <AdminStatCard label="Pagos hoje" value={summary.paidToday} icon={CheckCircle2} tone="green" />
-          <AdminStatCard label="Em execução" value={summary.inExec} icon={Loader2} tone="blue" />
-          <AdminStatCard label="Atrasados" value={summary.late} icon={AlertTriangle} tone="red" />
-          <AdminStatCard label="Receita" value={formatEur(summary.eur)} icon={Euro} tone="green" />
-        </div>
-      )}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <AdminStatCard
+          label="Pedidos hoje"
+          value={summary.todayCount}
+          icon={ShoppingCart}
+          tone="blue"
+        />
+        <AdminStatCard
+          label="Aguardando pagamento"
+          value={summary.waiting}
+          icon={Clock}
+          tone="amber"
+        />
+        <AdminStatCard
+          label="Pagos hoje"
+          value={summary.paidToday}
+          icon={CheckCircle2}
+          tone="green"
+        />
+        <AdminStatCard label="Em execução" value={summary.inExec} icon={Loader2} tone="blue" />
+        <AdminStatCard label="Atrasados" value={summary.late} icon={AlertTriangle} tone="red" />
+        <AdminStatCard label="Receita" value={formatEur(summary.eur)} icon={Euro} tone="green" />
+      </div>
 
       <BentoCard padded={false}>
         <div className="p-5 border-b border-admin-border space-y-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h3 className="font-display text-lg text-admin-ink">Pedidos</h3>
-              <p className="text-xs text-admin-ink-muted mt-1">{orders.length} pedidos cadastrados</p>
+              <p className="text-xs text-admin-ink-muted mt-1">
+                {orders.length} pedidos cadastrados
+              </p>
             </div>
             <span className="text-xs text-admin-ink-muted tabular-nums mt-1">
               {filtered.length} de {orders.length} {orders.length === 1 ? "pedido" : "pedidos"}
@@ -381,24 +378,35 @@ function EsteiraPage() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-admin-ink-muted" />
               <Input
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Buscar por cliente, e-mail, serviço ou voucher…"
                 className="pl-8 bg-admin-bg border-admin-border h-9"
               />
             </div>
             <Select value={paymentFilter} onValueChange={onFilterChange(setPaymentFilter)}>
-              <SelectTrigger className="w-[180px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[180px] h-9 bg-admin-bg border-admin-border">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {PAYMENT_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={deliveryFilter} onValueChange={onFilterChange(setDeliveryFilter)}>
-              <SelectTrigger className="w-[200px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[200px] h-9 bg-admin-bg border-admin-border">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {DELIVERY_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -414,7 +422,7 @@ function EsteiraPage() {
                 <tr>
                   <th className="text-left p-3 font-display">Cliente</th>
                   <th className="text-left p-3 font-display">Serviço</th>
-                  {canViewFinancials && <th className="text-right p-3 font-display">Valor</th>}
+                  <th className="text-right p-3 font-display">Valor</th>
                   <th className="text-left p-3 font-display">Pagamento</th>
                   <th className="text-left p-3 font-display">Execução</th>
                   <th className="text-left p-3 font-display">Voucher</th>
@@ -443,11 +451,7 @@ function EsteiraPage() {
                       )}
                     </td>
                     <td className="p-3 text-admin-ink-soft">{o.service_title}</td>
-                    {canViewFinancials && (
-                      <td className="p-3 text-right tabular-nums">
-                        {formatEur(o.amount_cents)}
-                      </td>
-                    )}
+                    <td className="p-3 text-right tabular-nums">{formatEur(o.amount_cents)}</td>
                     <td className="p-3" onClick={(e) => e.stopPropagation()}>
                       <span
                         className={`inline-block px-2 py-1 rounded text-xs uppercase tracking-wider ${
@@ -552,26 +556,20 @@ function EsteiraPage() {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      {isAdmin && (
-                        <select
-                          value={o.payment_status}
-                          onChange={(e) => setStatus(o.id, e.target.value as never)}
-                          className="hidden"
-                          aria-hidden
-                        />
-                      )}
                     </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={canViewFinancials ? 8 : 7} className="p-8 text-center text-admin-ink-muted text-sm">
+                    <td colSpan={8} className="p-8 text-center text-admin-ink-muted text-sm">
                       {orders.length === 0 ? (
                         "Nenhum pedido ainda"
                       ) : (
                         <>
                           Nenhum pedido corresponde aos filtros.{" "}
-                          <button onClick={resetFilters} className="text-admin-accent underline">Limpar filtros</button>
+                          <button onClick={resetFilters} className="text-admin-accent underline">
+                            Limpar filtros
+                          </button>
                         </>
                       )}
                     </td>
@@ -584,8 +582,16 @@ function EsteiraPage() {
               <div className="flex items-center justify-between gap-3 p-3 border-t border-admin-border flex-wrap">
                 <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
                   <span>Por página:</span>
-                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(parseInt(v, 10)); setPage(1); }}>
-                    <SelectTrigger className="h-8 w-[80px] bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+                  <Select
+                    value={String(pageSize)}
+                    onValueChange={(v) => {
+                      setPageSize(parseInt(v, 10));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[80px] bg-admin-bg border-admin-border">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="10">10</SelectItem>
                       <SelectItem value="25">25</SelectItem>
@@ -594,11 +600,25 @@ function EsteiraPage() {
                   </Select>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-admin-ink-muted">
-                  <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-8">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="h-8"
+                  >
                     <ChevronLeft className="h-3.5 w-3.5" /> Anterior
                   </Button>
-                  <span className="tabular-nums">Página {safePage} de {totalPages}</span>
-                  <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="h-8">
+                  <span className="tabular-nums">
+                    Página {safePage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="h-8"
+                  >
                     Próximo <ChevronRight className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -646,9 +666,7 @@ function EsteiraPage() {
                   <div>{linkModal.error}</div>
                 </div>
               )}
-              {linkModal.loading && (
-                <div className="text-muted-foreground">Preparando link...</div>
-              )}
+              {linkModal.loading && <div className="text-muted-foreground">Preparando link...</div>}
               {linkModal.paymentUrl && (
                 <div>
                   <Label>Link de pagamento</Label>
@@ -724,10 +742,11 @@ function EsteiraPage() {
                     label="Valor"
                     value={new Intl.NumberFormat("pt-PT", {
                       style: "currency",
-                      currency: bankModal.order.payment_currency ?? bankModal.order.currency ?? "EUR",
+                      currency:
+                        bankModal.order.payment_currency ?? bankModal.order.currency ?? "EUR",
                     }).format(
-                      ((bankModal.order.payment_amount_cents ?? bankModal.order.amount_cents ?? 0) /
-                        100),
+                      (bankModal.order.payment_amount_cents ?? bankModal.order.amount_cents ?? 0) /
+                        100,
                     )}
                     onCopy={() =>
                       copy(
@@ -764,11 +783,7 @@ function EsteiraPage() {
         </DialogContent>
       </Dialog>
 
-
-      <Dialog
-        open={!!selected}
-        onOpenChange={(o) => !o && setSelected(null)}
-      >
+      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Pedido · {selected?.service_title}</DialogTitle>
@@ -777,20 +792,23 @@ function EsteiraPage() {
             <div className="space-y-3 text-sm">
               <Row label="Cliente" value={selected.customer_name} />
               <Row label="E-mail" value={selected.customer_email ?? "—"} />
-              <Row label="Conta vinculada" value={selected.user_id ? "sim" : "não — pedido não aparece no portal"} />
-              {canViewFinancials && (
-                <>
-                  <Row label="Valor" value={formatEur(selected.amount_cents)} />
-                  <Row label="Método" value={selected.payment_method ?? "—"} />
-                </>
-              )}
+              <Row
+                label="Conta vinculada"
+                value={selected.user_id ? "sim" : "não — pedido não aparece no portal"}
+              />
+              <Row label="Valor" value={formatEur(selected.amount_cents)} />
+              <Row label="Método" value={selected.payment_method ?? "—"} />
               <Row label="Pagamento" value={selected.payment_status} />
               <Row label="Execução" value={selected.delivery_status ?? "—"} />
               <Row label="Voucher" value={selected.voucher_code ?? "—"} />
-              <Row label="Referência pagamento" value={selected.payment_provider_reference ?? "—"} />
+              <Row
+                label="Referência pagamento"
+                value={selected.payment_provider_reference ?? "—"}
+              />
               {selected.notes && <Row label="Notas" value={selected.notes} />}
               <p className="text-xs text-muted-foreground border-t pt-3">
-                Aba de Agenda / Documentos / Histórico chega quando a migração de campos for aplicada.
+                Aba de Agenda / Documentos / Histórico chega quando a migração de campos for
+                aplicada.
               </p>
             </div>
           )}
@@ -827,7 +845,6 @@ function EsteiraPage() {
     </div>
   );
 }
-
 
 function Row({ label, value }: { label: string; value: string }) {
   return (

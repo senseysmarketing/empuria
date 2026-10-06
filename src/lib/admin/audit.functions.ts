@@ -1,15 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireAdmin } from "./auth";
+import { requireStaff } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const listAuditLogs = createServerFn({ method: "POST" })
-  .middleware([requireAdmin()])
+  .middleware([requireStaff])
   .inputValidator((d) =>
-    z.object({
-      module: z.string().max(40).optional(),
-      limit: z.number().int().min(1).max(200).default(100),
-    }).parse(d),
+    z
+      .object({
+        module: z.string().max(40).optional(),
+        limit: z.number().int().min(1).max(200).default(100),
+      })
+      .parse(d),
   )
   .handler(async ({ data }) => {
     let q = supabaseAdmin
@@ -21,17 +23,25 @@ export const listAuditLogs = createServerFn({ method: "POST" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
 
-    const actorIds = Array.from(new Set((rows ?? []).map((r) => r.actor_id).filter((x): x is string => !!x)));
+    const actorIds = Array.from(
+      new Set((rows ?? []).map((r) => r.actor_id).filter((x): x is string => !!x)),
+    );
     const names = new Map<string, string>();
     if (actorIds.length) {
-      const { data: profs } = await supabaseAdmin.from("profiles").select("id, full_name").in("id", actorIds);
+      const { data: profs } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", actorIds);
       for (const p of profs ?? []) names.set(p.id, p.full_name ?? "—");
     }
-    return (rows ?? []).map((r) => ({ ...r, actor_name: r.actor_id ? names.get(r.actor_id) ?? null : null }));
+    return (rows ?? []).map((r) => ({
+      ...r,
+      actor_name: r.actor_id ? (names.get(r.actor_id) ?? null) : null,
+    }));
   });
 
 export const listImpersonationLogs = createServerFn({ method: "GET" })
-  .middleware([requireAdmin()])
+  .middleware([requireStaff])
   .handler(async () => {
     const { data, error } = await supabaseAdmin
       .from("impersonation_logs")
@@ -40,10 +50,18 @@ export const listImpersonationLogs = createServerFn({ method: "GET" })
       .limit(100);
     if (error) throw new Error(error.message);
 
-    const ids = Array.from(new Set([...(data ?? []).map((r) => r.admin_id), ...(data ?? []).map((r) => r.target_user_id)]));
+    const ids = Array.from(
+      new Set([
+        ...(data ?? []).map((r) => r.admin_id),
+        ...(data ?? []).map((r) => r.target_user_id),
+      ]),
+    );
     const names = new Map<string, string>();
     if (ids.length) {
-      const { data: profs } = await supabaseAdmin.from("profiles").select("id, full_name").in("id", ids);
+      const { data: profs } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", ids);
       for (const p of profs ?? []) names.set(p.id, p.full_name ?? "—");
     }
     return (data ?? []).map((r) => ({

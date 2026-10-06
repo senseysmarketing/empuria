@@ -14,7 +14,6 @@ import {
   Workflow,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useModuleAccess } from "@/hooks/use-module-access";
 import logoIcone from "@/assets/logo-empuria-icone.png";
 
 const items = [
@@ -33,12 +32,9 @@ const items = [
 export function AdminDock() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const { can } = useModuleAccess();
 
   const isActive = (to: string, exact?: boolean) =>
     exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
-
-  const visibleItems = items.filter((it) => can(it.module));
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 px-4 pb-4">
@@ -54,7 +50,7 @@ export function AdminDock() {
             </Link>
           </li>
           <li className="w-px h-5 bg-brown/60 mx-0.5" />
-          {visibleItems.map((it) => {
+          {items.map((it) => {
             const active = isActive(it.to, "exact" in it ? it.exact : false);
             return (
               <li key={it.to}>
@@ -92,7 +88,7 @@ export function AdminDock() {
             <button
               onClick={async () => {
                 await supabase.auth.signOut();
-                navigate({ to: "/login", search: { redirect: undefined } });
+                navigate({ to: "/login/admin", search: { redirect: undefined } });
               }}
               className="admin-dock-item flex items-center justify-center h-10 px-2.5 rounded-full text-offwhite/50 hover:text-red-brand hover:bg-brown/50 transition-colors"
               title="Sair"

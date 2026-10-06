@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireAdmin, requireModule } from "./auth";
-import { userHasAction } from "./permission-checks";
+import { requireModule } from "./auth";
 import { startMatchingCrmAutomationsForLead } from "./crm-automations.functions";
 import { sendUazapiTextInternal } from "@/lib/uazapi/uazapi.functions";
 import {
@@ -11,7 +9,6 @@ import {
   phoneToWhatsAppJid,
   getCountryFromPhone,
 } from "@/lib/phone/phone.utils";
-
 
 const systemStageKeys = new Set(["novo", "em_contato", "reuniao", "fechado", "descartado"]);
 
@@ -271,12 +268,13 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const db = context.supabase as any;
 
-    let canSeeAll = Boolean(context.isAdmin);
-    if (!canSeeAll) {
-      canSeeAll = await userHasAction(context.userId, "crm.view_all_leads");
-    }
+    const canSeeAll = true;
 
-    const leadsQuery = db.from("leads").select("*").order("created_at", { ascending: false }).limit(400);
+    const leadsQuery = db
+      .from("leads")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(400);
     if (!canSeeAll) leadsQuery.eq("assigned_to", context.userId);
 
     const [columnsRes, leadsRes, inboxRes, distributionRes, membersRes, activityRes, users] =
@@ -356,7 +354,6 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
       activity: activityRes.data ?? [],
       users,
       currentUserId: context.userId,
-      isAdmin: Boolean(context.isAdmin),
       canSeeAllLeads: canSeeAll,
       whatsappMode: "sugestao" as const,
     };
@@ -687,8 +684,7 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
       .single();
     if (leadError) throw new Error(leadError.message);
     const leadRow = lead as CrmLeadRow;
-    const leadE164 =
-      normalizeE164Phone(leadRow.phone) ?? normalizeE164Phone(leadRow.phone, "BR");
+    const leadE164 = normalizeE164Phone(leadRow.phone) ?? normalizeE164Phone(leadRow.phone, "BR");
     const phoneDigits = phoneToWhatsAppJid(leadE164) ?? leadRow.phone.replace(/\D/g, "");
     if (phoneDigits.length < 8) throw new Error("Lead sem telefone valido para WhatsApp.");
     if (isFinalStage(leadRow.pipeline_stage))
@@ -809,12 +805,13 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
     return {
       ok: true,
       delivery,
-      whatsappUrl: delivery === "wa_me" ? whatsappUrl(leadE164 ?? leadRow.phone, data.message) : null,
+      whatsappUrl:
+        delivery === "wa_me" ? whatsappUrl(leadE164 ?? leadRow.phone, data.message) : null,
     };
   });
 
 export const saveCrmColumn = createServerFn({ method: "POST" })
-  .middleware([requireAdmin()])
+  .middleware([requireModule("crm")])
   .inputValidator((d) =>
     z
       .object({
@@ -850,7 +847,7 @@ export const saveCrmColumn = createServerFn({ method: "POST" })
   });
 
 export const deactivateCrmColumn = createServerFn({ method: "POST" })
-  .middleware([requireAdmin()])
+  .middleware([requireModule("crm")])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const db = context.supabase as any;
@@ -870,7 +867,7 @@ export const deactivateCrmColumn = createServerFn({ method: "POST" })
   });
 
 export const saveCrmDistribution = createServerFn({ method: "POST" })
-  .middleware([requireAdmin()])
+  .middleware([requireModule("crm")])
   .inputValidator((d) =>
     z
       .object({

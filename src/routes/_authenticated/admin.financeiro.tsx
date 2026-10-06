@@ -15,6 +15,8 @@ import {
   WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
+import { RestrictedAreaCard } from "@/components/admin/RestrictedAreaCard";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,6 +94,19 @@ function statusClass(status: string) {
 }
 
 function FinanceiroPage() {
+  const { isLoading, isAdmin } = useCurrentUser();
+
+  if (isLoading) return null;
+  if (!isAdmin) {
+    return (
+      <RestrictedAreaCard message="Financeiro/Caixa é uma área exclusiva de administradores." />
+    );
+  }
+
+  return <FinanceiroContent />;
+}
+
+function FinanceiroContent() {
   const qc = useQueryClient();
   const [month, setMonth] = useState(defaultMonth());
   const [tab, setTab] = useState("resumo");
@@ -128,13 +143,7 @@ function FinanceiroPage() {
           search: filters.search || undefined,
           type: filters.type as "all" | "income" | "expense",
           status: filters.status as
-            | "all"
-            | "planned"
-            | "pending"
-            | "received"
-            | "paid"
-            | "overdue"
-            | "canceled",
+            "all" | "planned" | "pending" | "received" | "paid" | "overdue" | "canceled",
           sourceModule: filters.sourceModule === "all" ? undefined : filters.sourceModule,
           page: 0,
           pageSize: 60,
@@ -692,10 +701,7 @@ function NewTransactionDialog({
           currency: String(form.get("currency") ?? "BRL") as "BRL" | "EUR" | "USD",
           dueDate: String(form.get("dueDate") ?? ""),
           status: String(form.get("status") ?? "pending") as
-            | "planned"
-            | "pending"
-            | "received"
-            | "paid",
+            "planned" | "pending" | "received" | "paid",
           categoryId: emptyToNull(form.get("categoryId")),
           accountId: emptyToNull(form.get("accountId")),
           paymentMethod: emptyToNull(form.get("paymentMethod")),
@@ -940,11 +946,7 @@ function FinanceSettingsDialog({
         data: {
           name: String(form.get("name") ?? ""),
           type: String(form.get("type") ?? "cash") as
-            | "cash"
-            | "bank"
-            | "card"
-            | "gateway"
-            | "other",
+            "cash" | "bank" | "card" | "gateway" | "other",
           currency: String(form.get("currency") ?? "BRL") as "BRL" | "EUR" | "USD",
         },
       }),

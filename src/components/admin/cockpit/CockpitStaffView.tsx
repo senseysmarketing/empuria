@@ -3,8 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { getCockpitMetrics } from "@/lib/admin/cockpit.functions";
+import { getActivityFeed } from "@/lib/admin/cockpit.functions";
 import { listCalendarTasks } from "@/lib/admin/calendar-tasks.functions";
-import { CalendarClock, ListTodo, Users, Bell } from "lucide-react";
+import { ActivityFeed } from "@/components/admin/ActivityFeed";
+import { useTopBarQuickStat } from "@/components/shared/TopBarActionsContext";
+import { CalendarClock, ListTodo, Users, Crown } from "lucide-react";
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -13,9 +16,11 @@ function fmtTime(iso: string) {
 export function CockpitStaffView() {
   const fetchMetrics = useServerFn(getCockpitMetrics);
   const fetchTasks = useServerFn(listCalendarTasks);
+  const fetchFeed = useServerFn(getActivityFeed);
 
   const metricsQ = useQuery({ queryKey: ["cockpit"], queryFn: () => fetchMetrics(), retry: false });
   const tasksQ = useQuery({ queryKey: ["my-tasks"], queryFn: () => fetchTasks(), retry: false });
+  const feedQ = useQuery({ queryKey: ["activity"], queryFn: () => fetchFeed(), retry: false });
 
   const m = metricsQ.data;
   const allTasks = tasksQ.data ?? [];
@@ -32,6 +37,8 @@ export function CockpitStaffView() {
       return d < endOfDay;
     })
     .slice(0, 8);
+
+  useTopBarQuickStat({ label: "Reuniões hoje", value: String(m?.appointmentsToday ?? "—") });
 
   return (
     <div className="space-y-6">
@@ -62,10 +69,10 @@ export function CockpitStaffView() {
         />
         <AdminStatCard
           className="col-span-12 sm:col-span-6 lg:col-span-3"
-          label="Avisos"
-          value={0}
-          hint="Avisos operacionais"
-          icon={Bell}
+          label="Novos membros (30d)"
+          value={m?.newMembers ?? "—"}
+          hint="Clube do Imigrante"
+          icon={Crown}
           tone="neutral"
         />
 
@@ -80,9 +87,7 @@ export function CockpitStaffView() {
                   <div className="min-w-0">
                     <div className="text-sm text-admin-ink truncate">{t.title}</div>
                     {t.description && (
-                      <div className="text-xs text-admin-ink-muted truncate">
-                        {t.description}
-                      </div>
+                      <div className="text-xs text-admin-ink-muted truncate">{t.description}</div>
                     )}
                   </div>
                   {t.due_at && (
@@ -164,9 +169,7 @@ export function CockpitStaffView() {
                 >
                   <div>
                     <div className="text-admin-ink">{ar.visitor_name}</div>
-                    {ar.purpose && (
-                      <div className="text-xs text-admin-ink-muted">{ar.purpose}</div>
-                    )}
+                    {ar.purpose && <div className="text-xs text-admin-ink-muted">{ar.purpose}</div>}
                   </div>
                   <span className="text-xs text-admin-ink-muted tabular-nums">
                     {fmtTime(ar.arrived_at)}
@@ -177,6 +180,10 @@ export function CockpitStaffView() {
           ) : (
             <p className="text-sm text-admin-ink-muted">Nenhuma chegada registrada hoje.</p>
           )}
+        </BentoCard>
+
+        <BentoCard title="Feed de atividade" className="col-span-12">
+          <ActivityFeed initial={feedQ.data ?? []} />
         </BentoCard>
       </div>
     </div>

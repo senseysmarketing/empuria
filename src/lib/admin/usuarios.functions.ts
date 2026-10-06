@@ -255,7 +255,6 @@ export const impersonateUser = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    if (!context.isAdmin) throw new Error("Impersonação restrita a admins");
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("id,full_name")

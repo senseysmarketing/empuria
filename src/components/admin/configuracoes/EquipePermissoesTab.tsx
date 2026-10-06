@@ -5,22 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Search } from "lucide-react";
 import { listStaffWithPermissions } from "@/lib/admin/permissions.functions";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { NewStaffDialog } from "./NewStaffDialog";
 import { MemberCard, type MemberCardData } from "./MemberCard";
-import { EditMemberPermissionsDialog } from "./EditMemberPermissionsDialog";
 import { ManageMemberDialog } from "./ManageMemberDialog";
 import { cn } from "@/lib/utils";
-
 
 type Filter = "todos" | "admin" | "staff";
 
 export function EquipePermissoesTab() {
   const fetchList = useServerFn(listStaffWithPermissions);
-  const { isAdmin } = useCurrentUser();
 
   const [openNew, setOpenNew] = useState(false);
-  const [editing, setEditing] = useState<MemberCardData | null>(null);
   const [managing, setManaging] = useState<MemberCardData | null>(null);
 
   const [query, setQuery] = useState("");
@@ -46,20 +41,17 @@ export function EquipePermissoesTab() {
       <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h3 className="font-display text-xl text-admin-ink">Equipe & Permissões</h3>
+            <h3 className="font-display text-xl text-admin-ink">Equipe</h3>
             <p className="text-xs text-admin-ink-muted mt-1">
-              Admins têm acesso total automático. Edite cada staff para escolher um perfil
-              de acesso ou ajustar os grupos manualmente.
+              Staff opera os módulos administrativos; Financeiro/Caixa permanece exclusivo de admin.
             </p>
           </div>
-          {isAdmin && (
-            <Button
-              onClick={() => setOpenNew(true)}
-              className="bg-admin-accent text-white gap-2 shrink-0"
-            >
-              <UserPlus className="h-4 w-4" /> Novo membro
-            </Button>
-          )}
+          <Button
+            onClick={() => setOpenNew(true)}
+            className="bg-admin-accent text-white gap-2 shrink-0"
+          >
+            <UserPlus className="h-4 w-4" /> Novo membro
+          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
@@ -92,9 +84,7 @@ export function EquipePermissoesTab() {
         </div>
 
         {isLoading ? (
-          <div className="p-12 text-center text-admin-ink-muted text-sm">
-            Carregando equipe…
-          </div>
+          <div className="p-12 text-center text-admin-ink-muted text-sm">Carregando equipe…</div>
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-admin-ink-muted text-sm border border-dashed border-admin-border rounded-xl">
             Nenhum membro encontrado.
@@ -105,8 +95,6 @@ export function EquipePermissoesTab() {
               <MemberCard
                 key={u.id}
                 member={u as MemberCardData}
-                canEdit={isAdmin}
-                onEdit={() => setEditing(u as MemberCardData)}
                 onManage={() => setManaging(u as MemberCardData)}
               />
             ))}
@@ -115,17 +103,11 @@ export function EquipePermissoesTab() {
       </div>
 
       <NewStaffDialog open={openNew} onOpenChange={setOpenNew} />
-      <EditMemberPermissionsDialog
-        member={editing}
-        open={!!editing}
-        onOpenChange={(v) => !v && setEditing(null)}
-      />
       <ManageMemberDialog
         member={managing}
         open={!!managing}
         onOpenChange={(v) => !v && setManaging(null)}
       />
-
     </>
   );
 }

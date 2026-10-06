@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,7 @@ import logoCompleta from "@/assets/logo-empuria-completa.png";
 
 export const Route = createFileRoute("/redefinir-senha")({
   ssr: false,
+  validateSearch: z.object({ context: z.enum(["admin", "member"]).optional() }),
   component: RedefinirSenhaPage,
 });
 
@@ -21,6 +22,8 @@ const schema = z
 
 function RedefinirSenhaPage() {
   const navigate = useNavigate();
+  const { context } = useSearch({ from: "/redefinir-senha" });
+  const loginTo = context === "admin" ? "/login/admin" : "/login";
   const [ready, setReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,7 +61,7 @@ function RedefinirSenhaPage() {
       if (updErr) throw updErr;
       setInfo("Senha atualizada! Você será redirecionado para o login.");
       await supabase.auth.signOut();
-      setTimeout(() => navigate({ to: "/login" }), 1500);
+      setTimeout(() => navigate({ to: loginTo }), 1500);
     } catch (err) {
       if (err instanceof z.ZodError) setError(err.issues[0]?.message ?? "Dados inválidos");
       else setError(err instanceof Error ? err.message : "Falha ao redefinir senha");
@@ -92,7 +95,7 @@ function RedefinirSenhaPage() {
                 O link de redefinição é inválido ou expirou. Solicite um novo link à equipe.
               </p>
               <Link
-                to="/login"
+                to={loginTo}
                 className="inline-block text-xs uppercase tracking-wider font-display text-yellow-brand"
               >
                 Voltar ao login

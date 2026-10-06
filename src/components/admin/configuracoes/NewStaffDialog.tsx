@@ -15,7 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { createStaffMember } from "@/lib/admin/permissions.functions";
+import { createAdminMember, createStaffMember } from "@/lib/admin/permissions.functions";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 type Role = "staff" | "admin";
 
@@ -26,7 +27,9 @@ export function NewStaffDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const create = useServerFn(createStaffMember);
+  const createStaff = useServerFn(createStaffMember);
+  const createAdmin = useServerFn(createAdminMember);
+  const { isAdmin } = useCurrentUser();
   const qc = useQueryClient();
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", role: "staff" as Role });
   const [saving, setSaving] = useState(false);
@@ -40,12 +43,12 @@ export function NewStaffDialog({
     }
     setSaving(true);
     try {
+      const create = form.role === "admin" ? createAdmin : createStaff;
       const res = await create({
         data: {
           full_name: form.fullName.trim(),
           email: form.email.trim(),
           phone: form.phone.trim(),
-          role: form.role,
         },
       });
       toast.success(
@@ -69,7 +72,7 @@ export function NewStaffDialog({
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">Novo membro da equipe</DialogTitle>
           <DialogDescription>
-            Crie um usuário staff ou admin. Nenhuma senha é definida aqui.
+            Crie um integrante da equipe. Nenhuma senha é definida aqui.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -110,19 +113,21 @@ export function NewStaffDialog({
                 <div>
                   <div className="font-medium text-admin-ink">Staff</div>
                   <div className="text-xs text-admin-ink-muted">
-                    Acesso à área /admin. Permissões por módulo definidas na tabela abaixo.
+                    Acesso aos módulos operacionais do painel, exceto Financeiro/Caixa.
                   </div>
                 </div>
               </label>
-              <label className="flex items-start gap-3 rounded-lg border border-admin-border bg-admin-bg p-3 cursor-pointer hover:border-admin-accent/60">
-                <RadioGroupItem value="admin" className="mt-0.5" />
-                <div>
-                  <div className="font-medium text-admin-ink">Admin</div>
-                  <div className="text-xs text-admin-ink-muted">
-                    Acesso total a todos os módulos, sem necessidade de toggles.
+              {isAdmin && (
+                <label className="flex items-start gap-3 rounded-lg border border-admin-border bg-admin-bg p-3 cursor-pointer hover:border-admin-accent/60">
+                  <RadioGroupItem value="admin" className="mt-0.5" />
+                  <div>
+                    <div className="font-medium text-admin-ink">Admin</div>
+                    <div className="text-xs text-admin-ink-muted">
+                      Acesso total, incluindo Financeiro/Caixa.
+                    </div>
                   </div>
-                </div>
-              </label>
+                </label>
+              )}
             </RadioGroup>
           </div>
           <p className="rounded-lg border border-yellow-brand/30 bg-yellow-brand/10 p-3 text-xs text-admin-ink-muted">

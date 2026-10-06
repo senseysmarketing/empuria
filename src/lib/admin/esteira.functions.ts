@@ -1,27 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireStaff, requireAdmin, requireModule } from "./auth";
+import { requireStaff, requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
 import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
 
-const ORDER_SELECT_ADMIN = "*";
-const ORDER_SELECT_STAFF =
-  "id,customer_name,customer_email,service_title,payment_status,delivery_status,voucher_code,created_at,executed_at,user_id";
-
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireStaff])
   .handler(async ({ context }) => {
-    const select = context.isAdmin ? ORDER_SELECT_ADMIN : ORDER_SELECT_STAFF;
     const { data } = await context.supabase
       .from("orders")
-      .select(select as "*")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(300);
-    return (data ?? []).map((order) => ({
-      ...order,
-      canViewFinancials: !!context.isAdmin,
-    }));
+    return data ?? [];
   });
 
 export const updateOrder = createServerFn({ method: "POST" })
@@ -426,8 +418,7 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
       linkId = (inserted as { id: string }).id;
     }
 
-    const baseUrl =
-      data.baseUrl?.replace(/\/+$/, "") ?? "https://empuria.lovable.app";
+    const baseUrl = data.baseUrl?.replace(/\/+$/, "") ?? "https://empuria.lovable.app";
     const url = `${baseUrl}/pagar/${token}`;
 
     await supabaseAdmin.from("audit_logs").insert({

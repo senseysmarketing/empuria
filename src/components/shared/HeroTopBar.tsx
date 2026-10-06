@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { SpainWatermark } from "./SpainWatermark";
 import { useTopBarSlots } from "./TopBarActionsContext";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useModuleAccess } from "@/hooks/use-module-access";
 import { stopImpersonation } from "@/lib/impersonation";
 import logoIcone from "@/assets/logo-empuria-icone.png";
 
@@ -29,7 +28,6 @@ function formatDate(d: Date) {
 export function HeroTopBar({ variant }: { variant: Variant }) {
   const { actions, quickStat } = useTopBarSlots();
   const { impersonation } = useCurrentUser();
-  const { can } = useModuleAccess();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
@@ -60,7 +58,9 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
   const textMuted = "text-offwhite/65";
   const accent = isAdmin ? "text-orange-brand" : "text-yellow-brand";
   const watermark = isAdmin ? "text-orange-brand/15" : "text-yellow-brand/12";
-  const logoRing = isAdmin ? "bg-brown-deep/60 ring-orange-brand/20" : "bg-brown-deep/60 ring-yellow-brand/25";
+  const logoRing = isAdmin
+    ? "bg-brown-deep/60 ring-orange-brand/20"
+    : "bg-brown-deep/60 ring-yellow-brand/25";
   const greeting = isAdmin
     ? `${greetingFor(now)}, ${name || "equipe"}`
     : `Bem-vindo de volta, ${impersonation?.targetName?.split(" ")[0] || name || "imigrante"}`;
@@ -78,7 +78,9 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
       </div>
 
       <div className="relative max-w-7xl mx-auto px-6 py-6 flex flex-wrap items-center gap-5">
-        <div className={`h-14 w-14 rounded-2xl ring-1 flex items-center justify-center shrink-0 ${logoRing}`}>
+        <div
+          className={`h-14 w-14 rounded-2xl ring-1 flex items-center justify-center shrink-0 ${logoRing}`}
+        >
           <img src={logoIcone} alt="Empuria" className="h-9 w-9 object-contain" />
         </div>
 
@@ -86,7 +88,9 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
           <h1 className={`font-display font-bold text-2xl md:text-3xl tracking-tight ${textMain}`}>
             {greeting}
           </h1>
-          <p className={`text-xs md:text-sm mt-1 font-display uppercase tracking-widest ${textMuted}`}>
+          <p
+            className={`text-xs md:text-sm mt-1 font-display uppercase tracking-widest ${textMuted}`}
+          >
             <span className={accent}>●</span> {formatDate(now)}
           </p>
         </div>
@@ -104,7 +108,7 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
 
         {actions && <div className="flex items-center gap-3">{actions}</div>}
 
-        {(variant === "admin" || (isAdmin && can("configuracoes"))) && (
+        {variant === "admin" && (
           <Link
             to="/admin/configuracoes"
             search={{ tab: "perfil" }}
@@ -115,7 +119,6 @@ export function HeroTopBar({ variant }: { variant: Variant }) {
             <span className="hidden md:inline">Configurações</span>
           </Link>
         )}
-
       </div>
       {variant === "portal" && impersonation && (
         <div className="relative bg-brown-deep text-offwhite border-t border-offwhite/10">

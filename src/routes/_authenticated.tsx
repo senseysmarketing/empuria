@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authenticated")({
     if (!data.session) {
       const redirectTo = `${location.pathname}${location.searchStr ?? ""}`;
       throw redirect({
-        to: "/login",
+        to: location.pathname.startsWith("/admin") ? "/login/admin" : "/login",
         search: { redirect: redirectTo },
       });
     }

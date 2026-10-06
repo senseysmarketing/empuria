@@ -6,14 +6,18 @@ type Variant = "admin-required" | "member-only" | "session-expired";
 
 interface Props {
   variant: Variant;
+  context?: "admin" | "member";
 }
 
-export function AccessDeniedCard({ variant }: Props) {
+export function AccessDeniedCard({ variant, context = "member" }: Props) {
   const navigate = useNavigate();
 
   const logout = async () => {
     await supabase.auth.signOut();
-    navigate({ to: "/login", search: { redirect: undefined } });
+    navigate({
+      to: context === "admin" ? "/login/admin" : "/login",
+      search: { redirect: undefined },
+    });
   };
 
   const isAdminRequired = variant === "admin-required";
@@ -28,7 +32,13 @@ export function AccessDeniedCard({ variant }: Props) {
     : isSessionExpired
       ? "Entre novamente para continuar com seguranca."
       : "Sua conta de equipe nao usa o portal de membros. Acesse o painel administrativo para continuar.";
-  const primaryTo = isAdminRequired ? "/portal" : isSessionExpired ? "/login" : "/admin";
+  const primaryTo = isAdminRequired
+    ? "/portal"
+    : isSessionExpired
+      ? context === "admin"
+        ? "/login/admin"
+        : "/login"
+      : "/admin";
   const primaryLabel = isAdminRequired
     ? "Ir para meu painel"
     : isSessionExpired

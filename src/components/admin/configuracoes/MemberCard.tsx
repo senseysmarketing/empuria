@@ -1,34 +1,20 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, Settings2, Eye, UserCog } from "lucide-react";
-import { detectProfile, PROFILE_LABELS } from "@/lib/admin/permission-profiles";
+import { ShieldCheck, UserCog } from "lucide-react";
 
 export type MemberCardData = {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
   role: "admin" | "staff";
-  allowed_modules: string[];
-  allowed_actions?: string[];
   email?: string | null;
   phone?: string | null;
   is_blocked?: boolean;
 };
 
-export function MemberCard({
-  member,
-  onEdit,
-  onManage,
-  canEdit,
-}: {
-  member: MemberCardData;
-  onEdit: () => void;
-  onManage: () => void;
-  canEdit: boolean;
-}) {
+export function MemberCard({ member, onManage }: { member: MemberCardData; onManage: () => void }) {
   const isAdmin = member.role === "admin";
-  const profile = isAdmin ? null : detectProfile(member.allowed_modules);
   const initials = (member.full_name ?? "?")
     .split(" ")
     .map((s) => s[0])
@@ -68,11 +54,6 @@ export function MemberCard({
                 Inativo
               </Badge>
             )}
-            {profile && (
-              <span className="text-xs text-admin-ink-muted">
-                Perfil: <span className="text-admin-ink">{PROFILE_LABELS[profile]}</span>
-              </span>
-            )}
           </div>
           {member.email && (
             <div className="text-xs text-admin-ink-muted truncate mt-1">{member.email}</div>
@@ -82,38 +63,13 @@ export function MemberCard({
 
       <div className="text-xs text-admin-ink-muted">
         {isAdmin
-          ? "Acesso total ao sistema, sem restrições."
-          : `${member.allowed_modules.length} módulo${
-              member.allowed_modules.length === 1 ? "" : "s"
-            } liberado${member.allowed_modules.length === 1 ? "" : "s"}.`}
+          ? "Acesso total, incluindo Financeiro/Caixa."
+          : "Acesso aos módulos operacionais, exceto Financeiro/Caixa."}
       </div>
 
       <div className="mt-auto pt-2 flex flex-wrap justify-end gap-2">
-        {canEdit && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onManage}
-          >
-            <UserCog className="h-4 w-4 mr-1.5" /> Gerenciar usuário
-          </Button>
-        )}
-        <Button
-          variant={isAdmin ? "outline" : "default"}
-          size="sm"
-          onClick={onEdit}
-          disabled={!canEdit && !isAdmin}
-          className={isAdmin ? "" : "bg-admin-accent text-white hover:bg-admin-accent/90"}
-        >
-          {isAdmin ? (
-            <>
-              <Eye className="h-4 w-4 mr-1.5" /> Ver detalhes
-            </>
-          ) : (
-            <>
-              <Settings2 className="h-4 w-4 mr-1.5" /> Editar permissões
-            </>
-          )}
+        <Button variant="outline" size="sm" onClick={onManage}>
+          <UserCog className="h-4 w-4 mr-1.5" /> Gerenciar usuário
         </Button>
       </div>
     </div>

@@ -25,14 +25,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  KeyRound,
-  Mail,
-  ShieldOff,
-  ShieldCheck,
-  Loader2,
-  Copy,
-} from "lucide-react";
+import { KeyRound, Mail, ShieldOff, ShieldCheck, Loader2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import {
   updateUserProfile,
@@ -78,8 +71,7 @@ export function ManageMemberDialog({
   const isSelf = !!member && me?.userId === member.id;
   const isBlocked = Boolean(member?.is_blocked);
 
-  const invalidate = () =>
-    qc.invalidateQueries({ queryKey: ["staff-permissions"] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["staff-permissions"] });
 
   const saveProfile = useMutation({
     mutationFn: () =>
@@ -98,8 +90,7 @@ export function ManageMemberDialog({
   });
 
   const changeEmail = useMutation({
-    mutationFn: () =>
-      emailFn({ data: { id: memberId, new_email: newEmail.trim() } }),
+    mutationFn: () => emailFn({ data: { id: memberId, new_email: newEmail.trim() } }),
     onSuccess: () => {
       toast.success("E-mail alterado");
       setEmailEditing(false);
@@ -115,7 +106,7 @@ export function ManageMemberDialog({
           id: memberId,
           redirect_to:
             typeof window !== "undefined"
-              ? `${window.location.origin}/redefinir-senha`
+              ? `${window.location.origin}/redefinir-senha?context=admin`
               : undefined,
         },
       }),
@@ -137,8 +128,7 @@ export function ManageMemberDialog({
   });
 
   const toggleBlocked = useMutation({
-    mutationFn: () =>
-      blockFn({ data: { id: memberId, blocked: !isBlocked } }),
+    mutationFn: () => blockFn({ data: { id: memberId, blocked: !isBlocked } }),
     onSuccess: () => {
       toast.success(isBlocked ? "Usuário reativado" : "Usuário inativado");
       setConfirmBlock(false);
@@ -149,7 +139,6 @@ export function ManageMemberDialog({
   });
 
   if (!member) return null;
-
 
   return (
     <>
@@ -203,9 +192,7 @@ export function ManageMemberDialog({
                   disabled={saveProfile.isPending}
                   className="bg-admin-accent text-white hover:bg-admin-accent/90"
                 >
-                  {saveProfile.isPending && (
-                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  )}
+                  {saveProfile.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
                   Salvar dados
                 </Button>
               </div>
@@ -237,9 +224,7 @@ export function ManageMemberDialog({
                       }
                       className="bg-admin-accent text-white hover:bg-admin-accent/90"
                     >
-                      {changeEmail.isPending && (
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                      )}
+                      {changeEmail.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
                       Confirmar
                     </Button>
                     <Button
@@ -254,11 +239,7 @@ export function ManageMemberDialog({
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEmailEditing(true)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => setEmailEditing(true)}>
                     Alterar
                   </Button>
                 )}
@@ -290,8 +271,7 @@ export function ManageMemberDialog({
                 Gerar link de redefinição de senha
               </Button>
               <p className="text-xs text-admin-ink-muted">
-                O link é copiado para a área de transferência. Envie ao usuário
-                por canal seguro.
+                O link é copiado para a área de transferência. Envie ao usuário por canal seguro.
               </p>
             </div>
 
@@ -317,9 +297,7 @@ export function ManageMemberDialog({
                 {isBlocked ? "Reativar usuário" : "Inativar usuário"}
               </Button>
               {isSelf && (
-                <p className="text-xs text-admin-ink-muted">
-                  Você não pode inativar a si mesmo.
-                </p>
+                <p className="text-xs text-admin-ink-muted">Você não pode inativar a si mesmo.</p>
               )}
             </div>
           </div>
@@ -358,9 +336,7 @@ export function ManageMemberDialog({
                   : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
               }
             >
-              {toggleBlocked.isPending && (
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-              )}
+              {toggleBlocked.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
               {isBlocked ? "Reativar" : "Inativar"}
             </AlertDialogAction>
           </AlertDialogFooter>
