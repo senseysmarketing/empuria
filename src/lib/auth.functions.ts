@@ -8,21 +8,15 @@ export const getCurrentUserRole = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
 
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
+    const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
 
     if (error) throw new Error(error.message);
 
     const roles = (data ?? []).map((r) => r.role as AppRole);
     const isAdmin = roles.includes("admin");
     const isStaff = isAdmin || roles.includes("staff");
-    const primaryRole: AppRole = isAdmin
-      ? "admin"
-      : roles.includes("staff")
-        ? "staff"
-        : "member";
+    const isMember = roles.includes("member");
+    const primaryRole: AppRole = isAdmin ? "admin" : roles.includes("staff") ? "staff" : "member";
 
     return {
       userId,
@@ -30,6 +24,7 @@ export const getCurrentUserRole = createServerFn({ method: "GET" })
       roles,
       isAdmin,
       isStaff,
+      isMember,
       primaryRole,
       impersonation: context.impersonation ?? null,
     };
