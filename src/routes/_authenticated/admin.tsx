@@ -1,16 +1,29 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { AdminDock } from "@/components/admin/AdminDock";
+import { AdminHeader } from "@/components/admin/AdminHeader";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { AccessDeniedCard } from "@/components/auth/AccessDeniedCard";
-import { HeroTopBar } from "@/components/shared/HeroTopBar";
 import { TopBarActionsProvider } from "@/components/shared/TopBarActionsContext";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminLayout,
 });
 
 function AdminLayout() {
-  const { isLoading, isError, isStaff } = useCurrentUser();
+  const { isLoading, isError, isStaff, isAdmin } = useCurrentUser();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setSidebarCollapsed(localStorage.getItem("empuria.admin.sidebar.collapsed") === "true");
+  }, []);
+
+  const changeSidebarCollapsed = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    localStorage.setItem("empuria.admin.sidebar.collapsed", String(collapsed));
+  };
 
   if (isLoading) {
     return (
@@ -33,11 +46,24 @@ function AdminLayout() {
   return (
     <TopBarActionsProvider>
       <div className="min-h-screen bg-admin-bg text-admin-ink">
-        <HeroTopBar variant="admin" />
-        <main className="max-w-7xl mx-auto px-6 pt-6 pb-32">
-          <Outlet />
-        </main>
-        <AdminDock />
+        <AdminSidebar
+          collapsed={sidebarCollapsed}
+          isAdmin={isAdmin}
+          mobileOpen={mobileMenuOpen}
+          onCollapsedChange={changeSidebarCollapsed}
+          onMobileOpenChange={setMobileMenuOpen}
+        />
+        <div
+          className={cn(
+            "min-w-0 transition-[padding] duration-200",
+            sidebarCollapsed ? "md:pl-[72px]" : "md:pl-64",
+          )}
+        >
+          <AdminHeader onOpenMenu={() => setMobileMenuOpen(true)} />
+          <main className="mx-auto w-full max-w-7xl min-w-0 px-4 py-5 md:px-6 md:py-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </TopBarActionsProvider>
   );

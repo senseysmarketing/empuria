@@ -96,6 +96,25 @@ function pickCurrency(p: WisePayload): string | null {
   return null;
 }
 
+async function logRejectedWebhook(args: {
+  deliveryId: string | null;
+  payload: WisePayload;
+  notes: string;
+}) {
+  try {
+    await db.from("wise_events").insert({
+      event_id: args.deliveryId,
+      event_type: args.payload.event_type ?? "unknown",
+      payload: args.payload,
+      signature_valid: false,
+      match_status: "ignored",
+      notes: args.notes,
+    });
+  } catch {
+    // Rejection logging is best-effort and must never unblock or mask the HTTP response.
+  }
+}
+
 export const Route = createFileRoute("/api/public/webhooks/wise")({
   server: {
     handlers: {
@@ -110,26 +129,33 @@ export const Route = createFileRoute("/api/public/webhooks/wise")({
 
         const setting = await loadSetting();
         const signature =
-          request.headers.get("x-signature-sha256") ?? request.headers.get("X-Signature-SHA256") ?? "";
+          request.headers.get("x-signature-sha256") ??
+          request.headers.get("X-Signature-SHA256") ??
+          "";
         const deliveryId =
           request.headers.get("x-delivery-id") ?? request.headers.get("X-Delivery-Id") ?? null;
 
-        let signatureValid = false;
-        if (setting.publicKey) {
-          signatureValid = await verifyWiseWebhookSignature({
-            publicKeyPem: setting.publicKey,
-            signatureBase64: signature,
-            rawBody: raw,
-          });
-        }
-        // In sandbox or when no key configured, accept event but mark invalid.
-        if (setting.publicKey && !signatureValid) {
-          await db.from("wise_events").insert({
-            event_id: deliveryId,
-            event_type: payload.event_type ?? "unknown",
+        if (!setting.publicKey?.trim()) {
+          await logRejectedWebhook({
+            deliveryId,
             payload,
-            signature_valid: false,
-            match_status: "ignored",
+            notes: "Webhook recusado: chave publica Wise nao configurada",
+          });
+          return Response.json(
+            { ok: false, error: "Wise webhook public key is not configured" },
+            { status: 503 },
+          );
+        }
+
+        const signatureValid = await verifyWiseWebhookSignature({
+          publicKeyPem: setting.publicKey,
+          signatureBase64: signature,
+          rawBody: raw,
+        });
+        if (!signatureValid) {
+          await logRejectedWebhook({
+            deliveryId,
+            payload,
             notes: "Assinatura invalida",
           });
           return Response.json({ ok: false, error: "Invalid signature" }, { status: 401 });
@@ -152,12 +178,8 @@ export const Route = createFileRoute("/api/public/webhooks/wise")({
         let matchedPaymentId: string | null = null;
         let matchedOrderId: string | null = null;
         let matchStatus:
-          | "auto_matched"
-          | "pending"
-          | "underpaid"
-          | "overpaid"
-          | "pdv_matched"
-          | "pdv_pending" = "pending";
+          "auto_matched" | "pending" | "underpaid" | "overpaid" | "pdv_matched" | "pdv_pending" =
+          "pending";
 
         if (reference) {
           const isPdvRef = /^PDV-[A-Z0-9]+-A\d+$/i.test(reference);
@@ -180,7 +202,8 @@ export const Route = createFileRoute("/api/public/webhooks/wise")({
               matchedPaymentId = payment.id as string;
               matchedOrderId = payment.order_id as string;
               const sameCurrency =
-                !currency || String(currency).toUpperCase() === String(payment.currency).toUpperCase();
+                !currency ||
+                String(currency).toUpperCase() === String(payment.currency).toUpperCase();
               if (sameCurrency && amountCents !== null) {
                 if (amountCents === payment.amount_cents) matchStatus = "auto_matched";
                 else if (amountCents < payment.amount_cents) matchStatus = "underpaid";
