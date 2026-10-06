@@ -1,11 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import logoCompleta from "@/assets/logo-empuria-completa.png";
 
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const { isLoading, isStaff, isMember } = useCurrentUser();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -14,11 +14,20 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setAuthed(!!s));
-    return () => sub.subscription.unsubscribe();
-  }, []);
+  const accessDestination = isLoading
+    ? "/login"
+    : isStaff
+      ? "/admin"
+      : isMember
+        ? "/portal"
+        : "/login";
+  const accessLabel = isLoading
+    ? "Portal / Login"
+    : isStaff
+      ? "Painel Admin"
+      : isMember
+        ? "Meu Portal"
+        : "Portal / Login";
 
   return (
     <header
@@ -30,25 +39,29 @@ export function SiteHeader() {
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center group" aria-label="Instituto Empuria">
-          <img
-            src={logoCompleta}
-            alt="Instituto Empuria"
-            className="h-9 w-auto object-contain"
-          />
+          <img src={logoCompleta} alt="Instituto Empuria" className="h-9 w-auto object-contain" />
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-body text-offwhite/90">
-          <a href="/#instituto" className="hover:text-yellow-brand transition">O Instituto</a>
-          <a href="/#servicos" className="hover:text-yellow-brand transition">Serviços</a>
-          <a href="/#clube" className="hover:text-yellow-brand transition">Clube</a>
-          <a href="/#contato" className="hover:text-yellow-brand transition">Contato</a>
+          <a href="/#instituto" className="hover:text-yellow-brand transition">
+            O Instituto
+          </a>
+          <a href="/#servicos" className="hover:text-yellow-brand transition">
+            Serviços
+          </a>
+          <a href="/#clube" className="hover:text-yellow-brand transition">
+            Clube
+          </a>
+          <a href="/#contato" className="hover:text-yellow-brand transition">
+            Contato
+          </a>
         </nav>
 
         <Link
-          to={authed ? "/portal" : "/login"}
+          to={accessDestination}
           className="hidden md:inline-flex items-center gap-2 bg-orange-brand hover:bg-red-brand text-offwhite px-5 py-2.5 rounded-md font-display font-semibold text-xs uppercase tracking-wider transition-all hover:shadow-warm"
         >
-          {authed ? "Meu Portal" : "Portal / Login"}
+          {accessLabel}
         </Link>
       </div>
     </header>

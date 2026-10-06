@@ -28,7 +28,7 @@ export function SiteFooter() {
               <li><a href="#instituto" className="hover:text-yellow-brand">O Instituto</a></li>
               <li><a href="#servicos" className="hover:text-yellow-brand">Nossos Serviços</a></li>
               <li><a href="#clube" className="hover:text-yellow-brand">Clube da Imigração</a></li>
-              <li><a href="#" className="hover:text-yellow-brand">Login do Portal</a></li>
+              <li><a href="/login" className="hover:text-yellow-brand">Login do Portal</a></li>
             </ul>
           </div>
 

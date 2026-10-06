@@ -49,7 +49,7 @@ export function useCurrentUser() {
     isAdmin: query.data?.isAdmin ?? false,
     isStaff: query.data?.isStaff ?? false,
     isImpersonating: !!query.data?.impersonation,
-    isMember: query.data ? !query.data.isStaff || !!query.data.impersonation : false,
+    isMember: query.data?.isMember ?? false,
     primaryRole: query.data?.primaryRole,
     impersonation: query.data?.impersonation ?? null,
   };

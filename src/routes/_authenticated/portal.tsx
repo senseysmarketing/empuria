@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated/portal")({
 });
 
 function PortalLayout() {
-  const { isLoading, isError, isStaff, isImpersonating } = useCurrentUser();
+  const { isLoading, isError, isMember, isImpersonating } = useCurrentUser();
 
   if (isLoading) {
     return (
@@ -26,7 +26,7 @@ function PortalLayout() {
     return <AccessDeniedCard variant="session-expired" />;
   }
 
-  if (isStaff && !isImpersonating) {
+  if (!isMember && !isImpersonating) {
     return <AccessDeniedCard variant="member-only" />;
   }
 
