@@ -8,6 +8,8 @@ import { getCurrentUserRole } from "@/lib/auth.functions";
 import { checkFirstAccessEligibility, completeFirstAccess } from "@/lib/first-access.functions";
 import heroWelcome from "@/assets/hero-welcome-brazil-madrid.jpg.asset.json";
 import logoCompleta from "@/assets/logo-empuria-completa.png";
+import { Button } from "@/components/ui/button";
+import { Users } from "lucide-react";
 
 type LoginContext = "member" | "admin";
 type LoginMode = "login" | "signup" | "first_access";
@@ -223,7 +225,7 @@ export function AuthLoginPage({ context, redirect }: { context: LoginContext; re
         </div>
       </section>
 
-      <section className="bg-topo flex min-h-screen items-center justify-center px-6 py-10 sm:px-10 lg:px-12">
+      <section className="relative z-10 flex min-h-screen items-center justify-center bg-brown px-6 py-10 sm:px-10 lg:px-12 lg:shadow-login-divider">
         <div className="w-full max-w-md">
           <Link to="/" className="mb-10 inline-flex" aria-label="Instituto Empuria">
             <img
@@ -353,9 +355,12 @@ export function AuthLoginPage({ context, redirect }: { context: LoginContext; re
                 Voltar ao login de membros
               </Link>
             ) : (
-              <Link to="/login/admin" className="text-offwhite/55 hover:text-yellow-brand">
-                Acesso da equipe
-              </Link>
+              <Button asChild variant="outline" className="h-10 border-yellow-brand/35 bg-transparent px-6 font-display text-offwhite/90 shadow-none hover:border-yellow-brand/60 hover:bg-yellow-brand/10 hover:text-offwhite">
+                <Link to="/login/admin">
+                  <Users aria-hidden="true" />
+                  Acesso da equipe
+                </Link>
+              </Button>
             )}
             <Link to="/" className="block text-offwhite/45 hover:text-yellow-brand">
               Voltar para a página inicial

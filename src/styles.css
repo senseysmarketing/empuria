@@ -47,6 +47,7 @@
   --color-orange-brand: var(--orange-brand);
   --color-yellow-brand: var(--yellow-brand);
   --color-offwhite: var(--offwhite);
+  --shadow-login-divider: var(--login-divider-shadow);
 }
 
 :root {
@@ -84,6 +85,7 @@
   --gradient-sunset: linear-gradient(120deg, var(--red-brand) 0%, var(--orange-brand) 60%, var(--yellow-brand) 100%);
   --shadow-warm: 0 20px 60px -20px color-mix(in oklab, var(--brown) 50%, transparent);
   --shadow-card: 0 4px 24px -8px color-mix(in oklab, var(--brown) 20%, transparent);
+  --login-divider-shadow: -18px 0 30px -12px color-mix(in oklab, var(--brown-deep) 45%, transparent);
 
 
   /* Admin Portal — Light Mode (Apple-like) */
