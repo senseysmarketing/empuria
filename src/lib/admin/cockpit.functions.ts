@@ -12,15 +12,7 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
     const isoTomorrow = endOfDay.toISOString();
-    const thirtyDaysAgo = new Date(startOfDay);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-
-    const [monthlyMembers, todayAppts, upcoming, arrivals] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("is_club_member", true)
-        .gte("updated_at", thirtyDaysAgo.toISOString()),
+    const [todayAppts, upcoming, arrivals] = await Promise.all([
       supabase
         .from("appointments")
         .select("id,starts_at,status,services(title),profiles(full_name)")
@@ -41,7 +33,6 @@ export const getCockpitMetrics = createServerFn({ method: "GET" })
     ]);
 
     return {
-      newMembers: monthlyMembers.count ?? 0,
       appointmentsToday: (todayAppts.data ?? []).length,
       todayAppointments: todayAppts.data ?? [],
       upcomingAppointments: upcoming.data ?? [],

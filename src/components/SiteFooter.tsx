@@ -27,7 +27,7 @@ export function SiteFooter() {
             <ul className="space-y-2 font-body text-offwhite/85 text-sm">
               <li><a href="#instituto" className="hover:text-yellow-brand">O Instituto</a></li>
               <li><a href="#servicos" className="hover:text-yellow-brand">Nossos Serviços</a></li>
-              <li><a href="#clube" className="hover:text-yellow-brand">Clube da Imigração</a></li>
+              <li><a href="/#conteudos" className="hover:text-yellow-brand">Conteúdos</a></li>
               <li><a href="/login" className="hover:text-yellow-brand">Login do Portal</a></li>
             </ul>
           </div>

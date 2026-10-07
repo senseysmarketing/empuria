@@ -40,7 +40,7 @@ export const getAdminOverview = createServerFn({ method: "GET" })
         .select("*, services(title), profiles(full_name)")
         .order("starts_at", { ascending: true })
         .limit(100),
-      supabase.from("profiles").select("id, full_name, is_club_member, created_at").limit(100),
+      supabase.from("profiles").select("id, full_name, created_at").limit(100),
     ]);
 
     return {

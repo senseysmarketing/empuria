@@ -53,7 +53,6 @@ export async function createOrReuseManualCustomer(input: {
   phone: string | null;
   origin: ManualUserOrigin;
   actorId: string;
-  isClubMember?: boolean;
   adminNotes?: string | null;
 }): Promise<ManualCustomerResult> {
   const email = normalizeEmail(input.email);
@@ -121,7 +120,6 @@ export async function createOrReuseManualCustomer(input: {
     full_name: effectiveFullName,
     phone: effectivePhone,
     phone_country_iso: effectivePhoneCountry,
-    ...(input.isClubMember !== undefined ? { is_club_member: input.isClubMember } : {}),
     ...(input.adminNotes !== undefined ? { admin_notes: input.adminNotes || null } : {}),
     created_by_admin: shouldMarkManual,
     password_setup_required: passwordSetupRequired,

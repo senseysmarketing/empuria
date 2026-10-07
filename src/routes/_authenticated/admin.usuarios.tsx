@@ -15,7 +15,6 @@ import {
   Copy,
   Users,
   UserPlus,
-  Crown,
   Sparkles,
   ChevronLeft,
   ChevronRight,
@@ -60,7 +59,6 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { startImpersonation } from "@/lib/impersonation";
 import {
@@ -121,16 +119,15 @@ function PassaportesPanel() {
   const list = useServerFn(listUsers);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"todos" | "ativos" | "bloqueados">("todos");
-  const [clube, setClube] = useState<"todos" | "sim" | "nao">("todos");
   const [period, setPeriod] = useState<"todos" | "7d" | "mes">("todos");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const debounced = useDebounced(search, 300);
 
   const query = useQuery({
-    queryKey: ["admin-usuarios", debounced, status, clube, period, page],
+    queryKey: ["admin-usuarios", debounced, status, period, page],
     queryFn: () =>
-      list({ data: { search: debounced, status, clube, period, page, pageSize: PAGE_SIZE } }),
+      list({ data: { search: debounced, status, period, page, pageSize: PAGE_SIZE } }),
   });
 
   const items = query.data?.items ?? [];
@@ -143,7 +140,6 @@ function PassaportesPanel() {
   const clearFilters = () => {
     setSearch("");
     setStatus("todos");
-    setClube("todos");
     setPeriod("todos");
     setPage(1);
   };
@@ -151,9 +147,8 @@ function PassaportesPanel() {
   return (
     <div className="space-y-6">
       {/* Cards de resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <AdminStatCard label="Ativos" value={query.data?.totalActive ?? 0} icon={Users} tone="green" />
-        <AdminStatCard label="Membros do Clube" value={query.data?.totalClub ?? 0} icon={Crown} tone="amber" />
         <AdminStatCard label="Novos no mês" value={query.data?.newThisMonth ?? 0} icon={Sparkles} tone="blue" />
       </div>
 
@@ -204,22 +199,6 @@ function PassaportesPanel() {
               </SelectContent>
             </Select>
             <Select
-              value={clube}
-              onValueChange={(v: typeof clube) => {
-                setClube(v);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[150px] h-9 bg-admin-bg border-admin-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="sim">Membros</SelectItem>
-                <SelectItem value="nao">Não membros</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
               value={period}
               onValueChange={(v: typeof period) => {
                 setPeriod(v);
@@ -252,7 +231,6 @@ function PassaportesPanel() {
                 <th className="p-3 text-left font-display">Usuário</th>
                 <th className="p-3 text-left font-display">Passaporte</th>
                 <th className="p-3 text-left font-display">Status</th>
-                <th className="p-3 text-left font-display">Clube</th>
                 <th className="p-3 text-right font-display">Último acesso</th>
                 <th className="p-3 text-right font-display">Ações</th>
               </tr>
@@ -260,14 +238,14 @@ function PassaportesPanel() {
             <tbody>
               {query.isLoading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-admin-ink-muted">
+                  <td colSpan={5} className="p-8 text-center text-admin-ink-muted">
                     <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
                     Carregando…
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-admin-ink-muted text-sm">
+                  <td colSpan={5} className="p-8 text-center text-admin-ink-muted text-sm">
                     Nenhum usuário encontrado.
                     <div className="mt-3">
                       <Button variant="outline" size="sm" onClick={clearFilters}>
@@ -334,7 +312,6 @@ function CreateManualUserDialog({
     full_name: "",
     email: "",
     phone: "",
-    is_club_member: false,
     admin_notes: "",
   });
 
@@ -343,7 +320,6 @@ function CreateManualUserDialog({
       full_name: "",
       email: "",
       phone: "",
-      is_club_member: false,
       admin_notes: "",
     });
 
@@ -402,13 +378,6 @@ function CreateManualUserDialog({
               onChange={(e164) => setForm({ ...form, phone: e164 ?? "" })}
             />
           </div>
-          <label className="flex items-center gap-3 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
-            <Checkbox
-              checked={form.is_club_member}
-              onCheckedChange={(value) => setForm({ ...form, is_club_member: value === true })}
-            />
-            Membro do clube
-          </label>
           <div className="space-y-1.5">
             <Label>Observacoes internas</Label>
             <Textarea
@@ -540,13 +509,6 @@ function UserRow({ user }: { user: UserRowType }) {
               </span>
             )}
           </div>
-        </td>
-        <td className="p-3">
-          <span
-            className={`text-[10px] font-display uppercase tracking-wider px-2 py-0.5 rounded-full ${user.is_club_member ? "bg-yellow-brand/20 text-yellow-brand" : "bg-admin-border text-admin-ink-muted"}`}
-          >
-            {user.is_club_member ? "VIP" : "Standard"}
-          </span>
         </td>
         <td className="p-3 text-right text-xs text-admin-ink-muted tabular-nums">
           {relativeTime(user.last_sign_in_at)}

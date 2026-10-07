@@ -3,14 +3,13 @@ import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Settings, User, Plug, Users, Zap, FileText, Tags, Crown, ShieldAlert } from "lucide-react";
+import { Settings, User, Plug, Users, Zap, FileText, Tags, ShieldAlert } from "lucide-react";
 import { PerfilContaTab } from "@/components/admin/configuracoes/PerfilContaTab";
 import { IntegracoesTab } from "@/components/admin/configuracoes/IntegracoesTab";
 import { EquipePermissoesTab } from "@/components/admin/configuracoes/EquipePermissoesTab";
 import { ServicosPrecosTab } from "@/components/admin/configuracoes/ServicosPrecosTab";
 import { AutomacoesPanel } from "@/components/admin/AutomacoesPanel";
 import { LogsAuditoriaTab } from "@/components/admin/configuracoes/LogsAuditoriaTab";
-import { ClubeAdminTab } from "@/components/admin/configuracoes/ClubeAdminTab";
 import { ConciliacoesWiseTab } from "@/components/admin/configuracoes/ConciliacoesWiseTab";
 
 const TABS = [
@@ -18,7 +17,6 @@ const TABS = [
   "integracoes",
   "conciliacoes-wise",
   "equipe",
-  "clube",
   "servicos-precos",
   "automacoes",
   "logs",
@@ -109,13 +107,6 @@ function ConfiguracoesPage() {
             <Users className="h-4 w-4" /> Equipe
           </TabsTrigger>
           <TabsTrigger
-            value="clube"
-            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
-          >
-            <Crown className="h-4 w-4" /> Clube do Imigrante
-          </TabsTrigger>
-
-          <TabsTrigger
             value="servicos-precos"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
@@ -147,10 +138,6 @@ function ConfiguracoesPage() {
         <TabsContent value="equipe" className="mt-6">
           <EquipePermissoesTab />
         </TabsContent>
-        <TabsContent value="clube" className="mt-6">
-          <ClubeAdminTab />
-        </TabsContent>
-
         <TabsContent value="servicos-precos" className="mt-6">
           <ServicosPrecosTab />
         </TabsContent>

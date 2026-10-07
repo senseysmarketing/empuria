@@ -13,7 +13,6 @@ export type PdvCustomer = {
   full_name: string | null;
   phone: string | null;
   avatar_url: string | null;
-  is_club_member: boolean;
   is_blocked: boolean;
 };
 
@@ -106,11 +105,6 @@ export function CustomerSearchPanel({
                 <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />
               ) : (
                 <>
-                  {c.is_club_member && (
-                    <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-brand text-brown-deep font-display">
-                      Clube
-                    </span>
-                  )}
                   {c.is_blocked && (
                     <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-display">
                       Bloqueado

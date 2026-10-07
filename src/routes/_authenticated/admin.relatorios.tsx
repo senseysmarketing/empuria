@@ -22,7 +22,6 @@ import {
   UserCheck,
   Boxes,
   Activity,
-  Crown,
   MessageSquare,
   Clock,
   Megaphone,
@@ -58,7 +57,6 @@ import {
   
   getReportsServicos,
   getReportsEventos,
-  getReportsClube,
   getReportsCrm,
   type ReportFilters,
 } from "@/lib/admin/reports.functions";
@@ -72,7 +70,7 @@ import { useState } from "react";
 
 const searchSchema = z.object({
   tab: fallback(
-    z.enum(["visao", "historico", "vendas", "pdv", "servicos", "eventos", "clube", "crm"]),
+    z.enum(["visao", "historico", "vendas", "pdv", "servicos", "eventos", "crm"]),
     "visao",
   ).default("visao"),
   period: fallback(z.enum(["today", "7d", "30d", "month", "last_month", "custom"]), "30d").default(
@@ -129,9 +127,7 @@ const ORIGIN_LABEL: Record<string, string> = {
   orders: "Esteira",
   esteira: "Esteira",
   eventos: "Eventos",
-  clube: "Clube",
   manual: "Manual",
-  hubla: "Hubla",
 };
 
 function money(cents: number, currency = "EUR") {
@@ -211,7 +207,6 @@ function RelatoriosPage() {
             { v: "historico", l: "Histórico de Pedidos" },
             { v: "servicos", l: "Serviços & Agenda" },
             { v: "eventos", l: "Eventos" },
-            { v: "clube", l: "Clube" },
             { v: "crm", l: "CRM & SLA" },
           ].map((t) => (
             <TabsTrigger
@@ -243,9 +238,6 @@ function RelatoriosPage() {
         </TabsContent>
         <TabsContent value="eventos" className="mt-0">
           <EventosTab filters={filters} />
-        </TabsContent>
-        <TabsContent value="clube" className="mt-0">
-          <ClubeTab filters={filters} />
         </TabsContent>
         <TabsContent value="crm" className="mt-0">
           <CrmTab filters={filters} />
@@ -1266,178 +1258,6 @@ function EventosTab({ filters }: { filters: ReportFilters }) {
           />
         </BentoCard>
       </div>
-    </div>
-  );
-}
-
-// ---------- Clube do Imigrante ----------
-
-function ClubeTab({ filters }: { filters: ReportFilters }) {
-  const fetchFn = useServerFn(getReportsClube);
-  const q = useQuery({
-    queryKey: ["reports-clube", filters],
-    queryFn: () => fetchFn({ data: filters }),
-  });
-
-  if (q.isLoading) return <LoadingBlock />;
-  if (q.error) return <ErrorBlock error={q.error} />;
-  if (!q.data) return null;
-  const d = q.data;
-  const c = d.cards;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-12 gap-4">
-        <MetricCard
-          label="Membros ativos"
-          value={number(c.activeMembers.current)}
-          icon={Crown}
-          tone="green"
-        />
-        <MetricCard
-          label="Novas assinaturas"
-          value={number(c.newSubs.current)}
-          deltaPct={c.newSubs.deltaPct}
-          icon={Sparkles}
-          tone="blue"
-        />
-        <MetricCard
-          label="Cancelamentos"
-          value={number(c.canceled.current)}
-          deltaPct={c.canceled.deltaPct}
-          icon={UserMinus}
-          tone="red"
-        />
-        <MetricCard
-          label="Inadimplentes/Inativos"
-          value={number(c.inactive.current)}
-          icon={AlertTriangle}
-          tone="amber"
-        />
-        <MetricCard
-          label="Receita do Clube"
-          value={money(c.revenue.current)}
-          icon={TrendingUp}
-          tone="green"
-        />
-        <MetricCard label="MRR estimado" value={money(c.mrr.current)} icon={Wallet} tone="blue" />
-        <MetricCard
-          label="Churn"
-          value={`${c.churnPct.current.toFixed(1)}%`}
-          icon={TrendingDown}
-          tone="amber"
-        />
-        <MetricCard
-          label="Pagamentos aprovados"
-          value={number(c.approved.current)}
-          icon={ShoppingCart}
-          tone="neutral"
-        />
-      </div>
-
-      <div className="grid grid-cols-12 gap-4">
-        <BentoCard title="Eventos Hubla no período" className="col-span-12 lg:col-span-4">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-lg bg-admin-bg p-3">
-              <p className="text-xs text-admin-ink-muted">Recebidos</p>
-              <p className="font-display text-2xl text-admin-ink">{number(d.hubla.received)}</p>
-            </div>
-            <div className="rounded-lg bg-amber-50 p-3">
-              <p className="text-xs text-amber-800">Pendentes</p>
-              <p className="font-display text-2xl text-amber-900">{number(d.hubla.pending)}</p>
-            </div>
-            <div className="rounded-lg bg-red-50 p-3">
-              <p className="text-xs text-red-800">Com erro</p>
-              <p className="font-display text-2xl text-red-900">{number(d.hubla.errors)}</p>
-            </div>
-          </div>
-        </BentoCard>
-        <BentoCard title="Tipos de evento Hubla" className="col-span-12 lg:col-span-4">
-          <RankingList
-            rows={d.eventTypes.map((e) => ({
-              label: e.label,
-              value: `${number(e.count)}`,
-              raw: e.count,
-            }))}
-            empty="Sem eventos Hubla no período."
-          />
-        </BentoCard>
-        <BentoCard title="Erros recentes Hubla" className="col-span-12 lg:col-span-4">
-          {d.recentErrors.length === 0 ? (
-            <EmptyState label="Nenhum erro de integração Hubla. 🎉" />
-          ) : (
-            <ul className="space-y-2">
-              {d.recentErrors.map(
-                (e: {
-                  id: string;
-                  event_type: string;
-                  error_message: string | null;
-                  created_at: string;
-                }) => (
-                  <li key={e.id} className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-900">
-                    <div className="font-medium">{e.event_type}</div>
-                    <div className="opacity-80 truncate">
-                      {e.error_message ?? "Erro não detalhado"}
-                    </div>
-                    <div className="mt-1 text-[10px] opacity-60">
-                      {new Date(e.created_at).toLocaleString("pt-BR")}
-                    </div>
-                  </li>
-                ),
-              )}
-            </ul>
-          )}
-        </BentoCard>
-        <BentoCard title="Assinaturas vs cancelamentos (diário)" className="col-span-12">
-          <SubsDailyChart data={d.dailySeries} />
-        </BentoCard>
-      </div>
-    </div>
-  );
-}
-
-function SubsDailyChart({ data }: { data: { date: string; news: number; cancels: number }[] }) {
-  if (!data.some((d) => d.news > 0 || d.cancels > 0))
-    return <EmptyState label="Sem movimentações no período." />;
-  return (
-    <div className="h-64 w-full">
-      <ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.008 70)" vertical={false} />
-          <XAxis
-            dataKey="date"
-            tickFormatter={formatDate}
-            fontSize={10}
-            stroke="oklch(0.62 0.025 50)"
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            fontSize={10}
-            stroke="oklch(0.62 0.025 50)"
-            tickLine={false}
-            axisLine={false}
-            width={36}
-            allowDecimals={false}
-          />
-          <Tooltip
-            contentStyle={{
-              background: "white",
-              border: "1px solid oklch(0.91 0.008 70)",
-              borderRadius: 12,
-              fontSize: 12,
-            }}
-            labelFormatter={(l) => formatDate(String(l))}
-          />
-          <Bar dataKey="news" name="Novas" fill="oklch(0.62 0.16 150)" radius={[4, 4, 0, 0]} />
-          <Bar
-            dataKey="cancels"
-            name="Cancelamentos"
-            fill="oklch(0.55 0.18 25)"
-            radius={[4, 4, 0, 0]}
-          />
-        </BarChart>
-      </ResponsiveContainer>
     </div>
   );
 }

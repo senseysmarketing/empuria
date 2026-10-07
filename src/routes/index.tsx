@@ -411,38 +411,39 @@ function HomePage() {
       {/* EVENTOS - A Agenda Empuria */}
       <HomeEventsSection />
 
-      {/* CLUBE */}
-      <section id="clube" className="bg-offwhite py-24">
+      {/* CONTEÚDOS */}
+      <section id="conteudos" className="bg-offwhite py-24">
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7">
             <Reveal>
               <div className="text-orange-brand font-display font-semibold text-xs tracking-[0.3em] uppercase mb-4">
-                Comunidade & Retenção
+                Conteúdos para sua jornada
               </div>
             </Reveal>
             <Reveal delay={100}>
               <h2 className="font-display font-extrabold text-4xl md:text-5xl uppercase leading-[1] text-brown">
-                Muito mais que um serviço.
+                As respostas que você procura
                 <br />
-                Uma <span className="text-orange-brand">comunidade.</span>
+                antes de migrar para a <span className="text-orange-brand">Espanha.</span>
               </h2>
             </Reveal>
             <Reveal delay={200}>
               <p className="font-body text-lg mt-6 text-brown-deep/80 leading-relaxed max-w-xl">
-                Faça parte do Clube de Imigração Empuria. Uma assinatura pensada para quem quer
-                estar sempre um passo à frente. Acesso imediato a cursos completos, vídeos
-                exclusivos sobre a vida na Europa, dicas de ouro de quem já trilhou o caminho e uma
-                rede de contatos que impulsiona sua jornada.
+                O Instituto Empuria reuniu em uma série de vídeos conteúdos extremamente úteis para
+                quem está planejando ou vivendo a mudança para a Espanha. São respostas práticas
+                para algumas das dúvidas que mais recebemos diariamente — organizadas para ajudar
+                você a tomar decisões com mais segurança e evitar erros comuns durante o processo
+                de adaptação.
               </p>
             </Reveal>
             <Reveal delay={300}>
               <a
-                href="https://pay.hub.la/051PZzfAQ2R68zw9Oy8y"
+                href="https://hub.la/g/nlkOS0nwHm9T3qwamiFh"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-8 inline-flex items-center gap-2 bg-orange-brand hover:bg-red-brand text-offwhite px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all hover:shadow-warm hover:-translate-y-0.5"
               >
-                Quero Fazer Parte do Clube <ArrowRight className="w-4 h-4" />
+                Quero acessar os conteúdos <ArrowRight className="w-4 h-4" />
               </a>
             </Reveal>
           </div>
@@ -452,22 +453,17 @@ function HomePage() {
               <div className="relative bg-brown text-offwhite rounded-2xl p-8 shadow-warm border border-yellow-brand/20">
                 <div className="flex items-center justify-between mb-6">
                   <div className="font-display font-extrabold text-yellow-brand uppercase tracking-widest text-xs">
-                    Clube do Imigrante
+                    Conteúdo prático sobre a Espanha
                   </div>
                   <Sparkles className="w-5 h-5 text-yellow-brand" />
                 </div>
-                <div className="font-display font-extrabold text-5xl">
-                  R$ 199<span className="text-lg text-offwhite/60">/mês</span>
-                </div>
-                <div className="mt-2 font-body text-sm text-offwhite/70">
-                  ou 6x de R$ 133,17 <span className="text-offwhite/50">(semestral)</span>
-                </div>
                 <ul className="mt-6 space-y-3 font-body text-sm text-offwhite/85">
                   {[
-                    "Cursos completos sobre vida na Europa",
-                    "Vídeos exclusivos com especialistas",
-                    "Rede de contatos brasileira ativa",
-                    "Encontros mensais no espaço físico",
+                    "Primeiros passos ao chegar",
+                    "Documentação e processos",
+                    "Moradia e adaptação",
+                    "Vida prática na Espanha",
+                    "Dúvidas frequentes respondidas de forma objetiva",
                   ].map((b) => (
                     <li key={b} className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-yellow-brand mt-0.5 shrink-0" />

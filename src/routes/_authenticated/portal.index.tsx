@@ -44,7 +44,6 @@ function PortalDashboard() {
             userId={data.profile?.id ?? ""}
             fullName={data.profile?.full_name ?? "Imigrante"}
             memberSince={data.profile?.created_at}
-            isClubMember={data.metrics.isClubMember}
           />
         </div>
         <BentoCard className="col-span-12 lg:col-span-4" padded>
@@ -153,7 +152,7 @@ function EmptyBanner({
 }: {
   title: string;
   copy: string;
-  to: "/portal/loja" | "/portal/clube" | "/portal/servicos";
+  to: "/portal/loja" | "/portal/servicos";
   cta: string;
 }) {
   return (

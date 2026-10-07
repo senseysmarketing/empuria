@@ -20,7 +20,6 @@ const AUDIT_MODULES = [
   "financeiro",
   "agenda",
   "usuarios",
-  "clube",
   "slots",
   "configuracoes",
   "automacoes",

@@ -12,7 +12,6 @@ export type UserRow = {
   avatar_url: string | null;
   phone: string | null;
   email: string | null;
-  is_club_member: boolean;
   is_blocked: boolean;
   admin_notes: string | null;
   created_at: string;
@@ -30,7 +29,6 @@ export const listUsers = createServerFn({ method: "POST" })
       .object({
         search: z.string().trim().max(120).optional().default(""),
         status: z.enum(["todos", "ativos", "bloqueados"]).default("todos"),
-        clube: z.enum(["todos", "sim", "nao"]).default("todos"),
         period: z.enum(["todos", "7d", "mes"]).default("todos"),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(5).max(100).default(25),
@@ -55,8 +53,6 @@ export const listUsers = createServerFn({ method: "POST" })
     }
     if (data.status === "ativos") q = q.eq("is_blocked", false);
     if (data.status === "bloqueados") q = q.eq("is_blocked", true);
-    if (data.clube === "sim") q = q.eq("is_club_member", true);
-    if (data.clube === "nao") q = q.eq("is_club_member", false);
 
     const { data: profiles, error } = await q;
     if (error) throw new Error(error.message);
@@ -87,7 +83,6 @@ export const listUsers = createServerFn({ method: "POST" })
         avatar_url: p.avatar_url,
         phone: p.phone,
         email: meta?.email ?? null,
-        is_club_member: p.is_club_member,
         is_blocked: p.is_blocked,
         admin_notes: p.admin_notes,
         created_at: p.created_at,
@@ -113,7 +108,6 @@ export const listUsers = createServerFn({ method: "POST" })
 
     const total = rows.length;
     const totalActive = rows.filter((r) => !r.is_blocked).length;
-    const totalClub = rows.filter((r) => r.is_club_member).length;
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
@@ -126,7 +120,6 @@ export const listUsers = createServerFn({ method: "POST" })
       items,
       total,
       totalActive,
-      totalClub,
       newThisMonth,
       page: data.page,
       pageSize: data.pageSize,
@@ -141,7 +134,6 @@ export const createManualUser = createServerFn({ method: "POST" })
         full_name: z.string().trim().min(2).max(160),
         email: z.string().trim().email().max(255),
         phone: z.string().trim().min(5).max(40),
-        is_club_member: z.boolean().default(false),
         admin_notes: z.string().trim().max(2000).optional().or(z.literal("")),
       })
       .parse(d),
@@ -153,7 +145,6 @@ export const createManualUser = createServerFn({ method: "POST" })
       phone: data.phone,
       origin: "admin_created",
       actorId: context.userId,
-      isClubMember: data.is_club_member,
       adminNotes: data.admin_notes || null,
     });
     return customer;
@@ -167,7 +158,6 @@ export const updateUserProfile = createServerFn({ method: "POST" })
         id: z.string().uuid(),
         full_name: z.string().trim().min(1).max(160).optional(),
         phone: z.string().trim().max(40).optional().nullable(),
-        is_club_member: z.boolean().optional(),
         admin_notes: z.string().trim().max(2000).optional().nullable(),
       })
       .parse(d),

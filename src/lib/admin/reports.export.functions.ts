@@ -10,7 +10,6 @@ import {
   getReportsPdv,
   getReportsServicos,
   getReportsEventos,
-  getReportsClube,
   getReportsCrm,
   getReportsHistorico,
   historicoFiltersSchema,
@@ -22,13 +21,12 @@ const TAB_LABEL: Record<string, string> = {
   pdv: "PDV & Estoque",
   servicos: "Serviços & Agenda",
   eventos: "Eventos",
-  clube: "Clube do Imigrante",
   crm: "CRM & SLA",
   historico: "Histórico de Pedidos",
 };
 
 const exportSchema = z.object({
-  tab: z.enum(["visao", "vendas", "pdv", "servicos", "eventos", "clube", "crm", "historico"]),
+  tab: z.enum(["visao", "vendas", "pdv", "servicos", "eventos", "crm", "historico"]),
   filters: reportFiltersSchema,
 });
 
@@ -102,7 +100,6 @@ const MONEY_KEYS = new Set([
   "ticketAvg",
   "ticket",
   "revenue",
-  "mrr",
 ]);
 
 async function buildVisaoXlsx(wb: ExcelJS.Workbook, filters: z.infer<typeof reportFiltersSchema>) {
@@ -119,7 +116,6 @@ async function buildVisaoXlsx(wb: ExcelJS.Workbook, filters: z.infer<typeof repo
       ordersPaid: "Pedidos pagos",
       pdvSales: "Vendas PDV",
       newLeads: "Novos leads",
-      newClubMembers: "Novos membros do Clube",
       eventTickets: "Ingressos vendidos",
     },
     (k, v) => (MONEY_KEYS.has(k) ? money(v) : v),
@@ -311,49 +307,6 @@ async function buildEventosXlsx(wb: ExcelJS.Workbook, filters: z.infer<typeof re
   return d.range;
 }
 
-async function buildClubeXlsx(wb: ExcelJS.Workbook, filters: z.infer<typeof reportFiltersSchema>) {
-  const d = await (getReportsClube as unknown as (a: { data: typeof filters }) => Promise<Awaited<ReturnType<typeof getReportsClube>>>)({ data: filters });
-  addFiltersSheet(wb, "clube", filters, d.range);
-  addKpisSheet(
-    wb,
-    d.cards as never,
-    {
-      activeMembers: "Membros ativos",
-      newSubs: "Novas assinaturas",
-      canceled: "Cancelamentos",
-      inactive: "Inadimplentes/Inativos",
-      revenue: "Receita",
-      mrr: "MRR estimado",
-      churnPct: "Churn (%)",
-      approved: "Pagamentos aprovados",
-    },
-    (k, v) => (k === "revenue" || k === "mrr" ? money(v) : v),
-  );
-  addRankingSheet(wb, "Hubla resumo", [
-    { metrica: "Recebidos", qtd: d.hubla.received },
-    { metrica: "Pendentes", qtd: d.hubla.pending },
-    { metrica: "Com erro", qtd: d.hubla.errors },
-  ], [
-    { header: "Métrica", key: "metrica", width: 18 },
-    { header: "Qtd", key: "qtd", width: 12 },
-  ]);
-  addRankingSheet(wb, "Tipos de evento Hubla", d.eventTypes.map((e) => ({ evento: e.label, qtd: e.count })), [
-    { header: "Tipo de evento", key: "evento", width: 36 },
-    { header: "Qtd", key: "qtd", width: 12 },
-  ]);
-  addRankingSheet(wb, "Erros recentes Hubla", d.recentErrors.map((e: { event_type: string; error_message: string | null; created_at: string }) => ({ evento: e.event_type, erro: e.error_message ?? "", data: e.created_at })), [
-    { header: "Evento", key: "evento", width: 28 },
-    { header: "Erro", key: "erro", width: 60 },
-    { header: "Data", key: "data", width: 20 },
-  ]);
-  addRankingSheet(wb, "Diário", d.dailySeries.map((s) => ({ data: s.date, novas: s.news, cancelamentos: s.cancels })), [
-    { header: "Data", key: "data", width: 14 },
-    { header: "Novas", key: "novas", width: 10 },
-    { header: "Cancelamentos", key: "cancelamentos", width: 14 },
-  ]);
-  return d.range;
-}
-
 async function buildCrmXlsx(wb: ExcelJS.Workbook, filters: z.infer<typeof reportFiltersSchema>) {
   const d = await (getReportsCrm as unknown as (a: { data: typeof filters }) => Promise<Awaited<ReturnType<typeof getReportsCrm>>>)({ data: filters });
   addFiltersSheet(wb, "crm", filters, d.range);
@@ -434,9 +387,6 @@ export const exportReportXlsx = createServerFn({ method: "POST" })
         break;
       case "eventos":
         await buildEventosXlsx(wb, data.filters);
-        break;
-      case "clube":
-        await buildClubeXlsx(wb, data.filters);
         break;
       case "crm":
         await buildCrmXlsx(wb, data.filters);

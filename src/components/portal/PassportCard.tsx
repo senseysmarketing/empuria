@@ -7,12 +7,10 @@ export function PassportCard({
   userId,
   fullName,
   memberSince,
-  isClubMember,
 }: {
   userId: string;
   fullName: string;
   memberSince?: string | null;
-  isClubMember: boolean;
 }) {
   const [qr, setQr] = useState<string | null>(null);
   useEffect(() => {
@@ -61,7 +59,7 @@ export function PassportCard({
           <div className="text-[10px] uppercase tracking-widest font-display text-offwhite/60 mb-1">Passageiro</div>
           <div className="font-display text-2xl md:text-3xl font-bold truncate">{fullName || "Imigrante"}</div>
 
-          <div className="mt-5 grid grid-cols-3 gap-4 text-[10px] uppercase tracking-widest font-display">
+          <div className="mt-5 grid grid-cols-2 gap-4 text-[10px] uppercase tracking-widest font-display">
             <div>
               <div className="text-offwhite/50">Nº Passaporte</div>
               <div className="text-yellow-brand text-sm tabular-nums mt-1">{passNum}</div>
@@ -69,10 +67,6 @@ export function PassportCard({
             <div>
               <div className="text-offwhite/50">Embarcou em</div>
               <div className="text-offwhite text-sm mt-1">{since}</div>
-            </div>
-            <div>
-              <div className="text-offwhite/50">Classe</div>
-              <div className="text-yellow-brand text-sm mt-1">{isClubMember ? "Clube" : "Standard"}</div>
             </div>
           </div>
 

@@ -48,7 +48,6 @@ export const getPortalDashboard = createServerFn({ method: "GET" })
         activeServices: activeOrders.length,
         pendingPayment,
         vouchers: orders.filter((o) => o.voucher_code).length,
-        isClubMember: !!profileRes.data?.is_club_member,
       },
       suggested: suggestedRes.data ?? [],
     };
