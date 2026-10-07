@@ -12,7 +12,7 @@ export const lookupPassport = createServerFn({ method: "POST" })
     const endOfDay = new Date(startOfDay); endOfDay.setDate(endOfDay.getDate() + 1);
 
     const [profileRes, arrivalsRes, todayApptsRes, nextApptRes, openTabRes, activeOrdersRes] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, avatar_url, is_club_member, is_blocked, created_at, phone").eq("id", data.userId).maybeSingle(),
+      supabase.from("profiles").select("id, full_name, avatar_url, is_blocked, created_at, phone").eq("id", data.userId).maybeSingle(),
       supabase.from("arrivals").select("id", { count: "exact", head: true }).eq("user_id", data.userId),
       supabase.from("appointments").select("id, starts_at, status, services(title)").eq("user_id", data.userId).gte("starts_at", startOfDay.toISOString()).lt("starts_at", endOfDay.toISOString()).order("starts_at"),
       supabase.from("appointments").select("id, starts_at, status, services(title)").eq("user_id", data.userId).gte("starts_at", now.toISOString()).order("starts_at").limit(1).maybeSingle(),
@@ -101,7 +101,7 @@ export const getTab = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ tabId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const [tabRes, itemsRes] = await Promise.all([
-      context.supabase.from("tabs").select("*, profiles(full_name, is_club_member, avatar_url)").eq("id", data.tabId).single(),
+      context.supabase.from("tabs").select("*, profiles(full_name, avatar_url)").eq("id", data.tabId).single(),
       context.supabase.from("tab_items").select("*").eq("tab_id", data.tabId).order("created_at"),
     ]);
     if (tabRes.error) throw new Error("Comanda nao encontrada");

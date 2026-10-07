@@ -7,7 +7,6 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { updateUserProfile, type UserRow } from "@/lib/admin/usuarios.functions";
 
@@ -17,14 +16,12 @@ export function UsuarioEditSheet({ user, open, onClose, onSaved }: {
   const update = useServerFn(updateUserProfile);
   const [fullName, setFullName] = useState(user.full_name ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
-  const [isClub, setIsClub] = useState(user.is_club_member);
   const [notes, setNotes] = useState(user.admin_notes ?? "");
 
   useEffect(() => {
     if (open) {
       setFullName(user.full_name ?? "");
       setPhone(user.phone ?? "");
-      setIsClub(user.is_club_member);
       setNotes(user.admin_notes ?? "");
     }
   }, [open, user]);
@@ -34,7 +31,6 @@ export function UsuarioEditSheet({ user, open, onClose, onSaved }: {
       id: user.id,
       full_name: fullName.trim() || undefined,
       phone: phone.trim() || null,
-      is_club_member: isClub,
       admin_notes: notes.trim() || null,
     }}),
     onSuccess: () => { toast.success("Perfil atualizado"); onSaved(); onClose(); },
@@ -55,13 +51,6 @@ export function UsuarioEditSheet({ user, open, onClose, onSaved }: {
           <div className="space-y-2">
             <Label>Telefone</Label>
             <PhoneInput variant="admin" value={phone} onChange={(e164) => setPhone(e164 ?? "")} />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-admin-border p-3">
-            <div>
-              <div className="font-display text-sm">Membro do Clube</div>
-              <div className="text-xs text-admin-ink-muted">Acesso premium e benefícios</div>
-            </div>
-            <Switch checked={isClub} onCheckedChange={setIsClub} />
           </div>
           <div className="space-y-2">
             <Label>Notas internas (admin)</Label>

@@ -49,8 +49,8 @@ export function SiteHeader() {
           <a href="/#servicos" className="hover:text-yellow-brand transition">
             Serviços
           </a>
-          <a href="/#clube" className="hover:text-yellow-brand transition">
-            Clube
+          <a href="/#conteudos" className="hover:text-yellow-brand transition">
+            Conteúdos
           </a>
           <a href="/#contato" className="hover:text-yellow-brand transition">
             Contato

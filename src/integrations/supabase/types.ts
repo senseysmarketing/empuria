@@ -364,551 +364,6 @@ export type Database = {
         }
         Relationships: []
       }
-      club_benefits: {
-        Row: {
-          category: Database["public"]["Enums"]["product_category"] | null
-          created_at: string
-          id: string
-          is_active: boolean
-          kind: Database["public"]["Enums"]["benefit_kind"]
-          max_per_visit: number | null
-          name: string
-          product_id: string | null
-          scope: Database["public"]["Enums"]["benefit_scope"]
-          value: number
-        }
-        Insert: {
-          category?: Database["public"]["Enums"]["product_category"] | null
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          kind: Database["public"]["Enums"]["benefit_kind"]
-          max_per_visit?: number | null
-          name: string
-          product_id?: string | null
-          scope: Database["public"]["Enums"]["benefit_scope"]
-          value?: number
-        }
-        Update: {
-          category?: Database["public"]["Enums"]["product_category"] | null
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          kind?: Database["public"]["Enums"]["benefit_kind"]
-          max_per_visit?: number | null
-          name?: string
-          product_id?: string | null
-          scope?: Database["public"]["Enums"]["benefit_scope"]
-          value?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_benefits_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      club_certificates: {
-        Row: {
-          code: string
-          id: string
-          issued_at: string
-          module_id: string | null
-          scope: string
-          user_id: string
-        }
-        Insert: {
-          code: string
-          id?: string
-          issued_at?: string
-          module_id?: string | null
-          scope: string
-          user_id: string
-        }
-        Update: {
-          code?: string
-          id?: string
-          issued_at?: string
-          module_id?: string | null
-          scope?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_certificates_module_id_fkey"
-            columns: ["module_id"]
-            isOneToOne: false
-            referencedRelation: "club_modules"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      club_content: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          is_published: boolean
-          module: string
-          position: number
-          thumbnail_url: string | null
-          title: string
-          updated_at: string
-          video_embed_url: string | null
-          video_file_id: string | null
-          video_provider: string | null
-          video_source_url: string | null
-          video_url: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_published?: boolean
-          module?: string
-          position?: number
-          thumbnail_url?: string | null
-          title: string
-          updated_at?: string
-          video_embed_url?: string | null
-          video_file_id?: string | null
-          video_provider?: string | null
-          video_source_url?: string | null
-          video_url?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_published?: boolean
-          module?: string
-          position?: number
-          thumbnail_url?: string | null
-          title?: string
-          updated_at?: string
-          video_embed_url?: string | null
-          video_file_id?: string | null
-          video_provider?: string | null
-          video_source_url?: string | null
-          video_url?: string | null
-        }
-        Relationships: []
-      }
-      club_lesson_comments: {
-        Row: {
-          body: string
-          created_at: string
-          id: string
-          is_hidden: boolean
-          lesson_id: string
-          parent_id: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          id?: string
-          is_hidden?: boolean
-          lesson_id: string
-          parent_id?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          id?: string
-          is_hidden?: boolean
-          lesson_id?: string
-          parent_id?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_lesson_comments_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: false
-            referencedRelation: "club_lessons"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "club_lesson_comments_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "club_lesson_comments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      club_lesson_favorites: {
-        Row: {
-          created_at: string
-          id: string
-          lesson_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          lesson_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          lesson_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_lesson_favorites_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: false
-            referencedRelation: "club_lessons"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      club_lesson_files: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          file_type: string
-          file_url: string
-          id: string
-          label: string
-          lesson_id: string
-          position: number
-          size_bytes: number | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          file_type?: string
-          file_url: string
-          id?: string
-          label: string
-          lesson_id: string
-          position?: number
-          size_bytes?: number | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          file_type?: string
-          file_url?: string
-          id?: string
-          label?: string
-          lesson_id?: string
-          position?: number
-          size_bytes?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_lesson_files_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: false
-            referencedRelation: "club_lessons"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      club_lesson_progress: {
-        Row: {
-          completed_at: string | null
-          lesson_id: string
-          opened_at: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          completed_at?: string | null
-          lesson_id: string
-          opened_at?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          completed_at?: string | null
-          lesson_id?: string
-          opened_at?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_lesson_progress_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: false
-            referencedRelation: "club_lessons"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      club_lessons: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          description: string | null
-          duration_minutes: number | null
-          id: string
-          is_coming_soon: boolean
-          is_featured: boolean
-          is_published: boolean
-          legacy_content_id: string | null
-          module_id: string
-          position: number
-          published_at: string | null
-          slug: string | null
-          thumbnail_url: string | null
-          title: string
-          updated_at: string
-          video_embed_url: string | null
-          video_file_id: string | null
-          video_provider: string | null
-          video_source_url: string | null
-          video_url: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          duration_minutes?: number | null
-          id?: string
-          is_coming_soon?: boolean
-          is_featured?: boolean
-          is_published?: boolean
-          legacy_content_id?: string | null
-          module_id: string
-          position?: number
-          published_at?: string | null
-          slug?: string | null
-          thumbnail_url?: string | null
-          title: string
-          updated_at?: string
-          video_embed_url?: string | null
-          video_file_id?: string | null
-          video_provider?: string | null
-          video_source_url?: string | null
-          video_url?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          duration_minutes?: number | null
-          id?: string
-          is_coming_soon?: boolean
-          is_featured?: boolean
-          is_published?: boolean
-          legacy_content_id?: string | null
-          module_id?: string
-          position?: number
-          published_at?: string | null
-          slug?: string | null
-          thumbnail_url?: string | null
-          title?: string
-          updated_at?: string
-          video_embed_url?: string | null
-          video_file_id?: string | null
-          video_provider?: string | null
-          video_source_url?: string | null
-          video_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_lessons_module_id_fkey"
-            columns: ["module_id"]
-            isOneToOne: false
-            referencedRelation: "club_modules"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      club_modules: {
-        Row: {
-          cover_url: string | null
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          is_published: boolean
-          position: number
-          slug: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          cover_url?: string | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_published?: boolean
-          position?: number
-          slug: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          cover_url?: string | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_published?: boolean
-          position?: number
-          slug?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      club_settings: {
-        Row: {
-          benefits: Json
-          cover_url: string | null
-          cta_text: string
-          id: number
-          locked_screen_text: string
-          public_description: string
-          public_title: string
-          updated_at: string
-        }
-        Insert: {
-          benefits?: Json
-          cover_url?: string | null
-          cta_text?: string
-          id?: number
-          locked_screen_text?: string
-          public_description?: string
-          public_title?: string
-          updated_at?: string
-        }
-        Update: {
-          benefits?: Json
-          cover_url?: string | null
-          cta_text?: string
-          id?: number
-          locked_screen_text?: string
-          public_description?: string
-          public_title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      club_subscriptions: {
-        Row: {
-          access_status: string
-          buyer_email: string | null
-          buyer_phone: string | null
-          canceled_at: string | null
-          created_at: string
-          current_period_end: string | null
-          current_period_start: string | null
-          id: string
-          last_payment_at: string | null
-          next_billing_at: string | null
-          provider: string
-          provider_invoice_id: string | null
-          provider_member_id: string | null
-          provider_subscription_id: string | null
-          raw_payload: Json
-          status: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          access_status?: string
-          buyer_email?: string | null
-          buyer_phone?: string | null
-          canceled_at?: string | null
-          created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          last_payment_at?: string | null
-          next_billing_at?: string | null
-          provider?: string
-          provider_invoice_id?: string | null
-          provider_member_id?: string | null
-          provider_subscription_id?: string | null
-          raw_payload?: Json
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          access_status?: string
-          buyer_email?: string | null
-          buyer_phone?: string | null
-          canceled_at?: string | null
-          created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          last_payment_at?: string | null
-          next_billing_at?: string | null
-          provider?: string
-          provider_invoice_id?: string | null
-          provider_member_id?: string | null
-          provider_subscription_id?: string | null
-          raw_payload?: Json
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "club_subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      community_posts: {
-        Row: {
-          author_id: string | null
-          author_name: string | null
-          body: string
-          created_at: string
-          id: string
-          is_pinned: boolean
-          updated_at: string
-        }
-        Insert: {
-          author_id?: string | null
-          author_name?: string | null
-          body: string
-          created_at?: string
-          id?: string
-          is_pinned?: boolean
-          updated_at?: string
-        }
-        Update: {
-          author_id?: string | null
-          author_name?: string | null
-          body?: string
-          created_at?: string
-          id?: string
-          is_pinned?: boolean
-          updated_at?: string
-        }
-        Relationships: []
-      }
       crm_automation_execution_logs: {
         Row: {
           created_at: string
@@ -1984,7 +1439,6 @@ export type Database = {
           },
         ]
       }
-
       finance_payees: {
         Row: {
           created_at: string
@@ -2183,7 +1637,6 @@ export type Database = {
           },
         ]
       }
-
       finance_recurring_rules: {
         Row: {
           account_id: string | null
@@ -2279,8 +1732,8 @@ export type Database = {
           description: string
           due_date: string
           fx_date: string | null
-          fx_reference_rate: number | null
           fx_rate: number | null
+          fx_reference_rate: number | null
           fx_source: string | null
           id: string
           is_automatic: boolean
@@ -2309,8 +1762,8 @@ export type Database = {
           description: string
           due_date?: string
           fx_date?: string | null
-          fx_reference_rate?: number | null
           fx_rate?: number | null
+          fx_reference_rate?: number | null
           fx_source?: string | null
           id?: string
           is_automatic?: boolean
@@ -2339,8 +1792,8 @@ export type Database = {
           description?: string
           due_date?: string
           fx_date?: string | null
-          fx_reference_rate?: number | null
           fx_rate?: number | null
+          fx_reference_rate?: number | null
           fx_source?: string | null
           id?: string
           is_automatic?: boolean
@@ -2950,8 +2403,8 @@ export type Database = {
           id: string
           notes: string | null
           paid_at: string | null
-          payment_amount_cents: number | null
           payment_account_id: string | null
+          payment_amount_cents: number | null
           payment_currency: string | null
           payment_expires_at: string | null
           payment_method: string | null
@@ -2991,8 +2444,8 @@ export type Database = {
           id?: string
           notes?: string | null
           paid_at?: string | null
-          payment_amount_cents?: number | null
           payment_account_id?: string | null
+          payment_amount_cents?: number | null
           payment_currency?: string | null
           payment_expires_at?: string | null
           payment_method?: string | null
@@ -3032,8 +2485,8 @@ export type Database = {
           id?: string
           notes?: string | null
           paid_at?: string | null
-          payment_amount_cents?: number | null
           payment_account_id?: string | null
+          payment_amount_cents?: number | null
           payment_currency?: string | null
           payment_expires_at?: string | null
           payment_method?: string | null
@@ -3056,17 +2509,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "orders_payment_account_id_fkey"
-            columns: ["payment_account_id"]
-            isOneToOne: false
-            referencedRelation: "finance_accounts"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "orders_host_profile_id_fkey"
             columns: ["host_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_payment_account_id_fkey"
+            columns: ["payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -3877,7 +3330,6 @@ export type Database = {
           full_name: string | null
           id: string
           is_blocked: boolean
-          is_club_member: boolean
           password_setup_required: boolean
           phone: string | null
           phone_country_iso: string | null
@@ -3895,7 +3347,6 @@ export type Database = {
           full_name?: string | null
           id: string
           is_blocked?: boolean
-          is_club_member?: boolean
           password_setup_required?: boolean
           phone?: string | null
           phone_country_iso?: string | null
@@ -3913,7 +3364,6 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_blocked?: boolean
-          is_club_member?: boolean
           password_setup_required?: boolean
           phone?: string | null
           phone_country_iso?: string | null
@@ -4390,7 +3840,12 @@ export type Database = {
         Returns: undefined
       }
       finance_materialize_payout: {
-        Args: { p_actor?: string; p_currency: string; p_month: string; p_rule_id: string }
+        Args: {
+          p_actor?: string
+          p_currency: string
+          p_month: string
+          p_rule_id: string
+        }
         Returns: string
       }
       finance_month_is_closed: { Args: { p_month: string }; Returns: boolean }

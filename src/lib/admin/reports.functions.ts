@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireModule, requireAnyModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// Hubla / dynamic tables not always in generated types.
+// Dynamic tables not always in generated types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabaseAdmin as any;
 
@@ -17,7 +17,7 @@ export const reportFiltersSchema = z.object({
   to: z.string().optional(),
   compare: z.enum(["none", "prev_period", "prev_month"]).default("prev_period"),
   currency: z.enum(["BRL", "EUR", "both"]).default("both"),
-  origin: z.string().optional(), // pdv / esteira / eventos / clube / manual / hubla
+  origin: z.string().optional(), // pdv / esteira / eventos / manual
 });
 
 export type ReportFilters = z.infer<typeof reportFiltersSchema>;
@@ -211,7 +211,7 @@ async function groupExpensesByCategory(txs: FinTx[]) {
   })).sort((a, b) => b.amount_cents - a.amount_cents);
 }
 
-// ---------- Counts (leads, club, events) ----------
+// ---------- Counts (leads, events) ----------
 
 async function countLeads(range: Range): Promise<number> {
   const { count } = await db
@@ -219,17 +219,6 @@ async function countLeads(range: Range): Promise<number> {
     .select("id", { count: "exact", head: true })
     .gte("created_at", range.start + "T00:00:00")
     .lte("created_at", range.end + "T23:59:59");
-  return count ?? 0;
-}
-
-async function countNewClubMembers(range: Range): Promise<number> {
-  // profiles flagged as club member updated within range
-  const { count } = await db
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("is_club_member", true)
-    .gte("updated_at", range.start + "T00:00:00")
-    .lte("updated_at", range.end + "T23:59:59");
   return count ?? 0;
 }
 
@@ -266,7 +255,6 @@ export const getReportsOverview = createServerFn({ method: "POST" })
       prevTxs,
       leadsCurr,
       leadsPrev,
-      clubCurr,
       eventsCurr,
       pdvCurr,
     ] = await Promise.all([
@@ -274,7 +262,6 @@ export const getReportsOverview = createServerFn({ method: "POST" })
       compareRange ? fetchFinanceRange(compareRange, data) : Promise.resolve([] as FinTx[]),
       countLeads(range),
       compareRange ? countLeads(compareRange) : Promise.resolve(0),
-      countNewClubMembers(range),
       countEventTicketsSold(range),
       countPdvSales(range),
     ]);
@@ -285,8 +272,8 @@ export const getReportsOverview = createServerFn({ method: "POST" })
     const series = dailySeries(currentTxs, range);
     const byOrigin = groupByOrigin(currentTxs);
 
-    // Extras: leads funnel + low stock + unreplied + inactive subs
-    const [funnelRows, lowStockRows, unrepliedRows, inactiveSubsCount] = await Promise.all([
+    // Extras: leads funnel + low stock + unreplied
+    const [funnelRows, lowStockRows, unrepliedRows] = await Promise.all([
       db.from("leads").select("pipeline_stage,status").limit(5000),
       db
         .from("products")
@@ -297,10 +284,6 @@ export const getReportsOverview = createServerFn({ method: "POST" })
         .from("crm_inbox_messages")
         .select("id", { count: "exact", head: true })
         .eq("status", "received"),
-      db
-        .from("club_subscriptions")
-        .select("id", { count: "exact", head: true })
-        .eq("access_status", "inactive"),
     ]);
     const STAGES = ["novo", "qualificado", "analise", "fechado", "perdido"];
     const STAGE_LBL: Record<string, string> = {
@@ -321,7 +304,6 @@ export const getReportsOverview = createServerFn({ method: "POST" })
     }));
     const lowStockCount = lowStockRows.count ?? 0;
     const unrepliedCount = unrepliedRows.count ?? 0;
-    const inactiveSubs = inactiveSubsCount.count ?? 0;
 
     // Alerts
     const alerts: { type: string; message: string; severity: "warn" | "danger" }[] = [];
@@ -361,13 +343,6 @@ export const getReportsOverview = createServerFn({ method: "POST" })
         severity: "warn",
       });
     }
-    if (inactiveSubs > 0) {
-      alerts.push({
-        type: "inactive_subs",
-        message: `${inactiveSubs} assinatura(s) do Clube inativas/inadimplentes.`,
-        severity: "warn",
-      });
-    }
 
     const totalRevenue = current.received + current.receivable;
     const totalRevenuePrev = previous.received + previous.receivable;
@@ -384,7 +359,6 @@ export const getReportsOverview = createServerFn({ method: "POST" })
         ordersPaid: { current: current.ordersPaid, previous: previous.ordersPaid, deltaPct: pctDelta(current.ordersPaid, previous.ordersPaid) },
         pdvSales: { current: pdvCurr, previous: 0, deltaPct: null },
         newLeads: { current: leadsCurr, previous: leadsPrev, deltaPct: pctDelta(leadsCurr, leadsPrev) },
-        newClubMembers: { current: clubCurr, previous: 0, deltaPct: null },
         eventTickets: { current: eventsCurr, previous: 0, deltaPct: null },
       },
       series,
@@ -1065,168 +1039,6 @@ export const getReportsEventos = createServerFn({ method: "POST" })
         { label: "Check-in", count: curr.used },
         { label: "Cancelados", count: curr.canceled },
       ],
-    };
-  });
-
-// ---------- CLUBE DO IMIGRANTE ----------
-
-type ClubSubLite = {
-  id: string;
-  user_id: string | null;
-  status: string;
-  access_status: string;
-  current_period_start: string | null;
-  current_period_end: string | null;
-  last_payment_at: string | null;
-  next_billing_at: string | null;
-  canceled_at: string | null;
-  created_at: string;
-};
-
-type IntegrationEventLite = {
-  id: string;
-  provider: string;
-  event_type: string;
-  status: string;
-  processed_at: string | null;
-  error_message: string | null;
-  created_at: string;
-};
-
-export const getReportsClube = createServerFn({ method: "POST" })
-  .middleware([requireModule("relatorios")])
-  .inputValidator((d) => reportFiltersSchema.parse(d))
-  .handler(async ({ data }) => {
-    const range = resolveRange(data);
-    const compareRange =
-      data.compare === "none" ? null : previousRange(range, data.compare);
-
-    // Snapshot total (sem filtro de período) — para KPIs absolutos
-    const { data: allSubs } = await db
-      .from("club_subscriptions")
-      .select(
-        "id,user_id,status,access_status,current_period_start,current_period_end,last_payment_at,next_billing_at,canceled_at,created_at",
-      )
-      .limit(10000);
-    const subs = (allSubs ?? []) as ClubSubLite[];
-
-    const isActive = (s: ClubSubLite) =>
-      s.access_status === "active" || s.status === "active";
-    const isInactive = (s: ClubSubLite) =>
-      s.access_status === "inactive" && s.status !== "canceled";
-
-    const activeNow = subs.filter(isActive).length;
-    const inactiveNow = subs.filter(isInactive).length;
-
-    const inWindow = (iso: string | null) =>
-      !!iso && iso.slice(0, 10) >= range.start && iso.slice(0, 10) <= range.end;
-    const inPrev = (iso: string | null) =>
-      !!compareRange &&
-      !!iso &&
-      iso.slice(0, 10) >= compareRange.start &&
-      iso.slice(0, 10) <= compareRange.end;
-
-    const newSubsCurr = subs.filter((s) => inWindow(s.created_at)).length;
-    const newSubsPrev = subs.filter((s) => inPrev(s.created_at)).length;
-    const canceledCurr = subs.filter((s) => inWindow(s.canceled_at)).length;
-    const canceledPrev = subs.filter((s) => inPrev(s.canceled_at)).length;
-
-    // Série diária de novas assinaturas vs cancelamentos no período atual
-    const dailyMap: Record<string, { news: number; cancels: number }> = {};
-    for (let d = range.start; d <= range.end; d = addDays(d, 1))
-      dailyMap[d] = { news: 0, cancels: 0 };
-    for (const s of subs) {
-      if (s.created_at && inWindow(s.created_at)) {
-        const k = s.created_at.slice(0, 10);
-        if (dailyMap[k]) dailyMap[k].news += 1;
-      }
-      if (s.canceled_at && inWindow(s.canceled_at)) {
-        const k = s.canceled_at.slice(0, 10);
-        if (dailyMap[k]) dailyMap[k].cancels += 1;
-      }
-    }
-    const dailySeries = Object.entries(dailyMap).map(([date, v]) => ({
-      date,
-      news: v.news,
-      cancels: v.cancels,
-    }));
-
-    // Churn = cancelados no período / ativos no início (aproximação: ativos atuais + cancelados no período)
-    const denomChurn = activeNow + canceledCurr;
-    const churnPct = denomChurn > 0 ? (canceledCurr / denomChurn) * 100 : 0;
-
-    // Receita do Clube — via finance_transactions source_module = clube/hubla
-    const { data: finRows } = await db
-      .from("finance_transactions")
-      .select("amount_cents,status,paid_at,due_date,type,source_module,currency")
-      .in("source_module", ["clube", "hubla"])
-      .gte("due_date", range.start)
-      .lte("due_date", range.end)
-      .limit(10000);
-    let revenueCents = 0;
-    let approved = 0;
-    for (const t of (finRows ?? []) as FinTx[]) {
-      if (t.type === "income" && t.status === "received") {
-        revenueCents += t.amount_cents;
-        approved += 1;
-      }
-    }
-
-    // MRR aproximado: receita média mensal recorrente = média ponderada das últimas 30d * (30/dias)
-    const periodDays = diffDays(range.start, range.end) + 1;
-    const mrrCents = periodDays > 0 ? Math.round((revenueCents / periodDays) * 30) : 0;
-
-    // Integration events Hubla no período
-    const { data: intRows } = await db
-      .from("integration_events")
-      .select("id,provider,event_type,status,processed_at,error_message,created_at")
-      .eq("provider", "hubla")
-      .gte("created_at", range.start + "T00:00:00")
-      .lte("created_at", range.end + "T23:59:59")
-      .order("created_at", { ascending: false })
-      .limit(5000);
-    const intEvents = (intRows ?? []) as IntegrationEventLite[];
-
-    let hublaReceived = 0,
-      hublaErrors = 0,
-      hublaPending = 0;
-    const byEventType = new Map<string, number>();
-    for (const e of intEvents) {
-      hublaReceived++;
-      if (e.status === "error" || e.error_message) hublaErrors++;
-      else if (e.status === "received" || e.status === "pending") hublaPending++;
-      byEventType.set(e.event_type, (byEventType.get(e.event_type) ?? 0) + 1);
-    }
-    const eventTypes = Array.from(byEventType, ([label, count]) => ({ label, count })).sort(
-      (a, b) => b.count - a.count,
-    );
-
-    return {
-      range,
-      compareRange,
-      cards: {
-        activeMembers: { current: activeNow, previous: 0, deltaPct: null },
-        newSubs: { current: newSubsCurr, previous: newSubsPrev, deltaPct: pctDelta(newSubsCurr, newSubsPrev) },
-        canceled: { current: canceledCurr, previous: canceledPrev, deltaPct: pctDelta(canceledCurr, canceledPrev) },
-        inactive: { current: inactiveNow, previous: 0, deltaPct: null },
-        revenue: { current: revenueCents, previous: 0, deltaPct: null },
-        mrr: { current: mrrCents, previous: 0, deltaPct: null },
-        churnPct: { current: churnPct, previous: 0, deltaPct: null },
-        approved: { current: approved, previous: 0, deltaPct: null },
-      },
-      hubla: {
-        received: hublaReceived,
-        errors: hublaErrors,
-        pending: hublaPending,
-      },
-      dailySeries,
-      eventTypes,
-      recentErrors: intEvents.filter((e) => e.status === "error" || e.error_message).slice(0, 10).map((e) => ({
-        id: e.id,
-        event_type: e.event_type,
-        error_message: e.error_message,
-        created_at: e.created_at,
-      })),
     };
   });
 

@@ -26,18 +26,12 @@ import {
   CalendarDays,
   Copy,
   CreditCard,
-  Crown,
   Loader2,
   MessageCircle,
   QrCode,
   RotateCw,
   Unplug,
 } from "lucide-react";
-import {
-  getHublaAdminOverview,
-  saveHublaSettings,
-  testHublaConfiguration,
-} from "@/lib/hubla/hubla.functions";
 import {
   getMercadoPagoAdminOverview,
   saveMercadoPagoSettings,
@@ -121,9 +115,6 @@ function numberFromForm(value: FormDataEntryValue | null, fallback: number) {
 }
 
 export function IntegracoesTab() {
-  const fetchHublaOverview = useServerFn(getHublaAdminOverview);
-  const saveHubla = useServerFn(saveHublaSettings);
-  const testHubla = useServerFn(testHublaConfiguration);
   const fetchMpOverview = useServerFn(getMercadoPagoAdminOverview);
   const saveMp = useServerFn(saveMercadoPagoSettings);
   const testMp = useServerFn(testMercadoPagoConfiguration);
@@ -134,9 +125,6 @@ export function IntegracoesTab() {
   const refreshWaStatus = useServerFn(refreshUazapiStatus);
   const disconnectWa = useServerFn(disconnectUazapiInstance);
 
-  const [hublaEnabled, setHublaEnabled] = useState(false);
-  const [hublaConfigOpen, setHublaConfigOpen] = useState(false);
-  const [hublaEventsOpen, setHublaEventsOpen] = useState(false);
   const [mpEnabled, setMpEnabled] = useState(false);
   const [mpConfigOpen, setMpConfigOpen] = useState(false);
   const [mpEventsOpen, setMpEventsOpen] = useState(false);
@@ -150,15 +138,6 @@ export function IntegracoesTab() {
   const [waMode, setWaMode] = useState<"disabled" | "suggestion" | "automatic">("suggestion");
   const [waQrCode, setWaQrCode] = useState<string | null>(null);
   const [waPairCode, setWaPairCode] = useState<string | null>(null);
-
-  const hublaQ = useQuery({
-    queryKey: ["hubla-admin-overview"],
-    queryFn: async () => {
-      const data = await fetchHublaOverview();
-      setHublaEnabled(!!data.setting.is_enabled);
-      return data;
-    },
-  });
 
   const mpQ = useQuery({
     queryKey: ["mercadopago-admin-overview"],
@@ -184,10 +163,6 @@ export function IntegracoesTab() {
   });
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const hublaWebhookUrl = useMemo(
-    () => `${origin}${hublaQ.data?.webhookUrl ?? "/api/webhooks/hubla"}`,
-    [origin, hublaQ.data?.webhookUrl],
-  );
   const mpWebhookUrl = useMemo(
     () => `${origin}${mpQ.data?.webhookUrl ?? "/api/webhooks/mercadopago"}`,
     [origin, mpQ.data?.webhookUrl],
@@ -196,27 +171,6 @@ export function IntegracoesTab() {
     () => `${origin}${waQ.data?.webhookUrl ?? "/api/webhooks/uazapi"}`,
     [origin, waQ.data?.webhookUrl],
   );
-
-  const saveHublaMutation = useMutation({
-    mutationFn: (form: FormData) =>
-      saveHubla({
-        data: {
-          is_enabled: hublaEnabled,
-          checkout_url: emptyToNull(form.get("checkout_url")),
-          post_purchase_url: emptyToNull(form.get("post_purchase_url")),
-          webhook_secret: emptyToNull(form.get("webhook_secret")),
-          product_id: emptyToNull(form.get("product_id")),
-          offer_id: emptyToNull(form.get("offer_id")),
-          whatsapp_group_url: emptyToNull(form.get("whatsapp_group_url")),
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Configuracao Hubla salva");
-      setHublaConfigOpen(false);
-      hublaQ.refetch();
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar Hubla"),
-  });
 
   const saveMpMutation = useMutation({
     mutationFn: (form: FormData) =>
@@ -267,15 +221,6 @@ export function IntegracoesTab() {
       waQ.refetch();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar Uazapi"),
-  });
-
-  const testHublaMutation = useMutation({
-    mutationFn: () => testHubla(),
-    onSuccess: (result) => {
-      if (result.ok) toast.success("Configuracao minima da Hubla esta pronta");
-      else toast.error(`Faltando: ${result.missing.join(", ")}`);
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar Hubla"),
   });
 
   const testMpMutation = useMutation({
@@ -337,17 +282,6 @@ export function IntegracoesTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao desconectar WhatsApp"),
   });
 
-  const hublaSetting = hublaQ.data?.setting;
-  const hublaEvents = (hublaQ.data?.events ?? []) as IntegrationEvent[];
-  const hublaErrorCount = hublaQ.data?.errorCount ?? 0;
-  const hublaStatus = cardStatus(hublaEnabled, hublaErrorCount);
-  const hublaWebhook = webhookStatus({
-    enabled: hublaEnabled,
-    hasSecret: Boolean(hublaSetting?.webhook_secret),
-    lastEventAt: hublaSetting?.last_event_at,
-    errorCount: hublaErrorCount,
-  });
-
   const mpSetting = mpQ.data?.setting as MercadoPagoSetting | undefined;
   const mpEvents = (mpQ.data?.events ?? []) as IntegrationEvent[];
   const mpErrorCount = mpQ.data?.errorCount ?? 0;
@@ -374,36 +308,6 @@ export function IntegracoesTab() {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <IntegrationCard
-          icon={Crown}
-          iconClassName="text-amber-500"
-          name="Hubla"
-          description="Assinaturas do Clube do Imigrante"
-          badge={<Badge className={hublaStatus.className}>{hublaStatus.label}</Badge>}
-          details={[
-            ["Status", hublaStatus.label],
-            ["Checkout", hublaSetting?.checkout_url ? "configurado" : "nao configurado"],
-            ["Webhook", hublaWebhook],
-            ["Ultimo evento", formatRelativeDate(hublaSetting?.last_event_at)],
-          ]}
-          actions={
-            <>
-              <Button type="button" size="sm" onClick={() => setHublaConfigOpen(true)}>
-                Configurar
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setHublaEventsOpen(true)}
-              >
-                Ver eventos
-              </Button>
-            </>
-          }
-          loading={hublaQ.isLoading}
-        />
-
         <WiseIntegrationCard />
 
         <IntegrationCard
@@ -491,25 +395,6 @@ export function IntegracoesTab() {
           />
         ))}
       </div>
-
-      <HublaConfigDialog
-        open={hublaConfigOpen}
-        onOpenChange={setHublaConfigOpen}
-        enabled={hublaEnabled}
-        setEnabled={setHublaEnabled}
-        webhookUrl={hublaWebhookUrl}
-        setting={hublaSetting}
-        saveMutation={saveHublaMutation}
-        testMutation={testHublaMutation}
-      />
-
-      <EventsDialog
-        open={hublaEventsOpen}
-        onOpenChange={setHublaEventsOpen}
-        title="Eventos Hubla"
-        description="Ultimos webhooks recebidos e status de conciliacao."
-        events={hublaEvents}
-      />
 
       <MercadoPagoConfigDialog
         open={mpConfigOpen}
@@ -621,107 +506,6 @@ function IntegrationCard({
 
       <div className="mt-auto flex flex-wrap gap-2 pt-5">{actions}</div>
     </BentoCard>
-  );
-}
-
-function HublaConfigDialog({
-  open,
-  onOpenChange,
-  enabled,
-  setEnabled,
-  webhookUrl,
-  setting,
-  saveMutation,
-  testMutation,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  enabled: boolean;
-  setEnabled: (enabled: boolean) => void;
-  webhookUrl: string;
-  setting:
-    | {
-        checkout_url: string | null;
-        post_purchase_url: string | null;
-        webhook_secret: string | null;
-        product_id: string | null;
-        offer_id: string | null;
-        whatsapp_group_url: string | null;
-      }
-    | undefined;
-  saveMutation: { mutate: (form: FormData) => void; isPending: boolean };
-  testMutation: { mutate: () => void; isPending: boolean };
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-admin-border bg-admin-surface text-admin-ink sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Configurar Hubla</DialogTitle>
-          <DialogDescription className="text-admin-ink-muted">
-            Dados tecnicos da assinatura do Clube do Imigrante e webhook de conciliacao.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form
-          className="grid gap-4 lg:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            saveMutation.mutate(new FormData(e.currentTarget));
-          }}
-        >
-          <SwitchPanel
-            title="Ativar integracao"
-            description="Webhooks so serao aceitos quando a integracao estiver ativa e com segredo."
-            checked={enabled}
-            onCheckedChange={setEnabled}
-          />
-
-          <Field label="Checkout fixo Hubla">
-            <Input
-              name="checkout_url"
-              type="url"
-              placeholder="https://..."
-              defaultValue={setting?.checkout_url ?? ""}
-            />
-          </Field>
-          <Field label="URL pos-compra Empuria">
-            <Input
-              name="post_purchase_url"
-              placeholder="/clube/sucesso"
-              defaultValue={setting?.post_purchase_url ?? "/clube/sucesso"}
-            />
-          </Field>
-          <Field label="Segredo do webhook">
-            <Input
-              name="webhook_secret"
-              type="password"
-              placeholder={
-                setting?.webhook_secret
-                  ? "Preenchido - deixe em branco para manter"
-                  : "Token secreto"
-              }
-            />
-          </Field>
-          <ReadonlyWebhookField webhookUrl={webhookUrl} />
-          <Field label="ID do produto Hubla">
-            <Input name="product_id" defaultValue={setting?.product_id ?? ""} />
-          </Field>
-          <Field label="ID da oferta Hubla">
-            <Input name="offer_id" defaultValue={setting?.offer_id ?? ""} />
-          </Field>
-          <Field label="Link do grupo WhatsApp">
-            <Input
-              name="whatsapp_group_url"
-              type="url"
-              placeholder="https://chat.whatsapp.com/..."
-              defaultValue={setting?.whatsapp_group_url ?? ""}
-            />
-          </Field>
-
-          <DialogActions saveMutation={saveMutation} testMutation={testMutation} />
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

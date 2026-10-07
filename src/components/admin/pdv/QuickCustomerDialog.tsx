@@ -52,7 +52,6 @@ export function QuickCustomerDialog({
         full_name: res.full_name,
         phone: res.phone,
         avatar_url: null,
-        is_club_member: false,
         is_blocked: false,
       });
     } catch (e) {

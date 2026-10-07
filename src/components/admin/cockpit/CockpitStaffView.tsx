@@ -7,7 +7,7 @@ import { getActivityFeed } from "@/lib/admin/cockpit.functions";
 import { listCalendarTasks } from "@/lib/admin/calendar-tasks.functions";
 import { ActivityFeed } from "@/components/admin/ActivityFeed";
 import { useTopBarQuickStat } from "@/components/shared/TopBarActionsContext";
-import { CalendarClock, ListTodo, Users, Crown } from "lucide-react";
+import { CalendarClock, ListTodo, Users } from "lucide-react";
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -67,15 +67,6 @@ export function CockpitStaffView() {
           icon={Users}
           tone="green"
         />
-        <AdminStatCard
-          className="col-span-12 sm:col-span-6 lg:col-span-3"
-          label="Novos membros (30d)"
-          value={m?.newMembers ?? "—"}
-          hint="Clube do Imigrante"
-          icon={Crown}
-          tone="neutral"
-        />
-
         <BentoCard title="Minhas tarefas de hoje" className="col-span-12 lg:col-span-6">
           {myTasksToday.length > 0 ? (
             <ul className="space-y-3">

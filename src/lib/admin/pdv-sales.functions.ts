@@ -45,7 +45,7 @@ export const searchCustomers = createServerFn({ method: "POST" })
     const like = `%${q.replace(/[%_]/g, "")}%`;
     const { data: rows, error } = await supabaseAdmin
       .from("profiles")
-      .select("id, full_name, phone, avatar_url, is_club_member, is_blocked")
+      .select("id, full_name, phone, avatar_url, is_blocked")
       .or(`full_name.ilike.${like},phone.ilike.${like}`)
       .limit(10);
     if (error) throw new Error(error.message);
@@ -60,7 +60,7 @@ export const searchCustomers = createServerFn({ method: "POST" })
       if (missingIds.length) {
         const { data: profileMatches } = await supabaseAdmin
           .from("profiles")
-          .select("id, full_name, phone, avatar_url, is_club_member, is_blocked")
+          .select("id, full_name, phone, avatar_url, is_blocked")
           .in("id", missingIds);
         for (const row of profileMatches ?? []) byId.set(row.id, row);
       }

@@ -29,10 +29,9 @@ const CATEGORY_COLOR: Record<string, string> = {
   consultoria: "bg-blue-100 border-blue-400 text-blue-900",
   tour: "bg-emerald-100 border-emerald-400 text-emerald-900",
   burocracia: "bg-amber-100 border-amber-400 text-amber-900",
-  clube: "bg-purple-100 border-purple-400 text-purple-900",
 };
 
-type FilterKind = "todos" | "compromissos" | "tarefas" | "vagas" | "eventos" | "consultoria" | "tour" | "clube" | "burocracia";
+type FilterKind = "todos" | "compromissos" | "tarefas" | "vagas" | "eventos" | "consultoria" | "tour" | "burocracia";
 
 type CalItem = {
   id: string;
@@ -215,7 +214,6 @@ function AgendaPage() {
     { key: "eventos", label: "Eventos" },
     { key: "consultoria", label: "Consultoria" },
     { key: "tour", label: "Tour" },
-    { key: "clube", label: "Clube" },
     { key: "burocracia", label: "Burocracia" },
   ];
 
@@ -437,4 +435,3 @@ function SideList({ title, items, empty }: { title: string; items: CalItem[]; em
     </BentoCard>
   );
 }
-

@@ -3,11 +3,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { registerCheckIn, openTab } from "@/lib/admin/pdv.functions";
-import { Crown, MapPin, CalendarClock, Receipt, ShoppingBag, UserCheck } from "lucide-react";
+import { MapPin, CalendarClock, Receipt, ShoppingBag, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export type PassportContext = {
-  profile: { id: string; full_name: string | null; avatar_url: string | null; is_club_member: boolean; created_at: string; phone: string | null };
+  profile: { id: string; full_name: string | null; avatar_url: string | null; created_at: string; phone: string | null };
   visitCount: number;
   todayAppointments: Array<{ id: string; starts_at: string; status: string; services: { title: string } | null }>;
   nextAppointment: { id: string; starts_at: string; status: string; services: { title: string } | null } | null;
@@ -62,9 +62,6 @@ export function PassportContextModal({ context, open, onClose }: { context: Pass
                 <div className="text-[10px] uppercase tracking-widest text-yellow-brand/90 font-display">Passageiro</div>
                 <div className="font-display text-lg font-bold truncate">{p.full_name ?? "Imigrante"}</div>
               </div>
-            </div>
-            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase tracking-widest font-display ${p.is_club_member ? "bg-yellow-brand text-brown-deep" : "bg-offwhite/15"}`}>
-              <Crown className="h-3 w-3" /> {p.is_club_member ? "Classe Clube" : "Standard"}
             </div>
             <div className="mt-4 text-[11px] text-offwhite/70 font-body">
               Desde {new Date(p.created_at).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
