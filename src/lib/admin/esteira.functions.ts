@@ -37,7 +37,9 @@ export async function confirmOrderPaymentInternal(
   }
   const { data: current, error: currentError } = await supabaseAdmin
     .from("orders")
-    .select("id,payment_status,payment_amount_cents,payment_currency,amount_cents,currency,notes")
+    .select(
+      "id,payment_status,payment_amount_cents,payment_currency,amount_cents,currency,notes,fx_reference_rate,fx_reference_date,fx_rate,fx_source,fx_locked_at",
+    )
     .eq("id", data.orderId)
     .maybeSingle();
   if (currentError || !current) throw new Error("Pedido não encontrado.");
@@ -50,11 +52,13 @@ export async function confirmOrderPaymentInternal(
     settled_currency: data.settledCurrency,
     payment_account_id: data.paymentAccountId,
     paid_at: paidAt,
-    fx_reference_rate: data.fxReferenceRate ?? null,
-    fx_reference_date: data.fxReferenceDate ?? null,
-    fx_rate: data.fxRate ?? null,
-    fx_source: data.fxSource ?? null,
-    fx_locked_at: data.fxRate ? paidAt : null,
+    fx_reference_rate:
+      data.fxReferenceRate === undefined ? current.fx_reference_rate : data.fxReferenceRate,
+    fx_reference_date:
+      data.fxReferenceDate === undefined ? current.fx_reference_date : data.fxReferenceDate,
+    fx_rate: data.fxRate === undefined ? current.fx_rate : data.fxRate,
+    fx_source: data.fxSource === undefined ? current.fx_source : data.fxSource,
+    fx_locked_at: data.fxRate === undefined ? current.fx_locked_at : data.fxRate ? paidAt : null,
     voucher_code: `EMP-${Date.now().toString(36).toUpperCase()}`,
     notes: data.notes ? [current.notes, data.notes].filter(Boolean).join("\n") : current.notes,
   };
@@ -111,21 +115,12 @@ export const updateOrder = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        payment_status: z.enum(["pendente", "aprovado", "recusado", "estornado"]).optional(),
-        executed: z.boolean().optional(),
+        executed: z.literal(true),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
-    if (data.payment_status) {
-      patch.payment_status = data.payment_status;
-      if (data.payment_status === "aprovado") {
-        patch.voucher_code = `EMP-${Date.now().toString(36).toUpperCase()}`;
-        patch.paid_at = new Date().toISOString();
-      }
-    }
-    if (data.executed) patch.executed_at = new Date().toISOString();
+    const patch = { executed_at: new Date().toISOString() };
     const { error } = await context.supabase
       .from("orders")
       .update(patch as never)
@@ -391,7 +386,7 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
         fxReferenceRate: data.fxReferenceRate,
         fxReferenceDate: data.fxReferenceDate,
         fxRate: data.fxRate,
-        fxSource: data.fxSource ?? null,
+        fxSource: data.fxSource,
         notes: data.reason,
       },
       context.userId,

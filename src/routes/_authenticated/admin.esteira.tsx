@@ -191,11 +191,8 @@ function EsteiraPage() {
     queryFn: () => fetchAccounts(),
   });
   const settlementOrder = actionPrompt?.kind === "manual" ? actionPrompt.order : null;
-  const settlementBaseCurrency = (settlementOrder?.payment_currency ??
-    settlementOrder?.currency ??
-    "EUR") as "BRL" | "EUR";
-  const settlementBaseAmountCents =
-    settlementOrder?.payment_amount_cents ?? settlementOrder?.amount_cents ?? 0;
+  const settlementBaseCurrency = (settlementOrder?.currency ?? "EUR") as "BRL" | "EUR";
+  const settlementBaseAmountCents = settlementOrder?.amount_cents ?? 0;
   const settlementConversion = !!settlementOrder && settlementBaseCurrency !== settledCurrency;
   const settlementFxQ = useQuery({
     queryKey: [
@@ -342,10 +339,10 @@ function EsteiraPage() {
             settledCurrency,
             paymentAccountId,
             paidAt,
-            fxReferenceRate: settlementConversion ? settlementFxReferenceRate : null,
-            fxReferenceDate: settlementConversion ? settlementFxReferenceDate : null,
-            fxRate: settlementConversion && settlementFxRate ? Number(settlementFxRate) : null,
-            fxSource: settlementConversion ? (settlementFxSource ?? "MANUAL") : null,
+            fxReferenceRate: settlementConversion ? settlementFxReferenceRate : undefined,
+            fxReferenceDate: settlementConversion ? settlementFxReferenceDate : undefined,
+            fxRate: settlementConversion && settlementFxRate ? Number(settlementFxRate) : undefined,
+            fxSource: settlementConversion ? (settlementFxSource ?? "MANUAL") : undefined,
           },
         });
       if (kind === "cancel") await cancel({ data: { id: order.id, reason: reasonInput } });
