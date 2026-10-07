@@ -173,8 +173,7 @@ function FinanceiroContent() {
   };
 
   const statusMutation = useMutation({
-    mutationFn: (data: { id: string; status: "received" | "paid" | "canceled" }) =>
-      updateTxStatus({ data }),
+    mutationFn: (data: { id: string; status: "canceled" }) => updateTxStatus({ data }),
     onSuccess: () => {
       toast.success("Lancamento atualizado");
       refresh();

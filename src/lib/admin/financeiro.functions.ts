@@ -341,36 +341,37 @@ export const updateFinanceTransactionStatus = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        status: z.enum(["planned", "pending", "received", "paid", "canceled"]),
+        status: z.literal("canceled"),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { data: current, error: fetchErr } = await db
       .from("finance_transactions")
-      .select("id, type, status, is_automatic, source_module")
+      .select(
+        "id, type, status, is_automatic, source_module, settled_amount_cents, settled_currency",
+      )
       .eq("id", data.id)
       .single();
     if (fetchErr) throw new Error(fetchErr.message);
     if (current.is_automatic) {
       throw new Error("Lancamentos automaticos devem ser corrigidos no modulo de origem.");
     }
-    const finalStatus =
-      current.type === "income" && data.status === "paid"
-        ? "received"
-        : current.type === "expense" && data.status === "received"
-          ? "paid"
-          : data.status;
-    const paidAt =
-      finalStatus === "received" || finalStatus === "paid" ? new Date().toISOString() : null;
+    if (
+      ["received", "paid"].includes(current.status) ||
+      current.settled_amount_cents != null ||
+      current.settled_currency != null
+    ) {
+      throw new Error("Lancamento realizado nao pode ser cancelado por esta acao.");
+    }
     const { error } = await db
       .from("finance_transactions")
-      .update({ status: finalStatus, paid_at: paidAt })
+      .update({ status: data.status })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     await audit(context.userId, "finance.transaction.status", data.id, {
       old_status: current.status,
-      new_status: finalStatus,
+      new_status: data.status,
     });
     return { ok: true };
   });

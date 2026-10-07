@@ -4056,7 +4056,7 @@ export type Database = {
       }
       email_exists: { Args: { p_email: string }; Returns: boolean }
       finance_account_id_for_payment: {
-        Args: { p_payment_method: string }
+        Args: { p_currency: string; p_payment_method: string }
         Returns: string
       }
       finance_category_id: {

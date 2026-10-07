@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -53,6 +53,7 @@ import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
 
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
+import { getEurBrlReferenceRate } from "@/lib/finance/fx.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/esteira")({
   component: EsteiraPage,
@@ -140,6 +141,7 @@ function EsteiraPage() {
   const cancel = useServerFn(cancelOrder);
   const refund = useServerFn(refundOrder);
   const fetchAccounts = useServerFn(listPaymentAccounts);
+  const fetchFx = useServerFn(getEurBrlReferenceRate);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
@@ -159,6 +161,10 @@ function EsteiraPage() {
   const [settledCurrency, setSettledCurrency] = useState<"BRL" | "EUR">("EUR");
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
+  const [settlementFxReferenceRate, setSettlementFxReferenceRate] = useState<number | null>(null);
+  const [settlementFxReferenceDate, setSettlementFxReferenceDate] = useState<string | null>(null);
+  const [settlementFxRate, setSettlementFxRate] = useState("");
+  const [settlementFxSource, setSettlementFxSource] = useState<string | null>(null);
   const [linkModal, setLinkModal] = useState<{
     order: Order;
     loading: boolean;
@@ -184,6 +190,54 @@ function EsteiraPage() {
     queryKey: ["payment-accounts"],
     queryFn: () => fetchAccounts(),
   });
+  const settlementOrder = actionPrompt?.kind === "manual" ? actionPrompt.order : null;
+  const settlementBaseCurrency = (settlementOrder?.payment_currency ??
+    settlementOrder?.currency ??
+    "EUR") as "BRL" | "EUR";
+  const settlementBaseAmountCents =
+    settlementOrder?.payment_amount_cents ?? settlementOrder?.amount_cents ?? 0;
+  const settlementConversion = !!settlementOrder && settlementBaseCurrency !== settledCurrency;
+  const settlementFxQ = useQuery({
+    queryKey: [
+      "order-settlement-eur-brl-reference",
+      settlementOrder?.id,
+      paidAt,
+      settlementBaseCurrency,
+      settledCurrency,
+    ],
+    queryFn: () => fetchFx({ data: { date: paidAt } }),
+    enabled: settlementConversion,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (!settlementConversion) {
+      setSettlementFxReferenceRate(null);
+      setSettlementFxReferenceDate(null);
+      setSettlementFxRate("");
+      setSettlementFxSource(null);
+      if (settlementOrder) setSettledAmount((settlementBaseAmountCents / 100).toFixed(2));
+      return;
+    }
+    if (settlementFxQ.data?.ok) {
+      setSettlementFxReferenceRate(settlementFxQ.data.rate);
+      setSettlementFxReferenceDate(settlementFxQ.data.date);
+      setSettlementFxRate(String(settlementFxQ.data.rate));
+      setSettlementFxSource(settlementFxQ.data.source);
+    } else if (settlementFxQ.data && !settlementFxQ.data.ok) {
+      setSettlementFxReferenceRate(null);
+      setSettlementFxReferenceDate(null);
+      setSettlementFxSource("MANUAL");
+    }
+  }, [settlementBaseAmountCents, settlementConversion, settlementFxQ.data, settlementOrder]);
+
+  useEffect(() => {
+    const rate = Number(settlementFxRate);
+    if (!settlementConversion || !rate) return;
+    const baseAmount = settlementBaseAmountCents / 100;
+    const converted = settlementBaseCurrency === "EUR" ? baseAmount * rate : baseAmount / rate;
+    setSettledAmount(converted.toFixed(2));
+  }, [settlementBaseAmountCents, settlementBaseCurrency, settlementConversion, settlementFxRate]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -226,11 +280,16 @@ function EsteiraPage() {
   const summary = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const isToday = (value: string) => new Date(value).getTime() >= today.getTime();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isToday = (value: string) => {
+      const time = new Date(value).getTime();
+      return time >= today.getTime() && time < tomorrow.getTime();
+    };
     const todayCount = orders.filter((o) => isToday(o.created_at)).length;
     const waiting = orders.filter((o) => o.payment_status === "pendente").length;
     const paidToday = orders.filter(
-      (o) => o.payment_status === "aprovado" && isToday(o.created_at),
+      (o) => o.payment_status === "aprovado" && !!o.paid_at && isToday(o.paid_at),
     ).length;
     const inExec = orders.filter((o) => o.delivery_status === "processando").length;
     const late = orders.filter(
@@ -283,10 +342,10 @@ function EsteiraPage() {
             settledCurrency,
             paymentAccountId,
             paidAt,
-            fxReferenceRate: order.fx_reference_rate ?? null,
-            fxReferenceDate: order.fx_reference_date ?? null,
-            fxRate: order.fx_rate ?? null,
-            fxSource: order.fx_source ?? (order.fx_rate ? "MANUAL" : null),
+            fxReferenceRate: settlementConversion ? settlementFxReferenceRate : null,
+            fxReferenceDate: settlementConversion ? settlementFxReferenceDate : null,
+            fxRate: settlementConversion && settlementFxRate ? Number(settlementFxRate) : null,
+            fxSource: settlementConversion ? (settlementFxSource ?? "MANUAL") : null,
           },
         });
       if (kind === "cancel") await cancel({ data: { id: order.id, reason: reasonInput } });
@@ -523,8 +582,23 @@ function EsteiraPage() {
                                 setSettledAmount(
                                   String((o.payment_amount_cents ?? o.amount_cents ?? 0) / 100),
                                 );
-                                setPaymentAccountId(o.payment_account_id ?? "");
+                                const initialCurrency = (o.payment_currency ??
+                                  o.currency ??
+                                  "EUR") as "BRL" | "EUR";
+                                setPaymentAccountId(
+                                  paymentAccounts.some(
+                                    (account) =>
+                                      account.id === o.payment_account_id &&
+                                      account.currency === initialCurrency,
+                                  )
+                                    ? (o.payment_account_id ?? "")
+                                    : "",
+                                );
                                 setPaidAt(new Date().toISOString().slice(0, 10));
+                                setSettlementFxReferenceRate(o.fx_reference_rate ?? null);
+                                setSettlementFxReferenceDate(o.fx_reference_date ?? null);
+                                setSettlementFxRate(o.fx_rate ? String(o.fx_rate) : "");
+                                setSettlementFxSource(o.fx_source ?? null);
                               }}
                             >
                               <CheckCircle2 className="h-4 w-4 mr-2" /> Confirmar pagamento
@@ -886,6 +960,10 @@ function EsteiraPage() {
                     onValueChange={(value) => {
                       setSettledCurrency(value as "BRL" | "EUR");
                       setPaymentAccountId("");
+                      setSettlementFxReferenceRate(null);
+                      setSettlementFxReferenceDate(null);
+                      setSettlementFxRate("");
+                      setSettlementFxSource(value === settlementBaseCurrency ? null : "MANUAL");
                     }}
                   >
                     <SelectTrigger>
@@ -897,6 +975,37 @@ function EsteiraPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {settlementConversion && (
+                  <div className="space-y-2 rounded-lg bg-muted p-3 text-sm">
+                    <div>
+                      Valor de referência:{" "}
+                      {formatMoney(settlementBaseAmountCents, settlementBaseCurrency)}
+                    </div>
+                    <div>
+                      <Label>PTAX EUR/BRL</Label>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {settlementFxQ.isFetching
+                          ? "Buscando referência…"
+                          : settlementFxReferenceRate
+                            ? `${settlementFxReferenceRate.toFixed(4)} em ${settlementFxReferenceDate}`
+                            : "Referência indisponível — informe a cotação manualmente."}
+                      </p>
+                    </div>
+                    <div>
+                      <Label>Cotação aplicada</Label>
+                      <Input
+                        type="number"
+                        min="0.0001"
+                        step="0.0001"
+                        value={settlementFxRate}
+                        onChange={(event) => {
+                          setSettlementFxRate(event.target.value);
+                          if (!settlementFxReferenceRate) setSettlementFxSource("MANUAL");
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <Label>Conta</Label>
                   <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
@@ -926,7 +1035,13 @@ function EsteiraPage() {
               className="w-full border rounded p-2 text-sm"
             />
             <Button
-              disabled={actionPrompt?.kind === "manual" && (!paymentAccountId || !settledAmount)}
+              disabled={
+                actionPrompt?.kind === "manual" &&
+                (!paymentAccountId ||
+                  !settledAmount ||
+                  (settlementConversion && !settlementFxRate) ||
+                  settlementFxQ.isFetching)
+              }
               onClick={runPrompt}
               className="w-full bg-admin-accent hover:bg-admin-accent/90"
             >
