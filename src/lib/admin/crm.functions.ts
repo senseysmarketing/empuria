@@ -263,100 +263,203 @@ function normalizeColumnKey(label: string) {
     .slice(0, 48);
 }
 
+const crmLeadCardFields = [
+  "id",
+  "full_name",
+  "target_visa",
+  "assigned_to",
+  "crm_column_id",
+  "created_at",
+  "next_followup_at",
+  "qualification_answers",
+  "qualification_score",
+].join(",");
+
+const crmLeadSearchFields = "id, full_name, email, phone, target_visa, source, assigned_to";
+
+function sanitizePostgrestSearch(value: string) {
+  return value
+    .trim()
+    .replace(/[,%_()*"']/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 100);
+}
+
+function applyLeadSearch(query: any, search?: string) {
+  const term = sanitizePostgrestSearch(search ?? "");
+  if (!term) return query;
+  return query.or(
+    ["full_name", "phone", "email", "target_visa", "source"]
+      .map((column) => `${column}.ilike.%${term}%`)
+      .join(","),
+  );
+}
+
 export const listCrmWorkspace = createServerFn({ method: "GET" })
   .middleware([requireModule("crm")])
   .handler(async ({ context }) => {
     const db = context.supabase as any;
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
-    const canSeeAll = true;
+    const [
+      columnsRes,
+      distributionRes,
+      membersRes,
+      users,
+      mineRes,
+      followupsRes,
+      inboxRes,
+      lateRes,
+    ] = await Promise.all([
+      db
+        .from("crm_columns")
+        .select("*")
+        .eq("is_active", true)
+        .order("position", { ascending: true }),
+      db.from("crm_distribution_settings").select("*").eq("is_active", true).maybeSingle(),
+      db.from("crm_distribution_members").select("*").order("position", { ascending: true }),
+      listAssignableUsers(db),
+      db
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("assigned_to", context.userId),
+      db
+        .from("crm_followups")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .lte("due_at", todayEnd.toISOString()),
+      db
+        .from("crm_inbox_messages")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["received", "suggested"]),
+      db
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .lt("next_followup_at", new Date().toISOString()),
+    ]);
 
-    const leadsQuery = db
-      .from("leads")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(400);
-    if (!canSeeAll) leadsQuery.eq("assigned_to", context.userId);
-
-    const [columnsRes, leadsRes, inboxRes, distributionRes, membersRes, activityRes, users] =
-      await Promise.all([
-        db
-          .from("crm_columns")
-          .select("*")
-          .eq("is_active", true)
-          .order("position", { ascending: true }),
-        leadsQuery,
-        db
-          .from("crm_inbox_messages")
-          .select("*")
-          .in("status", ["received", "suggested"])
-          .order("created_at", { ascending: false })
-          .limit(100),
-        db.from("crm_distribution_settings").select("*").eq("is_active", true).maybeSingle(),
-        db.from("crm_distribution_members").select("*").order("position", { ascending: true }),
-        db
-          .from("lead_activity_log")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(300),
-        listAssignableUsers(db),
-      ]);
-
-    for (const res of [columnsRes, leadsRes, inboxRes, membersRes, activityRes]) {
+    for (const res of [columnsRes, membersRes, mineRes, followupsRes, inboxRes, lateRes]) {
       if (res.error) throw new Error(res.error.message);
     }
     if (distributionRes.error) throw new Error(distributionRes.error.message);
 
-    const profileById = new Map(users.map((user: CrmUser) => [user.id, user]));
-    const columns = (columnsRes.data ?? []) as CrmColumnRow[];
-    const columnByStage = new Map(columns.map((column: CrmColumnRow) => [column.key, column.id]));
-
-    const leads = ((leadsRes.data ?? []) as CrmLeadRow[]).map((lead: CrmLeadRow) => {
-      const legacyStage =
-        lead.pipeline_stage === "analise"
-          ? "em_contato"
-          : lead.pipeline_stage === "qualificado"
-            ? "fechado"
-            : lead.pipeline_stage;
-      return {
-        ...lead,
-        crm_column_id:
-          lead.crm_column_id ?? columnByStage.get(legacyStage) ?? columnByStage.get("novo") ?? null,
-        assigned_user: lead.assigned_to ? (profileById.get(lead.assigned_to) ?? null) : null,
-      };
-    });
-
-    const followupsQuery = db
-      .from("crm_followups")
-      .select("*")
-      .order("due_at", { ascending: true })
-      .limit(250);
-    if (!canSeeAll) followupsQuery.eq("assigned_to", context.userId);
-    const { data: followupRows, error: followupsError } = await followupsQuery;
-    if (followupsError) throw new Error(followupsError.message);
-
-    const followups = ((followupRows ?? []) as CrmFollowupRow[]).map(
-      (followup: CrmFollowupRow) => ({
-        ...followup,
-        assigned_user: followup.assigned_to
-          ? (profileById.get(followup.assigned_to) ?? null)
-          : null,
-        lead: leads.find((lead: CrmLeadWithOwner) => lead.id === followup.lead_id) ?? null,
-      }),
-    );
-
     return {
-      columns,
-      leads,
-      followups,
-      inbox: inboxRes.data ?? [],
+      columns: (columnsRes.data ?? []) as CrmColumnRow[],
       distribution: distributionRes.data ?? null,
       distributionMembers: membersRes.data ?? [],
-      activity: activityRes.data ?? [],
       users,
       currentUserId: context.userId,
-      canSeeAllLeads: canSeeAll,
       whatsappMode: "sugestao" as const,
+      metrics: {
+        mine: mineRes.count ?? 0,
+        followups: followupsRes.count ?? 0,
+        inbox: inboxRes.count ?? 0,
+        late: lateRes.count ?? 0,
+      },
     };
+  });
+
+export const listCrmColumnLeads = createServerFn({ method: "GET" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) =>
+    z
+      .object({
+        columnId: z.string().uuid(),
+        cursor: z
+          .object({ createdAt: z.string().datetime(), id: z.string().uuid() })
+          .nullable()
+          .optional(),
+        search: z.string().max(100).optional(),
+        owner: z.string().max(64).default("all"),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as any;
+    let query = db
+      .from("leads")
+      .select(crmLeadCardFields, { count: "exact" })
+      .eq("crm_column_id", data.columnId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(21);
+
+    const ownerId = data.owner === "mine" ? context.userId : data.owner;
+    if (ownerId !== "all") {
+      if (!z.string().uuid().safeParse(ownerId).success)
+        throw new Error("Filtro de responsavel invalido.");
+      query = query.eq("assigned_to", ownerId);
+    }
+    query = applyLeadSearch(query, data.search);
+    if (data.cursor) {
+      query = query.or(
+        `created_at.lt.${data.cursor.createdAt},and(created_at.eq.${data.cursor.createdAt},id.lt.${data.cursor.id})`,
+      );
+    }
+
+    const { data: rows, error, count } = await query;
+    if (error) throw new Error(error.message);
+    const page = (rows ?? []).slice(0, 20);
+    const last = page.at(-1);
+
+    return {
+      items: page,
+      totalCount: count ?? 0,
+      nextCursor:
+        (rows ?? []).length > 20 && last ? { createdAt: last.created_at, id: last.id } : null,
+    };
+  });
+
+export const getCrmLeadDetail = createServerFn({ method: "GET" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) => z.object({ leadId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as any;
+    const [leadRes, activityRes, users] = await Promise.all([
+      db.from("leads").select("*").eq("id", data.leadId).single(),
+      db
+        .from("lead_activity_log")
+        .select("*")
+        .eq("lead_id", data.leadId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      listAssignableUsers(db),
+    ]);
+    if (leadRes.error) throw new Error(leadRes.error.message);
+    if (activityRes.error) throw new Error(activityRes.error.message);
+    const owner = users.find((user) => user.id === leadRes.data.assigned_to) ?? null;
+    return { lead: { ...leadRes.data, assigned_user: owner }, activity: activityRes.data ?? [] };
+  });
+
+export const listCrmInboxMessages = createServerFn({ method: "GET" })
+  .middleware([requireModule("crm")])
+  .handler(async ({ context }) => {
+    const db = context.supabase as any;
+    const { data, error } = await db
+      .from("crm_inbox_messages")
+      .select("id, from_phone, from_name, body, status, created_at, matched_lead_id")
+      .in("status", ["received", "suggested"])
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const searchCrmLeads = createServerFn({ method: "GET" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) => z.object({ search: z.string().trim().min(2).max(100) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as any;
+    let query = db
+      .from("leads")
+      .select(crmLeadSearchFields)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    query = applyLeadSearch(query, data.search);
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
+    return rows ?? [];
   });
 
 export const createCrmLead = createServerFn({ method: "POST" })
