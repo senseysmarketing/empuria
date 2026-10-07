@@ -41,6 +41,13 @@ import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
 import { FinanceAccountCombobox } from "@/components/admin/financeiro/FinanceAccountCombobox";
 import { SettleTransactionPopover } from "@/components/admin/financeiro/SettleTransactionPopover";
 import { FinanceTeamPanel } from "@/components/admin/financeiro/FinanceTeamPanel";
+import { FinanceMonthClosePanel } from "@/components/admin/financeiro/FinanceMonthClosePanel";
+import { financeOriginLabel } from "@/lib/finance/origins";
+import {
+  closeFinanceMonth,
+  getFinanceDashboard,
+  prepareFinanceMonthClose,
+} from "@/lib/admin/finance-close.functions";
 import {
   createFinanceAccount,
   createFinanceCategory,
@@ -74,14 +81,13 @@ const STATUS_LABEL: Record<string, string> = {
   canceled: "Cancelado",
 };
 
-const ORIGIN_LABEL: Record<string, string> = {
-  manual: "Manual",
-  pdv: "PDV",
-  orders: "Esteira",
-};
-
 function defaultMonth() {
-  return new Date().toISOString().slice(0, 7);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}`;
 }
 
 function money(cents: number, currency = "BRL") {
@@ -135,11 +141,18 @@ function FinanceiroContent() {
   const toggleRule = useServerFn(toggleFinanceRecurringRule);
   const createCategory = useServerFn(createFinanceCategory);
   const createAccount = useServerFn(createFinanceAccount);
+  const fetchDashboard = useServerFn(getFinanceDashboard);
+  const prepareMonth = useServerFn(prepareFinanceMonthClose);
+  const closeMonth = useServerFn(closeFinanceMonth);
 
   const metaQ = useQuery({ queryKey: ["finance-meta"], queryFn: () => fetchMeta() });
   const overviewQ = useQuery({
     queryKey: ["finance-overview", month],
     queryFn: () => fetchOverview({ data: { month } }),
+  });
+  const dashboardQ = useQuery({
+    queryKey: ["finance-dashboard", month],
+    queryFn: () => fetchDashboard({ data: { month } }),
   });
   const transactionsQ = useQuery({
     queryKey: ["finance-transactions", month, filters],
@@ -174,7 +187,18 @@ function FinanceiroContent() {
     qc.invalidateQueries({ queryKey: ["finance-transactions"] });
     qc.invalidateQueries({ queryKey: ["finance-recurring"] });
     qc.invalidateQueries({ queryKey: ["finance-meta"] });
+    qc.invalidateQueries({ queryKey: ["finance-dashboard"] });
   };
+
+  const closeMutation = useMutation({
+    mutationFn: (action: "prepare" | "close") =>
+      action === "prepare" ? prepareMonth({ data: { month } }) : closeMonth({ data: { month } }),
+    onSuccess: (_closure, action) => {
+      toast.success(action === "prepare" ? "Revisão preparada" : "Mês fechado");
+      refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro no fechamento"),
+  });
 
   const statusMutation = useMutation({
     mutationFn: (data: { id: string; status: "canceled" }) => updateTxStatus({ data }),
@@ -192,13 +216,16 @@ function FinanceiroContent() {
     () => (transactionsQ.data?.rows ?? []) as FinanceTransaction[],
     [transactionsQ.data?.rows],
   );
-  const isLoading = overviewQ.isLoading || transactionsQ.isLoading || metaQ.isLoading;
+  const isLoading =
+    overviewQ.isLoading || transactionsQ.isLoading || metaQ.isLoading || dashboardQ.isLoading;
+  const monthClosed = dashboardQ.data?.status === "closed";
 
   const originOptions = useMemo(() => {
     const set = new Set(transactions.map((tx) => tx.source_module));
     return Array.from(set).sort();
   }, [transactions]);
-  const loadError = metaQ.error ?? overviewQ.error ?? transactionsQ.error ?? recurringQ.error;
+  const loadError =
+    metaQ.error ?? overviewQ.error ?? transactionsQ.error ?? recurringQ.error ?? dashboardQ.error;
 
   return (
     <div className="space-y-6">
@@ -229,13 +256,17 @@ function FinanceiroContent() {
             )}
             Atualizar
           </Button>
-          <NewTransactionDialog
-            categories={categories}
-            accounts={accounts}
-            createTx={createTx}
-            createAccount={createAccount}
-            onDone={refresh}
-          />
+          {monthClosed ? (
+            <FinanceAdjustmentDialog month={month} createTx={createTx} onDone={refresh} />
+          ) : (
+            <NewTransactionDialog
+              categories={categories}
+              accounts={accounts}
+              createTx={createTx}
+              createAccount={createAccount}
+              onDone={refresh}
+            />
+          )}
           <FinanceSettingsDialog
             createCategory={createCategory}
             createAccount={createAccount}
@@ -291,6 +322,26 @@ function FinanceiroContent() {
 
         <TabsContent value="resumo" className="mt-0 space-y-4">
           <div className="space-y-5">
+            {dashboardQ.data && (
+              <FinanceMonthClosePanel
+                month={month}
+                status={dashboardQ.data.status}
+                closure={dashboardQ.data.closure}
+                snapshot={dashboardQ.data.snapshot}
+                liveSnapshot={dashboardQ.data.liveSnapshot}
+                distributions={dashboardQ.data.distributions}
+                analytics={dashboardQ.data.analytics}
+                accounts={accounts}
+                prepare={() => closeMutation.mutate("prepare")}
+                close={() => closeMutation.mutate("close")}
+                busy={closeMutation.isPending}
+                settle={(data) => settleTx({ data })}
+                createAccount={async (name, currency) =>
+                  (await createAccount({ data: { name, type: "bank", currency } })).id
+                }
+                onChanged={refresh}
+              />
+            )}
             {(["BRL", "EUR"] as const).map((currency) => {
               const totals = overview?.totals[currency];
               return (
@@ -438,7 +489,7 @@ function FinanceiroContent() {
                   <SelectItem value="all">Todas origens</SelectItem>
                   {originOptions.map((origin) => (
                     <SelectItem key={origin} value={origin}>
-                      {ORIGIN_LABEL[origin] ?? origin}
+                      {financeOriginLabel(origin)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -611,7 +662,13 @@ function TransactionTable({
         <tbody>
           {rows.map((tx) => {
             const canSettle =
-              (["manual", "orders", "team_payout"].includes(tx.source_module) ||
+              ([
+                "manual",
+                "orders",
+                "team_payout",
+                "partner_distribution",
+                "month_adjustment",
+              ].includes(tx.source_module) ||
                 tx.source_module.startsWith("recurring:")) &&
               !["received", "paid", "canceled"].includes(tx.status);
             return (
@@ -623,9 +680,7 @@ function TransactionTable({
                   </p>
                 </td>
                 <td className="py-3 pr-3">
-                  <Badge variant="outline">
-                    {ORIGIN_LABEL[tx.source_module] ?? tx.source_module}
-                  </Badge>
+                  <Badge variant="outline">{financeOriginLabel(tx.source_module)}</Badge>
                 </td>
                 <td className="py-3 pr-3 text-admin-ink-muted">{tx.due_date}</td>
                 <td className="py-3 pr-3">
@@ -761,6 +816,114 @@ function RecurringTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function FinanceAdjustmentDialog({
+  month,
+  createTx,
+  onDone,
+}: {
+  month: string;
+  createTx: ReturnType<typeof useServerFn<typeof createFinanceTransaction>>;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [type, setType] = useState<"income" | "expense">("expense");
+  const [currency, setCurrency] = useState<"BRL" | "EUR">("BRL");
+  const dateParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const today = `${dateParts.find((part) => part.type === "year")?.value}-${dateParts.find((part) => part.type === "month")?.value}-${dateParts.find((part) => part.type === "day")?.value}`;
+  const mutation = useMutation({
+    mutationFn: (form: FormData) =>
+      createTx({
+        data: {
+          type,
+          currency,
+          description: String(form.get("description") ?? ""),
+          amount: Number(form.get("amount") ?? 0),
+          dueDate: today,
+          status: "pending",
+          categoryId: null,
+          accountId: null,
+          paymentMethod: null,
+          notes: String(form.get("notes") ?? "") || null,
+          adjustmentForMonth: `${month}-01`,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Ajuste registrado no mês atual");
+      setOpen(false);
+      onDone();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao ajustar"),
+  });
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">Registrar ajuste</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Ajuste de {month}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-admin-ink-muted">
+          O ajuste será lançado como pendência no mês atual ({today.slice(0, 7)}), com referência ao
+          mês fechado {month}. O snapshot antigo não muda.
+        </p>
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            mutation.mutate(new FormData(event.currentTarget));
+          }}
+        >
+          <Field label="Tipo">
+            <Select value={type} onValueChange={(value) => setType(value as "income" | "expense")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="income">Entrada</SelectItem>
+                <SelectItem value="expense">Saída</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Descrição">
+            <Input name="description" required minLength={3} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Valor">
+              <Input name="amount" type="number" min="0" step="0.01" required />
+            </Field>
+            <Field label="Moeda">
+              <Select
+                value={currency}
+                onValueChange={(value) => setCurrency(value as "BRL" | "EUR")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BRL">BRL</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <Field label="Observações">
+            <Textarea name="notes" />
+          </Field>
+          <Button type="submit" disabled={mutation.isPending}>
+            Registrar ajuste
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
