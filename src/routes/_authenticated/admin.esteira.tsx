@@ -7,9 +7,9 @@ import {
   listOrders,
   updateOrder,
   markOrderPaidManual,
+  listPaymentAccounts,
   cancelOrder,
   refundOrder,
-  generateWisePaymentForOrder,
 } from "@/lib/admin/esteira.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ import {
   ShoppingCart,
   Clock,
   Loader2,
-  Euro,
+  WalletCards,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -58,8 +58,11 @@ export const Route = createFileRoute("/_authenticated/admin/esteira")({
   component: EsteiraPage,
 });
 
-const eurFormatter = new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" });
-const formatEur = (cents: number | null | undefined) => eurFormatter.format((cents ?? 0) / 100);
+const formatMoney = (cents: number | null | undefined, currency = "EUR") =>
+  new Intl.NumberFormat(currency === "EUR" ? "pt-PT" : "pt-BR", {
+    style: "currency",
+    currency,
+  }).format((cents ?? 0) / 100);
 
 const STATUS_COLOR: Record<string, string> = {
   pendente: "bg-amber-100 text-amber-900",
@@ -101,7 +104,11 @@ type Order = {
   service_title: string;
   payment_status: "pendente" | "aprovado" | "recusado" | "estornado";
   delivery_status?:
-    "aguardando_pagamento" | "aguardando_documentos" | "processando" | "agendado" | "concluido";
+    | "aguardando_pagamento"
+    | "aguardando_documentos"
+    | "processando"
+    | "agendado"
+    | "concluido";
   voucher_code: string | null;
   created_at: string;
   executed_at: string | null;
@@ -109,6 +116,14 @@ type Order = {
   currency?: string;
   payment_amount_cents?: number | null;
   payment_currency?: string | null;
+  settled_amount_cents?: number | null;
+  settled_currency?: string | null;
+  payment_account_id?: string | null;
+  paid_at?: string | null;
+  fx_reference_rate?: number | null;
+  fx_reference_date?: string | null;
+  fx_rate?: number | null;
+  fx_source?: string | null;
   payment_method?: string | null;
   payment_url?: string | null;
   payment_provider_reference?: string | null;
@@ -124,7 +139,7 @@ function EsteiraPage() {
   const markManual = useServerFn(markOrderPaidManual);
   const cancel = useServerFn(cancelOrder);
   const refund = useServerFn(refundOrder);
-  const genLink = useServerFn(generateWisePaymentForOrder);
+  const fetchAccounts = useServerFn(listPaymentAccounts);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
@@ -140,6 +155,10 @@ function EsteiraPage() {
     order: Order;
   } | null>(null);
   const [reasonInput, setReasonInput] = useState("");
+  const [settledAmount, setSettledAmount] = useState("");
+  const [settledCurrency, setSettledCurrency] = useState<"BRL" | "EUR">("EUR");
+  const [paymentAccountId, setPaymentAccountId] = useState("");
+  const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
   const [linkModal, setLinkModal] = useState<{
     order: Order;
     loading: boolean;
@@ -160,6 +179,10 @@ function EsteiraPage() {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
     queryFn: () => fetchOrders() as unknown as Promise<Order[]>,
+  });
+  const { data: paymentAccounts = [] } = useQuery({
+    queryKey: ["payment-accounts"],
+    queryFn: () => fetchAccounts(),
   });
 
   const filtered = useMemo(() => {
@@ -216,11 +239,15 @@ function EsteiraPage() {
         new Date(o.created_at).getTime() < Date.now() - 1000 * 60 * 60 * 48,
     ).length;
     let eur = 0;
+    let brl = 0;
     for (const o of orders) {
       if (o.payment_status !== "aprovado") continue;
-      eur += o.amount_cents ?? 0;
+      const amount = o.settled_amount_cents ?? o.payment_amount_cents ?? o.amount_cents ?? 0;
+      const currency = o.settled_currency ?? o.payment_currency ?? o.currency;
+      if (currency === "BRL") brl += amount;
+      if (currency === "EUR") eur += amount;
     }
-    return { todayCount, waiting, paidToday, inExec, late, eur };
+    return { todayCount, waiting, paidToday, inExec, late, eur, brl };
   }, [orders]);
 
   const showVoucher = async (code: string) => {
@@ -235,66 +262,6 @@ function EsteiraPage() {
     refresh();
   };
 
-  const doGenLink = async (o: Order) => {
-    setLinkModal({ order: o, loading: true, reference: null, paymentUrl: null, error: null });
-    try {
-      const r = await genLink({ data: { id: o.id } });
-      setLinkModal({
-        order: o,
-        loading: false,
-        reference: r.reference ?? `EMP-${o.id}`,
-        paymentUrl: r.paymentUrl ?? null,
-        error: r.paymentUrl
-          ? null
-          : "Sem link Wise disponível. Configure o Quick Pay nas configurações de integração.",
-      });
-      refresh();
-    } catch (e) {
-      setLinkModal({
-        order: o,
-        loading: false,
-        reference: null,
-        paymentUrl: null,
-        error: e instanceof Error ? e.message : "Erro ao gerar link",
-      });
-    }
-  };
-
-  const doBankTransfer = async (o: Order) => {
-    setBankModal({
-      order: o,
-      loading: true,
-      error: null,
-      reference: null,
-      iban: null,
-      bic: null,
-      beneficiaryName: null,
-    });
-    try {
-      const r = await genLink({ data: { id: o.id } });
-      setBankModal({
-        order: o,
-        loading: false,
-        error: r.iban || r.bic ? null : "Dados bancários Wise não configurados.",
-        reference: r.reference ?? `EMP-${o.id}`,
-        iban: r.iban ?? null,
-        bic: r.bic ?? null,
-        beneficiaryName: r.beneficiaryName ?? null,
-      });
-      refresh();
-    } catch (e) {
-      setBankModal({
-        order: o,
-        loading: false,
-        error: e instanceof Error ? e.message : "Erro ao carregar dados bancários",
-        reference: null,
-        iban: null,
-        bic: null,
-        beneficiaryName: null,
-      });
-    }
-  };
-
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copiado`);
@@ -307,7 +274,21 @@ function EsteiraPage() {
     }
     try {
       const { kind, order } = actionPrompt;
-      if (kind === "manual") await markManual({ data: { id: order.id, reason: reasonInput } });
+      if (kind === "manual")
+        await markManual({
+          data: {
+            id: order.id,
+            reason: reasonInput,
+            settledAmountCents: Math.round(Number(settledAmount) * 100),
+            settledCurrency,
+            paymentAccountId,
+            paidAt,
+            fxReferenceRate: order.fx_reference_rate ?? null,
+            fxReferenceDate: order.fx_reference_date ?? null,
+            fxRate: order.fx_rate ?? null,
+            fxSource: order.fx_source ?? (order.fx_rate ? "MANUAL" : null),
+          },
+        });
       if (kind === "cancel") await cancel({ data: { id: order.id, reason: reasonInput } });
       if (kind === "refund") await refund({ data: { id: order.id, reason: reasonInput } });
       toast.success("Ação registrada");
@@ -357,7 +338,18 @@ function EsteiraPage() {
         />
         <AdminStatCard label="Em execução" value={summary.inExec} icon={Loader2} tone="blue" />
         <AdminStatCard label="Atrasados" value={summary.late} icon={AlertTriangle} tone="red" />
-        <AdminStatCard label="Receita" value={formatEur(summary.eur)} icon={Euro} tone="green" />
+        <AdminStatCard
+          label="Receita BRL"
+          value={formatMoney(summary.brl, "BRL")}
+          icon={WalletCards}
+          tone="green"
+        />
+        <AdminStatCard
+          label="Receita EUR"
+          value={formatMoney(summary.eur, "EUR")}
+          icon={WalletCards}
+          tone="green"
+        />
       </div>
 
       <BentoCard padded={false}>
@@ -451,7 +443,19 @@ function EsteiraPage() {
                       )}
                     </td>
                     <td className="p-3 text-admin-ink-soft">{o.service_title}</td>
-                    <td className="p-3 text-right tabular-nums">{formatEur(o.amount_cents)}</td>
+                    <td className="p-3 text-right tabular-nums">
+                      <div>{formatMoney(o.amount_cents, o.currency)}</div>
+                      {o.settled_amount_cents != null && (
+                        <div className="text-xs text-admin-ink-muted">
+                          Recebido:{" "}
+                          {formatMoney(
+                            o.settled_amount_cents,
+                            o.settled_currency ?? o.payment_currency ?? o.currency,
+                          )}
+                          {o.fx_rate ? ` · EUR → BRL · ${Number(o.fx_rate).toFixed(4)}` : ""}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-3" onClick={(e) => e.stopPropagation()}>
                       <span
                         className={`inline-block px-2 py-1 rounded text-xs uppercase tracking-wider ${
@@ -498,16 +502,6 @@ function EsteiraPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {o.payment_status !== "aprovado" && (
-                            <DropdownMenuItem onClick={() => doGenLink(o)}>
-                              <Link2 className="h-4 w-4 mr-2" /> Gerar link de pagamento
-                            </DropdownMenuItem>
-                          )}
-                          {o.payment_status !== "aprovado" && (
-                            <DropdownMenuItem onClick={() => doBankTransfer(o)}>
-                              <Landmark className="h-4 w-4 mr-2" /> Transferência bancária
-                            </DropdownMenuItem>
-                          )}
                           {o.payment_provider_reference && (
                             <DropdownMenuItem
                               onClick={() => {
@@ -523,9 +517,17 @@ function EsteiraPage() {
                               onClick={() => {
                                 setActionPrompt({ kind: "manual", order: o });
                                 setReasonInput("");
+                                setSettledCurrency(
+                                  (o.payment_currency ?? o.currency ?? "EUR") as "BRL" | "EUR",
+                                );
+                                setSettledAmount(
+                                  String((o.payment_amount_cents ?? o.amount_cents ?? 0) / 100),
+                                );
+                                setPaymentAccountId(o.payment_account_id ?? "");
+                                setPaidAt(new Date().toISOString().slice(0, 10));
                               }}
                             >
-                              <CheckCircle2 className="h-4 w-4 mr-2" /> Marcar pago manualmente
+                              <CheckCircle2 className="h-4 w-4 mr-2" /> Confirmar pagamento
                             </DropdownMenuItem>
                           )}
                           {!o.executed_at && o.payment_status === "aprovado" && (
@@ -796,7 +798,35 @@ function EsteiraPage() {
                 label="Conta vinculada"
                 value={selected.user_id ? "sim" : "não — pedido não aparece no portal"}
               />
-              <Row label="Valor" value={formatEur(selected.amount_cents)} />
+              <Row
+                label="Valor comercial"
+                value={formatMoney(selected.amount_cents, selected.currency)}
+              />
+              <Row
+                label="Cobrança prevista"
+                value={formatMoney(
+                  selected.payment_amount_cents,
+                  selected.payment_currency ?? selected.currency,
+                )}
+              />
+              {selected.settled_amount_cents != null && (
+                <Row
+                  label="Recebido"
+                  value={formatMoney(
+                    selected.settled_amount_cents,
+                    selected.settled_currency ?? selected.payment_currency ?? selected.currency,
+                  )}
+                />
+              )}
+              {selected.fx_reference_rate && (
+                <Row
+                  label="PTAX referência"
+                  value={Number(selected.fx_reference_rate).toFixed(4)}
+                />
+              )}
+              {selected.fx_rate && (
+                <Row label="Cotação aplicada" value={Number(selected.fx_rate).toFixed(4)} />
+              )}
               <Row label="Método" value={selected.payment_method ?? "—"} />
               <Row label="Pagamento" value={selected.payment_status} />
               <Row label="Execução" value={selected.delivery_status ?? "—"} />
@@ -820,13 +850,72 @@ function EsteiraPage() {
           <DialogHeader>
             <DialogTitle>
               {actionPrompt?.kind === "manual"
-                ? "Marcar como pago manualmente"
+                ? "Confirmar pagamento"
                 : actionPrompt?.kind === "cancel"
                   ? "Cancelar pedido"
                   : "Estornar pedido"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {actionPrompt?.kind === "manual" && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Data</Label>
+                    <Input
+                      type="date"
+                      value={paidAt}
+                      onChange={(event) => setPaidAt(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Valor realizado</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={settledAmount}
+                      onChange={(event) => setSettledAmount(event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Moeda</Label>
+                  <Select
+                    value={settledCurrency}
+                    onValueChange={(value) => {
+                      setSettledCurrency(value as "BRL" | "EUR");
+                      setPaymentAccountId("");
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BRL">BRL</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Conta</Label>
+                  <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentAccounts
+                        .filter((account) => account.currency === settledCurrency)
+                        .map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             <p className="text-sm text-muted-foreground">
               Informe o motivo (ficará registrado em audit_logs).
             </p>
@@ -836,7 +925,11 @@ function EsteiraPage() {
               rows={3}
               className="w-full border rounded p-2 text-sm"
             />
-            <Button onClick={runPrompt} className="w-full bg-admin-accent hover:bg-admin-accent/90">
+            <Button
+              disabled={actionPrompt?.kind === "manual" && (!paymentAccountId || !settledAmount)}
+              onClick={runPrompt}
+              className="w-full bg-admin-accent hover:bg-admin-accent/90"
+            >
               Confirmar
             </Button>
           </div>

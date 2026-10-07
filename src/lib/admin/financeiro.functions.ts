@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
+import { normalizeFinanceAccountName } from "@/lib/finance/accounts";
+import { confirmOrderPaymentInternal } from "./esteira.functions";
 
 type FinanceType = "income" | "expense";
 type FinanceStatus = "planned" | "pending" | "received" | "paid" | "overdue" | "canceled";
@@ -22,6 +24,7 @@ export type FinanceAccount = {
   type: string;
   currency: string;
   is_active: boolean;
+  normalized_name?: string;
 };
 
 export type FinanceTransaction = {
@@ -31,6 +34,14 @@ export type FinanceTransaction = {
   description: string;
   amount_cents: number;
   currency: string;
+  settled_amount_cents: number | null;
+  settled_currency: string | null;
+  reference_amount_cents: number | null;
+  reference_currency: string | null;
+  fx_reference_rate: number | null;
+  fx_rate: number | null;
+  fx_source: string | null;
+  fx_date: string | null;
   due_date: string;
   paid_at: string | null;
   category_id: string | null;
@@ -110,7 +121,7 @@ async function financeMeta() {
         .order("name"),
       db
         .from("finance_accounts")
-        .select("id, name, type, currency, is_active")
+        .select("id, name, type, currency, is_active, normalized_name")
         .eq("is_active", true)
         .order("name"),
     ]);
@@ -148,20 +159,23 @@ export const getFinanceOverview = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { start, end } = monthRange(data.month);
     const { categories, accounts } = await financeMeta();
+    const startPaidAt = `${start}T00:00:00.000Z`;
+    const endPaidAt = `${end}T23:59:59.999Z`;
     const { data: rows, error } = await db
       .from("finance_transactions")
       .select(
-        "id, type, status, description, amount_cents, currency, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
+        "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
       )
-      .gte("due_date", start)
-      .lte("due_date", end)
+      .or(
+        `and(due_date.gte.${start},due_date.lte.${end}),and(paid_at.gte.${startPaidAt},paid_at.lte.${endPaidAt})`,
+      )
       .order("due_date", { ascending: false })
       .limit(500);
     if (error) throw new Error(error.message);
 
     const txs = withNames((rows ?? []) as FinanceTransaction[], categories, accounts);
     const today = new Date().toISOString().slice(0, 10);
-    const totals = {
+    const emptyTotals = () => ({
       received: 0,
       receivable: 0,
       paid: 0,
@@ -169,42 +183,54 @@ export const getFinanceOverview = createServerFn({ method: "POST" })
       overdue: 0,
       realizedBalance: 0,
       projectedBalance: 0,
-    };
-    const byOrigin = new Map<string, number>();
-    const expenseByCategory = new Map<string, number>();
+    });
+    const totals = { BRL: emptyTotals(), EUR: emptyTotals() };
 
     for (const tx of txs) {
-      const signed = tx.type === "income" ? tx.amount_cents : -tx.amount_cents;
       const realized = tx.status === "received" || tx.status === "paid";
-      if (tx.status !== "canceled") totals.projectedBalance += signed;
-      if (realized) totals.realizedBalance += signed;
-      if (tx.type === "income" && tx.status === "received") totals.received += tx.amount_cents;
-      if (tx.type === "income" && ["planned", "pending", "overdue"].includes(tx.status)) {
-        totals.receivable += tx.amount_cents;
+      const dueInMonth = tx.due_date >= start && tx.due_date <= end;
+      const paidInMonth = !!tx.paid_at && tx.paid_at >= startPaidAt && tx.paid_at <= endPaidAt;
+      if (
+        realized &&
+        paidInMonth &&
+        (tx.settled_currency === "BRL" || tx.settled_currency === "EUR")
+      ) {
+        const bucket = totals[tx.settled_currency];
+        const amount = tx.settled_amount_cents ?? 0;
+        const signed = tx.type === "income" ? amount : -amount;
+        bucket.realizedBalance += signed;
+        if (tx.type === "income") bucket.received += amount;
+        else bucket.paid += amount;
       }
-      if (tx.type === "expense" && tx.status === "paid") totals.paid += tx.amount_cents;
-      if (tx.type === "expense" && ["planned", "pending", "overdue"].includes(tx.status)) {
-        totals.payable += tx.amount_cents;
+      if (
+        !realized &&
+        tx.status !== "canceled" &&
+        dueInMonth &&
+        (tx.currency === "BRL" || tx.currency === "EUR")
+      ) {
+        const bucket = totals[tx.currency];
+        const signed = tx.type === "income" ? tx.amount_cents : -tx.amount_cents;
+        bucket.projectedBalance += signed;
+        if (tx.type === "income") bucket.receivable += tx.amount_cents;
+        else bucket.payable += tx.amount_cents;
+        if (tx.due_date < today) bucket.overdue += tx.amount_cents;
       }
-      if (tx.status !== "canceled" && tx.due_date < today && !realized)
-        totals.overdue += tx.amount_cents;
-      if (tx.status !== "canceled")
-        byOrigin.set(tx.source_module, (byOrigin.get(tx.source_module) ?? 0) + signed);
-      if (tx.type === "expense" && tx.status !== "canceled") {
-        const key = tx.category_name ?? "Sem categoria";
-        expenseByCategory.set(key, (expenseByCategory.get(key) ?? 0) + tx.amount_cents);
-      }
+    }
+
+    for (const currency of ["BRL", "EUR"] as const) {
+      totals[currency].projectedBalance += totals[currency].realizedBalance;
     }
 
     return {
       totals,
-      byOrigin: Array.from(byOrigin, ([label, amount_cents]) => ({ label, amount_cents })),
-      expenseByCategory: Array.from(expenseByCategory, ([label, amount_cents]) => ({
-        label,
-        amount_cents,
-      })),
       pending: txs
-        .filter((tx) => tx.status !== "canceled" && !["received", "paid"].includes(tx.status))
+        .filter(
+          (tx) =>
+            tx.due_date >= start &&
+            tx.due_date <= end &&
+            tx.status !== "canceled" &&
+            !["received", "paid"].includes(tx.status),
+        )
         .sort((a, b) => a.due_date.localeCompare(b.due_date))
         .slice(0, 8),
       recent: txs.slice(0, 8),
@@ -235,7 +261,7 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
     let query = db
       .from("finance_transactions")
       .select(
-        "id, type, status, description, amount_cents, currency, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
+        "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
         { count: "exact" },
       )
       .gte("due_date", start)
@@ -292,6 +318,8 @@ export const createFinanceTransaction = createServerFn({ method: "POST" })
         currency: data.currency,
         due_date: data.dueDate,
         paid_at: paidAt,
+        settled_amount_cents: paidAt ? cents(data.amount) : null,
+        settled_currency: paidAt ? data.currency : null,
         category_id: data.categoryId ?? null,
         account_id: data.accountId ?? null,
         payment_method: data.paymentMethod ?? null,
@@ -344,6 +372,81 @@ export const updateFinanceTransactionStatus = createServerFn({ method: "POST" })
       old_status: current.status,
       new_status: finalStatus,
     });
+    return { ok: true };
+  });
+
+const settleInput = z.object({
+  id: z.string().uuid(),
+  paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  settledAmount: moneySchema,
+  settledCurrency: z.enum(["BRL", "EUR"]),
+  accountId: z.string().uuid(),
+  fxReferenceRate: z.number().positive().nullable().optional(),
+  fxReferenceDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
+  fxRate: z.number().positive().nullable().optional(),
+  fxSource: z.string().trim().max(40).nullable().optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+
+export const settleFinanceTransaction = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((input) => settleInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: tx, error: txError } = await db
+      .from("finance_transactions")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+    if (txError || !tx) throw new Error(txError?.message ?? "Lançamento não encontrado.");
+    if (tx.source_module === "pdv") throw new Error("Vendas PDV já são baixadas na origem.");
+    if (tx.source_module === "orders" && tx.source_id) {
+      return confirmOrderPaymentInternal(
+        {
+          orderId: tx.source_id,
+          paidAt: data.paidAt,
+          settledAmountCents: cents(data.settledAmount),
+          settledCurrency: data.settledCurrency,
+          paymentAccountId: data.accountId,
+          fxReferenceRate: data.fxReferenceRate,
+          fxReferenceDate: data.fxReferenceDate,
+          fxRate: data.fxRate,
+          fxSource: data.fxSource ?? null,
+          notes: data.notes,
+        },
+        context.userId,
+      );
+    }
+    if (tx.is_automatic)
+      throw new Error("Este lançamento automático deve ser corrigido no módulo de origem.");
+    const { data: account } = await db
+      .from("finance_accounts")
+      .select("currency,is_active")
+      .eq("id", data.accountId)
+      .single();
+    if (!account?.is_active || account.currency !== data.settledCurrency)
+      throw new Error("Selecione uma conta ativa na moeda realizada.");
+    const patch = {
+      status: tx.type === "income" ? "received" : "paid",
+      settled_amount_cents: cents(data.settledAmount),
+      settled_currency: data.settledCurrency,
+      paid_at: new Date(`${data.paidAt}T12:00:00.000Z`).toISOString(),
+      account_id: data.accountId,
+      fx_reference_rate: data.fxReferenceRate ?? null,
+      fx_rate: data.fxRate ?? null,
+      fx_source: data.fxSource ?? null,
+      fx_date: data.fxReferenceDate ?? null,
+      notes: data.notes ?? tx.notes,
+    };
+    const { error } = await db.from("finance_transactions").update(patch).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "finance.transaction.settle", data.id, {
+      old: tx,
+      new: patch,
+    } as Json);
     return { ok: true };
   });
 
@@ -483,9 +586,25 @@ export const createFinanceAccount = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    const { error } = await db
+    const normalizedName = normalizeFinanceAccountName(data.name);
+    const { data: existing } = await db
       .from("finance_accounts")
-      .insert({ name: data.name, type: data.type, currency: data.currency, is_active: true });
+      .select("id")
+      .eq("currency", data.currency)
+      .eq("normalized_name", normalizedName)
+      .maybeSingle();
+    if (existing) return { ok: true, id: existing.id as string, reused: true };
+    const { data: inserted, error } = await db
+      .from("finance_accounts")
+      .insert({
+        name: data.name.trim(),
+        normalized_name: normalizedName,
+        type: data.type,
+        currency: data.currency,
+        is_active: true,
+      })
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, id: inserted.id as string, reused: false };
   });

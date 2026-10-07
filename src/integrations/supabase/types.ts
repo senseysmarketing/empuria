@@ -1820,6 +1820,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          normalized_name: string
           type: string
           updated_at: string
         }
@@ -1829,6 +1830,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          normalized_name: string
           type?: string
           updated_at?: string
         }
@@ -1838,6 +1840,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          normalized_name?: string
           type?: string
           updated_at?: string
         }
@@ -1961,12 +1964,18 @@ export type Database = {
           description: string
           due_date: string
           fx_date: string | null
+          fx_reference_rate: number | null
           fx_rate: number | null
+          fx_source: string | null
           id: string
           is_automatic: boolean
           notes: string | null
           paid_at: string | null
           payment_method: string | null
+          reference_amount_cents: number | null
+          reference_currency: string | null
+          settled_amount_cents: number | null
+          settled_currency: string | null
           source_id: string | null
           source_module: string
           status: string
@@ -1984,12 +1993,18 @@ export type Database = {
           description: string
           due_date?: string
           fx_date?: string | null
+          fx_reference_rate?: number | null
           fx_rate?: number | null
+          fx_source?: string | null
           id?: string
           is_automatic?: boolean
           notes?: string | null
           paid_at?: string | null
           payment_method?: string | null
+          reference_amount_cents?: number | null
+          reference_currency?: string | null
+          settled_amount_cents?: number | null
+          settled_currency?: string | null
           source_id?: string | null
           source_module?: string
           status?: string
@@ -2007,12 +2022,18 @@ export type Database = {
           description?: string
           due_date?: string
           fx_date?: string | null
+          fx_reference_rate?: number | null
           fx_rate?: number | null
+          fx_source?: string | null
           id?: string
           is_automatic?: boolean
           notes?: string | null
           paid_at?: string | null
           payment_method?: string | null
+          reference_amount_cents?: number | null
+          reference_currency?: string | null
+          settled_amount_cents?: number | null
+          settled_currency?: string | null
           source_id?: string | null
           source_module?: string
           status?: string
@@ -2605,12 +2626,15 @@ export type Database = {
           external_reference: string | null
           fx_locked_at: string | null
           fx_rate: number | null
+          fx_reference_date: string | null
+          fx_reference_rate: number | null
           fx_source: string | null
           host_profile_id: string | null
           id: string
           notes: string | null
           paid_at: string | null
           payment_amount_cents: number | null
+          payment_account_id: string | null
           payment_currency: string | null
           payment_expires_at: string | null
           payment_method: string | null
@@ -2624,6 +2648,8 @@ export type Database = {
           service_id: string | null
           service_metadata: Json
           service_title: string
+          settled_amount_cents: number | null
+          settled_currency: string | null
           slot_id: string | null
           updated_at: string
           user_id: string | null
@@ -2641,12 +2667,15 @@ export type Database = {
           external_reference?: string | null
           fx_locked_at?: string | null
           fx_rate?: number | null
+          fx_reference_date?: string | null
+          fx_reference_rate?: number | null
           fx_source?: string | null
           host_profile_id?: string | null
           id?: string
           notes?: string | null
           paid_at?: string | null
           payment_amount_cents?: number | null
+          payment_account_id?: string | null
           payment_currency?: string | null
           payment_expires_at?: string | null
           payment_method?: string | null
@@ -2660,6 +2689,8 @@ export type Database = {
           service_id?: string | null
           service_metadata?: Json
           service_title: string
+          settled_amount_cents?: number | null
+          settled_currency?: string | null
           slot_id?: string | null
           updated_at?: string
           user_id?: string | null
@@ -2677,12 +2708,15 @@ export type Database = {
           external_reference?: string | null
           fx_locked_at?: string | null
           fx_rate?: number | null
+          fx_reference_date?: string | null
+          fx_reference_rate?: number | null
           fx_source?: string | null
           host_profile_id?: string | null
           id?: string
           notes?: string | null
           paid_at?: string | null
           payment_amount_cents?: number | null
+          payment_account_id?: string | null
           payment_currency?: string | null
           payment_expires_at?: string | null
           payment_method?: string | null
@@ -2696,12 +2730,21 @@ export type Database = {
           service_id?: string | null
           service_metadata?: Json
           service_title?: string
+          settled_amount_cents?: number | null
+          settled_currency?: string | null
           slot_id?: string | null
           updated_at?: string
           user_id?: string | null
           voucher_code?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_payment_account_id_fkey"
+            columns: ["payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_host_profile_id_fkey"
             columns: ["host_profile_id"]
