@@ -137,10 +137,10 @@ export function SettleTransactionPopover({
         settledAmount: Number(amount),
         settledCurrency: currency,
         accountId,
-        fxReferenceRate: conversion ? fxReferenceRate : null,
-        fxReferenceDate: conversion ? fxReferenceDate : null,
-        fxRate: conversion && fxRate ? Number(fxRate) : null,
-        fxSource: conversion ? (fxSource ?? "MANUAL") : null,
+        fxReferenceRate: conversion ? fxReferenceRate : undefined,
+        fxReferenceDate: conversion ? fxReferenceDate : undefined,
+        fxRate: conversion && fxRate ? Number(fxRate) : undefined,
+        fxSource: conversion ? (fxSource ?? "MANUAL") : undefined,
       }),
     onSuccess: () => {
       toast.success("Baixa confirmada");

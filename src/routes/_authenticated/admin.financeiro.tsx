@@ -40,18 +40,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
 import { FinanceAccountCombobox } from "@/components/admin/financeiro/FinanceAccountCombobox";
 import { SettleTransactionPopover } from "@/components/admin/financeiro/SettleTransactionPopover";
+import { FinanceTeamPanel } from "@/components/admin/financeiro/FinanceTeamPanel";
 import {
   createFinanceAccount,
   createFinanceCategory,
   createFinanceRecurringRule,
   createFinanceTransaction,
-  generateFinanceRecurringForMonth,
+  endFinanceRecurringRule,
   getFinanceOverview,
   listFinanceMeta,
   listFinanceRecurringRules,
   listFinanceTransactions,
   settleFinanceTransaction,
   toggleFinanceRecurringRule,
+  updateFinanceRecurringRule,
   updateFinanceTransactionStatus,
   type FinanceAccount,
   type FinanceCategory,
@@ -128,8 +130,9 @@ function FinanceiroContent() {
   const updateTxStatus = useServerFn(updateFinanceTransactionStatus);
   const settleTx = useServerFn(settleFinanceTransaction);
   const createRule = useServerFn(createFinanceRecurringRule);
+  const updateRule = useServerFn(updateFinanceRecurringRule);
+  const endRule = useServerFn(endFinanceRecurringRule);
   const toggleRule = useServerFn(toggleFinanceRecurringRule);
-  const generateRecurring = useServerFn(generateFinanceRecurringForMonth);
   const createCategory = useServerFn(createFinanceCategory);
   const createAccount = useServerFn(createFinanceAccount);
 
@@ -163,6 +166,7 @@ function FinanceiroContent() {
   const recurringQ = useQuery({
     queryKey: ["finance-recurring"],
     queryFn: () => fetchRecurring() as Promise<FinanceRecurringRule[]>,
+    enabled: tab === "recorrencias",
   });
 
   const refresh = () => {
@@ -179,15 +183,6 @@ function FinanceiroContent() {
       refresh();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao atualizar lancamento"),
-  });
-
-  const generateMutation = useMutation({
-    mutationFn: () => generateRecurring({ data: { month } }),
-    onSuccess: (result) => {
-      toast.success(`${result.inserted} recorrencia(s) verificadas para o mes`);
-      refresh();
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao gerar recorrencias"),
   });
 
   const categories = metaQ.data?.categories ?? [];
@@ -241,12 +236,6 @@ function FinanceiroContent() {
             createAccount={createAccount}
             onDone={refresh}
           />
-          <NewRecurringDialog
-            categories={categories}
-            accounts={accounts}
-            createRule={createRule}
-            onDone={refresh}
-          />
           <FinanceSettingsDialog
             createCategory={createCategory}
             createAccount={createAccount}
@@ -268,6 +257,12 @@ function FinanceiroContent() {
             className="data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
             Lancamentos
+          </TabsTrigger>
+          <TabsTrigger
+            value="equipe"
+            className="data-[state=active]:bg-admin-accent data-[state=active]:text-white"
+          >
+            Equipe & Repasses
           </TabsTrigger>
           <TabsTrigger
             value="recorrencias"
@@ -327,6 +322,18 @@ function FinanceiroContent() {
                       tone="amber"
                     />
                     <MetricCard
+                      label="Vencidos anteriores"
+                      value={money(
+                        (overview?.overduePrevious[currency] ?? []).reduce(
+                          (total, row) => total + row.amount_cents,
+                          0,
+                        ),
+                        currency,
+                      )}
+                      icon={CalendarClock}
+                      tone="red"
+                    />
+                    <MetricCard
                       label="Saldo realizado"
                       value={money(totals?.realizedBalance ?? 0, currency)}
                       icon={WalletCards}
@@ -348,6 +355,18 @@ function FinanceiroContent() {
                 <TransactionList
                   rows={overview?.pending ?? []}
                   empty="Nenhuma pendencia para o mes."
+                />
+              </BentoCard>
+              <BentoCard title="Vencidos anteriores · BRL" className="col-span-12 lg:col-span-6">
+                <TransactionList
+                  rows={(overview?.overduePrevious.BRL ?? []).slice(0, 8)}
+                  empty="Nenhuma pendência anterior em BRL."
+                />
+              </BentoCard>
+              <BentoCard title="Vencidos anteriores · EUR" className="col-span-12 lg:col-span-6">
+                <TransactionList
+                  rows={(overview?.overduePrevious.EUR ?? []).slice(0, 8)}
+                  empty="Nenhuma pendência anterior em EUR."
                 />
               </BentoCard>
               <BentoCard title="Ultimos lancamentos" className="col-span-12">
@@ -446,20 +465,20 @@ function FinanceiroContent() {
           </BentoCard>
         </TabsContent>
 
+        <TabsContent value="equipe" className="mt-0 space-y-4">
+          <FinanceTeamPanel month={month} accounts={accounts} onChanged={refresh} />
+        </TabsContent>
+
         <TabsContent value="recorrencias" className="mt-0 space-y-4">
           <div className="flex justify-end">
-            <Button
-              onClick={() => generateMutation.mutate()}
-              disabled={generateMutation.isPending}
-              className="gap-2"
-            >
-              {generateMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Gerar mes selecionado
-            </Button>
+            <NewRecurringDialog
+              categories={categories}
+              accounts={accounts}
+              createRule={createRule}
+              updateRule={updateRule}
+              onDone={refresh}
+              month={month}
+            />
           </div>
           <BentoCard title="Regras recorrentes">
             {recurringQ.isLoading ? (
@@ -469,11 +488,27 @@ function FinanceiroContent() {
             ) : (
               <RecurringTable
                 rows={recurringQ.data ?? []}
+                categories={categories}
+                accounts={accounts}
+                createRule={createRule}
+                updateRule={updateRule}
+                month={month}
+                onDone={refresh}
                 onToggle={(id, isActive) =>
                   toggleRule({ data: { id, isActive } }).then(() => {
                     toast.success("Recorrencia atualizada");
                     refresh();
                   })
+                }
+                onEnd={(id) =>
+                  endRule({ data: { id, endsOn: `${month}-01` } })
+                    .then(() => {
+                      toast.success("Recorrência encerrada");
+                      refresh();
+                    })
+                    .catch((error) =>
+                      toast.error(error instanceof Error ? error.message : "Erro ao encerrar"),
+                    )
                 }
               />
             )}
@@ -576,7 +611,9 @@ function TransactionTable({
         <tbody>
           {rows.map((tx) => {
             const canSettle =
-              tx.source_module !== "pdv" && !["received", "paid", "canceled"].includes(tx.status);
+              (["manual", "orders", "team_payout"].includes(tx.source_module) ||
+                tx.source_module.startsWith("recurring:")) &&
+              !["received", "paid", "canceled"].includes(tx.status);
             return (
               <tr key={tx.id} className="border-b border-admin-border last:border-0">
                 <td className="max-w-[260px] py-3 pr-3">
@@ -644,9 +681,23 @@ function TransactionTable({
 function RecurringTable({
   rows,
   onToggle,
+  onEnd,
+  categories,
+  accounts,
+  createRule,
+  updateRule,
+  month,
+  onDone,
 }: {
   rows: FinanceRecurringRule[];
   onToggle: (id: string, isActive: boolean) => void;
+  onEnd: (id: string) => void;
+  categories: FinanceCategory[];
+  accounts: FinanceAccount[];
+  createRule: ReturnType<typeof useServerFn<typeof createFinanceRecurringRule>>;
+  updateRule: ReturnType<typeof useServerFn<typeof updateFinanceRecurringRule>>;
+  month: string;
+  onDone: () => void;
 }) {
   if (!rows.length)
     return <p className="text-sm text-admin-ink-muted">Nenhuma recorrencia cadastrada.</p>;
@@ -656,7 +707,7 @@ function RecurringTable({
         <thead className="text-left text-xs uppercase tracking-wide text-admin-ink-muted">
           <tr className="border-b border-admin-border">
             <th className="py-3 pr-3">Descricao</th>
-            <th className="py-3 pr-3">Frequencia</th>
+            <th className="py-3 pr-3">Vigência</th>
             <th className="py-3 pr-3">Dia</th>
             <th className="py-3 pr-3">Categoria</th>
             <th className="py-3 pr-3 text-right">Valor</th>
@@ -667,7 +718,10 @@ function RecurringTable({
           {rows.map((rule) => (
             <tr key={rule.id} className="border-b border-admin-border last:border-0">
               <td className="py-3 pr-3 font-medium text-admin-ink">{rule.description}</td>
-              <td className="py-3 pr-3 text-admin-ink-muted">{rule.frequency}</td>
+              <td className="py-3 pr-3 text-admin-ink-muted">
+                {rule.starts_on.slice(0, 7)}
+                {rule.ends_on ? ` até ${rule.ends_on.slice(0, 7)}` : " em diante"}
+              </td>
               <td className="py-3 pr-3 text-admin-ink-muted">{rule.day_of_month}</td>
               <td className="py-3 pr-3 text-admin-ink-muted">
                 {rule.category_name ?? "Sem categoria"}
@@ -678,13 +732,29 @@ function RecurringTable({
                 {money(rule.amount_cents, rule.currency)}
               </td>
               <td className="py-3 pl-3 text-right">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onToggle(rule.id, !rule.is_active)}
-                >
-                  {rule.is_active ? "Ativa" : "Pausada"}
-                </Button>
+                <div className="flex justify-end gap-2">
+                  <NewRecurringDialog
+                    rule={rule}
+                    categories={categories}
+                    accounts={accounts}
+                    createRule={createRule}
+                    updateRule={updateRule}
+                    month={month}
+                    onDone={onDone}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onToggle(rule.id, !rule.is_active)}
+                  >
+                    {rule.is_active ? "Pausar" : "Reativar"}
+                  </Button>
+                  {!rule.ends_on && (
+                    <Button size="sm" variant="outline" onClick={() => onEnd(rule.id)}>
+                      Encerrar
+                    </Button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -911,31 +981,41 @@ function NewRecurringDialog({
   categories,
   accounts,
   createRule,
+  updateRule,
+  month,
+  rule,
   onDone,
 }: {
   categories: FinanceCategory[];
   accounts: FinanceAccount[];
   createRule: ReturnType<typeof useServerFn<typeof createFinanceRecurringRule>>;
+  updateRule: ReturnType<typeof useServerFn<typeof updateFinanceRecurringRule>>;
+  month: string;
+  rule?: FinanceRecurringRule;
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [type, setType] = useState<"income" | "expense">("expense");
+  const [type, setType] = useState<"income" | "expense">(rule?.type ?? "expense");
+  const [currency, setCurrency] = useState<"BRL" | "EUR">(rule?.currency === "EUR" ? "EUR" : "BRL");
+  const [categoryId, setCategoryId] = useState(rule?.category_id ?? "");
+  const [accountId, setAccountId] = useState(rule?.account_id ?? "");
   const mutation = useMutation({
-    mutationFn: (form: FormData) =>
-      createRule({
-        data: {
-          type,
-          description: String(form.get("description") ?? ""),
-          amount: Number(form.get("amount") ?? 0),
-          currency: String(form.get("currency") ?? "BRL") as "BRL" | "EUR" | "USD",
-          categoryId: emptyToNull(form.get("categoryId")),
-          accountId: emptyToNull(form.get("accountId")),
-          frequency: String(form.get("frequency") ?? "monthly") as "monthly" | "weekly" | "yearly",
-          dayOfMonth: Number(form.get("dayOfMonth") ?? 1),
-        },
-      }),
+    mutationFn: (form: FormData) => {
+      const data = {
+        type,
+        description: String(form.get("description") ?? ""),
+        amount: Number(form.get("amount") ?? 0),
+        currency,
+        categoryId: categoryId || null,
+        accountId: accountId || null,
+        dayOfMonth: Number(form.get("dayOfMonth") ?? 1),
+        startsOn: `${String(form.get("startsOn") ?? month).slice(0, 7)}-01`,
+        endsOn: form.get("endsOn") ? `${String(form.get("endsOn")).slice(0, 7)}-01` : null,
+      };
+      return rule ? updateRule({ data: { ...data, id: rule.id } }) : createRule({ data });
+    },
     onSuccess: () => {
-      toast.success("Recorrencia criada");
+      toast.success(rule ? "Recorrência atualizada" : "Recorrência criada");
       setOpen(false);
       onDone();
     },
@@ -946,12 +1026,12 @@ function NewRecurringDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
-          <CalendarClock className="h-4 w-4" /> Nova recorrencia
+          {!rule && <CalendarClock className="h-4 w-4" />} {rule ? "Editar" : "Nova recorrência"}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nova recorrencia</DialogTitle>
+          <DialogTitle>{rule ? "Editar recorrência" : "Nova recorrência mensal"}</DialogTitle>
         </DialogHeader>
         <form
           className="space-y-4"
@@ -972,43 +1052,108 @@ function NewRecurringDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Frequencia">
-              <Select name="frequency" defaultValue="monthly">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="yearly">Anual</SelectItem>
-                </SelectContent>
-              </Select>
+            <Field label="Frequência">
+              <Input value="Mensal" disabled />
             </Field>
           </div>
           <Field label="Descricao">
-            <Input name="description" required />
+            <Input name="description" defaultValue={rule?.description ?? ""} required />
           </Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Valor">
-              <Input name="amount" type="number" min="0" step="0.01" required />
+              <Input
+                name="amount"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={rule ? rule.amount_cents / 100 : ""}
+                required
+              />
             </Field>
             <Field label="Moeda">
-              <Select name="currency" defaultValue="BRL">
+              <Select
+                value={currency}
+                onValueChange={(value) => {
+                  setCurrency(value as "BRL" | "EUR");
+                  setAccountId("");
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BRL">BRL</SelectItem>
                   <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
             <Field label="Dia">
-              <Input name="dayOfMonth" type="number" min="1" max="31" defaultValue="1" />
+              <Input
+                name="dayOfMonth"
+                type="number"
+                min="1"
+                max="31"
+                defaultValue={rule?.day_of_month ?? 1}
+              />
             </Field>
           </div>
-          <CategoryAccountFields categories={categories} accounts={accounts} type={type} />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Início (mês)">
+              <Input
+                name="startsOn"
+                type="month"
+                defaultValue={rule?.starts_on.slice(0, 7) ?? month}
+                required
+              />
+            </Field>
+            <Field label="Fim (opcional)">
+              <Input name="endsOn" type="month" defaultValue={rule?.ends_on?.slice(0, 7) ?? ""} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Categoria">
+              <Select
+                value={categoryId || "none"}
+                onValueChange={(value) => setCategoryId(value === "none" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem categoria</SelectItem>
+                  {categories
+                    .filter(
+                      (item) => item.is_active && (item.type === type || item.type === "both"),
+                    )
+                    .map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Conta">
+              <Select
+                value={accountId || "none"}
+                onValueChange={(value) => setAccountId(value === "none" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem conta</SelectItem>
+                  {accounts
+                    .filter((item) => item.is_active && item.currency === currency)
+                    .map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
           <Button type="submit" disabled={mutation.isPending} className="w-full">
             {mutation.isPending ? "Salvando..." : "Salvar recorrencia"}
           </Button>

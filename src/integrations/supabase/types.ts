@@ -1876,6 +1876,205 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_payees: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          profile_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          profile_id?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          profile_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_payees_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payees_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_payout_rules: {
+        Row: {
+          amount_cents: number | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          day_of_month: number | null
+          ends_on: string | null
+          id: string
+          is_active: boolean
+          payee_id: string
+          percentage: number | null
+          rule_type: string
+          service_id: string | null
+          starts_on: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          day_of_month?: number | null
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          payee_id: string
+          percentage?: number | null
+          rule_type: string
+          service_id?: string | null
+          starts_on: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          day_of_month?: number | null
+          ends_on?: string | null
+          id?: string
+          is_active?: boolean
+          payee_id?: string
+          percentage?: number | null
+          rule_type?: string
+          service_id?: string | null
+          starts_on?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_payout_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payout_rules_payee_id_fkey"
+            columns: ["payee_id"]
+            isOneToOne: false
+            referencedRelation: "finance_payees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payout_rules_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_payouts: {
+        Row: {
+          amount_cents: number
+          base_amount_cents: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          finance_transaction_id: string | null
+          generated_at: string
+          id: string
+          payee_id: string
+          percentage: number | null
+          period_month: string
+          rule_id: string
+        }
+        Insert: {
+          amount_cents: number
+          base_amount_cents: number
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          finance_transaction_id?: string | null
+          generated_at?: string
+          id?: string
+          payee_id: string
+          percentage?: number | null
+          period_month: string
+          rule_id: string
+        }
+        Update: {
+          amount_cents?: number
+          base_amount_cents?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          finance_transaction_id?: string | null
+          generated_at?: string
+          id?: string
+          payee_id?: string
+          percentage?: number | null
+          period_month?: string
+          rule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_payouts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payouts_finance_transaction_id_fkey"
+            columns: ["finance_transaction_id"]
+            isOneToOne: true
+            referencedRelation: "finance_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payouts_payee_id_fkey"
+            columns: ["payee_id"]
+            isOneToOne: false
+            referencedRelation: "finance_payees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payouts_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "finance_payout_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
       finance_recurring_rules: {
         Row: {
           account_id: string | null
@@ -1887,10 +2086,12 @@ export type Database = {
           currency: string
           day_of_month: number
           description: string
+          ends_on: string | null
           frequency: string
           id: string
           is_active: boolean
           next_run_at: string | null
+          starts_on: string
           type: string
           updated_at: string
         }
@@ -1904,10 +2105,12 @@ export type Database = {
           currency?: string
           day_of_month?: number
           description: string
+          ends_on?: string | null
           frequency?: string
           id?: string
           is_active?: boolean
           next_run_at?: string | null
+          starts_on?: string
           type: string
           updated_at?: string
         }
@@ -1921,10 +2124,12 @@ export type Database = {
           currency?: string
           day_of_month?: number
           description?: string
+          ends_on?: string | null
           frequency?: string
           id?: string
           is_active?: boolean
           next_run_at?: string | null
+          starts_on?: string
           type?: string
           updated_at?: string
         }
@@ -4062,6 +4267,30 @@ export type Database = {
       finance_category_id: {
         Args: { p_name: string; p_type: string }
         Returns: string
+      }
+      finance_ensure_month: {
+        Args: { p_actor?: string; p_month: string }
+        Returns: undefined
+      }
+      finance_materialize_payout: {
+        Args: { p_actor?: string; p_currency: string; p_month: string; p_rule_id: string }
+        Returns: string
+      }
+      finance_payout_base: {
+        Args: { p_currency: string; p_month: string; p_rule_id: string }
+        Returns: number
+      }
+      finance_payout_projection: {
+        Args: { p_month: string }
+        Returns: {
+          base_amount_cents: number
+          currency: string
+          payee_id: string
+          payout_id: string
+          percentage: number
+          projected_amount_cents: number
+          rule_id: string
+        }[]
       }
       finance_sync_order: { Args: { p_order_id: string }; Returns: undefined }
       finance_sync_pdv_sale: { Args: { p_sale_id: string }; Returns: undefined }

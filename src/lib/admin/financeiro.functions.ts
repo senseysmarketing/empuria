@@ -8,7 +8,6 @@ import { confirmOrderPaymentInternal } from "./esteira.functions";
 
 type FinanceType = "income" | "expense";
 type FinanceStatus = "planned" | "pending" | "received" | "paid" | "overdue" | "canceled";
-type FinanceFrequency = "monthly" | "weekly" | "yearly";
 
 export type FinanceCategory = {
   id: string;
@@ -64,8 +63,10 @@ export type FinanceRecurringRule = {
   currency: string;
   category_id: string | null;
   account_id: string | null;
-  frequency: FinanceFrequency;
+  frequency: "monthly";
   day_of_month: number;
+  starts_on: string;
+  ends_on: string | null;
   is_active: boolean;
   next_run_at: string | null;
   created_at: string;
@@ -77,10 +78,12 @@ const db = supabaseAdmin as unknown as {
   // Tables are introduced by this migration before Supabase types are regenerated.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rpc: (name: string, args?: Record<string, unknown>) => any;
 };
 
 const moneySchema = z.number().finite().min(0).max(99_999_999);
-const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
+const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 function monthRange(month: string) {
   const [year, m] = month.split("-").map(Number);
@@ -94,6 +97,26 @@ function monthRange(month: string) {
 
 function cents(value: number) {
   return Math.round(value * 100);
+}
+
+async function ensureFinanceMonth(month: string, actorId?: string) {
+  const { error } = await db.rpc("finance_ensure_month", {
+    p_month: `${month}-01`,
+    p_actor: actorId ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function validateRuleAccount(accountId: string | null | undefined, currency: string) {
+  if (!accountId) return;
+  const { data: account, error } = await db
+    .from("finance_accounts")
+    .select("currency,is_active")
+    .eq("id", accountId)
+    .maybeSingle();
+  if (error || !account?.is_active || account.currency !== currency) {
+    throw new Error("Selecione uma conta ativa na moeda da recorrência.");
+  }
 }
 
 function withNames<T extends { category_id: string | null; account_id: string | null }>(
@@ -157,6 +180,7 @@ export const getFinanceOverview = createServerFn({ method: "POST" })
   .middleware([requireModule("financeiro")])
   .inputValidator((d) => z.object({ month: monthSchema }).parse(d))
   .handler(async ({ data }) => {
+    await ensureFinanceMonth(data.month);
     const { start, end } = monthRange(data.month);
     const { categories, accounts } = await financeMeta();
     const startPaidAt = `${start}T00:00:00.000Z`;
@@ -172,6 +196,17 @@ export const getFinanceOverview = createServerFn({ method: "POST" })
       .order("due_date", { ascending: false })
       .limit(500);
     if (error) throw new Error(error.message);
+
+    const { data: previousRows, error: previousError } = await db
+      .from("finance_transactions")
+      .select(
+        "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
+      )
+      .in("status", ["planned", "pending", "overdue"])
+      .lt("due_date", start)
+      .order("due_date", { ascending: true })
+      .limit(500);
+    if (previousError) throw new Error(previousError.message);
 
     const txs = withNames((rows ?? []) as FinanceTransaction[], categories, accounts);
     const today = new Date().toISOString().slice(0, 10);
@@ -223,6 +258,18 @@ export const getFinanceOverview = createServerFn({ method: "POST" })
 
     return {
       totals,
+      overduePrevious: {
+        BRL: withNames(
+          ((previousRows ?? []) as FinanceTransaction[]).filter((row) => row.currency === "BRL"),
+          categories,
+          accounts,
+        ),
+        EUR: withNames(
+          ((previousRows ?? []) as FinanceTransaction[]).filter((row) => row.currency === "EUR"),
+          categories,
+          accounts,
+        ),
+      },
       pending: txs
         .filter(
           (tx) =>
@@ -256,6 +303,7 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
+    await ensureFinanceMonth(data.month);
     const { start, end } = monthRange(data.month);
     const { categories, accounts } = await financeMeta();
     let query = db
@@ -415,13 +463,19 @@ export const settleFinanceTransaction = createServerFn({ method: "POST" })
           fxReferenceRate: data.fxReferenceRate,
           fxReferenceDate: data.fxReferenceDate,
           fxRate: data.fxRate,
-          fxSource: data.fxSource ?? null,
+          fxSource: data.fxSource,
           notes: data.notes,
         },
         context.userId,
       );
     }
-    if (tx.is_automatic)
+    if (["received", "paid", "canceled"].includes(tx.status))
+      throw new Error("Este lançamento não está pendente de baixa.");
+    if (
+      tx.is_automatic &&
+      tx.source_module !== "team_payout" &&
+      !tx.source_module.startsWith("recurring:")
+    )
       throw new Error("Este lançamento automático deve ser corrigido no módulo de origem.");
     const { data: account } = await db
       .from("finance_accounts")
@@ -455,11 +509,16 @@ const recurringInput = z.object({
   type: z.enum(["income", "expense"]),
   description: z.string().trim().min(3).max(180),
   amount: moneySchema,
-  currency: z.enum(["BRL", "EUR", "USD"]).default("BRL"),
+  currency: z.enum(["BRL", "EUR"]),
   categoryId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
-  frequency: z.enum(["monthly", "weekly", "yearly"]).default("monthly"),
   dayOfMonth: z.number().int().min(1).max(31).default(1),
+  startsOn: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/),
+  endsOn: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])-01$/)
+    .nullable()
+    .optional(),
 });
 
 export const listFinanceRecurringRules = createServerFn({ method: "GET" })
@@ -469,7 +528,7 @@ export const listFinanceRecurringRules = createServerFn({ method: "GET" })
     const { data, error } = await db
       .from("finance_recurring_rules")
       .select(
-        "id, type, description, amount_cents, currency, category_id, account_id, frequency, day_of_month, is_active, next_run_at, created_at",
+        "id, type, description, amount_cents, currency, category_id, account_id, frequency, day_of_month, starts_on, ends_on, is_active, next_run_at, created_at",
       )
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -480,6 +539,8 @@ export const createFinanceRecurringRule = createServerFn({ method: "POST" })
   .middleware([requireModule("financeiro")])
   .inputValidator((d) => recurringInput.parse(d))
   .handler(async ({ data, context }) => {
+    if (data.endsOn && data.endsOn < data.startsOn) throw new Error("Fim anterior ao início.");
+    await validateRuleAccount(data.accountId, data.currency);
     const { data: inserted, error } = await db
       .from("finance_recurring_rules")
       .insert({
@@ -489,8 +550,10 @@ export const createFinanceRecurringRule = createServerFn({ method: "POST" })
         currency: data.currency,
         category_id: data.categoryId ?? null,
         account_id: data.accountId ?? null,
-        frequency: data.frequency,
+        frequency: "monthly",
         day_of_month: data.dayOfMonth,
+        starts_on: data.startsOn,
+        ends_on: data.endsOn ?? null,
         is_active: true,
         created_by: context.userId,
       })
@@ -499,6 +562,55 @@ export const createFinanceRecurringRule = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     await audit(context.userId, "finance.recurring.create", inserted.id, inserted as Json);
     return { ok: true, id: inserted.id as string };
+  });
+
+export const updateFinanceRecurringRule = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) => recurringInput.extend({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    if (data.endsOn && data.endsOn < data.startsOn) throw new Error("Fim anterior ao início.");
+    await validateRuleAccount(data.accountId, data.currency);
+    const { error } = await db
+      .from("finance_recurring_rules")
+      .update({
+        type: data.type,
+        description: data.description,
+        amount_cents: cents(data.amount),
+        currency: data.currency,
+        category_id: data.categoryId ?? null,
+        account_id: data.accountId ?? null,
+        day_of_month: data.dayOfMonth,
+        starts_on: data.startsOn,
+        ends_on: data.endsOn ?? null,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "finance.recurring.update", data.id, data as Json);
+    return { ok: true };
+  });
+
+export const endFinanceRecurringRule = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) =>
+    z
+      .object({ id: z.string().uuid(), endsOn: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/) })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: rule, error: fetchError } = await db
+      .from("finance_recurring_rules")
+      .select("starts_on")
+      .eq("id", data.id)
+      .single();
+    if (fetchError || !rule) throw new Error("Recorrência não encontrada.");
+    if (data.endsOn < rule.starts_on) throw new Error("Fim anterior ao início.");
+    const { error } = await db
+      .from("finance_recurring_rules")
+      .update({ ends_on: data.endsOn, is_active: false })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "finance.recurring.end", data.id, { ends_on: data.endsOn });
+    return { ok: true };
   });
 
 export const toggleFinanceRecurringRule = createServerFn({ method: "POST" })
@@ -512,49 +624,6 @@ export const toggleFinanceRecurringRule = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     await audit(context.userId, "finance.recurring.toggle", data.id, { is_active: data.isActive });
     return { ok: true };
-  });
-
-export const generateFinanceRecurringForMonth = createServerFn({ method: "POST" })
-  .middleware([requireModule("financeiro")])
-  .inputValidator((d) => z.object({ month: monthSchema }).parse(d))
-  .handler(async ({ data, context }) => {
-    const [year, month] = data.month.split("-").map(Number);
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    const { data: rules, error } = await db
-      .from("finance_recurring_rules")
-      .select("*")
-      .eq("is_active", true);
-    if (error) throw new Error(error.message);
-    const today = new Date().toISOString().slice(0, 10);
-    const rows = ((rules ?? []) as FinanceRecurringRule[]).map((rule) => {
-      const day = Math.min(rule.day_of_month, lastDay);
-      const dueDate = `${data.month}-${String(day).padStart(2, "0")}`;
-      return {
-        type: rule.type,
-        status: dueDate > today ? "planned" : "pending",
-        description: rule.description,
-        amount_cents: rule.amount_cents,
-        currency: rule.currency,
-        due_date: dueDate,
-        category_id: rule.category_id,
-        account_id: rule.account_id,
-        source_module: `recurring:${data.month}`,
-        source_id: rule.id,
-        is_automatic: true,
-        notes: `Gerado por recorrencia ${rule.frequency}`,
-        created_by: context.userId,
-      };
-    });
-    if (!rows.length) return { ok: true, inserted: 0 };
-    const { error: insertErr } = await db
-      .from("finance_transactions")
-      .upsert(rows, { onConflict: "source_module,source_id", ignoreDuplicates: true });
-    if (insertErr) throw new Error(insertErr.message);
-    await audit(context.userId, "finance.recurring.generate", null, {
-      month: data.month,
-      count: rows.length,
-    });
-    return { ok: true, inserted: rows.length };
   });
 
 export const createFinanceCategory = createServerFn({ method: "POST" })
