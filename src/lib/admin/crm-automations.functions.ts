@@ -200,7 +200,7 @@ function messageForStep(step: AutomationStep, lead: LeadRow) {
 }
 
 async function canManageAutomations(_userId: string, _isAdmin?: boolean) {
-  // Módulo "automacoes" (ou admin) já é validado pelo middleware requireModule("automacoes").
+  // A central agora faz parte do CRM; o middleware do módulo protege todas as ações visuais.
   return true;
 }
 
@@ -211,7 +211,6 @@ async function canPauseAutomations(_userId: string, _isAdmin?: boolean) {
 async function canCancelPending(_userId: string, _isAdmin?: boolean) {
   return true;
 }
-
 
 async function assertManage(userId: string, isAdmin?: boolean) {
   if (!(await canManageAutomations(userId, isAdmin))) {
@@ -240,7 +239,11 @@ async function logAutomation(event: {
 }
 
 async function incrementMetric(flowId: string, key: string, amount = 1) {
-  await db.rpc("crm_automation_increment_metric", { p_flow_id: flowId, p_key: key, p_amount: amount });
+  await db.rpc("crm_automation_increment_metric", {
+    p_flow_id: flowId,
+    p_key: key,
+    p_amount: amount,
+  });
 }
 
 async function getFlowSteps(flowId: string) {
@@ -295,7 +298,11 @@ async function scheduleStep({
   if (error) throw new Error(error.message);
 }
 
-async function stopExecution(execution: AutomationExecution, reason: string, stepId?: string | null) {
+async function stopExecution(
+  execution: AutomationExecution,
+  reason: string,
+  stepId?: string | null,
+) {
   const stoppedAt = new Date().toISOString();
   await Promise.all([
     db
@@ -388,12 +395,15 @@ async function completeExecution(execution: AutomationExecution, stepId?: string
 }
 
 async function processStep(action: PendingAction) {
-  const [{ data: execution, error: executionError }, { data: flow, error: flowError }, { data: lead, error: leadError }] =
-    await Promise.all([
-      db.from("crm_automation_executions").select("*").eq("id", action.execution_id).single(),
-      db.from("crm_automation_flows").select("*").eq("id", action.flow_id).single(),
-      db.from("leads").select("*").eq("id", action.lead_id).single(),
-    ]);
+  const [
+    { data: execution, error: executionError },
+    { data: flow, error: flowError },
+    { data: lead, error: leadError },
+  ] = await Promise.all([
+    db.from("crm_automation_executions").select("*").eq("id", action.execution_id).single(),
+    db.from("crm_automation_flows").select("*").eq("id", action.flow_id).single(),
+    db.from("leads").select("*").eq("id", action.lead_id).single(),
+  ]);
   if (executionError) throw new Error(executionError.message);
   if (flowError) throw new Error(flowError.message);
   if (leadError) throw new Error(leadError.message);
@@ -418,7 +428,10 @@ async function processStep(action: PendingAction) {
   }
 
   const now = new Date();
-  if (step.step_type === "send_whatsapp" && !isWithinWindow(now, defaultScheduleWindow(flowRow.schedule_window))) {
+  if (
+    step.step_type === "send_whatsapp" &&
+    !isWithinWindow(now, defaultScheduleWindow(flowRow.schedule_window))
+  ) {
     const nextRun = nextAllowedRunAt(now, defaultScheduleWindow(flowRow.schedule_window));
     await db
       .from("crm_automation_pending_actions")
@@ -460,7 +473,9 @@ async function processStep(action: PendingAction) {
       return;
     }
 
-    if ((await messagesSentInExecution(executionRow.id)) >= Number(rules.max_messages_per_lead ?? 4)) {
+    if (
+      (await messagesSentInExecution(executionRow.id)) >= Number(rules.max_messages_per_lead ?? 4)
+    ) {
       await stopExecution(executionRow, "max_messages_reached", step.id);
       return;
     }
@@ -531,7 +546,10 @@ async function processStep(action: PendingAction) {
     if (step.config.action === "move_stage" && typeof step.config.stage === "string") {
       await db
         .from("leads")
-        .update({ pipeline_stage: step.config.stage, last_interaction_at: new Date().toISOString() })
+        .update({
+          pipeline_stage: step.config.stage,
+          last_interaction_at: new Date().toISOString(),
+        })
         .eq("id", leadRow.id);
     }
     await logAutomation({
@@ -570,7 +588,11 @@ async function processStep(action: PendingAction) {
 async function processPendingAction(action: PendingAction) {
   const { data: locked, error: lockError } = await db
     .from("crm_automation_pending_actions")
-    .update({ status: "locked", locked_at: new Date().toISOString(), attempts: action.attempts + 1 })
+    .update({
+      status: "locked",
+      locked_at: new Date().toISOString(),
+      attempts: action.attempts + 1,
+    })
     .eq("id", action.id)
     .eq("status", "pending")
     .select("*")
@@ -603,7 +625,11 @@ async function processPendingAction(action: PendingAction) {
           .eq("id", action.id),
         db
           .from("crm_automation_executions")
-          .update({ status: "failed", last_error: message, last_activity_at: new Date().toISOString() })
+          .update({
+            status: "failed",
+            last_error: message,
+            last_activity_at: new Date().toISOString(),
+          })
           .eq("id", action.execution_id),
         logAutomation({
           executionId: action.execution_id,
@@ -643,8 +669,14 @@ export async function processCrmAutomationPendingActionsInternal(limit = 30) {
   };
 }
 
-function flowMatchesLead(flow: AutomationFlow, triggerType: string, lead: LeadRow, payload?: Record<string, any>) {
-  if (flow.status !== "active" || flow.is_deleted || flow.trigger_type !== triggerType) return false;
+function flowMatchesLead(
+  flow: AutomationFlow,
+  triggerType: string,
+  lead: LeadRow,
+  payload?: Record<string, any>,
+) {
+  if (flow.status !== "active" || flow.is_deleted || flow.trigger_type !== triggerType)
+    return false;
   if (triggerType === "pipeline_stage_entered") {
     const stage = flow.trigger_config?.stage;
     if (stage && stage !== lead.pipeline_stage && stage !== payload?.stage) return false;
@@ -736,20 +768,11 @@ export async function startMatchingCrmAutomationsForLead(input: {
 }
 
 export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
-  .middleware([requireModule("automacoes")])
+  .middleware([requireModule("crm")])
   .handler(async ({ context }) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const [
-      flowsRes,
-      stepsRes,
-      executionsRes,
-      pendingRes,
-      logsRes,
-      sentTodayRes,
-      replyRes,
-      errorRes,
-    ] = await Promise.all([
+    const [flowsRes, stepsRes] = await Promise.all([
       db
         .from("crm_automation_flows")
         .select("*")
@@ -760,23 +783,37 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
         .select("*")
         .eq("is_deleted", false)
         .order("position", { ascending: true }),
-      db
-        .from("crm_automation_executions")
-        .select("id, flow_id, lead_id, status, current_step_id, started_at, last_activity_at, last_error")
-        .in("status", ["running", "waiting"])
-        .order("last_activity_at", { ascending: false })
-        .limit(200),
+    ]);
+    if (flowsRes.error) throw new Error(flowsRes.error.message);
+    if (stepsRes.error) throw new Error(stepsRes.error.message);
+    const flows = (flowsRes.data ?? []) as AutomationFlow[];
+
+    const [
+      pendingRes,
+      logsRes,
+      pendingCountRes,
+      sentTodayRes,
+      replyRes,
+      errorRes,
+      activeCountResults,
+    ] = await Promise.all([
       db
         .from("crm_automation_pending_actions")
-        .select("*, leads(full_name, phone), crm_automation_flows(name), crm_automation_steps(title, step_type)")
+        .select(
+          "*, leads(full_name, phone), crm_automation_flows(name), crm_automation_steps(title, step_type)",
+        )
         .eq("status", "pending")
         .order("run_at", { ascending: true })
-        .limit(80),
+        .limit(20),
       db
         .from("crm_automation_execution_logs")
         .select("*, leads(full_name), crm_automation_flows(name), crm_automation_steps(title)")
         .order("created_at", { ascending: false })
-        .limit(120),
+        .limit(30),
+      db
+        .from("crm_automation_pending_actions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
       db
         .from("crm_automation_execution_logs")
         .select("id", { count: "exact", head: true })
@@ -792,26 +829,34 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
         .select("id", { count: "exact", head: true })
         .eq("event_type", "send_error")
         .gte("created_at", today.toISOString()),
+      Promise.all(
+        flows.map((flow) =>
+          db
+            .from("crm_automation_executions")
+            .select("id", { count: "exact", head: true })
+            .eq("flow_id", flow.id)
+            .in("status", ["running", "waiting"]),
+        ),
+      ),
     ]);
 
-    for (const res of [flowsRes, stepsRes, executionsRes, pendingRes, logsRes]) {
+    for (const res of [pendingRes, logsRes, pendingCountRes]) {
       if (res.error) throw new Error(res.error.message);
     }
     if (sentTodayRes.error) throw new Error(sentTodayRes.error.message);
     if (replyRes.error) throw new Error(replyRes.error.message);
     if (errorRes.error) throw new Error(errorRes.error.message);
 
-    const flows = (flowsRes.data ?? []) as AutomationFlow[];
     const steps = (stepsRes.data ?? []) as AutomationStep[];
-    const executions = (executionsRes.data ?? []) as AutomationExecution[];
     const stepsByFlow = new Map<string, AutomationStep[]>();
     for (const step of steps) {
       if (!stepsByFlow.has(step.flow_id)) stepsByFlow.set(step.flow_id, []);
       stepsByFlow.get(step.flow_id)!.push(step);
     }
     const activeByFlow = new Map<string, number>();
-    for (const execution of executions) {
-      activeByFlow.set(execution.flow_id, (activeByFlow.get(execution.flow_id) ?? 0) + 1);
+    for (const [index, result] of activeCountResults.entries()) {
+      if (result.error) throw new Error(result.error.message);
+      activeByFlow.set(flows[index].id, result.count ?? 0);
     }
 
     return {
@@ -824,7 +869,7 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
       logs: logsRes.data ?? [],
       metrics: {
         activeFlows: flows.filter((flow) => flow.status === "active").length,
-        nextSends: (pendingRes.data ?? []).length,
+        nextSends: pendingCountRes.count ?? 0,
         messagesSentToday: sentTodayRes.count ?? 0,
         repliesToday: replyRes.count ?? 0,
         errorsToday: errorRes.count ?? 0,
@@ -842,7 +887,7 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
   });
 
 export const saveCrmAutomationFlow = createServerFn({ method: "POST" })
-  .middleware([requireModule("automacoes")])
+  .middleware([requireModule("crm")])
   .inputValidator((d) => flowInputSchema.parse(d))
   .handler(async ({ data, context }) => {
     await assertManage(context.userId, context.isAdmin);
@@ -863,10 +908,7 @@ export const saveCrmAutomationFlow = createServerFn({ method: "POST" })
       : await db.from("crm_automation_flows").insert(payload).select("*").single();
     if (error) throw new Error(error.message);
 
-    await db
-      .from("crm_automation_steps")
-      .update({ is_deleted: true })
-      .eq("flow_id", flow.id);
+    await db.from("crm_automation_steps").update({ is_deleted: true }).eq("flow_id", flow.id);
 
     for (const step of data.steps.sort((a, b) => a.position - b.position)) {
       const row = {
@@ -893,7 +935,7 @@ export const saveCrmAutomationFlow = createServerFn({ method: "POST" })
   });
 
 export const updateCrmAutomationFlowStatus = createServerFn({ method: "POST" })
-  .middleware([requireModule("automacoes")])
+  .middleware([requireModule("crm")])
   .inputValidator((d) =>
     z.object({ id: z.string().uuid(), status: z.enum(["active", "paused", "archived"]) }).parse(d),
   )
@@ -906,7 +948,10 @@ export const updateCrmAutomationFlowStatus = createServerFn({ method: "POST" })
       await assertManage(context.userId, context.isAdmin);
     }
 
-    const { error } = await db.from("crm_automation_flows").update({ status: data.status }).eq("id", data.id);
+    const { error } = await db
+      .from("crm_automation_flows")
+      .update({ status: data.status })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
 
     if (data.status !== "active") {
@@ -927,7 +972,7 @@ export const updateCrmAutomationFlowStatus = createServerFn({ method: "POST" })
   });
 
 export const duplicateCrmAutomationFlow = createServerFn({ method: "POST" })
-  .middleware([requireModule("automacoes")])
+  .middleware([requireModule("crm")])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertManage(context.userId, context.isAdmin);
@@ -966,7 +1011,7 @@ export const duplicateCrmAutomationFlow = createServerFn({ method: "POST" })
   });
 
 export const cancelCrmAutomationPendingAction = createServerFn({ method: "POST" })
-  .middleware([requireModule("automacoes")])
+  .middleware([requireModule("crm")])
   .inputValidator((d) =>
     z.object({ id: z.string().uuid(), reason: z.string().trim().max(300).optional() }).parse(d),
   )

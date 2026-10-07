@@ -43,7 +43,6 @@ import { Route as AuthenticatedAdminEsteiraRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminCrmRouteImport } from './routes/_authenticated/admin.crm'
 import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_authenticated/admin.configuracoes'
 import { Route as AuthenticatedAdminClubeRouteImport } from './routes/_authenticated/admin.clube'
-import { Route as AuthenticatedAdminAutomacoesRouteImport } from './routes/_authenticated/admin.automacoes'
 import { Route as AuthenticatedAdminAgendaRouteImport } from './routes/_authenticated/admin.agenda'
 import { Route as AuthenticatedAdminAcessoNegadoRouteImport } from './routes/_authenticated/admin.acesso-negado'
 import { Route as ApiPublicWebhooksWiseRouteImport } from './routes/api.public.webhooks.wise'
@@ -230,12 +229,6 @@ const AuthenticatedAdminClubeRoute = AuthenticatedAdminClubeRouteImport.update({
   path: '/clube',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
-const AuthenticatedAdminAutomacoesRoute =
-  AuthenticatedAdminAutomacoesRouteImport.update({
-    id: '/automacoes',
-    path: '/automacoes',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
 const AuthenticatedAdminAgendaRoute =
   AuthenticatedAdminAgendaRouteImport.update({
     id: '/agenda',
@@ -274,7 +267,6 @@ export interface FileRoutesByFullPath {
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
-  '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/admin/crm': typeof AuthenticatedAdminCrmRoute
@@ -312,7 +304,6 @@ export interface FileRoutesByTo {
   '/servicos/$slug': typeof ServicosSlugRoute
   '/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/admin/agenda': typeof AuthenticatedAdminAgendaRoute
-  '/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/admin/crm': typeof AuthenticatedAdminCrmRoute
@@ -354,7 +345,6 @@ export interface FileRoutesById {
   '/servicos/$slug': typeof ServicosSlugRoute
   '/_authenticated/admin/acesso-negado': typeof AuthenticatedAdminAcessoNegadoRoute
   '/_authenticated/admin/agenda': typeof AuthenticatedAdminAgendaRoute
-  '/_authenticated/admin/automacoes': typeof AuthenticatedAdminAutomacoesRoute
   '/_authenticated/admin/clube': typeof AuthenticatedAdminClubeRoute
   '/_authenticated/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
   '/_authenticated/admin/crm': typeof AuthenticatedAdminCrmRoute
@@ -396,7 +386,6 @@ export interface FileRouteTypes {
     | '/servicos/$slug'
     | '/admin/acesso-negado'
     | '/admin/agenda'
-    | '/admin/automacoes'
     | '/admin/clube'
     | '/admin/configuracoes'
     | '/admin/crm'
@@ -434,7 +423,6 @@ export interface FileRouteTypes {
     | '/servicos/$slug'
     | '/admin/acesso-negado'
     | '/admin/agenda'
-    | '/admin/automacoes'
     | '/admin/clube'
     | '/admin/configuracoes'
     | '/admin/crm'
@@ -475,7 +463,6 @@ export interface FileRouteTypes {
     | '/servicos/$slug'
     | '/_authenticated/admin/acesso-negado'
     | '/_authenticated/admin/agenda'
-    | '/_authenticated/admin/automacoes'
     | '/_authenticated/admin/clube'
     | '/_authenticated/admin/configuracoes'
     | '/_authenticated/admin/crm'
@@ -759,13 +746,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminClubeRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/automacoes': {
-      id: '/_authenticated/admin/automacoes'
-      path: '/automacoes'
-      fullPath: '/admin/automacoes'
-      preLoaderRoute: typeof AuthenticatedAdminAutomacoesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
     '/_authenticated/admin/agenda': {
       id: '/_authenticated/admin/agenda'
       path: '/agenda'
@@ -800,7 +780,6 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAcessoNegadoRoute: typeof AuthenticatedAdminAcessoNegadoRoute
   AuthenticatedAdminAgendaRoute: typeof AuthenticatedAdminAgendaRoute
-  AuthenticatedAdminAutomacoesRoute: typeof AuthenticatedAdminAutomacoesRoute
   AuthenticatedAdminClubeRoute: typeof AuthenticatedAdminClubeRoute
   AuthenticatedAdminConfiguracoesRoute: typeof AuthenticatedAdminConfiguracoesRoute
   AuthenticatedAdminCrmRoute: typeof AuthenticatedAdminCrmRoute
@@ -819,7 +798,6 @@ interface AuthenticatedAdminRouteChildren {
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAcessoNegadoRoute: AuthenticatedAdminAcessoNegadoRoute,
   AuthenticatedAdminAgendaRoute: AuthenticatedAdminAgendaRoute,
-  AuthenticatedAdminAutomacoesRoute: AuthenticatedAdminAutomacoesRoute,
   AuthenticatedAdminClubeRoute: AuthenticatedAdminClubeRoute,
   AuthenticatedAdminConfiguracoesRoute: AuthenticatedAdminConfiguracoesRoute,
   AuthenticatedAdminCrmRoute: AuthenticatedAdminCrmRoute,

@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
   PointerSensor,
@@ -18,10 +18,14 @@ import {
   deactivateCrmColumn,
   ignoreCrmInboxMessage,
   linkInboxToLead,
+  getCrmLeadDetail,
+  listCrmColumnLeads,
+  listCrmInboxMessages,
   listCrmWorkspace,
   logCrmWhatsappOpened,
   saveCrmColumn,
   saveCrmDistribution,
+  searchCrmLeads,
   sendCrmFollowupMessage,
   updateCrmFollowupStatus,
   updateCrmLeadColumn,
@@ -62,7 +66,6 @@ import {
   Search,
   Settings2,
   ShieldCheck,
-  Workflow,
   XCircle,
   UserRound,
   UsersRound,
@@ -70,6 +73,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { AdminStatCard, type AdminStatCardTone } from "@/components/admin/AdminStatCard";
 import { scoreLead, temperatureChip, temperatureOf } from "@/lib/leads/scoring";
+import { CrmAutomationsTab } from "@/components/admin/CrmAutomationsTab";
 
 export const Route = createFileRoute("/_authenticated/admin/crm")({
   component: CrmPage,
@@ -115,6 +119,25 @@ type Lead = {
   qualification_answers: JsonValue;
   qualification_score: number | null;
 };
+
+type LeadCardData = Pick<
+  Lead,
+  | "id"
+  | "full_name"
+  | "target_visa"
+  | "assigned_to"
+  | "assigned_user"
+  | "crm_column_id"
+  | "created_at"
+  | "next_followup_at"
+  | "qualification_answers"
+  | "qualification_score"
+>;
+
+type LeadSearchResult = Pick<
+  Lead,
+  "id" | "full_name" | "email" | "phone" | "target_visa" | "source" | "assigned_to"
+>;
 
 type Followup = {
   id: string;
@@ -164,15 +187,18 @@ type DistributionMember = {
 
 type Workspace = {
   columns: CrmColumn[];
-  leads: Lead[];
-  followups: Followup[];
-  inbox: InboxMessage[];
   distribution: Distribution;
   distributionMembers: DistributionMember[];
-  activity: Activity[];
   users: CrmUser[];
   currentUserId: string;
   whatsappMode: "sugestao" | "automatico" | "desativado";
+  metrics: { mine: number; followups: number; inbox: number; late: number };
+};
+
+type LeadPage = {
+  items: LeadCardData[];
+  totalCount: number;
+  nextCursor: { createdAt: string; id: string } | null;
 };
 
 const FOLLOWUP_TEMPLATE_OPTIONS = [
@@ -221,11 +247,13 @@ function CrmPage() {
 
   const [search, setSearch] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("all");
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [activeTab, setActiveTab] = useState("funil");
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [distributionOpen, setDistributionOpen] = useState(false);
   const [followupLead, setFollowupLead] = useState<Lead | null>(null);
+  const debouncedSearch = useDebouncedValue(search, 300);
 
   const { data, isLoading, isError, error } = useQuery<Workspace>({
     queryKey: ["crm-workspace"],
@@ -233,76 +261,23 @@ function CrmPage() {
     staleTime: 20_000,
   });
 
-  const filteredLeads = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return (data?.leads ?? []).filter((lead) => {
-      const ownerOk =
-        ownerFilter === "all" ||
-        (ownerFilter === "mine"
-          ? lead.assigned_to === data?.currentUserId
-          : lead.assigned_to === ownerFilter);
-      if (!ownerOk) return false;
-      if (!term) return true;
-      return [lead.full_name, lead.email, lead.phone, lead.target_visa, lead.source]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term));
-    });
-  }, [data?.currentUserId, data?.leads, ownerFilter, search]);
-
-  const grouped = useMemo(() => {
-    const groups = new Map<string, Lead[]>();
-    for (const column of data?.columns ?? []) groups.set(column.id, []);
-    for (const lead of filteredLeads) {
-      const key = lead.crm_column_id ?? data?.columns.find((column) => column.key === "novo")?.id;
-      if (!key) continue;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(lead);
-    }
-    return groups;
-  }, [data?.columns, filteredLeads]);
-
-  const metrics = useMemo(() => {
-    const now = Date.now();
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    const pendingFollowups = (data?.followups ?? []).filter((f) => f.status === "pending");
-    return {
-      mine: (data?.leads ?? []).filter((lead) => lead.assigned_to === data?.currentUserId).length,
-      followups: pendingFollowups.filter((f) => new Date(f.due_at).getTime() <= today.getTime())
-        .length,
-      inbox: (data?.inbox ?? []).length,
-      late: (data?.leads ?? []).filter(
-        (lead) => lead.next_followup_at && new Date(lead.next_followup_at).getTime() < now,
-      ).length,
-    };
-  }, [data?.currentUserId, data?.followups, data?.inbox, data?.leads]);
-
   const handleDrop = async (event: DragEndEvent) => {
     const leadId = String(event.active.id);
     const columnId = event.over?.id ? String(event.over.id) : "";
-    if (!columnId) return;
-    const lead = data?.leads.find((item) => item.id === leadId);
-    if (!lead || lead.crm_column_id === columnId) return;
-
-    qc.setQueryData<Workspace>(["crm-workspace"], (old) =>
-      old
-        ? {
-            ...old,
-            leads: old.leads.map((item) =>
-              item.id === leadId ? { ...item, crm_column_id: columnId } : item,
-            ),
-          }
-        : old,
-    );
+    const sourceColumnId = String(event.active.data.current?.columnId ?? "");
+    if (!columnId || !sourceColumnId || sourceColumnId === columnId) return;
 
     try {
       await moveLead({ data: { leadId, columnId } });
       const column = data?.columns.find((item) => item.id === columnId);
       toast.success(`Lead movido para ${column?.label ?? "nova coluna"}`);
-      qc.invalidateQueries({ queryKey: ["crm-workspace"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["crm-workspace", "column", sourceColumnId] }),
+        qc.invalidateQueries({ queryKey: ["crm-workspace", "column", columnId] }),
+        qc.invalidateQueries({ queryKey: ["crm-workspace"], exact: true }),
+      ]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao mover lead");
-      qc.invalidateQueries({ queryKey: ["crm-workspace"] });
     }
   };
 
@@ -339,15 +314,20 @@ function CrmPage() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric icon={UserRound} label="Meus leads" value={metrics.mine} tone="blue" />
+        <Metric icon={UserRound} label="Meus leads" value={data.metrics.mine} tone="blue" />
         <Metric
           icon={CalendarClock}
           label="Pendencias do CRM"
-          value={metrics.followups}
+          value={data.metrics.followups}
           tone="amber"
         />
-        <Metric icon={MessageCircle} label="Mensagens novas" value={metrics.inbox} tone="green" />
-        <Metric icon={Clock} label="Leads atrasados" value={metrics.late} tone="red" />
+        <Metric
+          icon={MessageCircle}
+          label="Mensagens novas"
+          value={data.metrics.inbox}
+          tone="green"
+        />
+        <Metric icon={Clock} label="Leads atrasados" value={data.metrics.late} tone="red" />
       </section>
 
       <section className="flex flex-col gap-2 rounded-xl border border-admin-border bg-admin-surface p-3 lg:flex-row lg:items-center">
@@ -376,7 +356,7 @@ function CrmPage() {
         </Select>
       </section>
 
-      <Tabs defaultValue="funil" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-admin-surface border border-admin-border">
           <TabsTrigger
             value="funil"
@@ -405,29 +385,34 @@ function CrmPage() {
                 <CrmColumnView
                   key={column.id}
                   column={column}
-                  leads={grouped.get(column.id) ?? []}
-                  onOpen={setSelectedLead}
+                  search={debouncedSearch}
+                  owner={ownerFilter}
+                  users={data.users}
+                  onOpen={setSelectedLeadId}
                 />
               ))}
             </div>
           </DndContext>
         </TabsContent>
 
-        <TabsContent value="inbox" className="mt-0">
-          <InboxTab messages={data.inbox} leads={data.leads} onOpenLead={setSelectedLead} />
-        </TabsContent>
+        {activeTab === "inbox" && (
+          <TabsContent value="inbox" className="mt-0">
+            <InboxTab onOpenLead={setSelectedLeadId} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="automacoes" className="mt-0">
-          <AutomationsEntryCard />
-        </TabsContent>
+        {activeTab === "automacoes" && (
+          <TabsContent value="automacoes" className="mt-0">
+            <CrmAutomationsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       <LeadDialog
-        lead={selectedLead}
+        leadId={selectedLeadId}
         users={data.users}
         columns={data.columns}
-        activity={data.activity.filter((item) => item.lead_id === selectedLead?.id)}
-        onClose={() => setSelectedLead(null)}
+        onClose={() => setSelectedLeadId(null)}
         onCreateFollowup={(lead) => setFollowupLead(lead)}
       />
       <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} users={data.users} />
@@ -442,42 +427,47 @@ function CrmPage() {
   );
 }
 
-function AutomationsEntryCard() {
-  return (
-    <div className="rounded-xl border border-admin-border bg-admin-surface p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-admin-border bg-admin-bg">
-            <Workflow className="h-5 w-5 text-admin-accent" />
-          </div>
-          <div>
-            <h2 className="font-display text-2xl font-semibold text-admin-ink">
-              Central de Automações CRM & WhatsApp
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm text-admin-ink-muted">
-              Crie fluxos de WhatsApp, acompanhe proximos envios, pause automacoes e consulte logs
-              de atendimento.
-            </p>
-          </div>
-        </div>
-        <Button className="gap-2" onClick={() => (window.location.href = "/admin/automacoes")}>
-          <Workflow className="h-4 w-4" /> Abrir central
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function CrmColumnView({
   column,
-  leads,
+  search,
+  owner,
+  users,
   onOpen,
 }: {
   column: CrmColumn;
-  leads: Lead[];
-  onOpen: (lead: Lead) => void;
+  search: string;
+  owner: string;
+  users: CrmUser[];
+  onOpen: (leadId: string) => void;
 }) {
+  const fetchLeads = useServerFn(listCrmColumnLeads);
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const { data, isLoading, isFetchingNextPage, fetchNextPage, hasNextPage, isError } =
+    useInfiniteQuery<LeadPage>({
+      queryKey: ["crm-workspace", "column", column.id, search, owner],
+      initialPageParam: null as LeadPage["nextCursor"],
+      queryFn: ({ pageParam }) =>
+        fetchLeads({
+          data: {
+            columnId: column.id,
+            cursor: pageParam as LeadPage["nextCursor"],
+            search,
+            owner,
+          },
+        }) as Promise<LeadPage>,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      staleTime: 20_000,
+    });
+  const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
+  const leads = useMemo(
+    () =>
+      (data?.pages.flatMap((page) => page.items) ?? []).map((lead) => ({
+        ...lead,
+        assigned_user: usersById.get(lead.assigned_to) ?? null,
+      })),
+    [data?.pages, usersById],
+  );
+  const totalCount = data?.pages[0]?.totalCount ?? 0;
   return (
     <div
       ref={setNodeRef}
@@ -492,24 +482,56 @@ function CrmColumnView({
             {column.type === "system" ? "Padrao" : "Personalizada"}
           </p>
         </div>
-        <span className="text-xs tabular-nums text-admin-ink-muted">{leads.length}</span>
+        <span className="text-xs tabular-nums text-admin-ink-muted">{totalCount}</span>
       </header>
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
-        {leads.length === 0 ? (
+        {isLoading ? (
+          <p className="py-6 text-center text-xs text-admin-ink-muted">Carregando 20 leads...</p>
+        ) : isError ? (
+          <p className="py-6 text-center text-xs text-red-700">Erro ao carregar esta coluna.</p>
+        ) : leads.length === 0 ? (
           <div className="rounded-lg border border-dashed border-admin-border p-6 text-center text-xs text-admin-ink-muted">
             Sem leads nesta coluna.
           </div>
         ) : (
-          leads.map((lead) => <LeadCard key={lead.id} lead={lead} onClick={() => onOpen(lead)} />)
+          leads.map((lead) => (
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              columnId={column.id}
+              onClick={() => onOpen(lead.id)}
+            />
+          ))
+        )}
+        {hasNextPage && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? "Carregando..." : "Carregar mais 20"}
+          </Button>
         )}
       </div>
     </div>
   );
 }
 
-function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
+function LeadCard({
+  lead,
+  columnId,
+  onClick,
+}: {
+  lead: LeadCardData;
+  columnId: string;
+  onClick: () => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: lead.id,
+    data: { columnId },
   });
   const temp = leadTemperature(lead);
   return (
@@ -563,20 +585,32 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   );
 }
 
-function InboxTab({
-  messages,
-  leads,
-  onOpenLead,
-}: {
-  messages: InboxMessage[];
-  leads: Lead[];
-  onOpenLead: (lead: Lead) => void;
-}) {
+function InboxTab({ onOpenLead }: { onOpenLead: (leadId: string) => void }) {
+  const fetchMessages = useServerFn(listCrmInboxMessages);
+  const searchLeadsFn = useServerFn(searchCrmLeads);
   const createLeadFn = useServerFn(createCrmLead);
   const ignoreFn = useServerFn(ignoreCrmInboxMessage);
   const linkFn = useServerFn(linkInboxToLead);
   const qc = useQueryClient();
   const [linkTarget, setLinkTarget] = useState<Record<string, string>>({});
+  const [leadSearch, setLeadSearch] = useState("");
+  const debouncedLeadSearch = useDebouncedValue(leadSearch, 300);
+  const {
+    data: messages = [],
+    isLoading,
+    isError,
+  } = useQuery<InboxMessage[]>({
+    queryKey: ["crm-workspace", "inbox"],
+    queryFn: () => fetchMessages() as Promise<InboxMessage[]>,
+    staleTime: 20_000,
+  });
+  const { data: leadResults = [], isFetching: isSearchingLeads } = useQuery<LeadSearchResult[]>({
+    queryKey: ["crm-workspace", "lead-search", debouncedLeadSearch],
+    queryFn: () =>
+      searchLeadsFn({ data: { search: debouncedLeadSearch } }) as Promise<LeadSearchResult[]>,
+    enabled: debouncedLeadSearch.trim().length >= 2,
+    staleTime: 20_000,
+  });
 
   const createFromInbox = useMutation({
     mutationFn: (message: InboxMessage) =>
@@ -617,6 +651,13 @@ function InboxTab({
       toast.error(error instanceof Error ? error.message : "Erro ao vincular mensagem"),
   });
 
+  if (isLoading)
+    return (
+      <div className="rounded-xl border border-admin-border bg-admin-surface p-8 text-center text-sm text-admin-ink-muted">
+        Carregando inbox...
+      </div>
+    );
+  if (isError) return <CrmError message="Erro ao carregar o Inbox WhatsApp." />;
   if (messages.length === 0)
     return (
       <EmptyState
@@ -627,6 +668,24 @@ function InboxTab({
 
   return (
     <div className="space-y-3">
+      <div className="rounded-xl border border-admin-border bg-admin-surface p-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-ink-muted" />
+          <Input
+            value={leadSearch}
+            onChange={(event) => setLeadSearch(event.target.value)}
+            placeholder="Buscar lead por nome, telefone ou e-mail para vincular..."
+            className="bg-admin-bg pl-9"
+          />
+        </div>
+        <p className="mt-1 text-xs text-admin-ink-muted">
+          {isSearchingLeads
+            ? "Buscando no servidor..."
+            : debouncedLeadSearch.length >= 2
+              ? `${leadResults.length} resultado(s)`
+              : "Digite ao menos 2 caracteres."}
+        </p>
+      </div>
       {messages.map((message) => (
         <article
           key={message.id}
@@ -650,10 +709,7 @@ function InboxTab({
                 <Button
                   variant="link"
                   className="mt-2 h-auto p-0 text-admin-accent"
-                  onClick={() => {
-                    const lead = leads.find((item) => item.id === message.matched_lead_id);
-                    if (lead) onOpenLead(lead);
-                  }}
+                  onClick={() => onOpenLead(message.matched_lead_id!)}
                 >
                   Abrir lead sugerido
                 </Button>
@@ -679,9 +735,9 @@ function InboxTab({
                     <SelectValue placeholder="Vincular a lead" />
                   </SelectTrigger>
                   <SelectContent>
-                    {leads.slice(0, 80).map((lead) => (
+                    {leadResults.map((lead) => (
                       <SelectItem key={lead.id} value={lead.id}>
-                        {lead.full_name}
+                        {lead.full_name} · {lead.phone}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1061,20 +1117,19 @@ function EditFollowupMessageDialog({
 }
 
 function LeadDialog({
-  lead,
+  leadId,
   users,
   columns,
-  activity,
   onClose,
   onCreateFollowup,
 }: {
-  lead: Lead | null;
+  leadId: string | null;
   users: Workspace["users"];
   columns: CrmColumn[];
-  activity: Workspace["activity"];
   onClose: () => void;
   onCreateFollowup: (lead: Lead) => void;
 }) {
+  const fetchDetail = useServerFn(getCrmLeadDetail);
   const qc = useQueryClient();
   const addNote = useServerFn(addCrmLeadNote);
   const updateOwner = useServerFn(updateCrmLeadOwner);
@@ -1083,6 +1138,15 @@ function LeadDialog({
   const logWa = useServerFn(logCrmWhatsappOpened);
   const [note, setNote] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
+  const { data: detail, isError } = useQuery<{ lead: Lead; activity: Activity[] }>({
+    queryKey: ["crm-workspace", "lead-detail", leadId],
+    queryFn: () =>
+      fetchDetail({ data: { leadId: leadId! } }) as Promise<{ lead: Lead; activity: Activity[] }>,
+    enabled: Boolean(leadId),
+    staleTime: 10_000,
+  });
+  const lead = detail?.lead ?? null;
+  const activity = detail?.activity ?? [];
 
   const noteMutation = useMutation({
     mutationFn: () => addNote({ data: { leadId: lead!.id, body: note } }),
@@ -1106,7 +1170,23 @@ function LeadDialog({
       toast.error(error instanceof Error ? error.message : "Erro ao salvar dossie"),
   });
 
-  if (!lead) return null;
+  if (!leadId) return null;
+  if (isError)
+    return (
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="bg-admin-surface">
+          <CrmError message="Erro ao carregar os detalhes deste lead." />
+        </DialogContent>
+      </Dialog>
+    );
+  if (!lead)
+    return (
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="bg-admin-surface">
+          <p className="py-8 text-center text-sm text-admin-ink-muted">Carregando detalhes...</p>
+        </DialogContent>
+      </Dialog>
+    );
   const temp = leadTemperature(lead);
   const phoneDigits = lead.phone.replace(/\D/g, "");
   const waText = encodeURIComponent(
@@ -1227,14 +1307,6 @@ function LeadDialog({
             >
               <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
             </Button>
-            <Button
-              className="w-full justify-start gap-2"
-              variant="outline"
-              onClick={() => (window.location.href = "/admin/automacoes")}
-            >
-              <Workflow className="h-4 w-4" /> Ver automações
-            </Button>
-
             <section className="rounded-xl border border-admin-border bg-admin-surface-2 p-3">
               <label className="text-xs uppercase tracking-wider text-admin-ink-muted">
                 Responsavel
@@ -1781,7 +1853,7 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function leadTemperature(lead: Lead) {
+function leadTemperature(lead: Pick<Lead, "qualification_answers" | "qualification_score">) {
   const answers = (lead.qualification_answers ?? {}) as Record<string, string | undefined>;
   const score =
     lead.qualification_score ??
@@ -1790,6 +1862,15 @@ function leadTemperature(lead: Lead) {
       (answers.budget_range as Parameters<typeof scoreLead>[1]) ?? null,
     );
   return temperatureChip(temperatureOf(score));
+}
+
+function useDebouncedValue<T>(value: T, delay: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timeout);
+  }, [delay, value]);
+  return debounced;
 }
 
 function firstName(fullName: string) {
@@ -1842,7 +1923,7 @@ function formatDateTime(value: string) {
   });
 }
 
-function formatActivity(event: Workspace["activity"][number]) {
+function formatActivity(event: Activity) {
   const payload = (event.payload ?? {}) as Record<string, string>;
   switch (event.kind) {
     case "created":

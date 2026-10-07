@@ -16,7 +16,6 @@ import {
   Users,
   WalletCards,
   Wine,
-  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,7 +31,6 @@ const mainItems = [
   { to: "/admin/eventos", label: "Eventos", icon: Ticket },
   { to: "/admin/esteira", label: "Esteira", icon: PackageCheck },
   { to: "/admin/crm", label: "CRM", icon: Filter },
-  { to: "/admin/automacoes", label: "Automações", icon: Workflow },
   { to: "/admin/financeiro", label: "Caixa", icon: WalletCards, adminOnly: true },
   { to: "/admin/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },

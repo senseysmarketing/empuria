@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -42,13 +41,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-
-export const Route = createFileRoute("/_authenticated/admin/automacoes")({
-  component: AutomacoesCrmPage,
-});
 
 type Step = {
   id?: string;
@@ -121,7 +122,12 @@ const defaultSteps: Step[] = [
     },
   },
   { position: 2, step_type: "delay", title: "Aguardar 1 dia", config: { amount: 1, unit: "days" } },
-  { position: 3, step_type: "condition", title: "Se nao respondeu", config: { condition: "no_reply" } },
+  {
+    position: 3,
+    step_type: "condition",
+    title: "Se nao respondeu",
+    config: { condition: "no_reply" },
+  },
   {
     position: 4,
     step_type: "send_whatsapp",
@@ -134,7 +140,7 @@ const defaultSteps: Step[] = [
   { position: 5, step_type: "end", title: "Encerrar", config: {} },
 ];
 
-function AutomacoesCrmPage() {
+export function CrmAutomationsTab() {
   const fetchWorkspace = useServerFn(listCrmAutomationWorkspace);
   const saveFlow = useServerFn(saveCrmAutomationFlow);
   const updateStatus = useServerFn(updateCrmAutomationFlowStatus);
@@ -153,7 +159,8 @@ function AutomacoesCrmPage() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["crm-automations-workspace"] });
 
   const statusMutation = useMutation({
-    mutationFn: (payload: { id: string; status: Flow["status"] }) => updateStatus({ data: payload }),
+    mutationFn: (payload: { id: string; status: Flow["status"] }) =>
+      updateStatus({ data: payload }),
     onSuccess: () => {
       toast.success("Status atualizado.");
       refresh();
@@ -228,7 +235,9 @@ function AutomacoesCrmPage() {
       {isLoading ? (
         <LoadingState />
       ) : isError ? (
-        <ErrorState message={error instanceof Error ? error.message : "Erro ao carregar automacoes."} />
+        <ErrorState
+          message={error instanceof Error ? error.message : "Erro ao carregar automacoes."}
+        />
       ) : data ? (
         <>
           <section className="grid grid-cols-2 gap-3 xl:grid-cols-6">
@@ -249,7 +258,10 @@ function AutomacoesCrmPage() {
 
             <TabsContent value="fluxos" className="mt-0">
               {empty ? (
-                <EmptyState onCreate={() => setCreating(true)} canCreate={data.permissions.canManage} />
+                <EmptyState
+                  onCreate={() => setCreating(true)}
+                  canCreate={data.permissions.canManage}
+                />
               ) : (
                 <div className="grid gap-3 xl:grid-cols-2">
                   {data.flows.map((flow) => (
@@ -311,7 +323,9 @@ function Kpi({
     <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs uppercase tracking-wide text-admin-ink-muted">{label}</span>
-        <Icon className={tone === "danger" ? "h-4 w-4 text-red-brand" : "h-4 w-4 text-admin-accent"} />
+        <Icon
+          className={tone === "danger" ? "h-4 w-4 text-red-brand" : "h-4 w-4 text-admin-accent"}
+        />
       </div>
       <div className="mt-3 font-display text-3xl font-bold text-admin-ink">{value}</div>
     </div>
@@ -354,7 +368,12 @@ function FlowCard({
           <Button size="sm" variant="outline" onClick={onEdit} className="gap-2">
             <Eye className="h-4 w-4" /> Editar
           </Button>
-          <Button size="sm" variant="outline" onClick={onDuplicate} disabled={!permissions.canManage}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onDuplicate}
+            disabled={!permissions.canManage}
+          >
             <Copy className="h-4 w-4" />
           </Button>
         </div>
@@ -598,17 +617,28 @@ function FlowEditorDialog({
                     A execução segue a ordem dos blocos de cima para baixo.
                   </p>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addStep} disabled={!canManage}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addStep}
+                  disabled={!canManage}
+                >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
 
               {draft.steps.map((step, index) => (
-                <div key={`${step.id ?? "new"}-${index}`} className="rounded-lg border border-admin-border bg-admin-surface p-3">
+                <div
+                  key={`${step.id ?? "new"}-${index}`}
+                  className="rounded-lg border border-admin-border bg-admin-surface p-3"
+                >
                   <div className="grid gap-3 md:grid-cols-[150px_1fr_120px]">
                     <Select
                       value={step.step_type}
-                      onValueChange={(value) => updateStep(index, { step_type: value as Step["step_type"] })}
+                      onValueChange={(value) =>
+                        updateStep(index, { step_type: value as Step["step_type"] })
+                      }
                       disabled={!canManage}
                     >
                       <SelectTrigger>
@@ -860,7 +890,10 @@ function PendingList({
   return (
     <div className="rounded-xl border border-admin-border bg-admin-surface">
       {items.map((item) => (
-        <div key={item.id} className="flex flex-col gap-3 border-b border-admin-border p-4 last:border-0 lg:flex-row lg:items-center lg:justify-between">
+        <div
+          key={item.id}
+          className="flex flex-col gap-3 border-b border-admin-border p-4 last:border-0 lg:flex-row lg:items-center lg:justify-between"
+        >
           <div>
             <div className="font-medium text-admin-ink">
               {item.leads?.full_name ?? "Lead"} - {item.crm_automation_flows?.name ?? "Fluxo"}
@@ -869,7 +902,12 @@ function PendingList({
               {item.crm_automation_steps?.title ?? "Etapa"} - {formatDate(item.run_at)}
             </div>
           </div>
-          <Button size="sm" variant="outline" disabled={!canCancel} onClick={() => onCancel(String(item.id))}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canCancel}
+            onClick={() => onCancel(String(item.id))}
+          >
             Cancelar envio
           </Button>
         </div>
@@ -883,7 +921,10 @@ function LogsList({ items }: { items: AutomationLogView[] }) {
   return (
     <div className="rounded-xl border border-admin-border bg-admin-surface">
       {items.map((item) => (
-        <div key={item.id} className="grid gap-2 border-b border-admin-border p-4 last:border-0 lg:grid-cols-[180px_1fr_180px]">
+        <div
+          key={item.id}
+          className="grid gap-2 border-b border-admin-border p-4 last:border-0 lg:grid-cols-[180px_1fr_180px]"
+        >
           <Badge variant="outline" className="w-fit">
             {eventLabel(item.event_type)}
           </Badge>
@@ -893,7 +934,9 @@ function LogsList({ items }: { items: AutomationLogView[] }) {
               {item.crm_automation_flows?.name ?? "Fluxo"} - {item.leads?.full_name ?? "Lead"}
             </div>
           </div>
-          <div className="text-xs text-admin-ink-muted lg:text-right">{formatDate(item.created_at)}</div>
+          <div className="text-xs text-admin-ink-muted lg:text-right">
+            {formatDate(item.created_at)}
+          </div>
         </div>
       ))}
     </div>
@@ -928,7 +971,10 @@ function LoadingState() {
   return (
     <div className="grid gap-3 xl:grid-cols-3">
       {[1, 2, 3].map((item) => (
-        <div key={item} className="h-32 animate-pulse rounded-xl border border-admin-border bg-admin-surface" />
+        <div
+          key={item}
+          className="h-32 animate-pulse rounded-xl border border-admin-border bg-admin-surface"
+        />
       ))}
     </div>
   );
