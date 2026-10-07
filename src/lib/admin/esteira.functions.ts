@@ -5,6 +5,81 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
 import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
 
+const currencySchema = z.enum(["BRL", "EUR"]);
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+const confirmPaymentSchema = z.object({
+  orderId: z.string().uuid(),
+  paidAt: isoDateSchema,
+  settledAmountCents: z.number().int().min(0),
+  settledCurrency: currencySchema,
+  paymentAccountId: z.string().uuid(),
+  fxReferenceRate: z.number().positive().nullable().optional(),
+  fxReferenceDate: isoDateSchema.nullable().optional(),
+  fxRate: z.number().positive().nullable().optional(),
+  fxSource: z.string().trim().max(40).nullable().optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+
+export async function confirmOrderPaymentInternal(
+  input: z.infer<typeof confirmPaymentSchema>,
+  actorId: string,
+) {
+  const data = confirmPaymentSchema.parse(input);
+  const { data: account, error: accountError } = await supabaseAdmin
+    .from("finance_accounts")
+    .select("id,currency,is_active")
+    .eq("id", data.paymentAccountId)
+    .maybeSingle();
+  if (accountError || !account || !account.is_active) throw new Error("Conta financeira inválida.");
+  if (account.currency !== data.settledCurrency) {
+    throw new Error("A moeda da conta deve ser igual à moeda recebida.");
+  }
+  const { data: current, error: currentError } = await supabaseAdmin
+    .from("orders")
+    .select("id,payment_status,payment_amount_cents,payment_currency,amount_cents,currency,notes")
+    .eq("id", data.orderId)
+    .maybeSingle();
+  if (currentError || !current) throw new Error("Pedido não encontrado.");
+
+  const paidAt = new Date(`${data.paidAt}T12:00:00.000Z`).toISOString();
+  const patch = {
+    payment_status: "aprovado",
+    payment_method: "manual",
+    settled_amount_cents: data.settledAmountCents,
+    settled_currency: data.settledCurrency,
+    payment_account_id: data.paymentAccountId,
+    paid_at: paidAt,
+    fx_reference_rate: data.fxReferenceRate ?? null,
+    fx_reference_date: data.fxReferenceDate ?? null,
+    fx_rate: data.fxRate ?? null,
+    fx_source: data.fxSource ?? null,
+    fx_locked_at: data.fxRate ? paidAt : null,
+    voucher_code: `EMP-${Date.now().toString(36).toUpperCase()}`,
+    notes: data.notes ? [current.notes, data.notes].filter(Boolean).join("\n") : current.notes,
+  };
+  const { error } = await supabaseAdmin
+    .from("orders")
+    .update(patch as never)
+    .eq("id", data.orderId);
+  if (error) throw new Error(error.message);
+  await supabaseAdmin.from("audit_logs").insert({
+    actor_id: actorId,
+    module: "esteira",
+    entity_type: "order",
+    entity_id: data.orderId,
+    action: "order.payment.confirm",
+    old_data: current,
+    new_data: patch,
+  });
+  return { ok: true };
+}
+
+export const confirmOrderPayment = createServerFn({ method: "POST" })
+  .middleware([requireStaff])
+  .inputValidator((input) => confirmPaymentSchema.parse(input))
+  .handler(({ data, context }) => confirmOrderPaymentInternal(data, context.userId));
+
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireStaff])
   .handler(async ({ context }) => {
@@ -13,6 +88,20 @@ export const listOrders = createServerFn({ method: "GET" })
       .select("*")
       .order("created_at", { ascending: false })
       .limit(300);
+    return data ?? [];
+  });
+
+export const listPaymentAccounts = createServerFn({ method: "GET" })
+  .middleware([requireStaff])
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin
+      .from("finance_accounts")
+      .select("id,name,currency,is_active")
+      .eq("is_active", true)
+      .in("currency", ["BRL", "EUR"])
+      .order("currency")
+      .order("name");
+    if (error) throw new Error(error.message);
     return data ?? [];
   });
 
@@ -154,7 +243,19 @@ const fullOrderSchema = z.object({
   service_id: z.string().uuid().nullable().optional(),
   service_title: z.string().trim().min(2).max(160),
   amount_cents: z.number().int().min(0),
-  payment_method: z.enum(["wise", "manual", "dinheiro", "gratuito", "pendente"]).default("wise"),
+  currency: currencySchema.default("EUR"),
+  payment_amount_cents: z.number().int().min(0),
+  payment_currency: currencySchema,
+  payment_method: z.enum(["received", "gratuito", "pendente"]),
+  paid_at: isoDateSchema.nullable().optional(),
+  settled_amount_cents: z.number().int().min(0).nullable().optional(),
+  settled_currency: currencySchema.nullable().optional(),
+  payment_account_id: z.string().uuid().nullable().optional(),
+  fx_reference_rate: z.number().positive().nullable().optional(),
+  fx_reference_date: isoDateSchema.nullable().optional(),
+  fx_rate: z.number().positive().nullable().optional(),
+  fx_source: z.string().trim().max(40).nullable().optional(),
+  initiated_from: z.enum(["esteira", "financeiro"]).default("esteira"),
   reason: z.string().trim().max(280).optional(),
   notes: z.string().trim().max(500).optional(),
   slot_id: z.string().uuid().nullable().optional(),
@@ -164,20 +265,14 @@ export const createOrderFull = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => fullOrderSchema.parse(d))
   .handler(async ({ data, context }) => {
-    if (data.payment_method === "manual" && !data.reason) {
-      throw new Error("Informe o motivo do pagamento manual");
-    }
-    if (data.payment_method === "dinheiro" && !data.reason) {
-      throw new Error("Informe a observação do recebimento em dinheiro");
-    }
+    if (data.payment_method === "received" && !data.payment_account_id)
+      throw new Error("Selecione a conta que recebeu.");
     if (data.amount_cents === 0 && data.payment_method !== "gratuito") {
       throw new Error("Pedido com valor zero exige confirmação como gratuito");
     }
 
     const payment_status =
-      data.payment_method === "gratuito" ||
-      data.payment_method === "manual" ||
-      data.payment_method === "dinheiro"
+      data.payment_method === "gratuito" || data.payment_method === "received"
         ? "aprovado"
         : "pendente";
 
@@ -191,17 +286,31 @@ export const createOrderFull = createServerFn({ method: "POST" })
       service_id: data.service_id ?? null,
       service_title: data.service_title,
       amount_cents: data.amount_cents,
-      currency: "EUR",
+      currency: data.currency,
       slot_id: data.slot_id ?? null,
       notes: data.notes ?? null,
       payment_status,
       payment_method: data.payment_method,
-      payment_currency: "EUR",
-      payment_amount_cents: data.amount_cents,
-      fx_rate: null,
-      fx_source: null,
-      fx_locked_at: null,
-      paid_at: payment_status === "aprovado" ? new Date().toISOString() : null,
+      payment_currency: data.payment_currency,
+      payment_amount_cents: data.payment_amount_cents,
+      settled_amount_cents:
+        payment_status === "aprovado"
+          ? (data.settled_amount_cents ?? data.payment_amount_cents)
+          : null,
+      settled_currency:
+        payment_status === "aprovado" ? (data.settled_currency ?? data.payment_currency) : null,
+      payment_account_id: payment_status === "aprovado" ? data.payment_account_id : null,
+      fx_reference_rate: data.fx_reference_rate ?? null,
+      fx_reference_date: data.fx_reference_date ?? null,
+      fx_rate: data.fx_rate ?? null,
+      fx_source: data.fx_source ?? null,
+      fx_locked_at: data.fx_rate ? new Date().toISOString() : null,
+      paid_at:
+        payment_status === "aprovado"
+          ? new Date(
+              `${data.paid_at ?? new Date().toISOString().slice(0, 10)}T12:00:00.000Z`,
+            ).toISOString()
+          : null,
       voucher_code: voucher,
     };
     const { data: order, error } = await context.supabase
@@ -219,18 +328,18 @@ export const createOrderFull = createServerFn({ method: "POST" })
       entity_type: "order",
       entity_id: order.id,
       action:
-        data.payment_method === "gratuito"
-          ? "order.create.gratuito"
-          : data.payment_method === "manual"
-            ? "order.create.manual_paid"
-            : data.payment_method === "dinheiro"
-              ? "order.create.dinheiro"
-              : data.payment_method === "wise"
-                ? "order.create.wise"
-                : "order.create",
+        data.initiated_from === "financeiro"
+          ? "order.create.financeiro"
+          : `order.create.${data.payment_method}`,
       new_data: {
         amount_cents: data.amount_cents,
-        currency: "EUR",
+        currency: data.currency,
+        payment_amount_cents: data.payment_amount_cents,
+        payment_currency: data.payment_currency,
+        settled_amount_cents: data.settled_amount_cents ?? null,
+        settled_currency: data.settled_currency ?? null,
+        fx_reference_rate: data.fx_reference_rate ?? null,
+        fx_rate: data.fx_rate ?? null,
         payment_method: data.payment_method,
         reason: data.reason ?? null,
       },
@@ -248,31 +357,33 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid(),
         reason: z.string().trim().min(3).max(280),
+        settledAmountCents: z.number().int().min(0),
+        settledCurrency: currencySchema,
+        paymentAccountId: z.string().uuid(),
+        paidAt: isoDateSchema,
+        fxReferenceRate: z.number().positive().nullable().optional(),
+        fxReferenceDate: isoDateSchema.nullable().optional(),
+        fxRate: z.number().positive().nullable().optional(),
+        fxSource: z.string().trim().max(40).nullable().optional(),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {
-      payment_status: "aprovado",
-      payment_method: "manual",
-      paid_at: new Date().toISOString(),
-      voucher_code: `EMP-${Date.now().toString(36).toUpperCase()}`,
-    };
-    const { error } = await context.supabase
-      .from("orders")
-      .update(patch as never)
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-
-    await supabaseAdmin.from("audit_logs").insert({
-      actor_id: context.userId,
-      module: "esteira",
-      entity_type: "order",
-      entity_id: data.id,
-      action: "order.payment.manual",
-      new_data: { reason: data.reason },
-    });
-    return { ok: true };
+    return confirmOrderPaymentInternal(
+      {
+        orderId: data.id,
+        paidAt: data.paidAt,
+        settledAmountCents: data.settledAmountCents,
+        settledCurrency: data.settledCurrency,
+        paymentAccountId: data.paymentAccountId,
+        fxReferenceRate: data.fxReferenceRate,
+        fxReferenceDate: data.fxReferenceDate,
+        fxRate: data.fxRate,
+        fxSource: data.fxSource ?? null,
+        notes: data.reason,
+      },
+      context.userId,
+    );
   });
 
 export const cancelOrder = createServerFn({ method: "POST" })

@@ -1,16 +1,19 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { CheckCircle2, Search, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
+import { PhoneInput } from "@/components/ui/phone-input";
 import {
   Select,
   SelectContent,
@@ -19,88 +22,100 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { Search, UserPlus, AlertTriangle, CheckCircle2, Copy, Link2, ChevronDown } from "lucide-react";
-import { listServicesAdmin } from "@/lib/admin/slots.functions";
 import {
-  searchCustomers,
   createCustomerLite,
   createOrderFull,
-  generateWisePaymentForOrder,
+  listPaymentAccounts,
+  searchCustomers,
 } from "@/lib/admin/esteira.functions";
-import { useQuery } from "@tanstack/react-query";
+import { listServicesAdmin } from "@/lib/admin/slots.functions";
+import { getEurBrlReferenceRate } from "@/lib/finance/fx.functions";
 
+type Currency = "BRL" | "EUR";
+type PaymentState = "pending" | "received" | "gratuito";
 type Customer = {
   id: string | null;
   full_name: string | null;
   email: string | null;
   phone: string | null;
 };
-
 type Service = {
   id: string;
   title: string;
   price_cents: number;
+  currency?: string | null;
   online_price_cents: number | null;
   online_currency: string | null;
-  currency?: string | null;
-  kind: string | null;
-  requires_slot: boolean;
 };
+type Account = { id: string; name: string; currency: string; is_active: boolean };
 
-const fmtEUR = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "EUR" });
-
-type PaymentMethod = "wise" | "manual" | "dinheiro" | "pendente" | "gratuito";
+function money(cents: number, currency: Currency) {
+  return new Intl.NumberFormat(currency === "EUR" ? "pt-PT" : "pt-BR", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
+}
 
 export function NewOrderWizard({
   open,
   onOpenChange,
   onCreated,
+  initiatedFrom = "esteira",
 }: {
   open: boolean;
-  onOpenChange: (v: boolean) => void;
+  onOpenChange: (value: boolean) => void;
   onCreated: () => void;
+  initiatedFrom?: "esteira" | "financeiro";
 }) {
   const search = useServerFn(searchCustomers);
   const createCustomer = useServerFn(createCustomerLite);
   const fetchServices = useServerFn(listServicesAdmin);
+  const fetchAccounts = useServerFn(listPaymentAccounts);
   const createOrder = useServerFn(createOrderFull);
-  const genWise = useServerFn(generateWisePaymentForOrder);
-
+  const fetchFx = useServerFn(getEurBrlReferenceRate);
   const [step, setStep] = useState(1);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Customer[]>([]);
-  const [searching, setSearching] = useState(false);
   const [newCust, setNewCust] = useState({ full_name: "", email: "", phone: "" });
-
-  const [service, setService] = useState<Service | null>(null);
   const [serviceMode, setServiceMode] = useState<"cadastrado" | "avulso">("cadastrado");
-  const [customTitle, setCustomTitle] = useState("");
-
-  const [amount, setAmount] = useState("");
-
-  const [method, setMethod] = useState<PaymentMethod>("wise");
-  const [reason, setReason] = useState("");
+  const [service, setService] = useState<Service | null>(null);
+  const [title, setTitle] = useState("");
+  const [commercialAmount, setCommercialAmount] = useState("");
+  const [commercialCurrency, setCommercialCurrency] = useState<Currency>("EUR");
+  const [paymentCurrency, setPaymentCurrency] = useState<Currency>("EUR");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [fxRate, setFxRate] = useState("");
+  const [paymentState, setPaymentState] = useState<PaymentState>("pending");
+  const [settledAmount, setSettledAmount] = useState("");
+  const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
+  const [accountId, setAccountId] = useState("");
   const [notes, setNotes] = useState("");
   const [confirmFree, setConfirmFree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [createdOrder, setCreatedOrder] = useState<{
-    id: string;
-    reference: string | null;
-    paymentUrl: string | null;
-    iban: string | null;
-    bic: string | null;
-    beneficiaryName: string | null;
-    method: PaymentMethod;
-  } | null>(null);
+  const [created, setCreated] = useState(false);
 
   const { data: services = [] } = useQuery({
     queryKey: ["admin-services-wizard"],
     queryFn: () => fetchServices(),
     enabled: open,
   });
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["payment-accounts"],
+    queryFn: () => fetchAccounts() as Promise<Account[]>,
+    enabled: open,
+  });
+  const conversion = commercialCurrency !== paymentCurrency;
+  const fxQ = useQuery({
+    queryKey: ["eur-brl-reference", paidAt],
+    queryFn: () => fetchFx({ data: { date: paidAt } }),
+    enabled: open && conversion,
+    staleTime: 30 * 60 * 1000,
+  });
+  const commercialCents = Math.round(Number(commercialAmount || 0) * 100);
+  const paymentCents = Math.round(Number(paymentAmount || 0) * 100);
+  const settledCents = Math.round(Number(settledAmount || 0) * 100);
+  const isFree = commercialCents === 0;
 
   useEffect(() => {
     if (!open) {
@@ -108,33 +123,21 @@ export function NewOrderWizard({
       setCustomer(null);
       setQuery("");
       setResults([]);
-      setNewCust({ full_name: "", email: "", phone: "" });
       setService(null);
-      setServiceMode("cadastrado");
-      setCustomTitle("");
-      setAmount("");
-      setMethod("wise");
-      setReason("");
+      setTitle("");
+      setCommercialAmount("");
+      setCommercialCurrency("EUR");
+      setPaymentCurrency("EUR");
+      setPaymentAmount("");
+      setFxRate("");
+      setPaymentState("pending");
+      setSettledAmount("");
+      setAccountId("");
       setNotes("");
       setConfirmFree(false);
-      setSubmitting(false);
-      setSubmitError(null);
-      setCreatedOrder(null);
+      setCreated(false);
     }
   }, [open]);
-
-  const runSearch = async () => {
-    if (query.trim().length < 2) return;
-    setSearching(true);
-    try {
-      const r = await search({ data: { q: query.trim() } });
-      setResults(r);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro na busca");
-    } finally {
-      setSearching(false);
-    }
-  };
 
   useEffect(() => {
     const q = query.trim();
@@ -142,212 +145,202 @@ export function NewOrderWizard({
       setResults([]);
       return;
     }
-    const t = setTimeout(() => {
-      runSearch();
-    }, 300);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+    const timer = setTimeout(
+      () =>
+        search({ data: { q } })
+          .then(setResults)
+          .catch(() => setResults([])),
+      300,
+    );
+    return () => clearTimeout(timer);
+  }, [query, search]);
 
-  const createCust = async () => {
-    if (!newCust.full_name || !newCust.email || !newCust.phone) {
-      toast.error("Nome, e-mail e telefone sao obrigatorios");
+  useEffect(() => {
+    if (!conversion) {
+      setFxRate("");
+      setPaymentAmount(commercialAmount);
       return;
     }
-    try {
-      const c = await createCustomer({ data: newCust });
-      setCustomer({ id: c.user_id, full_name: c.full_name, email: c.email, phone: c.phone });
-      toast.success("Cliente vinculado. Oriente o primeiro acesso pelo login.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro");
-    }
-  };
+    if (fxQ.data?.ok && fxQ.data.rate) setFxRate(String(fxQ.data.rate));
+  }, [conversion, fxQ.data, commercialAmount]);
 
-  const onSelectService = (id: string) => {
-    const s = services.find((x) => x.id === id) as Service | undefined;
-    if (s) {
-      setService(s);
-      setAmount(((s.price_cents ?? 0) / 100).toFixed(2));
-    }
-  };
-
-  const amountCents = Math.round(parseFloat(amount || "0") * 100);
-  const isFree = amountCents === 0;
-
-  // Auto-switch method when value becomes 0 or > 0
   useEffect(() => {
-    if (isFree && method !== "gratuito") setMethod("gratuito");
-    if (!isFree && method === "gratuito") setMethod("wise");
-  }, [isFree]); // eslint-disable-line react-hooks/exhaustive-deps
+    const rate = Number(fxRate);
+    if (!conversion || !rate || !commercialAmount) return;
+    const converted =
+      commercialCurrency === "EUR"
+        ? Number(commercialAmount) * rate
+        : Number(commercialAmount) / rate;
+    setPaymentAmount(converted.toFixed(2));
+  }, [fxRate, commercialAmount, commercialCurrency, conversion]);
 
-  const reasonRequired = method === "manual" || method === "dinheiro";
-  const reasonOk = !reasonRequired || reason.trim().length >= 3;
+  useEffect(() => {
+    if (paymentState === "received") setSettledAmount(paymentAmount);
+  }, [paymentState, paymentAmount]);
+  useEffect(() => {
+    if (isFree) setPaymentState("gratuito");
+    else if (paymentState === "gratuito") setPaymentState("pending");
+  }, [isFree, paymentState]);
+
+  const compatibleAccounts = useMemo(
+    () => accounts.filter((account) => account.currency === paymentCurrency),
+    [accounts, paymentCurrency],
+  );
   const canSubmit =
-    customer &&
-    (serviceMode === "cadastrado" ? !!service : customTitle.length >= 2) &&
-    amount !== "" &&
+    !!customer &&
+    commercialAmount !== "" &&
+    paymentAmount !== "" &&
+    (serviceMode === "cadastrado" ? !!service : title.trim().length >= 2) &&
     (!isFree || confirmFree) &&
-    reasonOk;
+    (paymentState !== "received" || (!!accountId && settledAmount !== ""));
+
+  const selectService = (id: string) => {
+    const selected = (services as Service[]).find((item) => item.id === id);
+    if (!selected) return;
+    const currency = ((selected.online_price_cents != null
+      ? selected.online_currency
+      : selected.currency) ?? "EUR") as Currency;
+    const cents = selected.online_price_cents ?? selected.price_cents ?? 0;
+    setService(selected);
+    setCommercialCurrency(currency);
+    setPaymentCurrency(currency);
+    setCommercialAmount((cents / 100).toFixed(2));
+    setPaymentAmount((cents / 100).toFixed(2));
+  };
+
+  const createNewCustomer = async () => {
+    try {
+      const value = await createCustomer({ data: newCust });
+      setCustomer({
+        id: value.user_id,
+        full_name: value.full_name,
+        email: value.email,
+        phone: value.phone,
+      });
+      toast.success("Cliente vinculado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao criar cliente");
+    }
+  };
 
   const submit = async () => {
-    if (!canSubmit || !customer || submitting) return;
+    if (!canSubmit || !customer) return;
     setSubmitting(true);
-    setSubmitError(null);
     try {
-      const effectiveMethod: PaymentMethod = isFree ? "gratuito" : method;
-      const trimmedReason = reason.trim();
-      const created = await createOrder({
+      await createOrder({
         data: {
           user_id: customer.id,
           customer_name: customer.full_name ?? "Sem nome",
-          customer_email: customer.email ?? undefined,
+          customer_email: customer.email,
           service_id: serviceMode === "cadastrado" ? service?.id : null,
-          service_title: serviceMode === "cadastrado" ? service!.title : customTitle,
-          amount_cents: amountCents,
-          payment_method: effectiveMethod,
-          reason:
-            effectiveMethod === "manual" || effectiveMethod === "dinheiro"
-              ? trimmedReason
-              : undefined,
+          service_title: serviceMode === "cadastrado" ? service!.title : title,
+          amount_cents: commercialCents,
+          currency: commercialCurrency,
+          payment_amount_cents: paymentCents,
+          payment_currency: paymentCurrency,
+          payment_method: paymentState,
+          paid_at: paymentState === "received" ? paidAt : null,
+          settled_amount_cents: paymentState === "received" ? settledCents : null,
+          settled_currency: paymentState === "received" ? paymentCurrency : null,
+          payment_account_id: paymentState === "received" ? accountId : null,
+          fx_reference_rate: conversion && fxQ.data?.ok ? fxQ.data.rate : null,
+          fx_reference_date: conversion && fxQ.data?.ok ? fxQ.data.date : null,
+          fx_rate: conversion && fxRate ? Number(fxRate) : null,
+          fx_source: conversion && fxQ.data?.ok ? fxQ.data.source : conversion ? "MANUAL" : null,
+          initiated_from: initiatedFrom,
           notes: notes || undefined,
         },
       });
-      let reference: string | null = null;
-      let paymentUrl: string | null = null;
-      let iban: string | null = null;
-      let bic: string | null = null;
-      let beneficiaryName: string | null = null;
-      if (effectiveMethod === "wise") {
-        try {
-          const link = await genWise({ data: { id: created.id } });
-          reference = link.reference ?? `EMP-${created.id}`;
-          paymentUrl = link.paymentUrl ?? null;
-          iban = link.iban ?? null;
-          bic = link.bic ?? null;
-          beneficiaryName = link.beneficiaryName ?? null;
-        } catch (e) {
-          toast.error(e instanceof Error ? e.message : "Não foi possível gerar o pagamento Wise");
-        }
-      }
-      setCreatedOrder({
-        id: created.id,
-        reference,
-        paymentUrl,
-        iban,
-        bic,
-        beneficiaryName,
-        method: effectiveMethod,
-      });
+      setCreated(true);
       setStep(4);
-      toast.success("Pedido criado");
       onCreated();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao criar pedido";
-      console.error("[NewOrderWizard] createOrder failed:", e);
-      setSubmitError(msg);
-      toast.error(msg);
+      toast.success("Pedido criado e sincronizado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao criar pedido");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const copy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copiado`);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Novo pedido</DialogTitle>
+          <DialogTitle>
+            {initiatedFrom === "financeiro" ? "Novo pedido pelo Financeiro" : "Novo pedido"}
+          </DialogTitle>
           <DialogDescription>
-            {step === 4 ? "Conclusão" : `Etapa ${step} de 3 · ${stepLabel(step)}`}
+            {step === 4
+              ? "Concluído"
+              : `Etapa ${step} de 3 · ${step === 1 ? "Cliente" : step === 2 ? "Serviço & valor" : "Pagamento"}`}
           </DialogDescription>
         </DialogHeader>
-
         {step === 1 && (
           <div className="space-y-4">
-            <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nome, e-mail ou telefone"
+                className="pl-9"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && runSearch()}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar nome, e-mail ou telefone"
               />
-              <Button onClick={runSearch} disabled={searching}>
-                <Search className="h-4 w-4" />
-              </Button>
             </div>
-
-            {results.length > 0 && (
-              <div className="border rounded divide-y max-h-56 overflow-auto">
-                {results.map((c) => (
+            {!!results.length && (
+              <div className="max-h-48 divide-y overflow-auto rounded border">
+                {results.map((item) => (
                   <button
-                    key={c.id ?? c.email ?? Math.random()}
-                    onClick={() => setCustomer(c)}
-                    className={`w-full text-left p-3 hover:bg-muted ${
-                      customer?.id === c.id ? "bg-admin-accent-soft" : ""
-                    }`}
+                    type="button"
+                    key={item.id ?? item.email ?? item.phone}
+                    className="w-full p-3 text-left hover:bg-muted"
+                    onClick={() => setCustomer(item)}
                   >
-                    <div className="font-medium">{c.full_name ?? "Sem nome"}</div>
+                    <strong>{item.full_name}</strong>
                     <div className="text-xs text-muted-foreground">
-                      {c.email ?? "sem e-mail"} · {c.phone ?? "sem telefone"}
+                      {item.email} · {item.phone}
                     </div>
                   </button>
                 ))}
               </div>
             )}
-
-            <div className="border-t pt-3">
-              <div className="flex items-center gap-2 text-sm font-display uppercase tracking-wider text-muted-foreground mb-2">
-                <UserPlus className="h-4 w-4" /> Criar novo cliente
+            <div className="rounded border p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                <UserPlus className="h-4 w-4" /> Novo cliente
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <Input
                   placeholder="Nome"
                   value={newCust.full_name}
-                  onChange={(e) => setNewCust({ ...newCust, full_name: e.target.value })}
+                  onChange={(event) => setNewCust({ ...newCust, full_name: event.target.value })}
                 />
                 <Input
                   placeholder="E-mail"
                   value={newCust.email}
-                  onChange={(e) => setNewCust({ ...newCust, email: e.target.value })}
+                  onChange={(event) => setNewCust({ ...newCust, email: event.target.value })}
                 />
                 <PhoneInput
                   value={newCust.phone}
-                  onChange={(e164) => setNewCust({ ...newCust, phone: e164 ?? "" })}
+                  onChange={(value) => setNewCust({ ...newCust, phone: value ?? "" })}
                 />
-                <Button variant="outline" onClick={createCust}>
+                <Button type="button" variant="outline" onClick={createNewCustomer}>
                   Criar e vincular
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                A conta e criada sem senha. O cliente acessa depois pelo link Primeiro acesso na
-                tela de login.
-              </p>
             </div>
-
             {customer && (
-              <div className="bg-admin-accent-soft border rounded p-3 text-sm">
-                <strong>Selecionado:</strong> {customer.full_name ?? "—"} ·{" "}
-                {customer.email ?? "sem e-mail"}
-                {!customer.email && (
-                  <div className="text-xs text-amber-700 mt-1 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Sem e-mail: pedido não aparecerá no
-                    portal.
-                  </div>
-                )}
+              <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                <strong>Selecionado:</strong> {customer.full_name} · {customer.email}
               </div>
             )}
           </div>
         )}
-
         {step === 2 && (
           <div className="space-y-4">
-            <div>
-              <Label>Tipo de serviço</Label>
-              <Select value={serviceMode} onValueChange={(v) => setServiceMode(v as never)}>
+            <Field label="Tipo de serviço">
+              <Select
+                value={serviceMode}
+                onValueChange={(value) => setServiceMode(value as typeof serviceMode)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -356,291 +349,215 @@ export function NewOrderWizard({
                   <SelectItem value="avulso">Serviço avulso</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
             {serviceMode === "cadastrado" ? (
-              <div>
-                <Label>Serviço</Label>
-                <Select value={service?.id ?? ""} onValueChange={onSelectService}>
+              <Field label="Serviço">
+                <Select value={service?.id ?? ""} onValueChange={selectService}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Escolha o serviço" />
+                    <SelectValue placeholder="Escolha" />
                   </SelectTrigger>
                   <SelectContent>
-                    {services.map((s) => {
-                      const eur = s.price_cents ?? 0;
+                    {(services as Service[]).map((item) => {
+                      const curr = ((item.online_price_cents != null
+                        ? item.online_currency
+                        : item.currency) ?? "EUR") as Currency;
                       return (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.title} · {fmtEUR.format(eur / 100)}
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.title} · {money(item.online_price_cents ?? item.price_cents, curr)}
                         </SelectItem>
                       );
                     })}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             ) : (
-              <div>
-                <Label>Título do serviço avulso</Label>
+              <>
+                <Field label="Título">
+                  <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+                </Field>
+                <Field label="Moeda comercial">
+                  <CurrencySelect
+                    value={commercialCurrency}
+                    onChange={(value) => {
+                      setCommercialCurrency(value);
+                      setPaymentCurrency(value);
+                    }}
+                  />
+                </Field>
+              </>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Valor comercial">
                 <Input
-                  placeholder="Ex: Consulta avulsa"
-                  value={customTitle}
-                  onChange={(e) => setCustomTitle(e.target.value)}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={commercialAmount}
+                  onChange={(event) => setCommercialAmount(event.target.value)}
                 />
+              </Field>
+              <Field label="Moeda do pagamento">
+                <CurrencySelect value={paymentCurrency} onChange={setPaymentCurrency} />
+              </Field>
+            </div>
+            {conversion && (
+              <div className="space-y-3 rounded border bg-muted/30 p-3">
+                <div className="text-sm">
+                  <strong>Referência PTAX:</strong>{" "}
+                  {fxQ.data?.ok
+                    ? `${fxQ.data.rate.toFixed(4)} em ${fxQ.data.date}`
+                    : "indisponível — informe manualmente"}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Cotação aplicada (1 EUR em BRL)">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={fxRate}
+                      onChange={(event) => setFxRate(event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Cobrança prevista">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={paymentAmount}
+                      onChange={(event) => setPaymentAmount(event.target.value)}
+                    />
+                  </Field>
+                </div>
               </div>
             )}
-
-            <div>
-              <Label>Valor (EUR)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Todo o sistema opera em EUR. Cobranças online são processadas pela Wise.
-              </p>
-            </div>
-
-            {isFree && (
-              <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm">
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={confirmFree}
-                    onChange={(e) => setConfirmFree(e.target.checked)}
-                    className="mt-1"
-                  />
-                  <span>
-                    Este pedido será criado com valor zero. Confirmo como{" "}
-                    <strong>pedido gratuito</strong>.
-                  </span>
-                </label>
+            {!conversion && (
+              <div className="text-sm text-muted-foreground">
+                Cobrança prevista: <strong>{money(paymentCents, paymentCurrency)}</strong>
               </div>
+            )}
+            {isFree && (
+              <label className="flex gap-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={confirmFree}
+                  onChange={(event) => setConfirmFree(event.target.checked)}
+                />{" "}
+                Confirmo este pedido como gratuito.
+              </label>
             )}
           </div>
         )}
-
         {step === 3 && (
           <div className="space-y-4">
-            <div>
-              <Label>Forma de pagamento</Label>
+            <Field label="Situação do pagamento">
               <Select
-                value={method}
-                onValueChange={(v) => setMethod(v as PaymentMethod)}
+                value={paymentState}
+                onValueChange={(value) => setPaymentState(value as PaymentState)}
                 disabled={isFree}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="wise">Gerar cobrança Wise (EUR)</SelectItem>
-                  <SelectItem value="dinheiro">Dinheiro (recebido pessoalmente)</SelectItem>
-                  <SelectItem value="manual">Marcar como pago manualmente</SelectItem>
-                  <SelectItem value="pendente">
-                    Apenas criar pedido (cobrar depois)
-                  </SelectItem>
+                  <SelectItem value="pending">A receber</SelectItem>
+                  <SelectItem value="received">Já recebido</SelectItem>
                   <SelectItem value="gratuito" disabled={!isFree}>
                     Gratuito
                   </SelectItem>
                 </SelectContent>
               </Select>
-              {method === "wise" && !isFree && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Gera link Wise + IBAN/BIC. A reconciliação é automática via webhook quando o
-                  valor cai no saldo EUR.
-                </p>
-              )}
-              {method === "dinheiro" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Pedido criado já como <strong>pago</strong>. Use a observação abaixo para
-                  registrar quem recebeu e quando.
-                </p>
-              )}
-              {method === "pendente" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  O pedido fica pendente. Você pode gerar a cobrança Wise depois pela esteira.
-                </p>
+            </Field>
+            {paymentState === "received" && (
+              <div className="space-y-3 rounded border p-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Data">
+                    <Input
+                      type="date"
+                      value={paidAt}
+                      onChange={(event) => setPaidAt(event.target.value)}
+                    />
+                  </Field>
+                  <Field label={`Valor recebido (${paymentCurrency})`}>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={settledAmount}
+                      onChange={(event) => setSettledAmount(event.target.value)}
+                    />
+                  </Field>
+                </div>
+                <Field label={`Conta em ${paymentCurrency}`}>
+                  <Select value={accountId} onValueChange={setAccountId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {compatibleAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+            )}
+            <Field label="Observação">
+              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
+            </Field>
+            <div className="rounded bg-muted p-3 text-sm">
+              Comercial: <strong>{money(commercialCents, commercialCurrency)}</strong>
+              <br />
+              Previsto: <strong>{money(paymentCents, paymentCurrency)}</strong>
+              {paymentState === "received" && (
+                <>
+                  <br />
+                  Realizado: <strong>{money(settledCents, paymentCurrency)}</strong>
+                </>
               )}
             </div>
-
-            {method === "manual" && (
-              <div>
-                <Label>Motivo do pagamento manual *</Label>
-                <Textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={2}
-                  placeholder="Ex.: Pago por transferência já confirmada"
-                />
-                {!reasonOk && (
-                  <p className="text-xs text-amber-700 mt-1">
-                    Informe pelo menos 3 caracteres para criar como pago manualmente.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {method === "dinheiro" && (
-              <div>
-                <Label>Observação do recebimento em dinheiro *</Label>
-                <Textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={2}
-                  placeholder="Ex.: Recebido em mãos por Fulano em 16/06"
-                />
-                {!reasonOk && (
-                  <p className="text-xs text-amber-700 mt-1">
-                    Informe pelo menos 3 caracteres descrevendo o recebimento.
-                  </p>
-                )}
-              </div>
-            )}
-
+          </div>
+        )}
+        {step === 4 && created && (
+          <div className="flex items-center gap-3 rounded border border-emerald-200 bg-emerald-50 p-5">
+            <CheckCircle2 className="h-6 w-6 text-emerald-700" />
             <div>
-              <Label>Notas internas (opcional)</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-            </div>
-
-            <div className="text-xs text-muted-foreground">
-              Cliente: <strong>{customer?.full_name}</strong> · Serviço:{" "}
-              <strong>{serviceMode === "cadastrado" ? service?.title : customTitle}</strong> ·
-              Valor: <strong>{fmtEUR.format(amountCents / 100)}</strong>
+              <strong>Pedido criado</strong>
+              <p className="text-sm text-muted-foreground">
+                Uma única receita foi sincronizada no Financeiro.
+              </p>
             </div>
           </div>
         )}
-
-        {step === 4 && createdOrder && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-4 rounded border border-emerald-200 bg-emerald-50">
-              <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
-              <div>
-                <div className="font-medium text-emerald-900">Pedido criado com sucesso</div>
-                <div className="text-xs text-emerald-800/80">
-                  {customer?.full_name} ·{" "}
-                  {serviceMode === "cadastrado" ? service?.title : customTitle} ·{" "}
-                  {fmtEUR.format(amountCents / 100)}
-                </div>
-              </div>
-            </div>
-
-            {createdOrder.method === "wise" && (
-              <div className="space-y-3">
-                <div className="text-sm text-muted-foreground">
-                  Aguardando confirmação automática via Wise (webhook <em>balances#credit</em>).
-                  O pedido será aprovado assim que o valor cair no saldo EUR com a referência
-                  abaixo.
-                </div>
-                {createdOrder.paymentUrl && (
-                  <div>
-                    <Label>Link de pagamento Wise</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        readOnly
-                        value={createdOrder.paymentUrl}
-                        className="font-mono text-xs"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => copy(createdOrder.paymentUrl!, "Link")}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button asChild variant="outline">
-                        <a href={createdOrder.paymentUrl} target="_blank" rel="noreferrer">
-                          <Link2 className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Envie ao cliente. O valor e a referência já vão preenchidos.
-                    </p>
-                  </div>
-                )}
-                {!createdOrder.paymentUrl && (
-                  <div className="border border-amber-300 bg-amber-50 rounded p-3 text-sm">
-                    <strong>Link Wise não configurado.</strong> Configure o "Link Quick Pay" nas{" "}
-                    <em>Configurações → Wise</em> para gerar links automaticamente. O cliente
-                    ainda pode pagar por IBAN/BIC abaixo.
-                  </div>
-                )}
-                {(createdOrder.iban || createdOrder.bic || createdOrder.beneficiaryName || createdOrder.reference) && (
-                  <BankTransferCollapsible
-                    defaultOpen={!createdOrder.paymentUrl}
-                    beneficiaryName={createdOrder.beneficiaryName}
-                    iban={createdOrder.iban}
-                    bic={createdOrder.bic}
-                    amountLabel={fmtEUR.format(amountCents / 100)}
-                    amountRaw={(amountCents / 100).toFixed(2)}
-                    reference={createdOrder.reference}
-                    hasWiseUrl={!!createdOrder.paymentUrl}
-                    onCopy={copy}
-                  />
-                )}
-              </div>
-            )}
-
-            {createdOrder.method === "manual" && (
-              <div className="text-sm text-muted-foreground">
-                Pagamento marcado como recebido manualmente.
-              </div>
-            )}
-            {createdOrder.method === "gratuito" && (
-              <div className="text-sm text-muted-foreground">Pedido registrado como gratuito.</div>
-            )}
-            {createdOrder.method === "pendente" && (
-              <div className="text-sm text-muted-foreground">
-                Pedido criado como pendente. Você pode gerar a cobrança Wise depois pela esteira.
-              </div>
-            )}
-          </div>
-        )}
-
-        {step === 3 && submitError && (
-          <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-            <strong>Não foi possível criar o pedido:</strong> {submitError}
-          </div>
-        )}
-
-        <div className="flex justify-between pt-4 border-t">
+        <div className="flex justify-between border-t pt-4">
           {step === 4 ? (
             <>
               <span />
-              <Button
-                onClick={() => onOpenChange(false)}
-                className="bg-admin-accent hover:bg-admin-accent/90"
-              >
-                Fechar
-              </Button>
+              <Button onClick={() => onOpenChange(false)}>Fechar</Button>
             </>
           ) : (
             <>
               <Button
                 variant="ghost"
-                onClick={() => setStep((s) => Math.max(1, s - 1))}
                 disabled={step === 1}
+                onClick={() => setStep((value) => value - 1)}
               >
                 Voltar
               </Button>
               {step < 3 ? (
                 <Button
-                  onClick={() => setStep((s) => s + 1)}
                   disabled={
                     (step === 1 && !customer) ||
                     (step === 2 &&
-                      ((serviceMode === "cadastrado" ? !service : customTitle.length < 2) ||
-                        amount === "" ||
+                      (!commercialAmount ||
+                        (serviceMode === "cadastrado" ? !service : title.trim().length < 2) ||
                         (isFree && !confirmFree)))
                   }
+                  onClick={() => setStep((value) => value + 1)}
                 >
                   Próximo
                 </Button>
               ) : (
-                <Button
-                  onClick={submit}
-                  disabled={!canSubmit || submitting}
-                  className="bg-admin-accent hover:bg-admin-accent/90"
-                >
+                <Button disabled={!canSubmit || submitting} onClick={submit}>
                   {submitting ? "Criando..." : "Criar pedido"}
                 </Button>
               )}
@@ -652,95 +569,31 @@ export function NewOrderWizard({
   );
 }
 
-function stepLabel(s: number) {
-  return s === 1 ? "Cliente" : s === 2 ? "Serviço & valor" : "Pagamento";
-}
-
-function BankTransferCollapsible({
-  defaultOpen,
-  beneficiaryName,
-  iban,
-  bic,
-  amountLabel,
-  amountRaw,
-  reference,
-  hasWiseUrl,
-  onCopy,
+function CurrencySelect({
+  value,
+  onChange,
 }: {
-  defaultOpen: boolean;
-  beneficiaryName: string | null;
-  iban: string | null;
-  bic: string | null;
-  amountLabel: string;
-  amountRaw: string;
-  reference: string | null;
-  hasWiseUrl: boolean;
-  onCopy: (text: string, label: string) => void;
+  value: Currency;
+  onChange: (value: Currency) => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-lg border border-dashed border-border bg-muted/20">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between p-4 text-left"
-      >
-        <span className="font-display text-[11px] uppercase tracking-widest text-muted-foreground">
-          {hasWiseUrl ? "Ou faça uma transferência bancária" : "Dados bancários EUR"}
-        </span>
-        <ChevronDown
-          className={`h-4 w-4 text-muted-foreground transition ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      {open && (
-        <div className="border-t border-border/60 px-4 pb-4 pt-2 text-sm">
-          {beneficiaryName && (
-            <BankRow label="Beneficiário" value={beneficiaryName} onCopy={() => onCopy(beneficiaryName, "Beneficiário")} />
-          )}
-          {iban && <BankRow label="IBAN" value={iban} onCopy={() => onCopy(iban, "IBAN")} mono />}
-          {bic && <BankRow label="BIC/SWIFT" value={bic} onCopy={() => onCopy(bic, "BIC")} mono />}
-          <BankRow label="Valor" value={amountLabel} onCopy={() => onCopy(amountRaw, "Valor")} />
-          {reference && (
-            <BankRow label="Referência" value={reference} onCopy={() => onCopy(reference, "Referência")} mono />
-          )}
-          {reference && (
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Inclua a referência <strong>{reference}</strong> na transferência para conciliação automática.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
+    <Select value={value} onValueChange={(next) => onChange(next as Currency)}>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="BRL">BRL</SelectItem>
+        <SelectItem value="EUR">EUR</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
 
-function BankRow({
-  label,
-  value,
-  onCopy,
-  mono,
-}: {
-  label: string;
-  value: string;
-  onCopy: () => void;
-  mono?: boolean;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="mt-2 flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        <Label className="font-display text-[10px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </Label>
-        <div className={`break-all text-sm ${mono ? "font-mono" : ""}`}>{value}</div>
-      </div>
-      <button
-        type="button"
-        onClick={onCopy}
-        className="mt-4 shrink-0 text-admin-accent"
-        aria-label="Copiar"
-      >
-        <Copy className="h-4 w-4" />
-      </button>
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      {children}
     </div>
   );
 }

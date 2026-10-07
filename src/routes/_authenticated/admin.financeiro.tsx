@@ -6,7 +6,6 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   CalendarClock,
-  CheckCircle2,
   Loader2,
   Plus,
   RefreshCw,
@@ -38,6 +37,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
+import { FinanceAccountCombobox } from "@/components/admin/financeiro/FinanceAccountCombobox";
+import { SettleTransactionPopover } from "@/components/admin/financeiro/SettleTransactionPopover";
 import {
   createFinanceAccount,
   createFinanceCategory,
@@ -48,6 +50,7 @@ import {
   listFinanceMeta,
   listFinanceRecurringRules,
   listFinanceTransactions,
+  settleFinanceTransaction,
   toggleFinanceRecurringRule,
   updateFinanceTransactionStatus,
   type FinanceAccount,
@@ -123,6 +126,7 @@ function FinanceiroContent() {
   const fetchRecurring = useServerFn(listFinanceRecurringRules);
   const createTx = useServerFn(createFinanceTransaction);
   const updateTxStatus = useServerFn(updateFinanceTransactionStatus);
+  const settleTx = useServerFn(settleFinanceTransaction);
   const createRule = useServerFn(createFinanceRecurringRule);
   const toggleRule = useServerFn(toggleFinanceRecurringRule);
   const generateRecurring = useServerFn(generateFinanceRecurringForMonth);
@@ -143,7 +147,13 @@ function FinanceiroContent() {
           search: filters.search || undefined,
           type: filters.type as "all" | "income" | "expense",
           status: filters.status as
-            "all" | "planned" | "pending" | "received" | "paid" | "overdue" | "canceled",
+            | "all"
+            | "planned"
+            | "pending"
+            | "received"
+            | "paid"
+            | "overdue"
+            | "canceled",
           sourceModule: filters.sourceModule === "all" ? undefined : filters.sourceModule,
           page: 0,
           pageSize: 60,
@@ -229,6 +239,7 @@ function FinanceiroContent() {
             categories={categories}
             accounts={accounts}
             createTx={createTx}
+            createAccount={createAccount}
             onDone={refresh}
           />
           <NewRecurringDialog
@@ -285,63 +296,75 @@ function FinanceiroContent() {
         )}
 
         <TabsContent value="resumo" className="mt-0 space-y-4">
-          <div className="grid grid-cols-12 gap-4">
-            <MetricCard
-              label="Recebido"
-              value={money(overview?.totals.received ?? 0)}
-              icon={ArrowUpCircle}
-              tone="green"
-            />
-            <MetricCard
-              label="A receber"
-              value={money(overview?.totals.receivable ?? 0)}
-              icon={CalendarClock}
-              tone="amber"
-            />
-            <MetricCard
-              label="Pago"
-              value={money(overview?.totals.paid ?? 0)}
-              icon={ArrowDownCircle}
-              tone="red"
-            />
-            <MetricCard
-              label="A pagar"
-              value={money(overview?.totals.payable ?? 0)}
-              icon={CalendarClock}
-              tone="amber"
-            />
-            <MetricCard
-              label="Saldo realizado"
-              value={money(overview?.totals.realizedBalance ?? 0)}
-              icon={WalletCards}
-              tone="blue"
-            />
-            <MetricCard
-              label="Saldo projetado"
-              value={money(overview?.totals.projectedBalance ?? 0)}
-              icon={WalletCards}
-              tone="slate"
-            />
+          <div className="space-y-5">
+            {(["BRL", "EUR"] as const).map((currency) => {
+              const totals = overview?.totals[currency];
+              return (
+                <section key={currency} className="space-y-3">
+                  <h2 className="font-display text-xl font-semibold">Caixa {currency}</h2>
+                  <div className="grid grid-cols-12 gap-4">
+                    <MetricCard
+                      label="Recebido"
+                      value={money(totals?.received ?? 0, currency)}
+                      icon={ArrowUpCircle}
+                      tone="green"
+                    />
+                    <MetricCard
+                      label="A receber"
+                      value={money(totals?.receivable ?? 0, currency)}
+                      icon={CalendarClock}
+                      tone="amber"
+                    />
+                    <MetricCard
+                      label="Pago"
+                      value={money(totals?.paid ?? 0, currency)}
+                      icon={ArrowDownCircle}
+                      tone="red"
+                    />
+                    <MetricCard
+                      label="A pagar"
+                      value={money(totals?.payable ?? 0, currency)}
+                      icon={CalendarClock}
+                      tone="amber"
+                    />
+                    <MetricCard
+                      label="Saldo realizado"
+                      value={money(totals?.realizedBalance ?? 0, currency)}
+                      icon={WalletCards}
+                      tone="blue"
+                    />
+                    <MetricCard
+                      label="Saldo projetado"
+                      value={money(totals?.projectedBalance ?? 0, currency)}
+                      icon={WalletCards}
+                      tone="slate"
+                    />
+                  </div>
+                </section>
+              );
+            })}
 
-            <BentoCard title="Pendencias do mes" className="col-span-12 lg:col-span-5">
-              <TransactionList
-                rows={overview?.pending ?? []}
-                empty="Nenhuma pendencia para o mes."
-              />
-            </BentoCard>
-            <BentoCard title="Origem dos valores" className="col-span-12 lg:col-span-4">
-              <Breakdown rows={overview?.byOrigin ?? []} />
-            </BentoCard>
-            <BentoCard title="Despesas por categoria" className="col-span-12 lg:col-span-3">
-              <Breakdown rows={overview?.expenseByCategory ?? []} expense />
-            </BentoCard>
-            <BentoCard title="Ultimos lancamentos" className="col-span-12">
-              <TransactionTable
-                rows={(overview?.recent ?? []) as FinanceTransaction[]}
-                onStatus={(id, status) => statusMutation.mutate({ id, status })}
-                compact
-              />
-            </BentoCard>
+            <div className="grid grid-cols-12 gap-4">
+              <BentoCard title="Pendencias do mes" className="col-span-12 lg:col-span-5">
+                <TransactionList
+                  rows={overview?.pending ?? []}
+                  empty="Nenhuma pendencia para o mes."
+                />
+              </BentoCard>
+              <BentoCard title="Ultimos lancamentos" className="col-span-12">
+                <TransactionTable
+                  rows={(overview?.recent ?? []) as FinanceTransaction[]}
+                  accounts={accounts}
+                  settle={(data) => settleTx({ data })}
+                  createAccount={async (name, currency) =>
+                    (await createAccount({ data: { name, type: "bank", currency } })).id
+                  }
+                  onDone={refresh}
+                  onCancel={(id) => statusMutation.mutate({ id, status: "canceled" })}
+                  compact
+                />
+              </BentoCard>
+            </div>
           </div>
         </TabsContent>
 
@@ -412,7 +435,13 @@ function FinanceiroContent() {
             ) : (
               <TransactionTable
                 rows={transactions}
-                onStatus={(id, status) => statusMutation.mutate({ id, status })}
+                accounts={accounts}
+                settle={(data) => settleTx({ data })}
+                createAccount={async (name, currency) =>
+                  (await createAccount({ data: { name, type: "bank", currency } })).id
+                }
+                onDone={refresh}
+                onCancel={(id) => statusMutation.mutate({ id, status: "canceled" })}
               />
             )}
           </BentoCard>
@@ -513,39 +542,21 @@ function TransactionList({ rows, empty }: { rows: FinanceTransaction[]; empty: s
   );
 }
 
-function Breakdown({
-  rows,
-  expense = false,
-}: {
-  rows: { label: string; amount_cents: number }[];
-  expense?: boolean;
-}) {
-  if (!rows.length) return <p className="text-sm text-admin-ink-muted">Sem dados no periodo.</p>;
-  return (
-    <ul className="space-y-3">
-      {rows.map((row) => (
-        <li key={row.label} className="flex items-center justify-between gap-3">
-          <span className="truncate text-sm text-admin-ink">
-            {ORIGIN_LABEL[row.label] ?? row.label}
-          </span>
-          <span
-            className={`text-sm font-medium ${expense || row.amount_cents < 0 ? "text-red-700" : "text-emerald-700"}`}
-          >
-            {money(Math.abs(row.amount_cents))}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function TransactionTable({
   rows,
-  onStatus,
+  accounts,
+  settle,
+  createAccount,
+  onDone,
+  onCancel,
   compact = false,
 }: {
   rows: FinanceTransaction[];
-  onStatus: (id: string, status: "received" | "paid" | "canceled") => void;
+  accounts: FinanceAccount[];
+  settle: React.ComponentProps<typeof SettleTransactionPopover>["settle"];
+  createAccount: React.ComponentProps<typeof SettleTransactionPopover>["createAccount"];
+  onDone: () => void;
+  onCancel: (id: string) => void;
   compact?: boolean;
 }) {
   if (!rows.length)
@@ -565,9 +576,8 @@ function TransactionTable({
         </thead>
         <tbody>
           {rows.map((tx) => {
-            const payableStatus = tx.type === "income" ? "received" : "paid";
             const canSettle =
-              !tx.is_automatic && !["received", "paid", "canceled"].includes(tx.status);
+              tx.source_module !== "pdv" && !["received", "paid", "canceled"].includes(tx.status);
             return (
               <tr key={tx.id} className="border-b border-admin-border last:border-0">
                 <td className="max-w-[260px] py-3 pr-3">
@@ -593,23 +603,30 @@ function TransactionTable({
                   className={`py-3 pr-3 text-right font-medium ${tx.type === "income" ? "text-emerald-700" : "text-red-700"}`}
                 >
                   {tx.type === "income" ? "+" : "-"} {money(tx.amount_cents, tx.currency)}
+                  {tx.settled_amount_cents != null && (
+                    <div className="text-xs text-admin-ink-muted">
+                      Realizado:{" "}
+                      {money(tx.settled_amount_cents, tx.settled_currency ?? tx.currency)}
+                    </div>
+                  )}
                 </td>
                 {!compact && (
                   <td className="py-3 pl-3 text-right">
                     <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!canSettle}
-                        onClick={() => onStatus(tx.id, payableStatus)}
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                      </Button>
+                      {canSettle && (
+                        <SettleTransactionPopover
+                          transaction={tx}
+                          accounts={accounts}
+                          settle={settle}
+                          createAccount={createAccount}
+                          onDone={onDone}
+                        />
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={tx.is_automatic || tx.status === "canceled"}
-                        onClick={() => onStatus(tx.id, "canceled")}
+                        onClick={() => onCancel(tx.id)}
                       >
                         Cancelar
                       </Button>
@@ -682,15 +699,25 @@ function NewTransactionDialog({
   categories,
   accounts,
   createTx,
+  createAccount,
   onDone,
 }: {
   categories: FinanceCategory[];
   accounts: FinanceAccount[];
   createTx: ReturnType<typeof useServerFn<typeof createFinanceTransaction>>;
+  createAccount: ReturnType<typeof useServerFn<typeof createFinanceAccount>>;
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<"income" | "expense">("income");
+  const [currency, setCurrency] = useState<"BRL" | "EUR" | "USD">("BRL");
+  const [categoryId, setCategoryId] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [orderWizardOpen, setOrderWizardOpen] = useState(false);
+  const orderCategoryId = categories.find(
+    (category) => category.is_system && category.name === "Pedidos/Servicos",
+  )?.id;
+  const orderMode = type === "income" && !!orderCategoryId && categoryId === orderCategoryId;
   const mutation = useMutation({
     mutationFn: (form: FormData) =>
       createTx({
@@ -698,12 +725,15 @@ function NewTransactionDialog({
           type,
           description: String(form.get("description") ?? ""),
           amount: Number(form.get("amount") ?? 0),
-          currency: String(form.get("currency") ?? "BRL") as "BRL" | "EUR" | "USD",
+          currency,
           dueDate: String(form.get("dueDate") ?? ""),
           status: String(form.get("status") ?? "pending") as
-            "planned" | "pending" | "received" | "paid",
-          categoryId: emptyToNull(form.get("categoryId")),
-          accountId: emptyToNull(form.get("accountId")),
+            | "planned"
+            | "pending"
+            | "received"
+            | "paid",
+          categoryId: categoryId || null,
+          accountId: accountId || null,
           paymentMethod: emptyToNull(form.get("paymentMethod")),
           notes: emptyToNull(form.get("notes")),
         },
@@ -717,91 +747,164 @@ function NewTransactionDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" /> Novo lancamento
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Novo lancamento</DialogTitle>
-        </DialogHeader>
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            mutation.mutate(new FormData(e.currentTarget));
-          }}
-        >
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Tipo">
-              <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="income">Entrada</SelectItem>
-                  <SelectItem value="expense">Saida</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Status">
-              <Select name="status" defaultValue="pending">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="planned">Planejado</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value={type === "income" ? "received" : "paid"}>
-                    {type === "income" ? "Recebido" : "Pago"}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <Field label="Descricao">
-            <Input name="description" required />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Valor">
-              <Input name="amount" type="number" min="0" step="0.01" required />
-            </Field>
-            <Field label="Moeda">
-              <Select name="currency" defaultValue="BRL">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BRL">BRL</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <Field label="Vencimento">
-            <Input
-              name="dueDate"
-              type="date"
-              defaultValue={new Date().toISOString().slice(0, 10)}
-              required
-            />
-          </Field>
-          <CategoryAccountFields categories={categories} accounts={accounts} type={type} />
-          <Field label="Metodo">
-            <Input name="paymentMethod" placeholder="dinheiro, cartao, pix, transferencia..." />
-          </Field>
-          <Field label="Observacoes">
-            <Textarea name="notes" />
-          </Field>
-          <Button type="submit" disabled={mutation.isPending} className="w-full">
-            {mutation.isPending ? "Salvando..." : "Salvar lancamento"}
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" /> Novo lancamento
           </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo lancamento</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              mutation.mutate(new FormData(e.currentTarget));
+            }}
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Tipo">
+                <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="income">Entrada</SelectItem>
+                    <SelectItem value="expense">Saida</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Status">
+                <Select name="status" defaultValue="pending">
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planned">Planejado</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value={type === "income" ? "received" : "paid"}>
+                      {type === "income" ? "Recebido" : "Pago"}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <Field label="Categoria">
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories
+                    .filter((category) => category.type === type || category.type === "both")
+                    .map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            {orderMode ? (
+              <div className="space-y-3 rounded border border-blue-200 bg-blue-50 p-4 text-sm">
+                <strong>Receita de pedido/serviço</strong>
+                <p>
+                  Para manter Esteira e Caixa sincronizados, esta operação cria primeiro um pedido;
+                  o lançamento financeiro será gerado automaticamente.
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setOrderWizardOpen(true);
+                  }}
+                >
+                  Criar pedido sincronizado
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setCategoryId("")}>
+                  Voltar ao lançamento comum
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Field label="Descricao">
+                  <Input name="description" required />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Valor">
+                    <Input name="amount" type="number" min="0" step="0.01" required />
+                  </Field>
+                  <Field label="Moeda">
+                    <Select
+                      value={currency}
+                      onValueChange={(value) => {
+                        setCurrency(value as typeof currency);
+                        setAccountId("");
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BRL">BRL</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+                <Field label="Vencimento">
+                  <Input
+                    name="dueDate"
+                    type="date"
+                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    required
+                  />
+                </Field>
+                <Field label="Conta">
+                  <FinanceAccountCombobox
+                    accounts={accounts}
+                    currency={currency}
+                    value={accountId}
+                    onChange={setAccountId}
+                    onCreate={async (name, accountCurrency) => {
+                      const result = await createAccount({
+                        data: { name, type: "bank", currency: accountCurrency },
+                      });
+                      await onDone();
+                      return result.id;
+                    }}
+                  />
+                </Field>
+                <Field label="Metodo">
+                  <Input
+                    name="paymentMethod"
+                    placeholder="dinheiro, cartao, pix, transferencia..."
+                  />
+                </Field>
+                <Field label="Observacoes">
+                  <Textarea name="notes" />
+                </Field>
+                <Button type="submit" disabled={mutation.isPending} className="w-full">
+                  {mutation.isPending ? "Salvando..." : "Salvar lancamento"}
+                </Button>
+              </>
+            )}
+          </form>
+        </DialogContent>
+      </Dialog>
+      <NewOrderWizard
+        open={orderWizardOpen}
+        onOpenChange={setOrderWizardOpen}
+        initiatedFrom="financeiro"
+        onCreated={() => {
+          onDone();
+        }}
+      />
+    </>
   );
 }
 
@@ -946,7 +1049,11 @@ function FinanceSettingsDialog({
         data: {
           name: String(form.get("name") ?? ""),
           type: String(form.get("type") ?? "cash") as
-            "cash" | "bank" | "card" | "gateway" | "other",
+            | "cash"
+            | "bank"
+            | "card"
+            | "gateway"
+            | "other",
           currency: String(form.get("currency") ?? "BRL") as "BRL" | "EUR" | "USD",
         },
       }),
