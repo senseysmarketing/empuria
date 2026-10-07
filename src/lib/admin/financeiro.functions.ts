@@ -50,6 +50,7 @@ export type FinanceTransaction = {
   source_id: string | null;
   is_automatic: boolean;
   notes: string | null;
+  adjustment_for_month: string | null;
   created_at: string;
   category_name?: string | null;
   account_name?: string | null;
@@ -105,6 +106,23 @@ async function ensureFinanceMonth(month: string, actorId?: string) {
     p_actor: actorId ?? null,
   });
   if (error) throw new Error(error.message);
+}
+
+async function assertFinanceMonthOpen(month: string) {
+  const { data: closed, error } = await db.rpc("finance_month_is_closed", {
+    p_month: `${month}-01`,
+  });
+  if (error) throw new Error(error.message);
+  if (closed) throw new Error("Mês fechado: registre um ajuste no mês aberto atual.");
+}
+
+function currentBusinessMonth() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}`;
 }
 
 async function validateRuleAccount(accountId: string | null | undefined, currency: string) {
@@ -342,12 +360,28 @@ const transactionInput = z.object({
   accountId: z.string().uuid().nullable().optional(),
   paymentMethod: z.string().trim().max(60).nullable().optional(),
   notes: z.string().trim().max(800).nullable().optional(),
+  adjustmentForMonth: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])-01$/)
+    .nullable()
+    .optional(),
 });
 
 export const createFinanceTransaction = createServerFn({ method: "POST" })
   .middleware([requireModule("financeiro")])
   .inputValidator((d) => transactionInput.parse(d))
   .handler(async ({ data, context }) => {
+    await assertFinanceMonthOpen(data.dueDate.slice(0, 7));
+    if (data.adjustmentForMonth) {
+      const { data: closed, error } = await db.rpc("finance_month_is_closed", {
+        p_month: data.adjustmentForMonth,
+      });
+      if (error) throw new Error(error.message);
+      if (!closed) throw new Error("O ajuste deve referenciar um mês fechado.");
+      if (data.dueDate.slice(0, 7) !== currentBusinessMonth()) {
+        throw new Error("O ajuste deve ser lançado no mês atual aberto.");
+      }
+    }
     const finalStatus =
       data.type === "income" && data.status === "paid"
         ? "received"
@@ -371,7 +405,8 @@ export const createFinanceTransaction = createServerFn({ method: "POST" })
         category_id: data.categoryId ?? null,
         account_id: data.accountId ?? null,
         payment_method: data.paymentMethod ?? null,
-        source_module: "manual",
+        source_module: data.adjustmentForMonth ? "month_adjustment" : "manual",
+        adjustment_for_month: data.adjustmentForMonth ?? null,
         is_automatic: false,
         notes: data.notes ?? null,
         created_by: context.userId,
@@ -379,7 +414,15 @@ export const createFinanceTransaction = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    await audit(context.userId, "finance.transaction.create", inserted.id, inserted as Json);
+    await audit(
+      context.userId,
+      data.adjustmentForMonth ? "finance.month.adjust" : "finance.transaction.create",
+      inserted.id,
+      {
+        id: inserted.id,
+        adjustment_for_month: data.adjustmentForMonth ?? null,
+      },
+    );
     return { ok: true, id: inserted.id as string };
   });
 
@@ -474,6 +517,7 @@ export const settleFinanceTransaction = createServerFn({ method: "POST" })
     if (
       tx.is_automatic &&
       tx.source_module !== "team_payout" &&
+      tx.source_module !== "partner_distribution" &&
       !tx.source_module.startsWith("recurring:")
     )
       throw new Error("Este lançamento automático deve ser corrigido no módulo de origem.");

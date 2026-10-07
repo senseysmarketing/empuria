@@ -185,9 +185,12 @@ export function FinanceTeamPanel({
     }
     for (const payout of data?.payouts ?? []) {
       const tx = payout.finance_transaction_id ? txMap.get(payout.finance_transaction_id) : null;
-      const currency = payout.currency as Currency;
+      const currency = (
+        tx?.status === "paid" ? (tx.settled_currency ?? payout.currency) : payout.currency
+      ) as Currency;
       if (currency !== "BRL" && currency !== "EUR") continue;
-      if (tx?.status === "paid") value[currency].paid += tx.settled_amount_cents ?? 0;
+      if (tx?.status === "paid")
+        value[currency].paid += tx.settled_amount_cents ?? payout.amount_cents;
       else value[currency].payable += payout.amount_cents;
     }
     return value;
@@ -379,7 +382,9 @@ export function FinanceTeamPanel({
                       )}
                       {transaction && (
                         <span className="text-admin-ink-muted">
-                          {transaction.status === "paid" ? "Pago" : "A pagar"}
+                          {transaction.status === "paid"
+                            ? `Pago ${money(transaction.settled_amount_cents ?? payout?.amount_cents ?? 0, transaction.settled_currency ?? projection.currency)}`
+                            : "A pagar"}
                         </span>
                       )}
                       {transaction &&
@@ -436,8 +441,13 @@ export function FinanceTeamPanel({
                       className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-admin-border pt-2"
                     >
                       <span>
-                        {payout.currency} {money(payout.amount_cents, payout.currency)} ·{" "}
-                        {transaction?.status === "paid" ? "Pago" : "A pagar"}
+                        {transaction?.status === "paid"
+                          ? money(
+                              transaction.settled_amount_cents ?? payout.amount_cents,
+                              transaction.settled_currency ?? payout.currency,
+                            )
+                          : money(payout.amount_cents, payout.currency)}{" "}
+                        · {transaction?.status === "paid" ? "Pago" : "A pagar"}
                         {transaction ? ` · vence ${transaction.due_date}` : ""}
                       </span>
                       {transaction &&

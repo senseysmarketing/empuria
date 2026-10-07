@@ -1876,6 +1876,115 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_month_closures: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          final_snapshot: Json | null
+          id: string
+          period_month: string
+          prepared_at: string | null
+          prepared_by: string | null
+          preview_snapshot: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          final_snapshot?: Json | null
+          id?: string
+          period_month: string
+          prepared_at?: string | null
+          prepared_by?: string | null
+          preview_snapshot?: Json | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          final_snapshot?: Json | null
+          id?: string
+          period_month?: string
+          prepared_at?: string | null
+          prepared_by?: string | null
+          preview_snapshot?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_month_closures_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_month_closures_prepared_by_fkey"
+            columns: ["prepared_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_month_distributions: {
+        Row: {
+          amount_cents: number
+          closure_id: string
+          created_at: string
+          currency: string
+          finance_transaction_id: string | null
+          id: string
+          partner_code: string
+          partner_name: string
+          percentage: number
+        }
+        Insert: {
+          amount_cents: number
+          closure_id: string
+          created_at?: string
+          currency: string
+          finance_transaction_id?: string | null
+          id?: string
+          partner_code: string
+          partner_name: string
+          percentage: number
+        }
+        Update: {
+          amount_cents?: number
+          closure_id?: string
+          created_at?: string
+          currency?: string
+          finance_transaction_id?: string | null
+          id?: string
+          partner_code?: string
+          partner_name?: string
+          percentage?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_month_distributions_closure_id_fkey"
+            columns: ["closure_id"]
+            isOneToOne: false
+            referencedRelation: "finance_month_closures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_month_distributions_finance_transaction_id_fkey"
+            columns: ["finance_transaction_id"]
+            isOneToOne: true
+            referencedRelation: "finance_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
       finance_payees: {
         Row: {
           created_at: string
@@ -2160,6 +2269,7 @@ export type Database = {
       finance_transactions: {
         Row: {
           account_id: string | null
+          adjustment_for_month: string | null
           amount_brl_cents: number | null
           amount_cents: number
           category_id: string | null
@@ -2189,6 +2299,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          adjustment_for_month?: string | null
           amount_brl_cents?: number | null
           amount_cents?: number
           category_id?: string | null
@@ -2218,6 +2329,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          adjustment_for_month?: string | null
           amount_brl_cents?: number | null
           amount_cents?: number
           category_id?: string | null
@@ -4268,6 +4380,11 @@ export type Database = {
         Args: { p_name: string; p_type: string }
         Returns: string
       }
+      finance_close_month: {
+        Args: { p_actor: string; p_month: string }
+        Returns: Json
+      }
+      finance_dashboard_month: { Args: { p_month: string }; Returns: Json }
       finance_ensure_month: {
         Args: { p_actor?: string; p_month: string }
         Returns: undefined
@@ -4275,6 +4392,11 @@ export type Database = {
       finance_materialize_payout: {
         Args: { p_actor?: string; p_currency: string; p_month: string; p_rule_id: string }
         Returns: string
+      }
+      finance_month_is_closed: { Args: { p_month: string }; Returns: boolean }
+      finance_month_snapshot: {
+        Args: { p_include_projection?: boolean; p_month: string }
+        Returns: Json
       }
       finance_payout_base: {
         Args: { p_currency: string; p_month: string; p_rule_id: string }
@@ -4291,6 +4413,10 @@ export type Database = {
           projected_amount_cents: number
           rule_id: string
         }[]
+      }
+      finance_prepare_month: {
+        Args: { p_actor: string; p_month: string }
+        Returns: Json
       }
       finance_sync_order: { Args: { p_order_id: string }; Returns: undefined }
       finance_sync_pdv_sale: { Args: { p_sale_id: string }; Returns: undefined }
