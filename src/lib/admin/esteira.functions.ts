@@ -267,6 +267,18 @@ export const createOrderFull = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (data.payment_method === "received" && !data.payment_account_id)
       throw new Error("Selecione a conta que recebeu.");
+    if (data.payment_method === "received") {
+      const settledCurrency = data.settled_currency ?? data.payment_currency;
+      const { data: account, error: accountError } = await supabaseAdmin
+        .from("finance_accounts")
+        .select("currency,is_active")
+        .eq("id", data.payment_account_id!)
+        .maybeSingle();
+      if (accountError || !account?.is_active) throw new Error("Conta financeira inválida.");
+      if (account.currency !== settledCurrency) {
+        throw new Error("A moeda da conta deve ser igual à moeda recebida.");
+      }
+    }
     if (data.amount_cents === 0 && data.payment_method !== "gratuito") {
       throw new Error("Pedido com valor zero exige confirmação como gratuito");
     }
