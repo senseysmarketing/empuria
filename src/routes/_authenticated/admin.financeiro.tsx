@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -50,7 +50,6 @@ import {
   createFinanceRecurringRule,
   createFinanceTransaction,
   endFinanceRecurringRule,
-  getFinanceOverview,
   listFinanceMeta,
   listFinanceSettings,
   listFinanceRecurringRules,
@@ -73,11 +72,9 @@ export const Route = createFileRoute("/_authenticated/admin/financeiro")({
 });
 
 const STATUS_LABEL: Record<string, string> = {
-  planned: "Planejado",
   pending: "Pendente",
   received: "Recebido",
   paid: "Pago",
-  overdue: "Vencido",
   canceled: "Cancelado",
 };
 
@@ -100,7 +97,6 @@ function money(cents: number, currency = "BRL") {
 function statusClass(status: string) {
   if (status === "received" || status === "paid") return "bg-emerald-100 text-emerald-900";
   if (status === "canceled") return "bg-slate-200 text-slate-700";
-  if (status === "overdue") return "bg-red-100 text-red-900";
   return "bg-amber-100 text-amber-900";
 }
 
@@ -121,15 +117,21 @@ function FinanceiroContent() {
   const qc = useQueryClient();
   const [month, setMonth] = useState(defaultMonth());
   const [tab, setTab] = useState("resumo");
+  const [newOpen, setNewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState({
     search: "",
     type: "all",
     status: "all",
     sourceModule: "all",
   });
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(filters.search), 300);
+    return () => window.clearTimeout(timer);
+  }, [filters.search]);
 
   const fetchMeta = useServerFn(listFinanceMeta);
-  const fetchOverview = useServerFn(getFinanceOverview);
   const fetchTransactions = useServerFn(listFinanceTransactions);
   const fetchRecurring = useServerFn(listFinanceRecurringRules);
   const createTx = useServerFn(createFinanceTransaction);
@@ -147,37 +149,48 @@ function FinanceiroContent() {
   const manageCategory = useServerFn(manageFinanceCategory);
   const fetchDashboard = useServerFn(getFinanceDashboard);
 
-  const metaQ = useQuery({ queryKey: ["finance-meta"], queryFn: () => fetchMeta() });
-  const settingsQ = useQuery({ queryKey: ["finance-settings"], queryFn: () => fetchSettings() });
-  const overviewQ = useQuery({
-    queryKey: ["finance-overview", month],
-    queryFn: () => fetchOverview({ data: { month } }),
+  const metaQ = useQuery({
+    queryKey: ["finance-meta"],
+    queryFn: () => fetchMeta(),
+    enabled: tab !== "resumo" || newOpen,
+    staleTime: 5 * 60_000,
+  });
+  const settingsQ = useQuery({
+    queryKey: ["finance-settings"],
+    queryFn: () => fetchSettings(),
+    enabled: settingsOpen,
+    staleTime: 5 * 60_000,
   });
   const dashboardQ = useQuery({
     queryKey: ["finance-dashboard", month],
     queryFn: () => fetchDashboard({ data: { month } }),
+    enabled: tab === "resumo",
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
   const transactionsQ = useQuery({
-    queryKey: ["finance-transactions", month, filters],
+    queryKey: [
+      "finance-transactions",
+      month,
+      debouncedSearch,
+      filters.type,
+      filters.status,
+      filters.sourceModule,
+    ],
     queryFn: () =>
       fetchTransactions({
         data: {
           month,
-          search: filters.search || undefined,
+          search: debouncedSearch || undefined,
           type: filters.type as "all" | "income" | "expense",
-          status: filters.status as
-            | "all"
-            | "planned"
-            | "pending"
-            | "received"
-            | "paid"
-            | "overdue"
-            | "canceled",
+          status: filters.status as "all" | "pending" | "received" | "paid" | "canceled",
           sourceModule: filters.sourceModule === "all" ? undefined : filters.sourceModule,
           page: 0,
           pageSize: 60,
         },
       }),
+    enabled: tab === "lancamentos",
+    placeholderData: keepPreviousData,
   });
   const recurringQ = useQuery({
     queryKey: ["finance-recurring"],
@@ -186,13 +199,19 @@ function FinanceiroContent() {
   });
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["finance-overview"] });
-    qc.invalidateQueries({ queryKey: ["finance-transactions"] });
-    qc.invalidateQueries({ queryKey: ["finance-recurring"] });
-    qc.invalidateQueries({ queryKey: ["finance-meta"] });
-    qc.invalidateQueries({ queryKey: ["finance-settings"] });
-    qc.invalidateQueries({ queryKey: ["finance-dashboard"] });
-    qc.invalidateQueries({ queryKey: ["finance-team"] });
+    for (const key of [
+      "finance-transactions",
+      "finance-recurring",
+      "finance-dashboard",
+      "finance-team",
+    ]) {
+      qc.invalidateQueries({ queryKey: [key], refetchType: "active" });
+    }
+  };
+  const refreshConfiguration = () => {
+    refresh();
+    qc.invalidateQueries({ queryKey: ["finance-meta"], refetchType: "active" });
+    qc.invalidateQueries({ queryKey: ["finance-settings"], refetchType: "active" });
   };
 
   const deleteMutation = useMutation({
@@ -214,20 +233,27 @@ function FinanceiroContent() {
 
   const categories = metaQ.data?.categories ?? [];
   const accounts = metaQ.data?.accounts ?? [];
-  const overview = overviewQ.data;
   const transactions = useMemo(
     () => (transactionsQ.data?.rows ?? []) as FinanceTransaction[],
     [transactionsQ.data?.rows],
   );
   const isLoading =
-    overviewQ.isLoading || transactionsQ.isLoading || metaQ.isLoading || dashboardQ.isLoading;
+    tab === "resumo"
+      ? dashboardQ.isLoading
+      : tab === "lancamentos"
+        ? transactionsQ.isLoading
+        : false;
 
   const originOptions = useMemo(() => {
     const set = new Set(transactions.map((tx) => tx.source_module));
     return Array.from(set).sort();
   }, [transactions]);
   const loadError =
-    metaQ.error ?? overviewQ.error ?? transactionsQ.error ?? recurringQ.error ?? dashboardQ.error;
+    dashboardQ.error ??
+    (tab !== "resumo" ? metaQ.error : null) ??
+    (tab === "lancamentos" ? transactionsQ.error : null) ??
+    (tab === "recorrencias" ? recurringQ.error : null) ??
+    settingsQ.error;
 
   return (
     <div className="space-y-6">
@@ -250,7 +276,12 @@ function FinanceiroContent() {
             onChange={(e) => setMonth(e.target.value || defaultMonth())}
             className="w-40 bg-admin-surface"
           />
-          <Button variant="outline" onClick={refresh} disabled={isLoading} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={refreshConfiguration}
+            disabled={isLoading}
+            className="gap-2"
+          >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -259,20 +290,22 @@ function FinanceiroContent() {
             Atualizar
           </Button>
           <NewTransactionDialog
+            onOpenChange={setNewOpen}
             categories={categories}
             accounts={accounts}
             createTx={createTx}
             createAccount={createAccount}
-            onDone={refresh}
+            onDone={refreshConfiguration}
           />
           <FinanceSettingsDialog
+            onOpenChange={setSettingsOpen}
             categories={settingsQ.data?.categories ?? []}
             accounts={settingsQ.data?.accounts ?? []}
             createCategory={createCategory}
             createAccount={createAccount}
             manageCategory={manageCategory}
             manageAccount={manageAccount}
-            onDone={refresh}
+            onDone={refreshConfiguration}
           />
         </div>
       </header>
@@ -324,15 +357,14 @@ function FinanceiroContent() {
 
         <TabsContent value="resumo" className="mt-0 space-y-4">
           <div className="space-y-5">
-            {dashboardQ.data && (
-              <FinanceMonthClosePanel
-                month={month}
-                snapshot={dashboardQ.data.snapshot}
-                analytics={dashboardQ.data.analytics}
-              />
+            {dashboardQ.isPlaceholderData && (
+              <p className="text-sm text-admin-ink-muted">Atualizando mês selecionado…</p>
+            )}
+            {dashboardQ.isFetching && !dashboardQ.data && (
+              <Loader2 className="h-6 w-6 animate-spin text-admin-accent" />
             )}
             {(["BRL", "EUR"] as const).map((currency) => {
-              const totals = overview?.totals[currency];
+              const totals = dashboardQ.data?.totals[currency];
               return (
                 <section key={currency} className="space-y-3">
                   <h2 className="font-display text-xl font-semibold">Caixa {currency}</h2>
@@ -362,75 +394,22 @@ function FinanceiroContent() {
                       tone="amber"
                     />
                     <MetricCard
-                      label="Vencidos anteriores"
-                      value={money(
-                        (overview?.overduePrevious[currency] ?? []).reduce(
-                          (total, row) => total + row.amount_cents,
-                          0,
-                        ),
-                        currency,
-                      )}
-                      icon={CalendarClock}
-                      tone="red"
-                    />
-                    <MetricCard
                       label="Saldo realizado"
                       value={money(totals?.realizedBalance ?? 0, currency)}
                       icon={WalletCards}
                       tone="blue"
-                    />
-                    <MetricCard
-                      label="Saldo projetado"
-                      value={money(totals?.projectedBalance ?? 0, currency)}
-                      icon={WalletCards}
-                      tone="slate"
                     />
                   </div>
                 </section>
               );
             })}
 
-            <div className="grid grid-cols-12 gap-4">
-              <BentoCard title="Pendencias do mes" className="col-span-12 lg:col-span-5">
-                <TransactionList
-                  rows={overview?.pending ?? []}
-                  empty="Nenhuma pendencia para o mes."
-                />
-              </BentoCard>
-              <BentoCard title="Vencidos anteriores · BRL" className="col-span-12 lg:col-span-6">
-                <TransactionList
-                  rows={(overview?.overduePrevious.BRL ?? []).slice(0, 8)}
-                  empty="Nenhuma pendência anterior em BRL."
-                />
-              </BentoCard>
-              <BentoCard title="Vencidos anteriores · EUR" className="col-span-12 lg:col-span-6">
-                <TransactionList
-                  rows={(overview?.overduePrevious.EUR ?? []).slice(0, 8)}
-                  empty="Nenhuma pendência anterior em EUR."
-                />
-              </BentoCard>
-              <BentoCard title="Ultimos lancamentos" className="col-span-12">
-                <TransactionTable
-                  rows={(overview?.recent ?? []) as FinanceTransaction[]}
-                  accounts={accounts}
-                  settle={(data) => settleTx({ data })}
-                  createAccount={async (name, currency) =>
-                    (await createAccount({ data: { name, type: "bank", currency } })).id
-                  }
-                  onDone={refresh}
-                  onDelete={(id) => {
-                    if (window.confirm("Excluir esta pendência?"))
-                      deleteMutation.mutate({ id, reason: null });
-                  }}
-                  onReverse={(id) => {
-                    const reason = window.prompt("Motivo do estorno da baixa (obrigatório):");
-                    if (reason?.trim() && reason.trim().length >= 3)
-                      reverseMutation.mutate({ id, reason: reason.trim() });
-                  }}
-                  compact
-                />
-              </BentoCard>
-            </div>
+            {dashboardQ.data && (
+              <FinanceMonthClosePanel
+                month={dashboardQ.data.snapshot.period_month.slice(0, 7)}
+                analytics={dashboardQ.data}
+              />
+            )}
           </div>
         </TabsContent>
 
@@ -522,7 +501,7 @@ function FinanceiroContent() {
         </TabsContent>
 
         <TabsContent value="equipe" className="mt-0 space-y-4">
-          <FinanceTeamPanel month={month} accounts={accounts} onChanged={refresh} />
+          <FinanceTeamPanel month={month} accounts={accounts} onChanged={refreshConfiguration} />
         </TabsContent>
 
         <TabsContent value="recorrencias" className="mt-0 space-y-4">
@@ -608,30 +587,6 @@ function MetricCard({
   );
 }
 
-function TransactionList({ rows, empty }: { rows: FinanceTransaction[]; empty: string }) {
-  if (!rows.length) return <p className="text-sm text-admin-ink-muted">{empty}</p>;
-  return (
-    <ul className="space-y-3">
-      {rows.map((tx) => (
-        <li
-          key={tx.id}
-          className="flex items-start justify-between gap-3 border-b border-admin-border pb-3 last:border-0"
-        >
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-admin-ink">{tx.description}</p>
-            <p className="text-xs text-admin-ink-muted">
-              {tx.due_date} · {tx.category_name ?? "Sem categoria"}
-            </p>
-          </div>
-          <span className={tx.type === "income" ? "text-emerald-700" : "text-red-700"}>
-            {money(tx.amount_cents, tx.currency)}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function TransactionTable({
   rows,
   accounts,
@@ -653,6 +608,12 @@ function TransactionTable({
 }) {
   if (!rows.length)
     return <p className="text-sm text-admin-ink-muted">Nenhum lancamento encontrado.</p>;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[780px] text-sm">
@@ -668,10 +629,11 @@ function TransactionTable({
         </thead>
         <tbody>
           {rows.map((tx) => {
+            const isPastDue = tx.status === "pending" && tx.due_date < today;
             const supported =
               ["manual", "orders", "team_payout"].includes(tx.source_module) ||
               tx.source_module.startsWith("recurring:");
-            const canSettle = supported && ["planned", "pending", "overdue"].includes(tx.status);
+            const canSettle = supported && tx.status === "pending";
             const canReverse = supported && ["received", "paid"].includes(tx.status);
             return (
               <tr key={tx.id} className="border-b border-admin-border last:border-0">
@@ -684,12 +646,21 @@ function TransactionTable({
                 <td className="py-3 pr-3">
                   <Badge variant="outline">{financeOriginLabel(tx.source_module)}</Badge>
                 </td>
-                <td className="py-3 pr-3 text-admin-ink-muted">{tx.due_date}</td>
+                <td
+                  className={
+                    isPastDue
+                      ? "py-3 pr-3 font-medium text-red-700"
+                      : "py-3 pr-3 text-admin-ink-muted"
+                  }
+                >
+                  {tx.due_date}
+                </td>
                 <td className="py-3 pr-3">
                   <span
                     className={`inline-flex rounded-full px-2 py-1 text-xs ${statusClass(tx.status)}`}
                   >
                     {STATUS_LABEL[tx.status] ?? tx.status}
+                    {isPastDue ? " · vencido" : ""}
                   </span>
                 </td>
                 <td
@@ -824,12 +795,14 @@ function RecurringTable({
 }
 
 function NewTransactionDialog({
+  onOpenChange,
   categories,
   accounts,
   createTx,
   createAccount,
   onDone,
 }: {
+  onOpenChange: (open: boolean) => void;
   categories: FinanceCategory[];
   accounts: FinanceAccount[];
   createTx: ReturnType<typeof useServerFn<typeof createFinanceTransaction>>;
@@ -855,7 +828,7 @@ function NewTransactionDialog({
           amount: Number(form.get("amount") ?? 0),
           currency,
           dueDate: String(form.get("dueDate") ?? ""),
-          status: String(form.get("status") ?? "pending") as "planned" | "pending",
+          status: "pending",
           categoryId: categoryId || null,
           accountId: accountId || null,
           paymentMethod: emptyToNull(form.get("paymentMethod")),
@@ -865,6 +838,7 @@ function NewTransactionDialog({
     onSuccess: () => {
       toast.success("Lancamento criado");
       setOpen(false);
+      onOpenChange(false);
       onDone();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao criar lancamento"),
@@ -872,7 +846,13 @@ function NewTransactionDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          onOpenChange(next);
+        }}
+      >
         <DialogTrigger asChild>
           <Button className="gap-2">
             <Plus className="h-4 w-4" /> Novo lancamento
@@ -902,15 +882,7 @@ function NewTransactionDialog({
                 </Select>
               </Field>
               <Field label="Status">
-                <Select name="status" defaultValue="pending">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="planned">Planejado</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                  </SelectContent>
-                </Select>
+                <p className="py-2 text-sm">Pendente</p>
               </Field>
             </div>
             <Field label="Categoria">
@@ -1216,6 +1188,7 @@ function NewRecurringDialog({
 }
 
 function FinanceSettingsDialog({
+  onOpenChange,
   categories,
   accounts,
   createCategory,
@@ -1224,6 +1197,7 @@ function FinanceSettingsDialog({
   manageAccount,
   onDone,
 }: {
+  onOpenChange: (open: boolean) => void;
   categories: FinanceCategory[];
   accounts: FinanceAccount[];
   createCategory: ReturnType<typeof useServerFn<typeof createFinanceCategory>>;
@@ -1329,7 +1303,13 @@ function FinanceSettingsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        onOpenChange(next);
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Settings className="h-4 w-4" /> Configurar

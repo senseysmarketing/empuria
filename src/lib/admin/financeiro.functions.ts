@@ -7,7 +7,7 @@ import { normalizeFinanceAccountName } from "@/lib/finance/accounts";
 import { confirmOrderPaymentInternal } from "./esteira.functions";
 
 type FinanceType = "income" | "expense";
-type FinanceStatus = "planned" | "pending" | "received" | "paid" | "overdue" | "canceled";
+type FinanceStatus = "pending" | "received" | "paid" | "canceled";
 
 export type FinanceCategory = {
   id: string;
@@ -201,114 +201,6 @@ export const listFinanceSettings = createServerFn({ method: "GET" })
     };
   });
 
-export const getFinanceOverview = createServerFn({ method: "POST" })
-  .middleware([requireModule("financeiro")])
-  .inputValidator((d) => z.object({ month: monthSchema }).parse(d))
-  .handler(async ({ data }) => {
-    await ensureFinanceMonth(data.month);
-    const { start, end } = monthRange(data.month);
-    const { categories, accounts } = await financeMeta(true);
-    const startPaidAt = `${start}T00:00:00.000Z`;
-    const endPaidAt = `${end}T23:59:59.999Z`;
-    const { data: rows, error } = await db
-      .from("finance_transactions")
-      .select(
-        "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
-      )
-      .or(
-        `and(due_date.gte.${start},due_date.lte.${end}),and(paid_at.gte.${startPaidAt},paid_at.lte.${endPaidAt})`,
-      )
-      .order("due_date", { ascending: false })
-      .limit(500);
-    if (error) throw new Error(error.message);
-
-    const { data: previousRows, error: previousError } = await db
-      .from("finance_transactions")
-      .select(
-        "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
-      )
-      .in("status", ["planned", "pending", "overdue"])
-      .lt("due_date", start)
-      .order("due_date", { ascending: true })
-      .limit(500);
-    if (previousError) throw new Error(previousError.message);
-
-    const txs = withNames((rows ?? []) as FinanceTransaction[], categories, accounts);
-    const today = new Date().toISOString().slice(0, 10);
-    const emptyTotals = () => ({
-      received: 0,
-      receivable: 0,
-      paid: 0,
-      payable: 0,
-      overdue: 0,
-      realizedBalance: 0,
-      projectedBalance: 0,
-    });
-    const totals = { BRL: emptyTotals(), EUR: emptyTotals() };
-
-    for (const tx of txs) {
-      const realized = tx.status === "received" || tx.status === "paid";
-      const dueInMonth = tx.due_date >= start && tx.due_date <= end;
-      const paidInMonth = !!tx.paid_at && tx.paid_at >= startPaidAt && tx.paid_at <= endPaidAt;
-      if (
-        realized &&
-        paidInMonth &&
-        (tx.settled_currency === "BRL" || tx.settled_currency === "EUR")
-      ) {
-        const bucket = totals[tx.settled_currency];
-        const amount = tx.settled_amount_cents ?? 0;
-        const signed = tx.type === "income" ? amount : -amount;
-        bucket.realizedBalance += signed;
-        if (tx.type === "income") bucket.received += amount;
-        else bucket.paid += amount;
-      }
-      if (
-        !realized &&
-        tx.status !== "canceled" &&
-        dueInMonth &&
-        (tx.currency === "BRL" || tx.currency === "EUR")
-      ) {
-        const bucket = totals[tx.currency];
-        const signed = tx.type === "income" ? tx.amount_cents : -tx.amount_cents;
-        bucket.projectedBalance += signed;
-        if (tx.type === "income") bucket.receivable += tx.amount_cents;
-        else bucket.payable += tx.amount_cents;
-        if (tx.due_date < today) bucket.overdue += tx.amount_cents;
-      }
-    }
-
-    for (const currency of ["BRL", "EUR"] as const) {
-      totals[currency].projectedBalance += totals[currency].realizedBalance;
-    }
-
-    return {
-      totals,
-      overduePrevious: {
-        BRL: withNames(
-          ((previousRows ?? []) as FinanceTransaction[]).filter((row) => row.currency === "BRL"),
-          categories,
-          accounts,
-        ),
-        EUR: withNames(
-          ((previousRows ?? []) as FinanceTransaction[]).filter((row) => row.currency === "EUR"),
-          categories,
-          accounts,
-        ),
-      },
-      pending: txs
-        .filter(
-          (tx) =>
-            tx.due_date >= start &&
-            tx.due_date <= end &&
-            tx.status !== "canceled" &&
-            !["received", "paid"].includes(tx.status),
-        )
-        .sort((a, b) => a.due_date.localeCompare(b.due_date))
-        .slice(0, 8),
-      recent: txs.filter((tx) => tx.status !== "canceled").slice(0, 8),
-    };
-  });
-
 export const listFinanceTransactions = createServerFn({ method: "POST" })
   .middleware([requireModule("financeiro")])
   .inputValidator((d) =>
@@ -317,9 +209,7 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
         month: monthSchema,
         search: z.string().trim().max(120).optional(),
         type: z.enum(["all", "income", "expense"]).default("all"),
-        status: z
-          .enum(["all", "planned", "pending", "received", "paid", "overdue", "canceled"])
-          .default("all"),
+        status: z.enum(["all", "pending", "received", "paid", "canceled"]).default("all"),
         sourceModule: z.string().trim().max(60).optional(),
         categoryId: z.string().uuid().optional(),
         page: z.number().int().min(0).default(0),
@@ -363,7 +253,7 @@ const transactionInput = z.object({
   amount: moneySchema,
   currency: z.enum(["BRL", "EUR", "USD"]).default("BRL"),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  status: z.enum(["planned", "pending"]).default("pending"),
+  status: z.literal("pending").default("pending"),
   categoryId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   paymentMethod: z.string().trim().max(60).nullable().optional(),

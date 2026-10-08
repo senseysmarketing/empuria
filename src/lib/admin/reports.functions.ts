@@ -147,13 +147,13 @@ function summarizeFinance(txs: FinTx[]): FinanceTotals {
       if (t.status === "received") {
         received += t.amount_cents;
         ordersPaid++;
-      } else if (["planned", "pending", "overdue"].includes(t.status)) {
+      } else if (t.status === "pending") {
         receivable += t.amount_cents;
         ordersPending++;
       }
     } else {
       if (t.status === "paid") expensesPaid += t.amount_cents;
-      else if (["planned", "pending", "overdue"].includes(t.status))
+      else if (t.status === "pending")
         expensesPending += t.amount_cents;
     }
     void realized;
@@ -409,7 +409,7 @@ export const getReportsVendas = createServerFn({ method: "POST" })
     const pendingByStatus = new Map<string, number>();
     for (const t of currentTxs) {
       if (t.type !== "income") continue;
-      if (!["planned", "pending", "overdue"].includes(t.status)) continue;
+      if (t.status !== "pending") continue;
       pendingByStatus.set(t.status, (pendingByStatus.get(t.status) ?? 0) + t.amount_cents);
     }
     const pendingStatusRows = Array.from(pendingByStatus, ([label, amount_cents]) => ({

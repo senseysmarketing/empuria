@@ -30,21 +30,31 @@ export type FinanceCloseSnapshot = {
 };
 
 export type FinanceDashboardData = {
+  totals: Record<
+    Currency,
+    {
+      received: number;
+      receivable: number;
+      paid: number;
+      payable: number;
+      realizedBalance: number;
+    }
+  >;
   daily: { day: string; currency: Currency; income_cents: number; expense_cents: number }[];
-  accounts: {
-    account_id: string;
-    account_name: string;
-    currency: Currency;
-    income_cents: number;
-    expense_cents: number;
-    net_cents: number;
-  }[];
   services: {
     service_id: string | null;
     service_title: string;
-    currency: Currency;
-    quantity: number;
-    revenue_cents: number;
+    sales_count: number;
+    paid_count: number;
+    pending_count: number;
+    currencies: Record<
+      Currency,
+      {
+        sold_cents: number;
+        received_cents: number;
+        receivable_cents: number;
+      }
+    >;
   }[];
   expenses: {
     category_id: string | null;
@@ -54,16 +64,15 @@ export type FinanceDashboardData = {
   }[];
   recurring: {
     currency: Currency;
-    planned_cents: number;
     paid_cents: number;
     pending_cents: number;
   }[];
   team: {
     currency: Currency;
-    projected_cents: number;
     payable_cents: number;
     paid_cents: number;
   }[];
+  snapshot: FinanceCloseSnapshot;
 };
 
 const db = supabaseAdmin as unknown as {
@@ -76,19 +85,9 @@ export const getFinanceDashboard = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ month: monthSchema }).parse(input))
   .handler(async ({ data }) => {
     const period = `${data.month}-01`;
-    const { error: ensureError } = await db.rpc("finance_ensure_month", {
+    const { data: dashboard, error } = await db.rpc("finance_dashboard_month", {
       p_month: period,
-      p_actor: null,
     });
-    if (ensureError) throw new Error(ensureError.message);
-    const [snapshotQ, analyticsQ] = await Promise.all([
-      db.rpc("finance_month_snapshot", { p_month: period, p_include_projection: true }),
-      db.rpc("finance_dashboard_month", { p_month: period }),
-    ]);
-    if (snapshotQ.error) throw new Error(snapshotQ.error.message);
-    if (analyticsQ.error) throw new Error(analyticsQ.error.message);
-    return {
-      snapshot: snapshotQ.data as FinanceCloseSnapshot,
-      analytics: analyticsQ.data as FinanceDashboardData,
-    };
+    if (error) throw new Error(error.message);
+    return dashboard as FinanceDashboardData;
   });
