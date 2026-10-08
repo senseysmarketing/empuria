@@ -54,7 +54,6 @@ import { Input } from "@/components/ui/input";
 import {
   getReportsOverview,
   getReportsVendas,
-  
   getReportsServicos,
   getReportsEventos,
   getReportsCrm,
@@ -104,7 +103,6 @@ function normalizeSearch(search: Partial<SearchSchema>): SearchSchema {
   };
 }
 
-
 // ---------- Helpers ----------
 
 const PERIOD_LABEL: Record<string, string> = {
@@ -131,7 +129,10 @@ const ORIGIN_LABEL: Record<string, string> = {
 };
 
 function money(cents: number, currency = "EUR") {
-  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", { style: "currency", currency }).format((cents ?? 0) / 100);
+  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", {
+    style: "currency",
+    currency,
+  }).format((cents ?? 0) / 100);
 }
 
 function number(n: number) {
@@ -218,7 +219,6 @@ function RelatoriosPage() {
             </TabsTrigger>
           ))}
         </TabsList>
-
 
         <TabsContent value="visao" className="mt-0">
           <VisaoGeralTab filters={filters} />
@@ -335,7 +335,6 @@ function GlobalFiltersBar({
     </BentoCard>
   );
 }
-
 
 // ---------- Reusable bits ----------
 
@@ -736,14 +735,7 @@ function VendasTab({ filters }: { filters: ReportFilters }) {
         <BentoCard title="Pendentes por status" className="col-span-12 lg:col-span-4">
           <RankingList
             rows={d.pendingByStatus.map((r) => ({
-              label:
-                r.label === "overdue"
-                  ? "Vencido"
-                  : r.label === "pending"
-                    ? "Pendente"
-                    : r.label === "planned"
-                      ? "Planejado"
-                      : r.label,
+              label: r.label === "pending" ? "Pendente" : r.label,
               value: money(r.amount_cents),
               raw: r.amount_cents,
             }))}

@@ -7,7 +7,7 @@ import { normalizeFinanceAccountName } from "@/lib/finance/accounts";
 import { confirmOrderPaymentInternal } from "./esteira.functions";
 
 type FinanceType = "income" | "expense";
-type FinanceStatus = "planned" | "pending" | "received" | "paid" | "overdue" | "canceled";
+type FinanceStatus = "pending" | "received" | "paid" | "canceled";
 
 export type FinanceCategory = {
   id: string;
@@ -227,7 +227,7 @@ export const getFinanceOverview = createServerFn({ method: "POST" })
       .select(
         "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
       )
-      .in("status", ["planned", "pending", "overdue"])
+      .eq("status", "pending")
       .lt("due_date", start)
       .order("due_date", { ascending: true })
       .limit(500);
@@ -317,9 +317,7 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
         month: monthSchema,
         search: z.string().trim().max(120).optional(),
         type: z.enum(["all", "income", "expense"]).default("all"),
-        status: z
-          .enum(["all", "planned", "pending", "received", "paid", "overdue", "canceled"])
-          .default("all"),
+        status: z.enum(["all", "pending", "received", "paid", "canceled"]).default("all"),
         sourceModule: z.string().trim().max(60).optional(),
         categoryId: z.string().uuid().optional(),
         page: z.number().int().min(0).default(0),
@@ -363,7 +361,7 @@ const transactionInput = z.object({
   amount: moneySchema,
   currency: z.enum(["BRL", "EUR", "USD"]).default("BRL"),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  status: z.enum(["planned", "pending"]).default("pending"),
+  status: z.literal("pending").default("pending"),
   categoryId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   paymentMethod: z.string().trim().max(60).nullable().optional(),
