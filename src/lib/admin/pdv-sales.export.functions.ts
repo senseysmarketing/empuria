@@ -7,11 +7,17 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const filtersSchema = z.object({
   search: z.string().trim().max(120).optional().default(""),
-  period: z.enum(["hoje", "ontem", "7d", "mes", "mes_anterior", "custom", "todos"]).optional().default("7d"),
+  period: z
+    .enum(["hoje", "ontem", "7d", "mes", "mes_anterior", "custom", "todos"])
+    .optional()
+    .default("7d"),
   dateFrom: z.string().trim().optional().nullable(),
   dateTo: z.string().trim().optional().nullable(),
-  paymentMethod: z.enum(["todos", "dinheiro", "cartao", "pix", "wise", "transferencia"]).optional().default("todos"),
-  status: z.enum(["todos", "concluida", "cancelada"]).optional().default("todos"),
+  paymentMethod: z
+    .enum(["todos", "dinheiro", "cartao", "pix", "wise", "transferencia"])
+    .optional()
+    .default("todos"),
+  status: z.enum(["todos", "pendente", "concluida", "cancelada"]).optional().default("todos"),
   cashierId: z.string().uuid().optional().nullable(),
   categoryIds: z.array(z.string().uuid()).optional().default([]),
   productIds: z.array(z.string().uuid()).optional().default([]),
@@ -41,8 +47,16 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 function dateRangeForPeriod(period: string, dateFrom?: string | null, dateTo?: string | null) {
   const now = new Date();
-  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-  const endOfDay = (d: Date) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
+  const startOfDay = (d: Date) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
+  const endOfDay = (d: Date) => {
+    const x = new Date(d);
+    x.setHours(23, 59, 59, 999);
+    return x;
+  };
   if (period === "todos") return {};
   if (period === "custom") {
     return {
@@ -50,9 +64,11 @@ function dateRangeForPeriod(period: string, dateFrom?: string | null, dateTo?: s
       to: dateTo ? endOfDay(new Date(dateTo)).toISOString() : undefined,
     };
   }
-  if (period === "hoje") return { from: startOfDay(now).toISOString(), to: endOfDay(now).toISOString() };
+  if (period === "hoje")
+    return { from: startOfDay(now).toISOString(), to: endOfDay(now).toISOString() };
   if (period === "ontem") {
-    const y = new Date(now); y.setDate(y.getDate() - 1);
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
     return { from: startOfDay(y).toISOString(), to: endOfDay(y).toISOString() };
   }
   if (period === "mes") {
@@ -64,15 +80,20 @@ function dateRangeForPeriod(period: string, dateFrom?: string | null, dateTo?: s
     const e = new Date(now.getFullYear(), now.getMonth(), 0);
     return { from: s.toISOString(), to: endOfDay(e).toISOString() };
   }
-  const s = new Date(now); s.setDate(s.getDate() - 7);
+  const s = new Date(now);
+  s.setDate(s.getDate() - 7);
   return { from: startOfDay(s).toISOString(), to: endOfDay(now).toISOString() };
 }
 
-function sanitizeLike(v: string) { return v.replace(/[%_]/g, "").trim(); }
+function sanitizeLike(v: string) {
+  return v.replace(/[%_]/g, "").trim();
+}
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "";
-  return new Intl.DateTimeFormat("pt-PT", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("pt-PT", { dateStyle: "short", timeStyle: "short" }).format(
+    new Date(iso),
+  );
 }
 
 export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
@@ -83,7 +104,10 @@ export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
 
     // Same category/product prefilter as listPdvSalesHistory
     let restrictSaleIds: string[] | null = null;
-    if ((data.categoryIds && data.categoryIds.length) || (data.productIds && data.productIds.length)) {
+    if (
+      (data.categoryIds && data.categoryIds.length) ||
+      (data.productIds && data.productIds.length)
+    ) {
       let productIds = data.productIds ?? [];
       if (data.categoryIds?.length) {
         const { data: prods } = await supabaseAdmin
@@ -91,7 +115,9 @@ export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
           .select("id")
           .in("category_id", data.categoryIds);
         const catProductIds = (prods ?? []).map((p) => p.id);
-        productIds = productIds.length ? productIds.filter((id) => catProductIds.includes(id)) : catProductIds;
+        productIds = productIds.length
+          ? productIds.filter((id) => catProductIds.includes(id))
+          : catProductIds;
       }
       if (!productIds.length) restrictSaleIds = [];
       else {
@@ -127,7 +153,10 @@ export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
     if (search.length >= 2) {
       const like = `%${search}%`;
       const { data: profs } = await supabaseAdmin
-        .from("profiles").select("id").or(`full_name.ilike.${like},phone.ilike.${like}`).limit(100);
+        .from("profiles")
+        .select("id")
+        .or(`full_name.ilike.${like},phone.ilike.${like}`)
+        .limit(100);
       const profileIds = (profs ?? []).map((p) => p.id);
       const parts = [`sale_code.ilike.${like}`, `payment_method.ilike.${like}`];
       if (profileIds.length) {
@@ -141,7 +170,9 @@ export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const rows = sales ?? [];
 
-    const profileIds = [...new Set(rows.flatMap((s) => [s.customer_id, s.cashier_id]).filter(Boolean))];
+    const profileIds = [
+      ...new Set(rows.flatMap((s) => [s.customer_id, s.cashier_id]).filter(Boolean)),
+    ];
     const { data: profs } = profileIds.length
       ? await supabaseAdmin.from("profiles").select("id, full_name, phone").in("id", profileIds)
       : { data: [] };
@@ -159,7 +190,9 @@ export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
       const e = itemMap.get(it.sale_id) ?? { qty: 0, lines: 0, description: "" };
       e.qty += it.qty;
       e.lines += 1;
-      e.description = e.description ? `${e.description}, ${it.qty}x ${it.product_name_snapshot}` : `${it.qty}x ${it.product_name_snapshot}`;
+      e.description = e.description
+        ? `${e.description}, ${it.qty}x ${it.product_name_snapshot}`
+        : `${it.qty}x ${it.product_name_snapshot}`;
       itemMap.set(it.sale_id, e);
     }
 
@@ -169,20 +202,41 @@ export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
 
     // Filters sheet
     const fs = wb.addWorksheet("Filtros");
-    fs.columns = [{ header: "Campo", key: "k", width: 28 }, { header: "Valor", key: "v", width: 60 }];
+    fs.columns = [
+      { header: "Campo", key: "k", width: 28 },
+      { header: "Valor", key: "v", width: 60 },
+    ];
     fs.addRow({ k: "Relatório", v: "Histórico de vendas PDV" });
     fs.addRow({ k: "Período", v: PERIOD_LABEL[data.period] ?? data.period });
     if (data.period === "custom") {
       fs.addRow({ k: "De", v: data.dateFrom ?? "—" });
       fs.addRow({ k: "Até", v: data.dateTo ?? "—" });
     }
-    fs.addRow({ k: "Forma de pagamento", v: data.paymentMethod === "todos" ? "Todas" : PAYMENT_LABEL[data.paymentMethod] ?? data.paymentMethod });
+    fs.addRow({
+      k: "Forma de pagamento",
+      v:
+        data.paymentMethod === "todos"
+          ? "Todas"
+          : (PAYMENT_LABEL[data.paymentMethod] ?? data.paymentMethod),
+    });
     fs.addRow({ k: "Status", v: data.status === "todos" ? "Todos" : data.status });
     fs.addRow({ k: "Operador", v: data.cashierId ?? "Todos" });
-    fs.addRow({ k: "Categorias", v: data.categoryIds?.length ? `${data.categoryIds.length} selecionadas` : "Todas" });
-    fs.addRow({ k: "Produtos", v: data.productIds?.length ? `${data.productIds.length} selecionados` : "Todos" });
-    fs.addRow({ k: "Valor mínimo €", v: data.minTotalEurCents !== undefined ? (data.minTotalEurCents / 100).toFixed(2) : "—" });
-    fs.addRow({ k: "Valor máximo €", v: data.maxTotalEurCents !== undefined ? (data.maxTotalEurCents / 100).toFixed(2) : "—" });
+    fs.addRow({
+      k: "Categorias",
+      v: data.categoryIds?.length ? `${data.categoryIds.length} selecionadas` : "Todas",
+    });
+    fs.addRow({
+      k: "Produtos",
+      v: data.productIds?.length ? `${data.productIds.length} selecionados` : "Todos",
+    });
+    fs.addRow({
+      k: "Valor mínimo €",
+      v: data.minTotalEurCents !== undefined ? (data.minTotalEurCents / 100).toFixed(2) : "—",
+    });
+    fs.addRow({
+      k: "Valor máximo €",
+      v: data.maxTotalEurCents !== undefined ? (data.maxTotalEurCents / 100).toFixed(2) : "—",
+    });
     fs.addRow({ k: "Busca", v: data.search || "—" });
     fs.addRow({ k: "Total de registros", v: rows.length });
     fs.addRow({ k: "Gerado em", v: new Date().toLocaleString("pt-PT") });
@@ -207,7 +261,11 @@ export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
       { header: "Motivo anulação", key: "void", width: 40 },
     ];
     ws.getRow(1).font = { bold: true };
-    ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEE5DA" } } as never;
+    ws.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFEEE5DA" },
+    } as never;
 
     let totalSum = 0;
     let completedCount = 0;
@@ -229,8 +287,9 @@ export const exportPdvHistoryXlsx = createServerFn({ method: "POST" })
         qty: items?.qty ?? 0,
         lines: items?.lines ?? 0,
         desc: items?.description ?? "",
-        pay: PAYMENT_LABEL[s.payment_method] ?? s.payment_method,
-        status: s.status === "cancelada" ? "Anulada" : "Concluída",
+        pay: s.payment_method ? (PAYMENT_LABEL[s.payment_method] ?? s.payment_method) : "A definir",
+        status:
+          s.status === "cancelada" ? "Cancelada" : s.status === "pendente" ? "Pendente" : "Paga",
         subtotal: (s.subtotal_eur_cents ?? 0) / 100,
         discount: (s.discount_eur_cents ?? 0) / 100,
         total,

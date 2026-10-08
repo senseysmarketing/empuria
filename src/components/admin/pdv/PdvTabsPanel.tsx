@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import confetti from "canvas-confetti";
 import {
-  Banknote,
   CheckCircle2,
   Clock,
-  CreditCard,
   Loader2,
   Minus,
   Plus,
@@ -51,7 +48,14 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { CustomerSearchPanel, type PdvCustomer } from "./CustomerSearchPanel";
 import { SaleCatalogGrid, type PdvCatalogItem } from "./SaleCatalogGrid";
-import { listPdvCatalog } from "@/lib/admin/pdv-sales.functions";
+import {
+  listPdvCatalog,
+  listPendingPdvSales,
+  listPdvSettlementAccounts,
+  settlePdvSale,
+  voidPdvSale,
+} from "@/lib/admin/pdv-sales.functions";
+import { PdvSettlePopover } from "./PdvSettlePopover";
 import {
   addPdvTabItem,
   cancelPdvTab,
@@ -61,27 +65,11 @@ import {
   openPdvTab,
   updatePdvTabItemQty,
   type PdvTabItemRecord,
-  type PdvTabPaymentMethod,
   type PdvTabWithRelations,
 } from "@/lib/admin/pdv-tabs.functions";
 import { cn } from "@/lib/utils";
 
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
-
-const PAYMENT_LABEL: Record<PdvTabPaymentMethod, string> = {
-  dinheiro: "Dinheiro",
-  transferencia: "Transferência bancária",
-};
-
-function fireConfetti() {
-  if (typeof window === "undefined") return;
-  const defaults = { spread: 70, ticks: 80, gravity: 0.9, scalar: 1, zIndex: 9999 };
-  confetti({ ...defaults, particleCount: 90, origin: { x: 0.5, y: 0.6 } });
-  setTimeout(() => {
-    confetti({ ...defaults, particleCount: 60, angle: 60, origin: { x: 0, y: 0.7 } });
-    confetti({ ...defaults, particleCount: 60, angle: 120, origin: { x: 1, y: 0.7 } });
-  }, 180);
-}
 
 function money(cents: number, currency: "BRL" | "EUR" = "EUR") {
   return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "pt-BR", {
@@ -136,6 +124,10 @@ export function PdvTabsPanel() {
   const qc = useQueryClient();
   const fetchTabs = useServerFn(listPdvTabsWorkspace);
   const fetchCatalog = useServerFn(listPdvCatalog);
+  const fetchPendingSales = useServerFn(listPendingPdvSales);
+  const fetchSettlementAccounts = useServerFn(listPdvSettlementAccounts);
+  const settleSale = useServerFn(settlePdvSale);
+  const voidSale = useServerFn(voidPdvSale);
   const openTab = useServerFn(openPdvTab);
   const addItem = useServerFn(addPdvTabItem);
   const updateQty = useServerFn(updatePdvTabItemQty);
@@ -152,14 +144,14 @@ export function PdvTabsPanel() {
     tabCode: string;
     customerName: string;
     totalCents: number;
-    paymentMethod: PdvTabPaymentMethod;
   } | null>(null);
 
   const [cancelTabTarget, setCancelTabTarget] = useState<PdvTabWithRelations | null>(null);
   const [reason, setReason] = useState("");
   const [discount, setDiscount] = useState<DiscountState>({ type: "none", value: 0 });
-  const [paymentMethod, setPaymentMethod] = useState<PdvTabPaymentMethod>("dinheiro");
   const [notes, setNotes] = useState("");
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
+  const [pendingCancelReason, setPendingCancelReason] = useState("");
 
   const tabsQ = useQuery({
     queryKey: ["pdv-tabs-workspace"],
@@ -170,12 +162,38 @@ export function PdvTabsPanel() {
     queryKey: ["pdv-catalog"],
     queryFn: () => fetchCatalog(),
   });
+  const pendingQ = useQuery({
+    queryKey: ["pdv-pending-sales"],
+    queryFn: () => fetchPendingSales(),
+  });
+  const accountsQ = useQuery({
+    queryKey: ["pdv-settlement-accounts"],
+    queryFn: () => fetchSettlementAccounts(),
+  });
+  const invalidatePending = () => {
+    qc.invalidateQueries({ queryKey: ["pdv-pending-sales"] });
+    qc.invalidateQueries({ queryKey: ["pdv-sales-history"] });
+    qc.invalidateQueries({ queryKey: ["finance-dashboard"] });
+  };
+  const cancelPendingMut = useMutation({
+    mutationFn: () => voidSale({ data: { saleId: pendingCancelId!, reason: pendingCancelReason } }),
+    onSuccess: () => {
+      toast.success("Venda pendente cancelada; estoque restaurado.");
+      setPendingCancelId(null);
+      setPendingCancelReason("");
+      invalidatePending();
+      qc.invalidateQueries({ queryKey: ["pdv-catalog"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao cancelar venda"),
+  });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["pdv-tabs-workspace"] });
     qc.invalidateQueries({ queryKey: ["pdv-catalog"] });
     qc.invalidateQueries({ queryKey: ["pdv-sales-history"] });
     qc.invalidateQueries({ queryKey: ["pdv-cashiers"] });
+    invalidatePending();
   };
 
   const openMut = useMutation({
@@ -227,7 +245,6 @@ export function PdvTabsPanel() {
         data: {
           tabId,
           discount,
-          paymentMethod,
           notes: notes || undefined,
         },
       }),
@@ -239,16 +256,14 @@ export function PdvTabsPanel() {
           tabCode: tab.tab_code,
           customerName: tab.customer_name_snapshot ?? tab.customer?.full_name ?? "Cliente sem nome",
           totalCents,
-          paymentMethod,
         });
       }
       setCloseDialogOpen(false);
       setSelectedTabId(null);
       setDiscount({ type: "none", value: 0 });
-      setPaymentMethod("dinheiro");
       setNotes("");
       invalidate();
-      fireConfetti();
+      toast.success("Comanda finalizada. A venda está pendente de pagamento.");
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Erro ao fechar comanda"),
@@ -437,6 +452,57 @@ export function PdvTabsPanel() {
             </div>
           )}
         </div>
+      </BentoCard>
+
+      <BentoCard title={`Pagamentos pendentes · ${pendingQ.data?.sales.length ?? 0}`}>
+        <div className="mb-3 flex flex-wrap gap-5 text-sm">
+          <span>
+            BRL: <strong>{money(pendingQ.data?.totals.BRL ?? 0, "BRL")}</strong>
+          </span>
+          <span>
+            EUR: <strong>{money(pendingQ.data?.totals.EUR ?? 0, "EUR")}</strong>
+          </span>
+        </div>
+        {pendingQ.isLoading ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : !pendingQ.data?.sales.length ? (
+          <p className="text-sm text-admin-ink-muted">Nenhum pagamento pendente.</p>
+        ) : (
+          <div className="space-y-2">
+            {pendingQ.data.sales.map((sale) => (
+              <div
+                key={sale.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border p-3 text-sm"
+              >
+                <div>
+                  <strong className="font-mono">{sale.sale_code}</strong>
+                  <span className="ml-2">{sale.customer_name_snapshot ?? "Cliente"}</span>
+                  <p className="text-xs text-admin-ink-muted">
+                    {new Date(sale.closed_at).toLocaleDateString("pt-BR")} ·{" "}
+                    {money(
+                      sale.payment_amount_cents ?? 0,
+                      sale.payment_currency === "BRL" ? "BRL" : "EUR",
+                    )}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <PdvSettlePopover
+                    sale={sale}
+                    accounts={accountsQ.data ?? []}
+                    settle={(input) => settleSale({ data: input })}
+                    onDone={() => {
+                      toast.success("Baixa confirmada.");
+                      invalidatePending();
+                    }}
+                  />
+                  <Button variant="outline" size="sm" onClick={() => setPendingCancelId(sale.id)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </BentoCard>
 
       {selectedTab && (
@@ -635,7 +701,6 @@ export function PdvTabsPanel() {
                   onClick={() => {
                     setSelectedTabId(selectedTab.id);
                     setDiscount({ type: "none", value: 0 });
-                    setPaymentMethod("dinheiro");
                     setNotes("");
                     setCloseDialogOpen(true);
                   }}
@@ -688,6 +753,31 @@ export function PdvTabsPanel() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={Boolean(pendingCancelId)}
+        onOpenChange={(open) => !open && setPendingCancelId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar venda pendente</DialogTitle>
+            <DialogDescription>
+              O estoque será restaurado. Esta ação fica na auditoria.
+            </DialogDescription>
+          </DialogHeader>
+          <Label>Motivo</Label>
+          <Textarea
+            value={pendingCancelReason}
+            onChange={(event) => setPendingCancelReason(event.target.value)}
+          />
+          <Button
+            disabled={pendingCancelReason.trim().length < 5 || cancelPendingMut.isPending}
+            onClick={() => cancelPendingMut.mutate()}
+          >
+            Confirmar cancelamento
+          </Button>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
         open={closeDialogOpen}
         onOpenChange={(open) => !isBusy && setCloseDialogOpen(open)}
@@ -696,8 +786,8 @@ export function PdvTabsPanel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Fechar comanda</AlertDialogTitle>
             <AlertDialogDescription>
-              O fechamento cria uma venda definitiva, baixa estoque fisico e envia o registro ao
-              financeiro.
+              O fechamento efetiva o estoque e cria uma venda pendente no Financeiro. O pagamento
+              será registrado depois, em Dar baixa.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4">
@@ -734,27 +824,6 @@ export function PdvTabsPanel() {
                 className="bg-admin-bg border-admin-border"
                 placeholder="0,00"
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant={paymentMethod === "dinheiro" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("dinheiro")}
-                className={cn(paymentMethod === "dinheiro" && "bg-admin-accent text-white")}
-              >
-                <Banknote className="h-4 w-4" />
-                Dinheiro
-              </Button>
-              <Button
-                type="button"
-                variant={paymentMethod === "transferencia" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("transferencia")}
-                className={cn(paymentMethod === "transferencia" && "bg-admin-accent text-white")}
-              >
-                <CreditCard className="h-4 w-4" />
-                Transferência
-              </Button>
             </div>
 
             <Textarea
@@ -853,9 +922,9 @@ export function PdvTabsPanel() {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/40 animate-scale-in">
               <CheckCircle2 className="h-8 w-8 text-emerald-400" />
             </div>
-            <DialogTitle className="text-xl font-display mt-2">Venda concluída!</DialogTitle>
+            <DialogTitle className="text-xl font-display mt-2">Venda pendente</DialogTitle>
             <DialogDescription className="text-admin-ink-muted">
-              A comanda foi fechada e a venda registrada com sucesso.
+              A comanda foi fechada e o estoque efetivado. Registre o pagamento no Histórico.
             </DialogDescription>
           </DialogHeader>
           {successInfo && (
@@ -867,10 +936,6 @@ export function PdvTabsPanel() {
               <div className="flex justify-between">
                 <span className="text-admin-ink-muted">Cliente</span>
                 <span className="text-right">{successInfo.customerName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-admin-ink-muted">Pagamento</span>
-                <span>{PAYMENT_LABEL[successInfo.paymentMethod]}</span>
               </div>
               <div className="flex justify-between border-t border-admin-border pt-2">
                 <span className="text-xs uppercase tracking-widest text-admin-ink-muted">

@@ -401,6 +401,9 @@ function HomePage() {
                 if (!event.currentTarget.contains(event.relatedTarget)) setCarouselPaused(false);
               }}
               onPointerDown={() => setCarouselPaused(true)}
+              onPointerUp={() => setCarouselPaused(false)}
+              onPointerCancel={() => setCarouselPaused(false)}
+              onTouchEnd={() => setCarouselPaused(false)}
               className="px-1"
               aria-label="Serviços disponíveis"
             >

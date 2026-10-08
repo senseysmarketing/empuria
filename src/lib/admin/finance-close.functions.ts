@@ -72,6 +72,11 @@ export type FinanceDashboardData = {
     payable_cents: number;
     paid_cents: number;
   }[];
+  pdv: {
+    currency: Currency;
+    received_cents: number;
+    pending_cents: number;
+  }[];
   snapshot: FinanceCloseSnapshot;
 };
 

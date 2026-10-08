@@ -170,6 +170,20 @@ export function FinanceMonthClosePanel({
             );
           })}
         </BentoCard>
+        <BentoCard title="PDV · Caixa e pendências">
+          <p className="mb-3 text-xs text-admin-ink-muted">
+            Valores já incluídos no Resumo acima; não são somados novamente.
+          </p>
+          {(["BRL", "EUR"] as const).map((currency) => {
+            const row = analytics.pdv?.find((item) => item.currency === currency);
+            return (
+              <p key={currency} className="text-sm">
+                {currency}: recebido {money(row?.received_cents ?? 0, currency)} · pendente{" "}
+                {money(row?.pending_cents ?? 0, currency)}
+              </p>
+            );
+          })}
+        </BentoCard>
       </div>
     </div>
   );

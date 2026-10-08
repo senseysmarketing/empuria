@@ -96,55 +96,6 @@ export const createCustomerQuick = createServerFn({ method: "POST" })
     };
   });
 
-// ---------- Fechar venda (atômico) ----------
-const closeSchema = z.object({
-  customerId: z.string().uuid(),
-  items: z
-    .array(
-      z.object({
-        productId: z.string().uuid(),
-        qty: z.number().int().min(1).max(99),
-      }),
-    )
-    .min(1)
-    .max(50),
-  discount: z.object({
-    type: z.enum(["none", "amount", "percent"]),
-    value: z.number().min(0).max(100000),
-  }),
-  paymentMethod: z.enum(["dinheiro", "cartao", "pix"]),
-  notes: z.string().trim().max(500).optional(),
-});
-
-export const closePdvSale = createServerFn({ method: "POST" })
-  .middleware([requireModule("pdv")])
-  .inputValidator((d) => closeSchema.parse(d))
-  .handler(async ({ data, context }) =>
-    withPdvLog(
-      {
-        action: "sale.close_direct",
-        actorId: context.userId,
-        customerId: data.customerId,
-        paymentMethod: data.paymentMethod,
-        route: "pdv.closeSale",
-        params: data,
-      },
-      async () => {
-        const { data: saleId, error } = await supabaseAdmin.rpc("pdv_close_sale", {
-          p_customer_id: data.customerId,
-          p_cashier_id: context.userId,
-          p_items: data.items.map((i) => ({ product_id: i.productId, qty: i.qty })),
-          p_discount_type: data.discount.type,
-          p_discount_value: data.discount.value,
-          p_payment_method: data.paymentMethod,
-          p_notes: data.notes ?? null,
-        } as never);
-        if (error) throw new Error(error.message);
-        return { saleId: saleId as unknown as string };
-      },
-    ),
-  );
-
 export type PdvSaleRecord = {
   id: string;
   customer_id: string;
@@ -158,7 +109,17 @@ export type PdvSaleRecord = {
   discount_brl_cents: number;
   total_eur_cents: number;
   total_brl_cents: number;
-  payment_method: string;
+  payment_method: string | null;
+  payment_amount_cents: number | null;
+  payment_currency: "BRL" | "EUR" | null;
+  settled_amount_cents: number | null;
+  settled_currency: "BRL" | "EUR" | null;
+  paid_at: string | null;
+  payment_account_id: string | null;
+  fx_reference_rate: number | null;
+  fx_reference_date: string | null;
+  fx_rate: number | null;
+  fx_source: string | null;
   status: string;
   notes: string | null;
   closed_at: string;
@@ -228,7 +189,7 @@ const historySchema = z.object({
     .enum(["todos", "dinheiro", "cartao", "pix", "wise", "transferencia"])
     .optional()
     .default("todos"),
-  status: z.enum(["todos", "concluida", "cancelada"]).optional().default("todos"),
+  status: z.enum(["todos", "pendente", "concluida", "cancelada"]).optional().default("todos"),
   cashierId: z.string().uuid().optional().nullable(),
   categoryIds: z.array(z.string().uuid()).optional().default([]),
   productIds: z.array(z.string().uuid()).optional().default([]),
@@ -436,6 +397,122 @@ export const listPdvCashiers = createServerFn({ method: "GET" })
       (a.full_name ?? "").localeCompare(b.full_name ?? "", "pt-PT"),
     );
   });
+
+export const listPdvSettlementAccounts = createServerFn({ method: "GET" })
+  .middleware([requireModule("pdv")])
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin
+      .from("finance_accounts")
+      .select("id,name,currency,is_active")
+      .eq("is_active", true)
+      .in("currency", ["BRL", "EUR"])
+      .order("name");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const listPendingPdvSales = createServerFn({ method: "GET" })
+  .middleware([requireModule("pdv")])
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin
+      .from("pdv_sales")
+      .select("*")
+      .eq("status", "pendente")
+      .order("closed_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const sales = (data ?? []) as PdvSaleRecord[];
+    return {
+      sales,
+      totals: {
+        BRL: sales
+          .filter((sale) => sale.payment_currency === "BRL")
+          .reduce((total, sale) => total + (sale.payment_amount_cents ?? 0), 0),
+        EUR: sales
+          .filter((sale) => sale.payment_currency === "EUR")
+          .reduce((total, sale) => total + (sale.payment_amount_cents ?? 0), 0),
+      },
+    };
+  });
+
+export const settlePdvSale = createServerFn({ method: "POST" })
+  .middleware([requireModule("pdv")])
+  .inputValidator((input) =>
+    z
+      .object({
+        saleId: z.string().uuid(),
+        paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        settledAmount: z.number().finite().positive().max(99_999_999),
+        settledCurrency: z.enum(["BRL", "EUR"]),
+        accountId: z.string().uuid(),
+        fxReferenceRate: z.number().finite().positive().nullable().optional(),
+        fxReferenceDate: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional(),
+        fxRate: z.number().finite().positive().nullable().optional(),
+        fxSource: z.string().max(60).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "sale.settle",
+        actorId: context.userId,
+        saleId: data.saleId,
+        route: "pdv.settleSale",
+        params: data,
+      },
+      async () => {
+        const { error } = await supabaseAdmin.rpc("pdv_settle_sale", {
+          p_sale_id: data.saleId,
+          p_actor_id: context.userId,
+          p_paid_at: data.paidAt,
+          p_settled_amount_cents: Math.round(data.settledAmount * 100),
+          p_settled_currency: data.settledCurrency,
+          p_account_id: data.accountId,
+          p_fx_reference_rate: data.fxReferenceRate ?? null,
+          p_fx_reference_date: data.fxReferenceDate ?? null,
+          p_fx_rate: data.fxRate ?? null,
+          p_fx_source: data.fxSource ?? null,
+        } as never);
+        if (error) throw new Error(error.message);
+        return { ok: true };
+      },
+    ),
+  );
+
+export const reversePdvSalePayment = createServerFn({ method: "POST" })
+  .middleware([requireModule("pdv")])
+  .inputValidator((input) =>
+    z
+      .object({
+        saleId: z.string().uuid(),
+        reason: z.string().trim().min(3).max(500),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) =>
+    withPdvLog(
+      {
+        action: "sale.reverse_payment",
+        actorId: context.userId,
+        saleId: data.saleId,
+        route: "pdv.reverseSalePayment",
+        params: data,
+      },
+      async () => {
+        const { error } = await supabaseAdmin.rpc("pdv_reverse_sale_payment", {
+          p_sale_id: data.saleId,
+          p_actor_id: context.userId,
+          p_reason: data.reason,
+        } as never);
+        if (error) throw new Error(error.message);
+        return { ok: true };
+      },
+    ),
+  );
 
 export const getPdvSale = createServerFn({ method: "POST" })
   .middleware([requireModule("pdv")])
