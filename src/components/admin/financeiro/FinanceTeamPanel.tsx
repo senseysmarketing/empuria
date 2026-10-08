@@ -16,9 +16,7 @@ import {
 } from "@/components/ui/select";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { SettleTransactionPopover } from "./SettleTransactionPopover";
-import type { FinanceAccount } from "@/lib/admin/financeiro.functions";
 import {
-  createFinanceAccount,
   settleFinanceTransaction,
   reverseFinanceSettlement,
 } from "@/lib/admin/financeiro.functions";
@@ -109,15 +107,7 @@ function financialChanged(values: FormValues, rule: FinancePayoutRule | null) {
   );
 }
 
-export function FinanceTeamPanel({
-  month,
-  accounts,
-  onChanged,
-}: {
-  month: string;
-  accounts: FinanceAccount[];
-  onChanged: () => void;
-}) {
+export function FinanceTeamPanel({ month, onChanged }: { month: string; onChanged: () => void }) {
   const qc = useQueryClient();
   const list = useServerFn(listFinanceTeamMonth);
   const save = useServerFn(saveFinanceTeamMember);
@@ -125,7 +115,6 @@ export function FinanceTeamPanel({
   const searchProfiles = useServerFn(searchFinancePayeeProfiles);
   const settle = useServerFn(settleFinanceTransaction);
   const reverse = useServerFn(reverseFinanceSettlement);
-  const createAccount = useServerFn(createFinanceAccount);
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<FinanceTeamMember | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -352,11 +341,7 @@ export function FinanceTeamPanel({
                       {transaction?.status === "pending" && (
                         <SettleTransactionPopover
                           transaction={transaction}
-                          accounts={accounts}
                           settle={(input) => settle({ data: input })}
-                          createAccount={async (name, currency) =>
-                            (await createAccount({ data: { name, type: "bank", currency } })).id
-                          }
                           onDone={changed}
                         />
                       )}

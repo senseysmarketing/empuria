@@ -8,7 +8,6 @@ import {
   listOrders,
   updateOrder,
   markOrderPaidManual,
-  listPaymentAccounts,
   cancelOrder,
   refundOrder,
 } from "@/lib/admin/esteira.functions";
@@ -138,7 +137,6 @@ function EsteiraPage() {
   const markManual = useServerFn(markOrderPaidManual);
   const cancel = useServerFn(cancelOrder);
   const refund = useServerFn(refundOrder);
-  const fetchAccounts = useServerFn(listPaymentAccounts);
   const fetchFx = useServerFn(getEurBrlReferenceRate);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -157,7 +155,6 @@ function EsteiraPage() {
   const [reasonInput, setReasonInput] = useState("");
   const [settledAmount, setSettledAmount] = useState("");
   const [settledCurrency, setSettledCurrency] = useState<"BRL" | "EUR">("EUR");
-  const [paymentAccountId, setPaymentAccountId] = useState("");
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
   const [settlementFxReferenceRate, setSettlementFxReferenceRate] = useState<number | null>(null);
   const [settlementFxReferenceDate, setSettlementFxReferenceDate] = useState<string | null>(null);
@@ -167,10 +164,6 @@ function EsteiraPage() {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
     queryFn: () => fetchOrders() as unknown as Promise<Order[]>,
-  });
-  const { data: paymentAccounts = [] } = useQuery({
-    queryKey: ["payment-accounts"],
-    queryFn: () => fetchAccounts(),
   });
   const settlementOrder = actionPrompt?.kind === "manual" ? actionPrompt.order : null;
   const settlementBaseCurrency = (settlementOrder?.currency ?? "EUR") as "BRL" | "EUR";
@@ -330,7 +323,6 @@ function EsteiraPage() {
             reason: reasonInput,
             settledAmountCents: Math.round(Number(settledAmount) * 100),
             settledCurrency,
-            paymentAccountId,
             paidAt,
             fxReferenceRate: settlementConversion ? settlementFxReferenceRate : undefined,
             fxReferenceDate: settlementConversion ? settlementFxReferenceDate : undefined,
@@ -601,18 +593,6 @@ function EsteiraPage() {
                                 setSettledAmount(
                                   String((o.payment_amount_cents ?? o.amount_cents ?? 0) / 100),
                                 );
-                                const initialCurrency = (o.payment_currency ??
-                                  o.currency ??
-                                  "EUR") as "BRL" | "EUR";
-                                setPaymentAccountId(
-                                  paymentAccounts.some(
-                                    (account) =>
-                                      account.id === o.payment_account_id &&
-                                      account.currency === initialCurrency,
-                                  )
-                                    ? (o.payment_account_id ?? "")
-                                    : "",
-                                );
                                 setPaidAt(new Date().toISOString().slice(0, 10));
                                 setSettlementFxReferenceRate(o.fx_reference_rate ?? null);
                                 setSettlementFxReferenceDate(o.fx_reference_date ?? null);
@@ -845,7 +825,6 @@ function EsteiraPage() {
                     value={settledCurrency}
                     onValueChange={(value) => {
                       setSettledCurrency(value as "BRL" | "EUR");
-                      setPaymentAccountId("");
                       setSettlementFxReferenceRate(null);
                       setSettlementFxReferenceDate(null);
                       setSettlementFxRate("");
@@ -892,23 +871,6 @@ function EsteiraPage() {
                     </div>
                   </div>
                 )}
-                <div>
-                  <Label>Conta</Label>
-                  <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentAccounts
-                        .filter((account) => account.currency === settledCurrency)
-                        .map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </>
             )}
             <p className="text-sm text-muted-foreground">
@@ -923,8 +885,7 @@ function EsteiraPage() {
             <Button
               disabled={
                 actionPrompt?.kind === "manual" &&
-                (!paymentAccountId ||
-                  !settledAmount ||
+                (!settledAmount ||
                   (settlementConversion && !settlementFxRate) ||
                   settlementFxQ.isFetching)
               }

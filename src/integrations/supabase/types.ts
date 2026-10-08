@@ -4137,7 +4137,7 @@ export type Database = {
           p_paid_at: string
           p_settled_amount_cents: number
           p_settled_currency: string
-          p_account_id: string
+          p_account_id?: string | null
           p_fx_reference_rate?: number | null
           p_fx_reference_date?: string | null
           p_fx_rate?: number | null

@@ -3,7 +3,6 @@ import { z } from "zod";
 import { requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
-import { normalizeFinanceAccountName } from "@/lib/finance/accounts";
 import { confirmOrderPaymentInternal } from "./esteira.functions";
 
 type FinanceType = "income" | "expense";
@@ -15,16 +14,6 @@ export type FinanceCategory = {
   type: "income" | "expense" | "both";
   is_system: boolean;
   is_active: boolean;
-};
-
-export type FinanceAccount = {
-  id: string;
-  name: string;
-  type: string;
-  currency: string;
-  is_active: boolean;
-  normalized_name?: string;
-  has_history?: boolean;
 };
 
 export type FinanceTransaction = {
@@ -53,7 +42,6 @@ export type FinanceTransaction = {
   notes: string | null;
   created_at: string;
   category_name?: string | null;
-  account_name?: string | null;
 };
 
 export type FinanceRecurringRule = {
@@ -72,7 +60,6 @@ export type FinanceRecurringRule = {
   next_run_at: string | null;
   created_at: string;
   category_name?: string | null;
-  account_name?: string | null;
 };
 
 const db = supabaseAdmin as unknown as {
@@ -108,55 +95,48 @@ async function ensureFinanceMonth(month: string, actorId?: string) {
   if (error) throw new Error(error.message);
 }
 
-async function validateRuleAccount(accountId: string | null | undefined, currency: string) {
-  if (!accountId) return;
-  const { data: account, error } = await db
-    .from("finance_accounts")
-    .select("currency,is_active")
-    .eq("id", accountId)
-    .maybeSingle();
-  if (error || !account?.is_active || account.currency !== currency) {
-    throw new Error("Selecione uma conta ativa na moeda da recorrência.");
-  }
-}
-
-function withNames<T extends { category_id: string | null; account_id: string | null }>(
+function withNames<T extends { category_id: string | null }>(
   rows: T[],
   categories: FinanceCategory[],
-  accounts: FinanceAccount[],
 ) {
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
-  const accountMap = new Map(accounts.map((a) => [a.id, a.name]));
   return rows.map((row) => ({
     ...row,
     category_name: row.category_id ? (categoryMap.get(row.category_id) ?? null) : null,
-    account_name: row.account_id ? (accountMap.get(row.account_id) ?? null) : null,
   }));
 }
 
-async function financeMeta(includeArchived = false) {
-  const [{ data: categories, error: categoryErr }, { data: accounts, error: accountErr }] =
-    await Promise.all([
-      db
-        .from("finance_categories")
-        .select("id, name, type, is_system, is_active")
-        .order("type")
-        .order("name"),
-      db
-        .from("finance_accounts")
-        .select("id, name, type, currency, is_active, normalized_name")
-        .order("name"),
-    ]);
+async function financeMeta() {
+  const { data: categories, error: categoryErr } = await db
+    .from("finance_categories")
+    .select("id, name, type, is_system, is_active")
+    .eq("is_system", true)
+    .eq("is_active", true)
+    .order("type")
+    .order("name");
   if (categoryErr) throw new Error(categoryErr.message);
-  if (accountErr) throw new Error(accountErr.message);
-  return {
-    categories: ((categories ?? []) as FinanceCategory[]).filter(
-      (row) => includeArchived || row.is_active,
-    ),
-    accounts: ((accounts ?? []) as FinanceAccount[]).filter(
-      (row) => includeArchived || row.is_active,
-    ),
-  };
+  return { categories: (categories ?? []) as FinanceCategory[] };
+}
+
+async function validateOperationalCategory(
+  categoryId: string | null | undefined,
+  type: FinanceType,
+) {
+  if (!categoryId) return null;
+  const { data, error } = await db
+    .from("finance_categories")
+    .select("name,is_system,is_active,type")
+    .eq("id", categoryId)
+    .maybeSingle();
+  if (
+    error ||
+    !data?.is_system ||
+    !data.is_active ||
+    (data.type !== "both" && data.type !== type)
+  ) {
+    throw new Error("Categoria padrão inativa ou incompatível com o tipo de lançamento.");
+  }
+  return data as { name: string; is_system: boolean };
 }
 
 async function audit(
@@ -179,28 +159,6 @@ export const listFinanceMeta = createServerFn({ method: "GET" })
   .middleware([requireModule("financeiro")])
   .handler(async () => financeMeta());
 
-export const listFinanceSettings = createServerFn({ method: "GET" })
-  .middleware([requireModule("financeiro")])
-  .handler(async () => {
-    const meta = await financeMeta(true);
-    const [transactions, orders, recurring] = await Promise.all([
-      db.from("finance_transactions").select("account_id").not("account_id", "is", null),
-      db.from("orders").select("payment_account_id").not("payment_account_id", "is", null),
-      db.from("finance_recurring_rules").select("account_id").not("account_id", "is", null),
-    ]);
-    for (const q of [transactions, orders, recurring])
-      if (q.error) throw new Error(q.error.message);
-    const used = new Set([
-      ...(transactions.data ?? []).map((row: { account_id: string }) => row.account_id),
-      ...(orders.data ?? []).map((row: { payment_account_id: string }) => row.payment_account_id),
-      ...(recurring.data ?? []).map((row: { account_id: string }) => row.account_id),
-    ]);
-    return {
-      ...meta,
-      accounts: meta.accounts.map((account) => ({ ...account, has_history: used.has(account.id) })),
-    };
-  });
-
 export const listFinanceTransactions = createServerFn({ method: "POST" })
   .middleware([requireModule("financeiro")])
   .inputValidator((d) =>
@@ -220,7 +178,7 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await ensureFinanceMonth(data.month);
     const { start, end } = monthRange(data.month);
-    const { categories, accounts } = await financeMeta(true);
+    const { categories } = await financeMeta();
     let query = db
       .from("finance_transactions")
       .select(
@@ -242,7 +200,7 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
     const { data: rows, error, count } = await query;
     if (error) throw new Error(error.message);
     return {
-      rows: withNames((rows ?? []) as FinanceTransaction[], categories, accounts),
+      rows: withNames((rows ?? []) as FinanceTransaction[], categories),
       count: count ?? 0,
     };
   });
@@ -255,7 +213,6 @@ const transactionInput = z.object({
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: z.literal("pending").default("pending"),
   categoryId: z.string().uuid().nullable().optional(),
-  accountId: z.string().uuid().nullable().optional(),
   paymentMethod: z.string().trim().max(60).nullable().optional(),
   notes: z.string().trim().max(800).nullable().optional(),
 });
@@ -264,21 +221,12 @@ export const createFinanceTransaction = createServerFn({ method: "POST" })
   .middleware([requireModule("financeiro")])
   .inputValidator((d) => transactionInput.parse(d))
   .handler(async ({ data, context }) => {
-    if (data.categoryId) {
-      const { data: category, error: categoryError } = await db
-        .from("finance_categories")
-        .select("name,is_system,is_active,type")
-        .eq("id", data.categoryId)
-        .single();
-      if (categoryError) throw new Error(categoryError.message);
-      if (!category.is_active || (category.type !== "both" && category.type !== data.type)) {
-        throw new Error("Categoria inativa ou incompatível com o tipo de lançamento.");
-      }
-      if (category.is_system && category.name === "Pedidos/Servicos") {
+    const category = await validateOperationalCategory(data.categoryId, data.type);
+    if (category) {
+      if (category.name === "Pedidos/Servicos") {
         throw new Error("Receitas de serviços devem ser criadas na origem Pedidos.");
       }
     }
-    await validateRuleAccount(data.accountId, data.currency);
     const { data: inserted, error } = await db
       .from("finance_transactions")
       .insert({
@@ -292,7 +240,7 @@ export const createFinanceTransaction = createServerFn({ method: "POST" })
         settled_amount_cents: null,
         settled_currency: null,
         category_id: data.categoryId ?? null,
-        account_id: data.accountId ?? null,
+        account_id: null,
         payment_method: data.paymentMethod ?? null,
         source_module: "manual",
         is_automatic: false,
@@ -349,7 +297,6 @@ const settleInput = z.object({
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   settledAmount: moneySchema,
   settledCurrency: z.enum(["BRL", "EUR"]),
-  accountId: z.string().uuid(),
   fxReferenceRate: z.number().positive().nullable().optional(),
   fxReferenceDate: z
     .string()
@@ -379,7 +326,6 @@ export const settleFinanceTransaction = createServerFn({ method: "POST" })
           paidAt: data.paidAt,
           settledAmountCents: cents(data.settledAmount),
           settledCurrency: data.settledCurrency,
-          paymentAccountId: data.accountId,
           fxReferenceRate: data.fxReferenceRate,
           fxReferenceDate: data.fxReferenceDate,
           fxRate: data.fxRate,
@@ -398,19 +344,14 @@ export const settleFinanceTransaction = createServerFn({ method: "POST" })
       !tx.source_module.startsWith("recurring:")
     )
       throw new Error("Este lançamento automático deve ser corrigido no módulo de origem.");
-    const { data: account } = await db
-      .from("finance_accounts")
-      .select("currency,is_active")
-      .eq("id", data.accountId)
-      .single();
-    if (!account?.is_active || account.currency !== data.settledCurrency)
-      throw new Error("Selecione uma conta ativa na moeda realizada.");
+    if ((tx.reference_currency ?? tx.currency) !== data.settledCurrency && !data.fxRate)
+      throw new Error("Cotação aplicada obrigatória para conversão.");
     const patch = {
       status: tx.type === "income" ? "received" : "paid",
       settled_amount_cents: cents(data.settledAmount),
       settled_currency: data.settledCurrency,
       paid_at: new Date(`${data.paidAt}T12:00:00.000Z`).toISOString(),
-      account_id: data.accountId,
+      account_id: null,
       fx_reference_rate: data.fxReferenceRate ?? null,
       fx_rate: data.fxRate ?? null,
       fx_source: data.fxSource ?? null,
@@ -432,7 +373,6 @@ const recurringInput = z.object({
   amount: moneySchema,
   currency: z.enum(["BRL", "EUR"]),
   categoryId: z.string().uuid().nullable().optional(),
-  accountId: z.string().uuid().nullable().optional(),
   dayOfMonth: z.number().int().min(1).max(31).default(1),
   startsOn: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/),
   endsOn: z
@@ -445,7 +385,7 @@ const recurringInput = z.object({
 export const listFinanceRecurringRules = createServerFn({ method: "GET" })
   .middleware([requireModule("financeiro")])
   .handler(async () => {
-    const { categories, accounts } = await financeMeta(true);
+    const { categories } = await financeMeta();
     const { data, error } = await db
       .from("finance_recurring_rules")
       .select(
@@ -453,7 +393,7 @@ export const listFinanceRecurringRules = createServerFn({ method: "GET" })
       )
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return withNames((data ?? []) as FinanceRecurringRule[], categories, accounts);
+    return withNames((data ?? []) as FinanceRecurringRule[], categories);
   });
 
 export const createFinanceRecurringRule = createServerFn({ method: "POST" })
@@ -461,7 +401,7 @@ export const createFinanceRecurringRule = createServerFn({ method: "POST" })
   .inputValidator((d) => recurringInput.parse(d))
   .handler(async ({ data, context }) => {
     if (data.endsOn && data.endsOn < data.startsOn) throw new Error("Fim anterior ao início.");
-    await validateRuleAccount(data.accountId, data.currency);
+    await validateOperationalCategory(data.categoryId, data.type);
     const { data: inserted, error } = await db
       .from("finance_recurring_rules")
       .insert({
@@ -470,7 +410,7 @@ export const createFinanceRecurringRule = createServerFn({ method: "POST" })
         amount_cents: cents(data.amount),
         currency: data.currency,
         category_id: data.categoryId ?? null,
-        account_id: data.accountId ?? null,
+        account_id: null,
         frequency: "monthly",
         day_of_month: data.dayOfMonth,
         starts_on: data.startsOn,
@@ -490,7 +430,7 @@ export const updateFinanceRecurringRule = createServerFn({ method: "POST" })
   .inputValidator((d) => recurringInput.extend({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     if (data.endsOn && data.endsOn < data.startsOn) throw new Error("Fim anterior ao início.");
-    await validateRuleAccount(data.accountId, data.currency);
+    await validateOperationalCategory(data.categoryId, data.type);
     const { error } = await db
       .from("finance_recurring_rules")
       .update({
@@ -499,7 +439,7 @@ export const updateFinanceRecurringRule = createServerFn({ method: "POST" })
         amount_cents: cents(data.amount),
         currency: data.currency,
         category_id: data.categoryId ?? null,
-        account_id: data.accountId ?? null,
+        account_id: null,
         day_of_month: data.dayOfMonth,
         starts_on: data.startsOn,
         ends_on: data.endsOn ?? null,
@@ -545,200 +485,4 @@ export const toggleFinanceRecurringRule = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     await audit(context.userId, "finance.recurring.toggle", data.id, { is_active: data.isActive });
     return { ok: true };
-  });
-
-export const createFinanceCategory = createServerFn({ method: "POST" })
-  .middleware([requireModule("financeiro")])
-  .inputValidator((d) =>
-    z
-      .object({
-        name: z.string().trim().min(2).max(80),
-        type: z.enum(["income", "expense", "both"]),
-      })
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const { data: inserted, error } = await db
-      .from("finance_categories")
-      .insert({ name: data.name, type: data.type, is_system: false, is_active: true })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    await audit(context.userId, "finance.category.create", inserted.id, data);
-    return { ok: true };
-  });
-
-export const createFinanceAccount = createServerFn({ method: "POST" })
-  .middleware([requireModule("financeiro")])
-  .inputValidator((d) =>
-    z
-      .object({
-        name: z.string().trim().min(2).max(80),
-        type: z.enum(["cash", "bank", "card", "gateway", "other"]),
-        currency: z.enum(["BRL", "EUR", "USD"]),
-      })
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const normalizedName = normalizeFinanceAccountName(data.name);
-    const { data: existing } = await db
-      .from("finance_accounts")
-      .select("id")
-      .eq("currency", data.currency)
-      .eq("normalized_name", normalizedName)
-      .maybeSingle();
-    if (existing) {
-      const { error: reviveError } = await db
-        .from("finance_accounts")
-        .update({ is_active: true })
-        .eq("id", existing.id);
-      if (reviveError) throw new Error(reviveError.message);
-      await audit(context.userId, "finance.account.reactivate", existing.id, { name: data.name });
-      return { ok: true, id: existing.id as string, reused: true };
-    }
-    const { data: inserted, error } = await db
-      .from("finance_accounts")
-      .insert({
-        name: data.name.trim(),
-        normalized_name: normalizedName,
-        type: data.type,
-        currency: data.currency,
-        is_active: true,
-      })
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    await audit(context.userId, "finance.account.create", inserted.id, data);
-    return { ok: true, id: inserted.id as string, reused: false };
-  });
-
-async function accountReferenceCount(id: string) {
-  const [tx, orders, recurring] = await Promise.all([
-    db
-      .from("finance_transactions")
-      .select("id", { count: "exact", head: true })
-      .eq("account_id", id),
-    db.from("orders").select("id", { count: "exact", head: true }).eq("payment_account_id", id),
-    db
-      .from("finance_recurring_rules")
-      .select("id", { count: "exact", head: true })
-      .eq("account_id", id),
-  ]);
-  for (const q of [tx, orders, recurring]) if (q.error) throw new Error(q.error.message);
-  return (tx.count ?? 0) + (orders.count ?? 0) + (recurring.count ?? 0);
-}
-
-export const manageFinanceAccount = createServerFn({ method: "POST" })
-  .middleware([requireModule("financeiro")])
-  .inputValidator((d) =>
-    z
-      .object({
-        id: z.string().uuid(),
-        action: z.enum(["edit", "archive", "reactivate", "remove"]),
-        name: z.string().trim().min(2).max(80).optional(),
-        type: z.enum(["cash", "bank", "card", "gateway", "other"]).optional(),
-        currency: z.enum(["BRL", "EUR", "USD"]).optional(),
-      })
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const { data: current, error: readError } = await db
-      .from("finance_accounts")
-      .select("*")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (readError || !current) throw new Error("Conta não encontrada.");
-    const references = await accountReferenceCount(data.id);
-    if (data.action === "edit") {
-      if (!data.name || !data.type || !data.currency)
-        throw new Error("Preencha nome, tipo e moeda.");
-      if (references && data.currency !== current.currency)
-        throw new Error("Conta com histórico não pode mudar de moeda.");
-      const { error } = await db
-        .from("finance_accounts")
-        .update({
-          name: data.name,
-          normalized_name: normalizeFinanceAccountName(data.name),
-          type: data.type,
-          currency: data.currency,
-        })
-        .eq("id", data.id);
-      if (error) throw new Error(error.message);
-    } else if (data.action === "remove" && references === 0) {
-      const { error } = await db.from("finance_accounts").delete().eq("id", data.id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await db
-        .from("finance_accounts")
-        .update({ is_active: data.action === "reactivate" })
-        .eq("id", data.id);
-      if (error) throw new Error(error.message);
-    }
-    await audit(context.userId, `finance.account.${data.action}`, data.id, {
-      previous: current,
-      references,
-      input: data,
-    } as Json);
-    return { ok: true, archivedInstead: data.action === "remove" && references > 0 };
-  });
-
-async function categoryReferenceCount(id: string) {
-  const [tx, recurring] = await Promise.all([
-    db
-      .from("finance_transactions")
-      .select("id", { count: "exact", head: true })
-      .eq("category_id", id),
-    db
-      .from("finance_recurring_rules")
-      .select("id", { count: "exact", head: true })
-      .eq("category_id", id),
-  ]);
-  for (const q of [tx, recurring]) if (q.error) throw new Error(q.error.message);
-  return (tx.count ?? 0) + (recurring.count ?? 0);
-}
-
-export const manageFinanceCategory = createServerFn({ method: "POST" })
-  .middleware([requireModule("financeiro")])
-  .inputValidator((d) =>
-    z
-      .object({
-        id: z.string().uuid(),
-        action: z.enum(["edit", "archive", "reactivate", "remove"]),
-        name: z.string().trim().min(2).max(80).optional(),
-        type: z.enum(["income", "expense", "both"]).optional(),
-      })
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const { data: current, error: readError } = await db
-      .from("finance_categories")
-      .select("*")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (readError || !current) throw new Error("Categoria não encontrada.");
-    if (current.is_system) throw new Error("Categoria de sistema não pode ser alterada.");
-    const references = await categoryReferenceCount(data.id);
-    if (data.action === "edit") {
-      if (!data.name || !data.type) throw new Error("Preencha nome e tipo.");
-      const { error } = await db
-        .from("finance_categories")
-        .update({ name: data.name, type: data.type })
-        .eq("id", data.id);
-      if (error) throw new Error(error.message);
-    } else if (data.action === "remove" && references === 0) {
-      const { error } = await db.from("finance_categories").delete().eq("id", data.id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await db
-        .from("finance_categories")
-        .update({ is_active: data.action === "reactivate" })
-        .eq("id", data.id);
-      if (error) throw new Error(error.message);
-    }
-    await audit(context.userId, `finance.category.${data.action}`, data.id, {
-      previous: current,
-      references,
-      input: data,
-    } as Json);
-    return { ok: true, archivedInstead: data.action === "remove" && references > 0 };
   });

@@ -51,7 +51,6 @@ import { SaleCatalogGrid, type PdvCatalogItem } from "./SaleCatalogGrid";
 import {
   listPdvCatalog,
   listPendingPdvSales,
-  listPdvSettlementAccounts,
   settlePdvSale,
   voidPdvSale,
 } from "@/lib/admin/pdv-sales.functions";
@@ -125,7 +124,6 @@ export function PdvTabsPanel() {
   const fetchTabs = useServerFn(listPdvTabsWorkspace);
   const fetchCatalog = useServerFn(listPdvCatalog);
   const fetchPendingSales = useServerFn(listPendingPdvSales);
-  const fetchSettlementAccounts = useServerFn(listPdvSettlementAccounts);
   const settleSale = useServerFn(settlePdvSale);
   const voidSale = useServerFn(voidPdvSale);
   const openTab = useServerFn(openPdvTab);
@@ -165,10 +163,6 @@ export function PdvTabsPanel() {
   const pendingQ = useQuery({
     queryKey: ["pdv-pending-sales"],
     queryFn: () => fetchPendingSales(),
-  });
-  const accountsQ = useQuery({
-    queryKey: ["pdv-settlement-accounts"],
-    queryFn: () => fetchSettlementAccounts(),
   });
   const invalidatePending = () => {
     qc.invalidateQueries({ queryKey: ["pdv-pending-sales"] });
@@ -488,7 +482,6 @@ export function PdvTabsPanel() {
                 <div className="flex gap-2">
                   <PdvSettlePopover
                     sale={sale}
-                    accounts={accountsQ.data ?? []}
                     settle={(input) => settleSale({ data: input })}
                     onDone={() => {
                       toast.success("Baixa confirmada.");

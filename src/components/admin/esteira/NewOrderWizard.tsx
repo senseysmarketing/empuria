@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Search, UserPlus } from "lucide-react";
@@ -25,7 +25,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   createCustomerLite,
   createOrderFull,
-  listPaymentAccounts,
   searchCustomers,
 } from "@/lib/admin/esteira.functions";
 import { listServicesAdmin } from "@/lib/admin/slots.functions";
@@ -47,7 +46,6 @@ type Service = {
   online_price_cents: number | null;
   online_currency: string | null;
 };
-type Account = { id: string; name: string; currency: string; is_active: boolean };
 
 function money(cents: number, currency: Currency) {
   return new Intl.NumberFormat(currency === "EUR" ? "pt-PT" : "pt-BR", {
@@ -70,7 +68,6 @@ export function NewOrderWizard({
   const search = useServerFn(searchCustomers);
   const createCustomer = useServerFn(createCustomerLite);
   const fetchServices = useServerFn(listServicesAdmin);
-  const fetchAccounts = useServerFn(listPaymentAccounts);
   const createOrder = useServerFn(createOrderFull);
   const fetchFx = useServerFn(getEurBrlReferenceRate);
   const [step, setStep] = useState(1);
@@ -89,7 +86,6 @@ export function NewOrderWizard({
   const [paymentState, setPaymentState] = useState<PaymentState>("pending");
   const [settledAmount, setSettledAmount] = useState("");
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
-  const [accountId, setAccountId] = useState("");
   const [notes, setNotes] = useState("");
   const [confirmFree, setConfirmFree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -98,11 +94,6 @@ export function NewOrderWizard({
   const { data: services = [] } = useQuery({
     queryKey: ["admin-services-wizard"],
     queryFn: () => fetchServices(),
-    enabled: open,
-  });
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["payment-accounts"],
-    queryFn: () => fetchAccounts() as Promise<Account[]>,
     enabled: open,
   });
   const conversion = commercialCurrency !== paymentCurrency;
@@ -132,7 +123,6 @@ export function NewOrderWizard({
       setFxRate("");
       setPaymentState("pending");
       setSettledAmount("");
-      setAccountId("");
       setNotes("");
       setConfirmFree(false);
       setCreated(false);
@@ -182,17 +172,14 @@ export function NewOrderWizard({
     else if (paymentState === "gratuito") setPaymentState("pending");
   }, [isFree, paymentState]);
 
-  const compatibleAccounts = useMemo(
-    () => accounts.filter((account) => account.currency === paymentCurrency),
-    [accounts, paymentCurrency],
-  );
   const canSubmit =
     !!customer &&
     commercialAmount !== "" &&
     paymentAmount !== "" &&
+    (!conversion || Number(fxRate) > 0) &&
     (serviceMode === "cadastrado" ? !!service : title.trim().length >= 2) &&
     (!isFree || confirmFree) &&
-    (paymentState !== "received" || (!!accountId && settledAmount !== ""));
+    (paymentState !== "received" || settledAmount !== "");
 
   const selectService = (id: string) => {
     const selected = (services as Service[]).find((item) => item.id === id);
@@ -242,7 +229,6 @@ export function NewOrderWizard({
           paid_at: paymentState === "received" ? paidAt : null,
           settled_amount_cents: paymentState === "received" ? settledCents : null,
           settled_currency: paymentState === "received" ? paymentCurrency : null,
-          payment_account_id: paymentState === "received" ? accountId : null,
           fx_reference_rate: conversion && fxQ.data?.ok ? fxQ.data.rate : null,
           fx_reference_date: conversion && fxQ.data?.ok ? fxQ.data.date : null,
           fx_rate: conversion && fxRate ? Number(fxRate) : null,
@@ -485,20 +471,6 @@ export function NewOrderWizard({
                     />
                   </Field>
                 </div>
-                <Field label={`Conta em ${paymentCurrency}`}>
-                  <Select value={accountId} onValueChange={setAccountId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {compatibleAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
               </div>
             )}
             <Field label="Observação">

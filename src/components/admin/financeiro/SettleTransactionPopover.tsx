@@ -14,9 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { FinanceAccount, FinanceTransaction } from "@/lib/admin/financeiro.functions";
+import type { FinanceTransaction } from "@/lib/admin/financeiro.functions";
 import { getEurBrlReferenceRate } from "@/lib/finance/fx.functions";
-import { FinanceAccountCombobox } from "./FinanceAccountCombobox";
 
 type Currency = "BRL" | "EUR";
 
@@ -35,26 +34,21 @@ function transactionBase(transaction: FinanceTransaction) {
 
 export function SettleTransactionPopover({
   transaction,
-  accounts,
   settle,
-  createAccount,
   onDone,
 }: {
   transaction: FinanceTransaction;
-  accounts: FinanceAccount[];
   settle: (data: {
     id: string;
     paidAt: string;
     settledAmount: number;
     settledCurrency: Currency;
-    accountId: string;
     fxReferenceRate?: number | null;
     fxReferenceDate?: string | null;
     fxRate?: number | null;
     fxSource?: string | null;
     notes?: string | null;
   }) => Promise<unknown>;
-  createAccount: (name: string, currency: "BRL" | "EUR" | "USD") => Promise<string>;
   onDone: () => void;
 }) {
   const fetchFx = useServerFn(getEurBrlReferenceRate);
@@ -65,7 +59,6 @@ export function SettleTransactionPopover({
   const [currency, setCurrency] = useState<Currency>(
     transaction.currency === "EUR" ? "EUR" : "BRL",
   );
-  const [accountId, setAccountId] = useState(transaction.account_id ?? "");
   const [fxReferenceRate, setFxReferenceRate] = useState<number | null>(
     transaction.fx_reference_rate,
   );
@@ -80,18 +73,11 @@ export function SettleTransactionPopover({
     setPaidAt(new Date().toISOString().slice(0, 10));
     setAmount(String(transaction.amount_cents / 100));
     setCurrency(initialCurrency);
-    setAccountId(
-      accounts.some(
-        (account) => account.id === transaction.account_id && account.currency === initialCurrency,
-      )
-        ? (transaction.account_id ?? "")
-        : "",
-    );
     setFxReferenceRate(transaction.fx_reference_rate);
     setFxReferenceDate(transaction.fx_date);
     setFxRate(transaction.fx_rate ? String(transaction.fx_rate) : "");
     setFxSource(transaction.fx_source);
-  }, [accounts, open, transaction]);
+  }, [open, transaction]);
 
   const fxQ = useQuery({
     queryKey: ["settlement-eur-brl-reference", transaction.id, paidAt, base.currency, currency],
@@ -136,7 +122,6 @@ export function SettleTransactionPopover({
         paidAt,
         settledAmount: Number(amount),
         settledCurrency: currency,
-        accountId,
         fxReferenceRate: conversion ? fxReferenceRate : undefined,
         fxReferenceDate: conversion ? fxReferenceDate : undefined,
         fxRate: conversion && fxRate ? Number(fxRate) : undefined,
@@ -175,7 +160,6 @@ export function SettleTransactionPopover({
               value={currency}
               onValueChange={(value) => {
                 setCurrency(value as Currency);
-                setAccountId("");
                 setFxReferenceRate(null);
                 setFxReferenceDate(null);
                 setFxRate("");
@@ -234,21 +218,9 @@ export function SettleTransactionPopover({
             onChange={(event) => setAmount(event.target.value)}
           />
         </div>
-        <div>
-          <Label>Conta</Label>
-          <FinanceAccountCombobox
-            accounts={accounts}
-            currency={currency}
-            value={accountId}
-            onChange={setAccountId}
-            onCreate={createAccount}
-          />
-        </div>
         <Button
           className="w-full"
-          disabled={
-            !accountId || !amount || (conversion && !fxRate) || fxQ.isFetching || mutation.isPending
-          }
+          disabled={!amount || (conversion && !fxRate) || fxQ.isFetching || mutation.isPending}
           onClick={() => mutation.mutate()}
         >
           {mutation.isPending ? "Confirmando..." : "Confirmar baixa"}

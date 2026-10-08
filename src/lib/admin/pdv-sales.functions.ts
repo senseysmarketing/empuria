@@ -398,19 +398,6 @@ export const listPdvCashiers = createServerFn({ method: "GET" })
     );
   });
 
-export const listPdvSettlementAccounts = createServerFn({ method: "GET" })
-  .middleware([requireModule("pdv")])
-  .handler(async () => {
-    const { data, error } = await supabaseAdmin
-      .from("finance_accounts")
-      .select("id,name,currency,is_active")
-      .eq("is_active", true)
-      .in("currency", ["BRL", "EUR"])
-      .order("name");
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
-
 export const listPendingPdvSales = createServerFn({ method: "GET" })
   .middleware([requireModule("pdv")])
   .handler(async () => {
@@ -443,7 +430,6 @@ export const settlePdvSale = createServerFn({ method: "POST" })
         paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         settledAmount: z.number().finite().positive().max(99_999_999),
         settledCurrency: z.enum(["BRL", "EUR"]),
-        accountId: z.string().uuid(),
         fxReferenceRate: z.number().finite().positive().nullable().optional(),
         fxReferenceDate: z
           .string()
@@ -471,7 +457,6 @@ export const settlePdvSale = createServerFn({ method: "POST" })
           p_paid_at: data.paidAt,
           p_settled_amount_cents: Math.round(data.settledAmount * 100),
           p_settled_currency: data.settledCurrency,
-          p_account_id: data.accountId,
           p_fx_reference_rate: data.fxReferenceRate ?? null,
           p_fx_reference_date: data.fxReferenceDate ?? null,
           p_fx_rate: data.fxRate ?? null,

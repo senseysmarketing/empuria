@@ -12,7 +12,6 @@ const confirmPaymentSchema = z.object({
   paidAt: isoDateSchema,
   settledAmountCents: z.number().int().min(0),
   settledCurrency: currencySchema,
-  paymentAccountId: z.string().uuid(),
   fxReferenceRate: z.number().positive().nullable().optional(),
   fxReferenceDate: isoDateSchema.nullable().optional(),
   fxRate: z.number().positive().nullable().optional(),
@@ -25,15 +24,6 @@ export async function confirmOrderPaymentInternal(
   actorId: string,
 ) {
   const data = confirmPaymentSchema.parse(input);
-  const { data: account, error: accountError } = await supabaseAdmin
-    .from("finance_accounts")
-    .select("id,currency,is_active")
-    .eq("id", data.paymentAccountId)
-    .maybeSingle();
-  if (accountError || !account || !account.is_active) throw new Error("Conta financeira inválida.");
-  if (account.currency !== data.settledCurrency) {
-    throw new Error("A moeda da conta deve ser igual à moeda recebida.");
-  }
   const { data: current, error: currentError } = await supabaseAdmin
     .from("orders")
     .select(
@@ -42,6 +32,8 @@ export async function confirmOrderPaymentInternal(
     .eq("id", data.orderId)
     .maybeSingle();
   if (currentError || !current) throw new Error("Pedido não encontrado.");
+  if (current.currency !== data.settledCurrency && !data.fxRate)
+    throw new Error("Cotação aplicada obrigatória para conversão.");
 
   const paidAt = new Date(`${data.paidAt}T12:00:00.000Z`).toISOString();
   const patch = {
@@ -49,7 +41,7 @@ export async function confirmOrderPaymentInternal(
     payment_method: "manual",
     settled_amount_cents: data.settledAmountCents,
     settled_currency: data.settledCurrency,
-    payment_account_id: data.paymentAccountId,
+    payment_account_id: null,
     paid_at: paidAt,
     fx_reference_rate:
       data.fxReferenceRate === undefined ? current.fx_reference_rate : data.fxReferenceRate,
@@ -99,20 +91,6 @@ export const listOrders = createServerFn({ method: "GET" })
       if (!data || data.length < 1000) break;
     }
     return orders;
-  });
-
-export const listPaymentAccounts = createServerFn({ method: "GET" })
-  .middleware([requireStaff])
-  .handler(async () => {
-    const { data, error } = await supabaseAdmin
-      .from("finance_accounts")
-      .select("id,name,currency,is_active")
-      .eq("is_active", true)
-      .in("currency", ["BRL", "EUR"])
-      .order("currency")
-      .order("name");
-    if (error) throw new Error(error.message);
-    return data ?? [];
   });
 
 export const updateOrder = createServerFn({ method: "POST" })
@@ -251,7 +229,6 @@ const fullOrderSchema = z.object({
   paid_at: isoDateSchema.nullable().optional(),
   settled_amount_cents: z.number().int().min(0).nullable().optional(),
   settled_currency: currencySchema.nullable().optional(),
-  payment_account_id: z.string().uuid().nullable().optional(),
   fx_reference_rate: z.number().positive().nullable().optional(),
   fx_reference_date: isoDateSchema.nullable().optional(),
   fx_rate: z.number().positive().nullable().optional(),
@@ -266,20 +243,15 @@ export const createOrderFull = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => fullOrderSchema.parse(d))
   .handler(async ({ data, context }) => {
-    if (data.payment_method === "received" && !data.payment_account_id)
-      throw new Error("Selecione a conta que recebeu.");
-    if (data.payment_method === "received") {
-      const settledCurrency = data.settled_currency ?? data.payment_currency;
-      const { data: account, error: accountError } = await supabaseAdmin
-        .from("finance_accounts")
-        .select("currency,is_active")
-        .eq("id", data.payment_account_id!)
-        .maybeSingle();
-      if (accountError || !account?.is_active) throw new Error("Conta financeira inválida.");
-      if (account.currency !== settledCurrency) {
-        throw new Error("A moeda da conta deve ser igual à moeda recebida.");
-      }
-    }
+    if (data.currency !== data.payment_currency && !data.fx_rate)
+      throw new Error("Cotação aplicada obrigatória para conversão.");
+    if (
+      data.payment_method === "received" &&
+      data.settled_currency &&
+      data.settled_currency !== data.payment_currency &&
+      !data.fx_rate
+    )
+      throw new Error("Cotação aplicada obrigatória para conversão.");
     if (data.amount_cents === 0 && data.payment_method !== "gratuito") {
       throw new Error("Pedido com valor zero exige confirmação como gratuito");
     }
@@ -312,7 +284,7 @@ export const createOrderFull = createServerFn({ method: "POST" })
           : null,
       settled_currency:
         payment_status === "aprovado" ? (data.settled_currency ?? data.payment_currency) : null,
-      payment_account_id: payment_status === "aprovado" ? data.payment_account_id : null,
+      payment_account_id: null,
       fx_reference_rate: data.fx_reference_rate ?? null,
       fx_reference_date: data.fx_reference_date ?? null,
       fx_rate: data.fx_rate ?? null,
@@ -372,7 +344,6 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
         reason: z.string().trim().min(3).max(280),
         settledAmountCents: z.number().int().min(0),
         settledCurrency: currencySchema,
-        paymentAccountId: z.string().uuid(),
         paidAt: isoDateSchema,
         fxReferenceRate: z.number().positive().nullable().optional(),
         fxReferenceDate: isoDateSchema.nullable().optional(),
@@ -388,7 +359,6 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
         paidAt: data.paidAt,
         settledAmountCents: data.settledAmountCents,
         settledCurrency: data.settledCurrency,
-        paymentAccountId: data.paymentAccountId,
         fxReferenceRate: data.fxReferenceRate,
         fxReferenceDate: data.fxReferenceDate,
         fxRate: data.fxRate,
