@@ -18,6 +18,7 @@ export type FinancePayee = {
   profile_id: string | null;
   notes: string | null;
   is_active: boolean;
+  archived_at: string | null;
 };
 
 export type FinancePayoutRule = {
@@ -27,11 +28,14 @@ export type FinancePayoutRule = {
   amount_cents: number | null;
   currency: string | null;
   percentage: number | null;
-  service_id: string | null;
+  service_ids: string[];
+  include_brl: boolean;
+  include_eur: boolean;
   day_of_month: number | null;
   starts_on: string;
   ends_on: string | null;
   is_active: boolean;
+  archived_at: string | null;
 };
 
 export type FinancePayout = {
@@ -44,6 +48,7 @@ export type FinancePayout = {
   percentage: number | null;
   amount_cents: number;
   finance_transaction_id: string | null;
+  voided_at: string | null;
 };
 
 export type FinancePayoutProjection = {
@@ -56,8 +61,8 @@ export type FinancePayoutProjection = {
   payout_id: string | null;
 };
 
-// The functions and tables are introduced by this migration before generated
-// Supabase types are available locally.
+// Keep the finance calls on a narrow dynamic client while the branch's new
+// schema is awaiting deployment to the project used for local development.
 const db = supabaseAdmin as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
@@ -90,7 +95,9 @@ const ruleInput = z
     amount: z.number().finite().min(0).max(21_474_836).nullable().optional(),
     currency: currencySchema.nullable().optional(),
     percentage: z.number().finite().positive().max(100).nullable().optional(),
-    serviceId: z.string().uuid().nullable().optional(),
+    serviceIds: z.array(z.string().uuid()).max(50).default([]),
+    includeBrl: z.boolean().default(true),
+    includeEur: z.boolean().default(true),
     dayOfMonth: z.number().int().min(1).max(31).nullable().optional(),
     startsOn: monthStartSchema,
     endsOn: monthStartSchema.nullable().optional(),
@@ -103,8 +110,14 @@ const ruleInput = z
       if (rule.amount == null || !rule.currency || !rule.dayOfMonth) {
         ctx.addIssue({ code: "custom", message: "Valor, moeda e vencimento são obrigatórios." });
       }
-    } else if (!rule.percentage || (rule.ruleType === "service_percent" && !rule.serviceId)) {
+    } else if (
+      !rule.percentage ||
+      (rule.ruleType === "service_percent" && !rule.serviceIds.length)
+    ) {
       ctx.addIssue({ code: "custom", message: "Percentual e serviço são obrigatórios." });
+    }
+    if (rule.ruleType !== "fixed_monthly" && !rule.includeBrl && !rule.includeEur) {
+      ctx.addIssue({ code: "custom", message: "Selecione BRL, EUR ou ambas." });
     }
   });
 
@@ -116,7 +129,8 @@ function rulePatch(data: z.infer<typeof ruleInput>) {
     amount_cents: fixed ? Math.round((data.amount ?? 0) * 100) : null,
     currency: fixed ? data.currency : null,
     percentage: fixed ? null : data.percentage,
-    service_id: data.ruleType === "service_percent" ? data.serviceId : null,
+    include_brl: data.includeBrl,
+    include_eur: data.includeEur,
     day_of_month: fixed ? data.dayOfMonth : null,
     starts_on: data.startsOn,
     ends_on: data.endsOn ?? null,
@@ -125,7 +139,9 @@ function rulePatch(data: z.infer<typeof ruleInput>) {
 
 export const listFinanceTeamMonth = createServerFn({ method: "POST" })
   .middleware([requireModule("financeiro")])
-  .inputValidator((d) => z.object({ month: monthSchema }).parse(d))
+  .inputValidator((d) =>
+    z.object({ month: monthSchema, showArchived: z.boolean().default(false) }).parse(d),
+  )
   .handler(async ({ data }) => {
     const period = `${data.month}-01`;
     const { error: ensureError } = await db.rpc("finance_ensure_month", {
@@ -133,27 +149,31 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
       p_actor: null,
     });
     if (ensureError) throw new Error(ensureError.message);
-    const [payeesQ, rulesQ, payoutsQ, projectionsQ, servicesQ] = await Promise.all([
-      db.from("finance_payees").select("id,name,type,profile_id,notes,is_active").order("name"),
+    const [payeesQ, rulesQ, payoutsQ, projectionsQ, servicesQ, ruleServicesQ] = await Promise.all([
+      db
+        .from("finance_payees")
+        .select("id,name,type,profile_id,notes,is_active,archived_at")
+        .order("name"),
       db
         .from("finance_payout_rules")
         .select(
-          "id,payee_id,rule_type,amount_cents,currency,percentage,service_id,day_of_month,starts_on,ends_on,is_active",
+          "id,payee_id,rule_type,amount_cents,currency,percentage,day_of_month,starts_on,ends_on,is_active,archived_at,include_brl,include_eur",
         )
         .order("created_at", { ascending: false }),
       db
         .from("finance_payouts")
         .select(
-          "id,payee_id,rule_id,period_month,currency,base_amount_cents,percentage,amount_cents,finance_transaction_id",
+          "id,payee_id,rule_id,period_month,currency,base_amount_cents,percentage,amount_cents,finance_transaction_id,voided_at",
         )
         .eq("period_month", period),
       db.rpc("finance_payout_projection", { p_month: period }),
       supabaseAdmin.from("services").select("id,title").order("title"),
+      db.from("finance_payout_rule_services").select("rule_id,service_id"),
     ]);
-    for (const query of [payeesQ, rulesQ, payoutsQ, projectionsQ, servicesQ]) {
+    for (const query of [payeesQ, rulesQ, payoutsQ, projectionsQ, servicesQ, ruleServicesQ]) {
       if (query.error) throw new Error(query.error.message);
     }
-    const payouts = (payoutsQ.data ?? []) as FinancePayout[];
+    const payouts = ((payoutsQ.data ?? []) as FinancePayout[]).filter((p) => !p.voided_at);
     const transactionIds = payouts.map((payout) => payout.finance_transaction_id).filter(Boolean);
     const transactionsQ = transactionIds.length
       ? await db
@@ -165,8 +185,24 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
       : { data: [], error: null };
     if (transactionsQ.error) throw new Error(transactionsQ.error.message);
     return {
-      payees: (payeesQ.data ?? []) as FinancePayee[],
-      rules: (rulesQ.data ?? []) as FinancePayoutRule[],
+      payees: ((payeesQ.data ?? []) as FinancePayee[]).filter(
+        (p) => data.showArchived || !p.archived_at,
+      ),
+      rules: ((rulesQ.data ?? []) as Omit<FinancePayoutRule, "service_ids">[])
+        .filter(
+          (r) =>
+            data.showArchived ||
+            (!r.archived_at &&
+              (payeesQ.data ?? []).some(
+                (p: FinancePayee) => p.id === r.payee_id && !p.archived_at,
+              )),
+        )
+        .map((r) => ({
+          ...r,
+          service_ids: (ruleServicesQ.data ?? [])
+            .filter((rs: { rule_id: string; service_id: string }) => rs.rule_id === r.id)
+            .map((rs: { service_id: string }) => rs.service_id),
+        })),
       payouts,
       projections: (projectionsQ.data ?? []) as FinancePayoutProjection[],
       transactions: (transactionsQ.data ?? []) as FinanceTransaction[],
@@ -219,10 +255,66 @@ export const toggleFinancePayee = createServerFn({ method: "POST" })
     const { error } = await db
       .from("finance_payees")
       .update({ is_active: data.isActive })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .is("archived_at", null);
     if (error) throw new Error(error.message);
     await audit(context.userId, "finance.payee.toggle", data.id, data);
     return { ok: true };
+  });
+
+export const archiveFinancePayee = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await db
+      .from("finance_payees")
+      .update({
+        is_active: false,
+        archived_at: new Date().toISOString(),
+        archived_by: context.userId,
+      })
+      .eq("id", data.id)
+      .is("archived_at", null);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "finance.payee.archive", data.id, data);
+    return { ok: true };
+  });
+
+export const searchFinancePayeeProfiles = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) => z.object({ query: z.string().trim().min(2).max(120) }).parse(d))
+  .handler(async ({ data }) => {
+    const query = data.query.replace(/[%_,()]/g, "");
+    const [{ data: profiles, error }, auth] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("id,full_name,phone")
+        .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`)
+        .limit(20),
+      supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 }),
+    ]);
+    if (error) throw new Error(error.message);
+    if (auth.error) throw new Error(auth.error.message);
+    const emailMap = new Map((auth.data.users ?? []).map((user) => [user.id, user.email ?? null]));
+    const ids = new Set((profiles ?? []).map((profile) => profile.id));
+    const emailMatches = (auth.data.users ?? [])
+      .filter(
+        (user) => user.email?.toLowerCase().includes(query.toLowerCase()) && !ids.has(user.id),
+      )
+      .slice(0, 20);
+    const { data: extra } = emailMatches.length
+      ? await supabaseAdmin
+          .from("profiles")
+          .select("id,full_name,phone")
+          .in(
+            "id",
+            emailMatches.map((user) => user.id),
+          )
+      : { data: [] as typeof profiles };
+    return [...(profiles ?? []), ...(extra ?? [])].slice(0, 20).map((profile) => ({
+      ...profile,
+      email: emailMap.get(profile.id) ?? null,
+    }));
   });
 
 export const createFinancePayoutRule = createServerFn({ method: "POST" })
@@ -235,6 +327,11 @@ export const createFinancePayoutRule = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+    const { error: servicesError } = await db.rpc("finance_set_payout_rule_services", {
+      p_rule_id: inserted.id,
+      p_service_ids: data.ruleType === "service_percent" ? data.serviceIds : [],
+    });
+    if (servicesError) throw new Error(servicesError.message);
     await audit(context.userId, "finance.payout_rule.create", inserted.id, data);
     return { ok: true, id: inserted.id as string };
   });
@@ -248,6 +345,11 @@ export const updateFinancePayoutRule = createServerFn({ method: "POST" })
       .update(rulePatch(data.rule))
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+    const { error: servicesError } = await db.rpc("finance_set_payout_rule_services", {
+      p_rule_id: data.id,
+      p_service_ids: data.rule.ruleType === "service_percent" ? data.rule.serviceIds : [],
+    });
+    if (servicesError) throw new Error(servicesError.message);
     await audit(context.userId, "finance.payout_rule.update", data.id, data.rule);
     return { ok: true };
   });
@@ -259,9 +361,28 @@ export const toggleFinancePayoutRule = createServerFn({ method: "POST" })
     const { error } = await db
       .from("finance_payout_rules")
       .update({ is_active: data.isActive })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .is("archived_at", null);
     if (error) throw new Error(error.message);
     await audit(context.userId, "finance.payout_rule.toggle", data.id, data);
+    return { ok: true };
+  });
+
+export const archiveFinancePayoutRule = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await db
+      .from("finance_payout_rules")
+      .update({
+        is_active: false,
+        archived_at: new Date().toISOString(),
+        archived_by: context.userId,
+      })
+      .eq("id", data.id)
+      .is("archived_at", null);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "finance.payout_rule.archive", data.id, data);
     return { ok: true };
   });
 
