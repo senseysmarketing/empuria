@@ -1561,13 +1561,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "finance_payouts_voided_by_fkey"
-            columns: ["voided_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "finance_payouts_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -1593,6 +1586,13 @@ export type Database = {
             columns: ["rule_id"]
             isOneToOne: false
             referencedRelation: "finance_payout_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payouts_voided_by_fkey"
+            columns: ["voided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3950,11 +3950,11 @@ export type Database = {
         Args: { p_name: string; p_type: string }
         Returns: string
       }
+      finance_dashboard_month: { Args: { p_month: string }; Returns: Json }
       finance_delete_pending_transaction: {
         Args: { p_actor: string; p_id: string; p_reason?: string }
         Returns: undefined
       }
-      finance_dashboard_month: { Args: { p_month: string }; Returns: Json }
       finance_ensure_month: {
         Args: { p_actor?: string; p_month: string }
         Returns: undefined
@@ -3996,6 +3996,10 @@ export type Database = {
         Args: { p_actor: string; p_data: Json }
         Returns: string
       }
+      finance_set_payout_rule_services: {
+        Args: { p_rule_id: string; p_service_ids: string[] }
+        Returns: undefined
+      }
       finance_set_team_member_state: {
         Args: {
           p_action: string
@@ -4006,10 +4010,8 @@ export type Database = {
         }
         Returns: undefined
       }
-      finance_set_payout_rule_services: {
-        Args: { p_rule_id: string; p_service_ids: string[] }
-        Returns: undefined
-      }
+      finance_sync_order: { Args: { p_order_id: string }; Returns: undefined }
+      finance_sync_pdv_sale: { Args: { p_sale_id: string }; Returns: undefined }
       finance_sync_team_payouts: {
         Args: {
           p_actor?: string
@@ -4019,8 +4021,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      finance_sync_order: { Args: { p_order_id: string }; Returns: undefined }
-      finance_sync_pdv_sale: { Args: { p_sale_id: string }; Returns: undefined }
       has_action: {
         Args: { _action: string; _user_id: string }
         Returns: boolean
@@ -4198,12 +4198,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4227,11 +4227,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4252,11 +4252,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4277,11 +4277,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4294,11 +4294,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
