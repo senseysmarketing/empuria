@@ -3,7 +3,6 @@ import { z } from "zod";
 import { requireStaff, requireModule } from "./auth";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createOrReuseManualCustomer } from "./manual-users";
-import { createWisePaymentForOrder } from "@/lib/wise/wise.functions";
 
 const currencySchema = z.enum(["BRL", "EUR"]);
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -568,49 +567,3 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
 
 // Kept for backward compatibility with existing modal.
 export const createOrder = createOrderFull;
-
-/**
- * Admin-side: mint a Wise payment for an order created via the esteira wizard.
- * Returns the hosted Quick Pay URL (with amount/reference) when available,
- * plus IBAN/BIC fallback for manual transfer.
- */
-export const generateWisePaymentForOrder = createServerFn({ method: "POST" })
-  .middleware([requireStaff])
-  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { data: order, error } = await context.supabase
-      .from("orders")
-      .select(
-        "id,service_title,amount_cents,currency,payment_amount_cents,payment_currency,customer_email,payment_status",
-      )
-      .eq("id", data.id)
-      .maybeSingle();
-    if (error || !order) throw new Error(error?.message ?? "Pedido não encontrado.");
-    const row = order as unknown as {
-      id: string;
-      service_title: string;
-      amount_cents: number;
-      currency: string | null;
-      payment_amount_cents: number | null;
-      payment_currency: string | null;
-      customer_email: string | null;
-      payment_status: string;
-    };
-    if (row.payment_status === "aprovado") throw new Error("Pedido já está pago.");
-    const result = await createWisePaymentForOrder({
-      orderId: row.id,
-      amountCents: row.payment_amount_cents ?? row.amount_cents,
-      currency: row.payment_currency ?? row.currency ?? "EUR",
-      description: row.service_title,
-      customerEmail: row.customer_email,
-    });
-    await context.supabase
-      .from("orders")
-      .update({
-        payment_provider: "wise",
-        payment_provider_reference: result.reference,
-        external_reference: result.reference,
-      } as never)
-      .eq("id", row.id);
-    return result;
-  });

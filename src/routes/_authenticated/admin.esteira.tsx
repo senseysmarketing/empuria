@@ -36,7 +36,6 @@ import {
   Plus,
   QrCode,
   MoreHorizontal,
-  Link2,
   Copy,
   Ban,
   RotateCcw,
@@ -48,7 +47,6 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  Landmark,
 } from "lucide-react";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
@@ -127,7 +125,6 @@ type Order = {
   fx_rate?: number | null;
   fx_source?: string | null;
   payment_method?: string | null;
-  payment_url?: string | null;
   payment_provider_reference?: string | null;
   notes?: string | null;
 };
@@ -166,22 +163,6 @@ function EsteiraPage() {
   const [settlementFxReferenceDate, setSettlementFxReferenceDate] = useState<string | null>(null);
   const [settlementFxRate, setSettlementFxRate] = useState("");
   const [settlementFxSource, setSettlementFxSource] = useState<string | null>(null);
-  const [linkModal, setLinkModal] = useState<{
-    order: Order;
-    loading: boolean;
-    reference: string | null;
-    paymentUrl: string | null;
-    error: string | null;
-  } | null>(null);
-  const [bankModal, setBankModal] = useState<{
-    order: Order;
-    loading: boolean;
-    error: string | null;
-    reference: string | null;
-    iban: string | null;
-    bic: string | null;
-    beneficiaryName: string | null;
-  } | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
@@ -764,139 +745,6 @@ function EsteiraPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!linkModal} onOpenChange={(o) => !o && setLinkModal(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Link de pagamento Wise</DialogTitle>
-          </DialogHeader>
-          {linkModal && (
-            <div className="space-y-3 text-sm">
-              <div className="text-xs text-muted-foreground">
-                Pedido · {linkModal.order.customer_name} · {linkModal.order.service_title}
-              </div>
-              {linkModal.error && (
-                <div className="border border-amber-300 bg-amber-50 rounded p-3 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
-                  <div>{linkModal.error}</div>
-                </div>
-              )}
-              {linkModal.loading && <div className="text-muted-foreground">Preparando link...</div>}
-              {linkModal.paymentUrl && (
-                <div>
-                  <Label>Link de pagamento</Label>
-                  <div className="flex gap-2 mt-1">
-                    <Input readOnly value={linkModal.paymentUrl} className="font-mono text-xs" />
-                    <Button variant="outline" onClick={() => copy(linkModal.paymentUrl!, "Link")}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button asChild variant="outline">
-                      <a href={linkModal.paymentUrl} target="_blank" rel="noreferrer">
-                        <Link2 className="h-4 w-4" />
-                      </a>
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Envie ao cliente. Ele conclui o pagamento via Wise (EUR).
-                  </p>
-                </div>
-              )}
-              <div className="flex justify-end pt-2">
-                <Button onClick={() => setLinkModal(null)}>Fechar</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!bankModal} onOpenChange={(o) => !o && setBankModal(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Dados para transferência bancária</DialogTitle>
-          </DialogHeader>
-          {bankModal && (
-            <div className="space-y-3 text-sm">
-              <div className="text-xs text-muted-foreground">
-                Pedido · {bankModal.order.customer_name} · {bankModal.order.service_title}
-              </div>
-              {bankModal.loading && (
-                <div className="text-muted-foreground">Preparando dados...</div>
-              )}
-              {bankModal.error && (
-                <div className="border border-amber-300 bg-amber-50 rounded p-3 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-700 shrink-0" />
-                  <div>{bankModal.error}</div>
-                </div>
-              )}
-              {!bankModal.loading && (bankModal.iban || bankModal.bic) && (
-                <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-2">
-                  {bankModal.beneficiaryName && (
-                    <BankRow
-                      label="Beneficiário"
-                      value={bankModal.beneficiaryName}
-                      onCopy={() => copy(bankModal.beneficiaryName!, "Beneficiário")}
-                    />
-                  )}
-                  {bankModal.iban && (
-                    <BankRow
-                      label="IBAN"
-                      value={bankModal.iban}
-                      mono
-                      onCopy={() => copy(bankModal.iban!, "IBAN")}
-                    />
-                  )}
-                  {bankModal.bic && (
-                    <BankRow
-                      label="BIC/SWIFT"
-                      value={bankModal.bic}
-                      mono
-                      onCopy={() => copy(bankModal.bic!, "BIC")}
-                    />
-                  )}
-                  <BankRow
-                    label="Valor"
-                    value={new Intl.NumberFormat("pt-PT", {
-                      style: "currency",
-                      currency:
-                        bankModal.order.payment_currency ?? bankModal.order.currency ?? "EUR",
-                    }).format(
-                      (bankModal.order.payment_amount_cents ?? bankModal.order.amount_cents ?? 0) /
-                        100,
-                    )}
-                    onCopy={() =>
-                      copy(
-                        (
-                          (bankModal.order.payment_amount_cents ??
-                            bankModal.order.amount_cents ??
-                            0) / 100
-                        ).toFixed(2),
-                        "Valor",
-                      )
-                    }
-                  />
-                  {bankModal.reference && (
-                    <BankRow
-                      label="Referência"
-                      value={bankModal.reference}
-                      mono
-                      onCopy={() => copy(bankModal.reference!, "Referência")}
-                    />
-                  )}
-                  {bankModal.reference && (
-                    <p className="text-[11px] text-muted-foreground pt-1">
-                      Inclua a referência <strong>{bankModal.reference}</strong> na transferência
-                      para conciliação automática.
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="flex justify-end pt-2">
-                <Button onClick={() => setBankModal(null)}>Fechar</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -1097,37 +945,6 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between gap-3 border-b last:border-0 py-1.5">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-admin-ink text-right">{value}</span>
-    </div>
-  );
-}
-
-function BankRow({
-  label,
-  value,
-  onCopy,
-  mono,
-}: {
-  label: string;
-  value: string;
-  onCopy: () => void;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        <div className="font-display text-[10px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </div>
-        <div className={`break-all text-sm ${mono ? "font-mono" : ""}`}>{value}</div>
-      </div>
-      <button
-        type="button"
-        onClick={onCopy}
-        className="mt-3 shrink-0 text-admin-accent"
-        aria-label="Copiar"
-      >
-        <Copy className="h-4 w-4" />
-      </button>
     </div>
   );
 }

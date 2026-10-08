@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   updateServicePrice,
+  createServicePrice,
   createServiceImageUploadUrl,
 } from "@/lib/admin/service-prices.functions";
 import { getServiceImage } from "@/lib/service-images";
@@ -41,6 +42,8 @@ export type ServiceRow = {
   requires_documents: boolean;
   duration_minutes: number | null;
   image_url: string | null;
+  archived_at: string | null;
+  archived_by: string | null;
 };
 
 function centsToInput(cents: number | null | undefined) {
@@ -56,6 +59,7 @@ type Props = {
 
 export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }: Props) {
   const updateFn = useServerFn(updateServicePrice);
+  const createFn = useServerFn(createServicePrice);
   const uploadUrlFn = useServerFn(createServiceImageUploadUrl);
 
   const [title, setTitle] = useState("");
@@ -70,23 +74,22 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
   const [note, setNote] = useState("");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const draftImageId = useRef<string>(crypto.randomUUID());
 
   useEffect(() => {
-    if (!service) return;
-    setTitle(service.title ?? "");
-    setShortDesc(service.short_description ?? "");
-    setDescription(service.description ?? "");
-    setImageUrl(service.image_url ?? null);
-    setPriceInput(centsToInput(service.online_price_cents ?? service.price_cents));
-    setIsActive(Boolean(service.is_active));
-    setRequiresSlot(Boolean(service.requires_slot));
-    setRequiresDocuments(Boolean(service.requires_documents));
-    setDuration(Number(service.duration_minutes ?? 0));
-    setNote(service.display_price_note ?? "");
-  }, [service]);
+    setTitle(service?.title ?? "");
+    setShortDesc(service?.short_description ?? "");
+    setDescription(service?.description ?? "");
+    setImageUrl(service?.image_url ?? null);
+    setPriceInput(centsToInput(service?.online_price_cents ?? service?.price_cents));
+    setIsActive(service?.is_active ?? true);
+    setRequiresSlot(Boolean(service?.requires_slot));
+    setRequiresDocuments(Boolean(service?.requires_documents));
+    setDuration(Number(service?.duration_minutes ?? 0));
+    setNote(service?.display_price_note ?? "");
+  }, [service, open]);
 
   const handleFile = async (file: File) => {
-    if (!service) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       toast.error("Use JPG, PNG ou WEBP.");
       return;
@@ -99,7 +102,7 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
       setUploading(true);
       const signed = await uploadUrlFn({
         data: {
-          service_id: service.id,
+          service_id: service?.id ?? draftImageId.current,
           filename: file.name,
           content_type: file.type,
         },
@@ -122,7 +125,6 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!service) throw new Error("Serviço inválido");
       const priceNumber = Number(String(priceInput).replace(",", "."));
       const cents = Math.round((Number.isFinite(priceNumber) ? priceNumber : 0) * 100);
 
@@ -137,25 +139,23 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
         if (!ok) throw new Error("Salvamento cancelado.");
       }
 
-      return updateFn({
-        data: {
-          id: service.id,
-          title: title.trim(),
-          short_description: shortDesc.trim() || null,
-          description: description.trim() || null,
-          image_url: imageUrl,
-          online_price_cents: cents,
-          online_currency: "EUR",
-          display_price_note: note.trim() || null,
-          is_active: isActive,
-          requires_slot: requiresSlot,
-          requires_documents: requiresDocuments,
-          duration_minutes: requiresSlot ? Number(duration) : null,
-        },
-      });
+      const input = {
+        title: title.trim(),
+        short_description: shortDesc.trim() || null,
+        description: description.trim() || null,
+        image_url: imageUrl,
+        online_price_cents: cents,
+        online_currency: "EUR" as const,
+        display_price_note: note.trim() || null,
+        is_active: isActive,
+        requires_slot: requiresSlot,
+        requires_documents: requiresDocuments,
+        duration_minutes: requiresSlot ? Number(duration) : null,
+      };
+      return service ? updateFn({ data: { ...input, id: service.id } }) : createFn({ data: input });
     },
     onSuccess: async () => {
-      toast.success("Serviço atualizado");
+      toast.success(service ? "Serviço atualizado" : "Serviço criado");
       await onSaved();
     },
     onError: (error) => {
@@ -171,7 +171,7 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
-            {service?.title ?? "Editar serviço"}
+            {service ? `Editar ${service.title}` : "Novo serviço"}
           </DialogTitle>
           <DialogDescription>
             Ajuste o conteúdo público, imagem de capa, valor e regras de venda.
@@ -262,7 +262,9 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
           <div className="space-y-2">
             <Label>Valor cobrado no site (EUR)</Label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-admin-ink-muted">€</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-admin-ink-muted">
+                €
+              </span>
               <Input
                 inputMode="decimal"
                 value={priceInput}

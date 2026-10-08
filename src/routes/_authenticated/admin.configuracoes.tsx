@@ -3,24 +3,15 @@ import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Settings, User, Plug, Users, Zap, FileText, Tags, ShieldAlert } from "lucide-react";
+import { Settings, User, Plug, Users, Zap, FileText, Tags } from "lucide-react";
 import { PerfilContaTab } from "@/components/admin/configuracoes/PerfilContaTab";
 import { IntegracoesTab } from "@/components/admin/configuracoes/IntegracoesTab";
 import { EquipePermissoesTab } from "@/components/admin/configuracoes/EquipePermissoesTab";
 import { ServicosPrecosTab } from "@/components/admin/configuracoes/ServicosPrecosTab";
 import { AutomacoesPanel } from "@/components/admin/AutomacoesPanel";
 import { LogsAuditoriaTab } from "@/components/admin/configuracoes/LogsAuditoriaTab";
-import { ConciliacoesWiseTab } from "@/components/admin/configuracoes/ConciliacoesWiseTab";
 
-const TABS = [
-  "perfil",
-  "integracoes",
-  "conciliacoes-wise",
-  "equipe",
-  "servicos-precos",
-  "automacoes",
-  "logs",
-] as const;
+const TABS = ["perfil", "integracoes", "equipe", "servicos-precos", "automacoes", "logs"] as const;
 
 type Tab = (typeof TABS)[number];
 
@@ -95,12 +86,6 @@ function ConfiguracoesPage() {
             <Plug className="h-4 w-4" /> Integrações
           </TabsTrigger>
           <TabsTrigger
-            value="conciliacoes-wise"
-            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
-          >
-            <ShieldAlert className="h-4 w-4" /> Conciliações Wise
-          </TabsTrigger>
-          <TabsTrigger
             value="equipe"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
@@ -131,9 +116,6 @@ function ConfiguracoesPage() {
         </TabsContent>
         <TabsContent value="integracoes" className="mt-6">
           <IntegracoesTab />
-        </TabsContent>
-        <TabsContent value="conciliacoes-wise" className="mt-6">
-          <ConciliacoesWiseTab />
         </TabsContent>
         <TabsContent value="equipe" className="mt-6">
           <EquipePermissoesTab />

@@ -3502,6 +3502,8 @@ export type Database = {
       }
       services: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           category: Database["public"]["Enums"]["service_category"]
           created_at: string
           currency: string
@@ -3526,6 +3528,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           category: Database["public"]["Enums"]["service_category"]
           created_at?: string
           currency?: string
@@ -3550,6 +3554,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           category?: Database["public"]["Enums"]["service_category"]
           created_at?: string
           currency?: string
@@ -3573,7 +3579,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "services_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_action_permissions: {
         Row: {
@@ -4054,10 +4068,6 @@ export type Database = {
         Args: { p_actor_id: string; p_item_id: string; p_reason: string }
         Returns: undefined
       }
-      pdv_cancel_wise_attempt: {
-        Args: { p_actor_id: string; p_attempt_id: string; p_reason: string }
-        Returns: undefined
-      }
       pdv_close_sale: {
         Args: {
           p_cashier_id: string
@@ -4081,31 +4091,15 @@ export type Database = {
         }
         Returns: string
       }
-      pdv_confirm_wise_payment: {
-        Args: {
-          p_amount_cents: number
-          p_currency: string
-          p_raw: Json
-          p_reference: string
-        }
-        Returns: Json
-      }
       pdv_next_sale_code: { Args: { p_closed_at?: string }; Returns: string }
       pdv_next_tab_code: { Args: { p_at?: string }; Returns: string }
       pdv_open_tab: {
         Args: { p_customer_id: string; p_notes?: string; p_opened_by: string }
         Returns: Json
       }
-      pdv_request_wise_payment: {
-        Args: {
-          p_actor_id: string
-          p_discount_type: string
-          p_discount_value: number
-          p_notes?: string
-          p_payment_url: string
-          p_tab_id: string
-        }
-        Returns: Json
+      service_archive_restore_or_delete: {
+        Args: { p_action: string; p_actor: string; p_service_id: string }
+        Returns: string
       }
       pdv_update_tab_item_qty: {
         Args: { p_actor_id: string; p_item_id: string; p_qty: number }
@@ -4115,7 +4109,6 @@ export type Database = {
         Args: { p_admin_id: string; p_reason: string; p_sale_id: string }
         Returns: undefined
       }
-      wise_next_reference: { Args: never; Returns: string }
     }
     Enums: {
       activity_type:

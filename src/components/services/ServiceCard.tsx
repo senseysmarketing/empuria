@@ -15,7 +15,7 @@ export type PublicService = {
   slug: string;
   title: string;
   short_description: string | null;
-  kind: "airport" | "tour" | "consulting" | "banking" | "meeting";
+  kind: "airport" | "tour" | "consulting" | "banking" | "meeting" | null;
   price_cents: number;
   currency: string;
   online_price_cents?: number | null;
@@ -45,7 +45,7 @@ export function ServiceCard({
   onDetails?: (s: PublicService) => void;
   variant?: "dark" | "light";
 }) {
-  const Icon = ICONS[service.kind] ?? MapPin;
+  const Icon = ICONS[service.kind ?? ""] ?? MapPin;
   const isDark = variant === "dark";
 
   return (

@@ -35,6 +35,7 @@ export const listPublicServices = createServerFn({ method: "GET" }).handler(asyn
       "id,slug,title,short_description,description,kind,price_cents,currency,online_price_cents,online_currency,display_price_note,requires_slot,requires_documents,meeting_address,image_url",
     )
     .eq("is_active", true)
+    .is("archived_at", null)
     .eq("category", "esteira1")
     .order("price_cents", { ascending: true });
   return (data ?? []) as PublicServiceRow[];
@@ -49,6 +50,8 @@ export const getPublicService = createServerFn({ method: "POST" })
         "id,slug,title,short_description,description,kind,price_cents,currency,online_price_cents,online_currency,display_price_note,requires_slot,requires_documents,document_checklist,meeting_address,image_url,is_active",
       )
       .eq("slug", data.slug)
+      .eq("is_active", true)
+      .is("archived_at", null)
       .maybeSingle();
     return (svc ?? null) as PublicServiceRow | null;
   });
