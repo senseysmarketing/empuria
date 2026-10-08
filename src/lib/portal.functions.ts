@@ -10,7 +10,11 @@ export const getMyDashboard = createServerFn({ method: "GET" })
     const userId = context.effectiveUserId ?? context.userId;
 
     const [profileRes, apptRes, rolesRes] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("id,full_name,avatar_url,created_at,member_status,member_next_step")
+        .eq("id", userId)
+        .maybeSingle(),
       supabase
         .from("appointments")
         .select("id, starts_at, ends_at, status, service_id, services(title)")

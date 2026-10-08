@@ -34,7 +34,7 @@ const mainItems = [
   { to: "/admin/financeiro", label: "Caixa", icon: WalletCards, adminOnly: true },
   { to: "/admin/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
-  { to: "/admin/usuarios", label: "Usuários", icon: Users },
+  { to: "/admin/usuarios", label: "Membros", icon: Users },
 ] as const;
 
 type SidebarProps = {
