@@ -77,88 +77,100 @@ export function FinanceMonthClosePanel({
         </div>
       </BentoCard>
       <h2 className="font-display text-xl font-semibold">Dashboard do mês</h2>
-      {(["BRL", "EUR"] as const).map((currency) => {
-        const daily = analytics.daily.filter((row) => row.currency === currency);
-        const services = analytics.services.filter(
-          (row) =>
-            row.currencies[currency].sold_cents > 0 || row.currencies[currency].received_cents > 0,
-        );
-        const expenses = analytics.expenses.filter((row) => row.currency === currency);
-        const recurring = analytics.recurring.find((row) => row.currency === currency);
-        const team = analytics.team.find((row) => row.currency === currency);
-        return (
-          <section key={currency} className="space-y-4">
-            <h3 className="font-display text-lg font-semibold">Painel {currency}</h3>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <BentoCard title="Fluxo diário realizado">
-                {daily.length ? (
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={daily} margin={{ left: 8, right: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="day" tickFormatter={(day: string) => day.slice(8)} />
-                        <YAxis tickFormatter={(value: number) => `${Math.round(value / 100)}`} />
-                        <Tooltip formatter={(value) => money(Number(value ?? 0), currency)} />
-                        <Legend />
-                        <Bar dataKey="income_cents" name="Entradas" fill="#059669" />
-                        <Bar dataKey="expense_cents" name="Saídas" fill="#dc2626" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p className="text-sm text-admin-ink-muted">Sem movimento realizado.</p>
-                )}
-              </BentoCard>
-              <BentoCard title="Serviços mais vendidos">
-                <div className="space-y-2 text-sm">
-                  {services.map((row) => (
-                    <div
-                      key={`${row.service_id ?? row.service_title}-${currency}`}
-                      className="border-b border-admin-border pb-2"
-                    >
-                      <strong>
-                        {row.service_title} · {row.sales_count} pedido(s)
-                      </strong>
-                      <p>
-                        Vendido {money(row.currencies[currency].sold_cents, currency)} · Recebido{" "}
-                        {money(row.currencies[currency].received_cents, currency)} · A receber{" "}
-                        {money(row.currencies[currency].receivable_cents, currency)}
-                      </p>
-                    </div>
-                  ))}
-                  {!services.length && <p className="text-admin-ink-muted">Sem vendas no mês.</p>}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {(["BRL", "EUR"] as const).map((currency) => {
+          const daily = analytics.daily.filter((row) => row.currency === currency);
+          return (
+            <BentoCard key={currency} title={`Fluxo diário realizado · ${currency}`}>
+              {daily.length ? (
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={daily} margin={{ left: 8, right: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="day" tickFormatter={(day: string) => day.slice(8)} />
+                      <YAxis tickFormatter={(value: number) => `${Math.round(value / 100)}`} />
+                      <Tooltip formatter={(value) => money(Number(value ?? 0), currency)} />
+                      <Legend />
+                      <Bar dataKey="income_cents" name="Entradas" fill="#059669" />
+                      <Bar dataKey="expense_cents" name="Saídas" fill="#dc2626" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              </BentoCard>
-              <BentoCard title="Maiores despesas do mês">
-                <div className="space-y-2 text-sm">
-                  {expenses.map((row) => (
-                    <div
-                      key={`${row.category_id ?? "none"}-${currency}`}
-                      className="flex justify-between border-b border-admin-border pb-2"
-                    >
-                      <span>{row.category_name}</span>
-                      <strong>{money(row.amount_cents, currency)}</strong>
-                    </div>
-                  ))}
-                  {!expenses.length && <p className="text-admin-ink-muted">Sem despesas no mês.</p>}
-                </div>
-              </BentoCard>
-              <BentoCard title="Recorrências">
-                <p className="text-sm">
-                  Pago {money(recurring?.paid_cents ?? 0, currency)} · A pagar{" "}
-                  {money(recurring?.pending_cents ?? 0, currency)}
-                </p>
-              </BentoCard>
-              <BentoCard title="Equipe & Repasses">
-                <p className="text-sm">
-                  Pago {money(team?.paid_cents ?? 0, currency)} · A pagar{" "}
-                  {money(team?.payable_cents ?? 0, currency)}
-                </p>
-              </BentoCard>
-            </div>
-          </section>
-        );
-      })}
+              ) : (
+                <p className="text-sm text-admin-ink-muted">Sem movimento realizado.</p>
+              )}
+            </BentoCard>
+          );
+        })}
+        <BentoCard title="Serviços mais vendidos">
+          <div className="space-y-3 text-sm">
+            {analytics.services.map((row) => (
+              <div
+                key={row.service_id ?? row.service_title}
+                className="border-b border-admin-border pb-2"
+              >
+                <strong>
+                  {row.service_title} · {row.sales_count} pedido(s)
+                </strong>
+                {(["BRL", "EUR"] as const).map((currency) => {
+                  const amounts = row.currencies[currency];
+                  if (!amounts.sold_cents && !amounts.received_cents) return null;
+                  return (
+                    <p key={currency}>
+                      {currency}: vendido {money(amounts.sold_cents, currency)} · recebido{" "}
+                      {money(amounts.received_cents, currency)} · a receber{" "}
+                      {money(amounts.receivable_cents, currency)}
+                    </p>
+                  );
+                })}
+              </div>
+            ))}
+            {!analytics.services.length && (
+              <p className="text-admin-ink-muted">Sem vendas no mês.</p>
+            )}
+          </div>
+        </BentoCard>
+        <BentoCard title="Maiores despesas do mês">
+          <div className="space-y-2 text-sm">
+            {analytics.expenses.map((row) => (
+              <div
+                key={`${row.category_id ?? "none"}-${row.currency}`}
+                className="flex justify-between border-b border-admin-border pb-2"
+              >
+                <span>
+                  {row.category_name} · {row.currency}
+                </span>
+                <strong>{money(row.amount_cents, row.currency)}</strong>
+              </div>
+            ))}
+            {!analytics.expenses.length && (
+              <p className="text-admin-ink-muted">Sem despesas no mês.</p>
+            )}
+          </div>
+        </BentoCard>
+        <BentoCard title="Recorrências">
+          {(["BRL", "EUR"] as const).map((currency) => {
+            const row = analytics.recurring.find((item) => item.currency === currency);
+            return (
+              <p key={currency} className="text-sm">
+                {currency}: pago {money(row?.paid_cents ?? 0, currency)} · a pagar{" "}
+                {money(row?.pending_cents ?? 0, currency)}
+              </p>
+            );
+          })}
+        </BentoCard>
+        <BentoCard title="Equipe & Repasses">
+          {(["BRL", "EUR"] as const).map((currency) => {
+            const row = analytics.team.find((item) => item.currency === currency);
+            return (
+              <p key={currency} className="text-sm">
+                {currency}: pago {money(row?.paid_cents ?? 0, currency)} · a pagar{" "}
+                {money(row?.payable_cents ?? 0, currency)}
+              </p>
+            );
+          })}
+        </BentoCard>
+      </div>
     </div>
   );
 }

@@ -608,6 +608,12 @@ function TransactionTable({
 }) {
   if (!rows.length)
     return <p className="text-sm text-admin-ink-muted">Nenhum lancamento encontrado.</p>;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[780px] text-sm">
@@ -623,6 +629,7 @@ function TransactionTable({
         </thead>
         <tbody>
           {rows.map((tx) => {
+            const isPastDue = tx.status === "pending" && tx.due_date < today;
             const supported =
               ["manual", "orders", "team_payout"].includes(tx.source_module) ||
               tx.source_module.startsWith("recurring:");
@@ -639,12 +646,21 @@ function TransactionTable({
                 <td className="py-3 pr-3">
                   <Badge variant="outline">{financeOriginLabel(tx.source_module)}</Badge>
                 </td>
-                <td className="py-3 pr-3 text-admin-ink-muted">{tx.due_date}</td>
+                <td
+                  className={
+                    isPastDue
+                      ? "py-3 pr-3 font-medium text-red-700"
+                      : "py-3 pr-3 text-admin-ink-muted"
+                  }
+                >
+                  {tx.due_date}
+                </td>
                 <td className="py-3 pr-3">
                   <span
                     className={`inline-flex rounded-full px-2 py-1 text-xs ${statusClass(tx.status)}`}
                   >
                     {STATUS_LABEL[tx.status] ?? tx.status}
+                    {isPastDue ? " · vencido" : ""}
                   </span>
                 </td>
                 <td
