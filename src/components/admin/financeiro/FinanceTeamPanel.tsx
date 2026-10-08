@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -20,31 +20,36 @@ import type { FinanceAccount } from "@/lib/admin/financeiro.functions";
 import {
   createFinanceAccount,
   settleFinanceTransaction,
-  deleteFinancePendingTransaction,
   reverseFinanceSettlement,
 } from "@/lib/admin/financeiro.functions";
 import {
-  createFinancePayee,
-  updateFinancePayee,
-  toggleFinancePayee,
-  archiveFinancePayee,
-  createFinancePayoutRule,
-  updateFinancePayoutRule,
-  toggleFinancePayoutRule,
-  archiveFinancePayoutRule,
-  searchFinancePayeeProfiles,
-  endFinancePayoutRule,
   listFinanceTeamMonth,
-  materializeFinancePayout,
+  saveFinanceTeamMember,
+  searchFinancePayeeProfiles,
+  setFinanceTeamMemberState,
   type FinancePayee,
   type FinancePayoutRule,
+  type FinanceTeamMember,
 } from "@/lib/admin/finance-team.functions";
 
 type Currency = "BRL" | "EUR";
-type PayeeType = FinancePayee["type"];
 type RuleType = FinancePayoutRule["rule_type"];
+type FormValues = {
+  name: string;
+  type: FinancePayee["type"];
+  profileId: string | null;
+  notes: string | null;
+  ruleType: RuleType;
+  amountCents: number | null;
+  currency: Currency | null;
+  percentage: number | null;
+  includeBrl: boolean;
+  includeEur: boolean;
+  dayOfMonth: number | null;
+  serviceIds: string[];
+};
 
-const PAYEE_TYPES: Record<PayeeType, string> = {
+const PAYEE_TYPES: Record<FinancePayee["type"], string> = {
   team: "Equipe",
   contractor: "Prestador",
   partner: "Parceiro",
@@ -54,7 +59,21 @@ const PAYEE_TYPES: Record<PayeeType, string> = {
 const RULE_TYPES: Record<RuleType, string> = {
   fixed_monthly: "Fixo mensal",
   revenue_percent: "% da receita realizada",
-  service_percent: "% do serviço",
+  service_percent: "% dos serviços selecionados",
+};
+const EMPTY_FORM: FormValues = {
+  name: "",
+  type: "team",
+  profileId: null,
+  notes: null,
+  ruleType: "fixed_monthly",
+  amountCents: null,
+  currency: "BRL",
+  percentage: null,
+  includeBrl: true,
+  includeEur: true,
+  dayOfMonth: 1,
+  serviceIds: [],
 };
 
 function money(cents: number, currency: string) {
@@ -64,8 +83,30 @@ function money(cents: number, currency: string) {
   }).format(cents / 100);
 }
 
-function monthStart(month: string) {
-  return `${month}-01`;
+function ruleDescription(rule: FinancePayoutRule | null) {
+  if (!rule) return "Sem configuração ativa neste mês";
+  if (rule.rule_type === "fixed_monthly")
+    return `${RULE_TYPES[rule.rule_type]} · ${money(rule.amount_cents ?? 0, rule.currency ?? "BRL")} · dia ${rule.day_of_month}`;
+  const currencies = [rule.include_brl && "BRL", rule.include_eur && "EUR"]
+    .filter(Boolean)
+    .join(" / ");
+  return `${RULE_TYPES[rule.rule_type]} · ${rule.percentage}% · ${currencies}${rule.rule_type === "service_percent" ? ` · ${rule.service_ids.length} serviço(s)` : ""}`;
+}
+
+function financialChanged(values: FormValues, rule: FinancePayoutRule | null) {
+  if (!rule) return true;
+  return (
+    values.ruleType !== rule.rule_type ||
+    (values.ruleType === "fixed_monthly"
+      ? values.amountCents !== rule.amount_cents ||
+        values.currency !== rule.currency ||
+        values.dayOfMonth !== rule.day_of_month
+      : values.percentage !== rule.percentage ||
+        values.includeBrl !== rule.include_brl ||
+        values.includeEur !== rule.include_eur ||
+        (values.ruleType === "service_percent" &&
+          [...values.serviceIds].sort().join() !== [...rule.service_ids].sort().join()))
+  );
 }
 
 export function FinanceTeamPanel({
@@ -79,36 +120,24 @@ export function FinanceTeamPanel({
 }) {
   const qc = useQueryClient();
   const list = useServerFn(listFinanceTeamMonth);
-  const createPayee = useServerFn(createFinancePayee);
-  const updatePayee = useServerFn(updateFinancePayee);
-  const togglePayee = useServerFn(toggleFinancePayee);
-  const archivePayee = useServerFn(archiveFinancePayee);
-  const createRule = useServerFn(createFinancePayoutRule);
-  const updateRule = useServerFn(updateFinancePayoutRule);
-  const toggleRule = useServerFn(toggleFinancePayoutRule);
-  const archiveRule = useServerFn(archiveFinancePayoutRule);
+  const save = useServerFn(saveFinanceTeamMember);
+  const setState = useServerFn(setFinanceTeamMemberState);
   const searchProfiles = useServerFn(searchFinancePayeeProfiles);
-  const endRule = useServerFn(endFinancePayoutRule);
-  const materialize = useServerFn(materializeFinancePayout);
   const settle = useServerFn(settleFinanceTransaction);
-  const deletePending = useServerFn(deleteFinancePendingTransaction);
-  const reverseSettlement = useServerFn(reverseFinanceSettlement);
+  const reverse = useServerFn(reverseFinanceSettlement);
   const createAccount = useServerFn(createFinanceAccount);
-  const [payeeOpen, setPayeeOpen] = useState(false);
-  const [editingPayee, setEditingPayee] = useState<FinancePayee | null>(null);
-  const [payeeType, setPayeeType] = useState<PayeeType>("team");
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [profileQuery, setProfileQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [ruleOpen, setRuleOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<FinancePayoutRule | null>(null);
-  const [rulePayeeId, setRulePayeeId] = useState("");
-  const [ruleType, setRuleType] = useState<RuleType>("fixed_monthly");
-  const [ruleCurrency, setRuleCurrency] = useState<Currency>("BRL");
-  const [includeBrl, setIncludeBrl] = useState(true);
-  const [includeEur, setIncludeEur] = useState(true);
-  const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [editing, setEditing] = useState<FinanceTeamMember | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [form, setForm] = useState<FormValues>(EMPTY_FORM);
+  const [profileQuery, setProfileQuery] = useState("");
   const [serviceSearch, setServiceSearch] = useState("");
+  const [decisionOpen, setDecisionOpen] = useState(false);
+  const [stateTarget, setStateTarget] = useState<{
+    member: FinanceTeamMember;
+    action: "pause" | "remove";
+  } | null>(null);
+  const [removePending, setRemovePending] = useState(true);
 
   const teamQ = useQuery({
     queryKey: ["finance-team", month, showArchived],
@@ -117,549 +146,272 @@ export function FinanceTeamPanel({
   const profileQ = useQuery({
     queryKey: ["finance-payee-profiles", profileQuery],
     queryFn: () => searchProfiles({ data: { query: profileQuery.trim() } }),
-    enabled: payeeOpen && profileQuery.trim().length >= 2,
+    enabled: formOpen && profileQuery.trim().length >= 2,
   });
   const changed = () => {
     qc.invalidateQueries({ queryKey: ["finance-team"] });
     onChanged();
   };
-  const payeeMutation = useMutation({
-    mutationFn: (form: FormData) => {
-      const input = {
-        name: String(form.get("name") ?? ""),
-        type: payeeType,
-        profileId,
-        notes: String(form.get("notes") ?? "").trim() || null,
-      };
-      return editingPayee
-        ? updatePayee({ data: { ...input, id: editingPayee.id } })
-        : createPayee({ data: input });
-    },
+  const saveMutation = useMutation({
+    mutationFn: (choice: { mode: "current" | "next_month"; reversePaid: boolean }) =>
+      save({
+        data: {
+          payeeId: editing?.payee.id ?? null,
+          month: `${month}-01`,
+          ...choice,
+          ...form,
+        },
+      }),
     onSuccess: () => {
-      toast.success("Beneficiário salvo");
-      setPayeeOpen(false);
+      toast.success("Pessoa e repasse salvos");
+      setFormOpen(false);
+      setDecisionOpen(false);
       changed();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao salvar"),
   });
-  const ruleMutation = useMutation({
-    mutationFn: (form: FormData) => {
-      const input = {
-        payeeId: rulePayeeId,
-        ruleType,
-        amount: ruleType === "fixed_monthly" ? Number(form.get("amount") ?? 0) : null,
-        currency: ruleType === "fixed_monthly" ? ruleCurrency : null,
-        percentage: ruleType === "fixed_monthly" ? null : Number(form.get("percentage") ?? 0),
-        serviceIds: ruleType === "service_percent" ? serviceIds : [],
-        includeBrl,
-        includeEur,
-        dayOfMonth: ruleType === "fixed_monthly" ? Number(form.get("dayOfMonth") ?? 1) : null,
-        startsOn: String(form.get("startsOn") ?? ""),
-        endsOn: String(form.get("endsOn") ?? "").trim() || null,
-      };
-      return editingRule
-        ? updateRule({ data: { id: editingRule.id, rule: input } })
-        : createRule({ data: input });
-    },
+  const stateMutation = useMutation({
+    mutationFn: (input: {
+      payeeId: string;
+      action: "pause" | "reactivate" | "remove";
+      removePending: boolean;
+    }) => setState({ data: { ...input, month: `${month}-01` } }),
     onSuccess: () => {
-      toast.success("Regra salva. Ocorrências já geradas permanecem intactas.");
-      setRuleOpen(false);
+      toast.success("Situação atualizada");
+      setStateTarget(null);
       changed();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao salvar"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao atualizar"),
   });
-  const actionMutation = useMutation({
-    mutationFn: (action: {
-      kind: "payee" | "rule" | "end" | "materialize" | "archivePayee" | "archiveRule";
-      id: string;
-      active?: boolean;
-      currency?: Currency;
-    }) => {
-      if (action.kind === "payee")
-        return togglePayee({ data: { id: action.id, isActive: !!action.active } });
-      if (action.kind === "rule")
-        return toggleRule({ data: { id: action.id, isActive: !!action.active } });
-      if (action.kind === "archivePayee") return archivePayee({ data: { id: action.id } });
-      if (action.kind === "archiveRule") return archiveRule({ data: { id: action.id } });
-      if (action.kind === "end")
-        return endRule({ data: { id: action.id, endsOn: monthStart(month) } });
-      return materialize({ data: { ruleId: action.id, month, currency: action.currency! } });
-    },
+  const reverseMutation = useMutation({
+    mutationFn: (input: { id: string; reason: string }) => reverse({ data: input }),
     onSuccess: () => {
-      toast.success("Ação concluída");
+      toast.success("Baixa estornada; repasse será recalculado");
       changed();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro na ação"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao estornar"),
   });
-  const transactionMutation = useMutation({
-    mutationFn: async (input: {
-      id: string;
-      action: "delete" | "reverse";
-      reason: string | null;
-    }) => {
-      if (input.action === "delete")
-        return deletePending({ data: { id: input.id, reason: input.reason } });
-      return reverseSettlement({ data: { id: input.id, reason: input.reason ?? "" } });
-    },
-    onSuccess: () => {
-      toast.success("Repasse atualizado");
-      changed();
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro no repasse"),
-  });
-  const actOnTransaction = (id: string, action: "delete" | "reverse") => {
-    if (action === "delete") {
-      if (window.confirm("Excluir este repasse pendente? Ele não será regenerado."))
-        transactionMutation.mutate({ id, action, reason: null });
-      return;
-    }
-    const reason = window.prompt("Motivo obrigatório do estorno da baixa:");
-    if (reason?.trim() && reason.trim().length >= 3)
-      transactionMutation.mutate({ id, action, reason: reason.trim() });
-  };
 
-  const data = teamQ.data;
-  const payeeMap = useMemo(
-    () => new Map((data?.payees ?? []).map((payee) => [payee.id, payee])),
-    [data],
-  );
-  const txMap = useMemo(() => new Map((data?.transactions ?? []).map((tx) => [tx.id, tx])), [data]);
-  const payoutMap = useMemo(
-    () => new Map((data?.payouts ?? []).map((payout) => [payout.id, payout])),
-    [data],
-  );
-  const totals = useMemo(() => {
-    const value = {
-      BRL: { projected: 0, payable: 0, paid: 0 },
-      EUR: { projected: 0, payable: 0, paid: 0 },
-    };
-    for (const projection of data?.projections ?? []) {
-      if (!projection.payout_id)
-        value[projection.currency].projected += projection.projected_amount_cents;
-    }
-    for (const payout of data?.payouts ?? []) {
-      const tx = payout.finance_transaction_id ? txMap.get(payout.finance_transaction_id) : null;
-      const currency = (
-        tx?.status === "paid" ? (tx.settled_currency ?? payout.currency) : payout.currency
-      ) as Currency;
-      if (currency !== "BRL" && currency !== "EUR") continue;
-      if (tx?.status === "paid")
-        value[currency].paid += tx.settled_amount_cents ?? payout.amount_cents;
-      else value[currency].payable += payout.amount_cents;
-    }
-    return value;
-  }, [data, txMap]);
-
-  function openPayee(payee: FinancePayee | null) {
-    setEditingPayee(payee);
-    setPayeeType(payee?.type ?? "team");
-    setProfileId(payee?.profile_id ?? null);
+  function openForm(member: FinanceTeamMember | null) {
+    const payee = member?.payee;
+    const rule = member?.rule;
+    setEditing(member);
+    setForm({
+      name: payee?.name ?? "",
+      type: payee?.type ?? "team",
+      profileId: payee?.profile_id ?? null,
+      notes: payee?.notes ?? null,
+      ruleType: rule?.rule_type ?? "fixed_monthly",
+      amountCents: rule?.amount_cents ?? null,
+      currency: (rule?.currency as Currency) ?? "BRL",
+      percentage: rule?.percentage ?? null,
+      includeBrl: rule?.include_brl ?? true,
+      includeEur: rule?.include_eur ?? true,
+      dayOfMonth: rule?.day_of_month ?? 1,
+      serviceIds: rule?.service_ids ?? [],
+    });
     setProfileQuery("");
-    setPayeeOpen(true);
-  }
-  function openRule(rule: FinancePayoutRule | null, payeeId?: string) {
-    setEditingRule(rule);
-    setRulePayeeId(
-      rule?.payee_id ??
-        payeeId ??
-        data?.payees.find((payee) => payee.is_active && !payee.archived_at)?.id ??
-        "",
-    );
-    setRuleType(rule?.rule_type ?? "fixed_monthly");
-    setRuleCurrency((rule?.currency as Currency) ?? "BRL");
-    setIncludeBrl(rule?.include_brl ?? true);
-    setIncludeEur(rule?.include_eur ?? true);
-    setServiceIds(rule?.service_ids ?? []);
     setServiceSearch("");
-    setRuleOpen(true);
+    setFormOpen(true);
   }
+
+  const hasPaid = !!editing?.payouts.some(({ transaction }) => transaction?.status === "paid");
+  const valid =
+    form.name.trim().length >= 2 &&
+    (form.ruleType === "fixed_monthly"
+      ? form.amountCents !== null && form.amountCents >= 0 && !!form.currency && !!form.dayOfMonth
+      : !!form.percentage &&
+        (form.includeBrl || form.includeEur) &&
+        (form.ruleType !== "service_percent" || form.serviceIds.length > 0));
+  const data = teamQ.data;
 
   return (
     <div className="space-y-4">
       {teamQ.error && <p className="text-sm text-red-700">{teamQ.error.message}</p>}
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => openPayee(null)}>Novo beneficiário</Button>
-        <Button variant="outline" disabled={!data?.payees.length} onClick={() => openRule(null)}>
-          Nova regra
-        </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => openForm(null)}>Adicionar pessoa</Button>
+        <span className="text-sm text-admin-ink-muted">
+          Repasses pendentes são sincronizados automaticamente com a receita realizada.
+        </span>
         <label className="ml-auto flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={showArchived}
-            onChange={(e) => setShowArchived(e.target.checked)}
+            onChange={(event) => setShowArchived(event.target.checked)}
           />
-          Mostrar arquivados
+          Mostrar removidos
         </label>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         {(["BRL", "EUR"] as const).map((currency) => (
           <BentoCard key={currency} title={`Repasses ${currency}`}>
-            <div className="grid gap-3 text-sm sm:grid-cols-3">
-              <div>
-                Projetado
-                <div className="font-semibold">{money(totals[currency].projected, currency)}</div>
-              </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 A pagar
-                <div className="font-semibold">{money(totals[currency].payable, currency)}</div>
+                <div className="font-semibold">
+                  {money(data?.totals[currency].payable ?? 0, currency)}
+                </div>
               </div>
               <div>
-                Pago<div className="font-semibold">{money(totals[currency].paid, currency)}</div>
+                Pago
+                <div className="font-semibold">
+                  {money(data?.totals[currency].paid ?? 0, currency)}
+                </div>
               </div>
             </div>
           </BentoCard>
         ))}
       </div>
-      <BentoCard title="Beneficiários">
-        {!data?.payees.length && (
-          <p className="text-sm text-admin-ink-muted">Nenhum beneficiário cadastrado.</p>
+      <BentoCard title="Pessoas e repasses">
+        {teamQ.isPending && <p className="text-sm text-admin-ink-muted">Carregando…</p>}
+        {!teamQ.isPending && !data?.members.length && (
+          <p className="text-sm text-admin-ink-muted">Nenhuma pessoa cadastrada.</p>
         )}
         <div className="space-y-3">
-          {data?.payees.map((payee) => (
-            <div
-              key={payee.id}
-              className="flex flex-wrap items-center justify-between gap-2 border-b border-admin-border py-2 text-sm"
-            >
-              <div>
-                <strong>{payee.name}</strong>
-                <div className="text-admin-ink-muted">
-                  {PAYEE_TYPES[payee.type]} ·{" "}
-                  {data.rules.filter((rule) => rule.payee_id === payee.id).length} regra(s) ·{" "}
-                  {payee.archived_at ? "Arquivado" : payee.is_active ? "Ativo" : "Pausado"}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => openPayee(payee)}>
-                  Editar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!!payee.archived_at}
-                  onClick={() => openRule(null, payee.id)}
-                >
-                  Nova regra
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!!payee.archived_at}
-                  onClick={() =>
-                    actionMutation.mutate({ kind: "payee", id: payee.id, active: !payee.is_active })
-                  }
-                >
-                  {payee.is_active ? "Pausar" : "Reativar"}
-                </Button>
-                {!payee.archived_at && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (window.confirm("Arquivar beneficiário e interromper novas projeções?"))
-                        actionMutation.mutate({ kind: "archivePayee", id: payee.id });
-                    }}
-                  >
-                    Arquivar
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </BentoCard>
-      <BentoCard title="Regras e repasses do mês">
-        {!data?.rules.length && (
-          <p className="text-sm text-admin-ink-muted">Nenhuma regra cadastrada.</p>
-        )}
-        <div className="space-y-4">
-          {data?.rules.map((rule) => {
-            const payee = payeeMap.get(rule.payee_id);
-            const fixedPayouts = data.payouts.filter(
-              (payout) => payout.rule_id === rule.id && rule.rule_type === "fixed_monthly",
-            );
-            const projections = data.projections.filter(
-              (projection) => projection.rule_id === rule.id,
-            );
-            const historicalPayouts = data.payouts.filter(
-              (payout) =>
-                payout.rule_id === rule.id &&
-                payout.percentage !== null &&
-                !projections.some((projection) => projection.payout_id === payout.id),
-            );
+          {data?.members.map((member) => {
+            const { payee, rule } = member;
             return (
-              <section key={rule.id} className="rounded-lg border border-admin-border p-3 text-sm">
-                <div className="flex flex-wrap items-start justify-between gap-2">
+              <section key={payee.id} className="rounded-lg border border-admin-border p-3 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <strong>{payee?.name ?? "Beneficiário"}</strong>
+                    <strong>{payee.name}</strong>
                     <div className="text-admin-ink-muted">
-                      {RULE_TYPES[rule.rule_type]} · {rule.starts_on.slice(0, 7)}
-                      {rule.ends_on ? ` até ${rule.ends_on.slice(0, 7)}` : ""} ·{" "}
-                      {rule.archived_at ? "Arquivada" : rule.is_active ? "Ativa" : "Pausada"}
-                      {rule.rule_type !== "fixed_monthly" &&
-                        ` · ${rule.include_brl ? "BRL" : ""}${rule.include_brl && rule.include_eur ? "/" : ""}${rule.include_eur ? "EUR" : ""}`}
-                      {rule.rule_type === "service_percent" &&
-                        ` · ${rule.service_ids.length} serviço(s)`}
+                      {PAYEE_TYPES[payee.type]} ·{" "}
+                      {payee.archived_at ? "Removido" : payee.is_active ? "Ativo" : "Pausado"}
                     </div>
+                    <div className="text-admin-ink-muted">{ruleDescription(rule)}</div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!!rule.archived_at}
-                      onClick={() => openRule(rule)}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!!rule.archived_at}
-                      onClick={() =>
-                        actionMutation.mutate({
-                          kind: "rule",
-                          id: rule.id,
-                          active: !rule.is_active,
-                        })
-                      }
-                    >
-                      {rule.is_active ? "Pausar" : "Reativar"}
-                    </Button>
-                    {!rule.archived_at && (
+                    {!payee.archived_at && (
+                      <Button size="sm" variant="outline" onClick={() => openForm(member)}>
+                        Editar
+                      </Button>
+                    )}
+                    {!payee.archived_at && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={stateMutation.isPending}
+                        onClick={() =>
+                          payee.is_active
+                            ? (setRemovePending(true), setStateTarget({ member, action: "pause" }))
+                            : stateMutation.mutate({
+                                payeeId: payee.id,
+                                action: "reactivate",
+                                removePending: false,
+                              })
+                        }
+                      >
+                        {payee.is_active ? "Pausar" : "Reativar"}
+                      </Button>
+                    )}
+                    {!payee.archived_at && (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          if (window.confirm("Arquivar regra e interromper novas projeções?"))
-                            actionMutation.mutate({ kind: "archiveRule", id: rule.id });
+                          setRemovePending(true);
+                          setStateTarget({ member, action: "remove" });
                         }}
                       >
-                        Arquivar
-                      </Button>
-                    )}
-                    {!rule.ends_on && !rule.archived_at && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => actionMutation.mutate({ kind: "end", id: rule.id })}
-                      >
-                        Encerrar
+                        Remover
                       </Button>
                     )}
                   </div>
                 </div>
-                {rule.rule_type === "fixed_monthly" && (
-                  <p className="mt-2 text-admin-ink-muted">
-                    {money(rule.amount_cents ?? 0, rule.currency ?? "BRL")} · dia{" "}
-                    {rule.day_of_month}
-                  </p>
-                )}
-                {projections.map((projection) => {
-                  const payout = projection.payout_id ? payoutMap.get(projection.payout_id) : null;
-                  const transaction = payout?.finance_transaction_id
-                    ? txMap.get(payout.finance_transaction_id)
-                    : null;
-                  return (
-                    <div
-                      key={projection.currency}
-                      className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-admin-border pt-2"
-                    >
-                      <span>
-                        {projection.currency}: base{" "}
-                        {money(
-                          payout?.base_amount_cents ?? projection.base_amount_cents,
-                          projection.currency,
-                        )}{" "}
-                        × {payout?.percentage ?? projection.percentage}% ={" "}
-                        <strong>
-                          {money(
-                            payout?.amount_cents ?? projection.projected_amount_cents,
-                            projection.currency,
-                          )}
-                        </strong>
-                      </span>
-                      {!payout && (
-                        <Button
-                          size="sm"
-                          disabled={actionMutation.isPending}
-                          onClick={() =>
-                            actionMutation.mutate({
-                              kind: "materialize",
-                              id: rule.id,
-                              currency: projection.currency,
-                            })
-                          }
-                        >
-                          Gerar repasse
-                        </Button>
+                {member.payouts.map(({ payout, transaction }) => (
+                  <div
+                    key={payout.id}
+                    className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-admin-border pt-2"
+                  >
+                    <div>
+                      <strong>{money(payout.amount_cents, payout.currency)}</strong> ·{" "}
+                      {transaction?.status === "paid"
+                        ? "Pago"
+                        : transaction?.status === "pending"
+                          ? "A pagar"
+                          : "Sem valor a pagar"}
+                      {payout.percentage !== null && (
+                        <div className="text-admin-ink-muted">
+                          Base {money(payout.base_amount_cents, payout.currency)} ×{" "}
+                          {payout.percentage}%
+                        </div>
                       )}
-                      {transaction && (
-                        <span className="text-admin-ink-muted">
-                          {transaction.status === "paid"
-                            ? `Pago ${money(transaction.settled_amount_cents ?? payout?.amount_cents ?? 0, transaction.settled_currency ?? projection.currency)}`
-                            : "A pagar"}
-                        </span>
-                      )}
-                      {transaction &&
-                        !["paid", "received", "canceled"].includes(transaction.status) && (
-                          <SettleTransactionPopover
-                            transaction={transaction}
-                            accounts={accounts}
-                            settle={(input) => settle({ data: input })}
-                            createAccount={async (name, currency) =>
-                              (await createAccount({ data: { name, type: "bank", currency } })).id
-                            }
-                            onDone={changed}
-                          />
-                        )}
-                      {transaction &&
-                        !["paid", "received", "canceled"].includes(transaction.status) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => actOnTransaction(transaction.id, "delete")}
-                          >
-                            Excluir repasse
-                          </Button>
-                        )}
-                      {transaction?.status === "paid" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => actOnTransaction(transaction.id, "reverse")}
-                        >
-                          Estornar baixa
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-                {historicalPayouts.map((payout) => {
-                  const transaction = payout.finance_transaction_id
-                    ? txMap.get(payout.finance_transaction_id)
-                    : null;
-                  return (
-                    <div
-                      key={payout.id}
-                      className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-admin-border pt-2"
-                    >
-                      <span>
-                        {payout.currency}: base {money(payout.base_amount_cents, payout.currency)} ×{" "}
-                        {payout.percentage}% ={" "}
-                        <strong>{money(payout.amount_cents, payout.currency)}</strong> (snapshot)
-                      </span>
-                      {transaction &&
-                        !["paid", "received", "canceled"].includes(transaction.status) && (
-                          <SettleTransactionPopover
-                            transaction={transaction}
-                            accounts={accounts}
-                            settle={(input) => settle({ data: input })}
-                            createAccount={async (name, currency) =>
-                              (await createAccount({ data: { name, type: "bank", currency } })).id
-                            }
-                            onDone={changed}
-                          />
-                        )}
-                      {transaction &&
-                        !["paid", "received", "canceled"].includes(transaction.status) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => actOnTransaction(transaction.id, "delete")}
-                          >
-                            Excluir repasse
-                          </Button>
-                        )}
-                      {transaction?.status === "paid" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => actOnTransaction(transaction.id, "reverse")}
-                        >
-                          Estornar baixa
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-                {fixedPayouts.map((payout) => {
-                  const transaction = payout.finance_transaction_id
-                    ? txMap.get(payout.finance_transaction_id)
-                    : null;
-                  return (
-                    <div
-                      key={payout.id}
-                      className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-admin-border pt-2"
-                    >
-                      <span>
-                        {transaction?.status === "paid"
-                          ? money(
-                              transaction.settled_amount_cents ?? payout.amount_cents,
+                      {transaction?.status === "paid" &&
+                        transaction.settled_amount_cents != null && (
+                          <div className="text-admin-ink-muted">
+                            Realizado{" "}
+                            {money(
+                              transaction.settled_amount_cents,
                               transaction.settled_currency ?? payout.currency,
-                            )
-                          : money(payout.amount_cents, payout.currency)}{" "}
-                        · {transaction?.status === "paid" ? "Pago" : "A pagar"}
-                        {transaction ? ` · vence ${transaction.due_date}` : ""}
-                      </span>
-                      {transaction &&
-                        !["paid", "received", "canceled"].includes(transaction.status) && (
-                          <SettleTransactionPopover
-                            transaction={transaction}
-                            accounts={accounts}
-                            settle={(input) => settle({ data: input })}
-                            createAccount={async (name, currency) =>
-                              (await createAccount({ data: { name, type: "bank", currency } })).id
-                            }
-                            onDone={changed}
-                          />
+                            )}
+                          </div>
                         )}
-                      {transaction &&
-                        !["paid", "received", "canceled"].includes(transaction.status) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => actOnTransaction(transaction.id, "delete")}
-                          >
-                            Excluir repasse
-                          </Button>
-                        )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {transaction?.status === "pending" && (
+                        <SettleTransactionPopover
+                          transaction={transaction}
+                          accounts={accounts}
+                          settle={(input) => settle({ data: input })}
+                          createAccount={async (name, currency) =>
+                            (await createAccount({ data: { name, type: "bank", currency } })).id
+                          }
+                          onDone={changed}
+                        />
+                      )}
                       {transaction?.status === "paid" && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => actOnTransaction(transaction.id, "reverse")}
+                          onClick={() => {
+                            const reason = window.prompt("Motivo obrigatório do estorno da baixa:");
+                            if (reason?.trim() && reason.trim().length >= 3)
+                              reverseMutation.mutate({ id: transaction.id, reason: reason.trim() });
+                          }}
                         >
                           Estornar baixa
                         </Button>
                       )}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </section>
             );
           })}
         </div>
       </BentoCard>
 
-      <Dialog open={payeeOpen} onOpenChange={setPayeeOpen}>
-        <DialogContent>
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingPayee ? "Editar beneficiário" : "Novo beneficiário"}</DialogTitle>
+            <DialogTitle>
+              {editing ? "Editar pessoa e repasse" : "Adicionar pessoa e repasse"}
+            </DialogTitle>
           </DialogHeader>
           <form
-            key={editingPayee?.id ?? "new"}
             className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
-              payeeMutation.mutate(new FormData(event.currentTarget));
+              if (!valid) return;
+              if (editing && financialChanged(form, editing.rule)) setDecisionOpen(true);
+              else saveMutation.mutate({ mode: "current", reversePaid: false });
             }}
           >
             <div>
               <Label>Nome</Label>
-              <Input name="name" defaultValue={editingPayee?.name ?? ""} required />
+              <Input
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                required
+              />
             </div>
             <div>
               <Label>Tipo</Label>
-              <Select value={payeeType} onValueChange={(value) => setPayeeType(value as PayeeType)}>
+              <Select
+                value={form.type}
+                onValueChange={(value) => setForm({ ...form, type: value as FormValues["type"] })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -673,34 +425,34 @@ export function FinanceTeamPanel({
               </Select>
             </div>
             <div>
-              <Label>Vincular a membro (opcional)</Label>
+              <Label>Vincular a perfil (opcional)</Label>
               <Input
                 value={profileQuery}
-                onChange={(e) => setProfileQuery(e.target.value)}
+                onChange={(event) => setProfileQuery(event.target.value)}
                 placeholder="Buscar nome, e-mail ou telefone"
               />
-              {profileId && (
+              {form.profileId && (
                 <div className="mt-1 text-xs text-admin-ink-muted">
-                  Perfil selecionado: {profileId}{" "}
+                  Perfil selecionado ·{" "}
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => setProfileId(null)}
+                    onClick={() => setForm({ ...form, profileId: null })}
                   >
                     Desvincular
                   </Button>
                 </div>
               )}
               {profileQ.data && profileQuery.trim().length >= 2 && (
-                <div className="mt-1 max-h-36 overflow-y-auto rounded border border-admin-border">
+                <div className="mt-1 max-h-32 overflow-y-auto rounded border border-admin-border">
                   {profileQ.data.map((profile) => (
                     <button
                       key={profile.id}
                       type="button"
                       className="block w-full p-2 text-left text-xs hover:bg-admin-bg"
                       onClick={() => {
-                        setProfileId(profile.id);
+                        setForm({ ...form, profileId: profile.id });
                         setProfileQuery(
                           `${profile.full_name ?? "Sem nome"} · ${profile.email ?? profile.phone ?? ""}`,
                         );
@@ -714,48 +466,17 @@ export function FinanceTeamPanel({
             </div>
             <div>
               <Label>Notas</Label>
-              <Textarea name="notes" defaultValue={editingPayee?.notes ?? ""} />
-            </div>
-            <Button type="submit" disabled={payeeMutation.isPending}>
-              Salvar beneficiário
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={ruleOpen} onOpenChange={setRuleOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingRule ? "Editar regra" : "Nova regra"}</DialogTitle>
-          </DialogHeader>
-          <form
-            key={editingRule?.id ?? "new"}
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              ruleMutation.mutate(new FormData(event.currentTarget));
-            }}
-          >
-            <div>
-              <Label>Beneficiário</Label>
-              <Select value={rulePayeeId} onValueChange={setRulePayeeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {data?.payees
-                    .filter((payee) => payee.is_active || payee.id === rulePayeeId)
-                    .map((payee) => (
-                      <SelectItem key={payee.id} value={payee.id}>
-                        {payee.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Textarea
+                value={form.notes ?? ""}
+                onChange={(event) => setForm({ ...form, notes: event.target.value || null })}
+              />
             </div>
             <div>
-              <Label>Tipo de regra</Label>
-              <Select value={ruleType} onValueChange={(value) => setRuleType(value as RuleType)}>
+              <Label>Forma de receber</Label>
+              <Select
+                value={form.ruleType}
+                onValueChange={(value) => setForm({ ...form, ruleType: value as RuleType })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -768,17 +489,23 @@ export function FinanceTeamPanel({
                 </SelectContent>
               </Select>
             </div>
-            {ruleType === "fixed_monthly" ? (
+            {form.ruleType === "fixed_monthly" ? (
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <Label>Valor</Label>
                   <Input
-                    name="amount"
                     type="number"
                     min="0"
                     step="0.01"
-                    defaultValue={
-                      editingRule?.amount_cents != null ? editingRule.amount_cents / 100 : ""
+                    value={form.amountCents === null ? "" : form.amountCents / 100}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        amountCents:
+                          event.target.value === ""
+                            ? null
+                            : Math.round(Number(event.target.value) * 100),
+                      })
                     }
                     required
                   />
@@ -786,8 +513,8 @@ export function FinanceTeamPanel({
                 <div>
                   <Label>Moeda</Label>
                   <Select
-                    value={ruleCurrency}
-                    onValueChange={(value) => setRuleCurrency(value as Currency)}
+                    value={form.currency ?? "BRL"}
+                    onValueChange={(value) => setForm({ ...form, currency: value as Currency })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -801,11 +528,16 @@ export function FinanceTeamPanel({
                 <div>
                   <Label>Dia</Label>
                   <Input
-                    name="dayOfMonth"
                     type="number"
                     min="1"
                     max="31"
-                    defaultValue={editingRule?.day_of_month ?? 1}
+                    value={form.dayOfMonth ?? ""}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        dayOfMonth: event.target.value ? Number(event.target.value) : null,
+                      })
+                    }
                     required
                   />
                 </div>
@@ -815,12 +547,17 @@ export function FinanceTeamPanel({
                 <div>
                   <Label>Percentual</Label>
                   <Input
-                    name="percentage"
                     type="number"
                     min="0.0001"
                     max="100"
                     step="0.0001"
-                    defaultValue={editingRule?.percentage ?? ""}
+                    value={form.percentage ?? ""}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        percentage: event.target.value ? Number(event.target.value) : null,
+                      })
+                    }
                     required
                   />
                 </div>
@@ -829,28 +566,28 @@ export function FinanceTeamPanel({
                   <label className="flex items-center gap-1">
                     <input
                       type="checkbox"
-                      checked={includeBrl}
-                      onChange={(e) => setIncludeBrl(e.target.checked)}
+                      checked={form.includeBrl}
+                      onChange={(event) => setForm({ ...form, includeBrl: event.target.checked })}
                     />
                     BRL
                   </label>
                   <label className="flex items-center gap-1">
                     <input
                       type="checkbox"
-                      checked={includeEur}
-                      onChange={(e) => setIncludeEur(e.target.checked)}
+                      checked={form.includeEur}
+                      onChange={(event) => setForm({ ...form, includeEur: event.target.checked })}
                     />
                     EUR
                   </label>
                 </div>
               </div>
             )}
-            {ruleType === "service_percent" && (
+            {form.ruleType === "service_percent" && (
               <div>
-                <Label>Serviços ({serviceIds.length} selecionado(s))</Label>
+                <Label>Serviços ({form.serviceIds.length} selecionado(s))</Label>
                 <Input
                   value={serviceSearch}
-                  onChange={(e) => setServiceSearch(e.target.value)}
+                  onChange={(event) => setServiceSearch(event.target.value)}
                   placeholder="Buscar serviço"
                 />
                 <div className="mt-1 max-h-40 space-y-1 overflow-y-auto rounded border border-admin-border p-2">
@@ -862,13 +599,14 @@ export function FinanceTeamPanel({
                       <label key={service.id} className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"
-                          checked={serviceIds.includes(service.id)}
-                          onChange={(e) =>
-                            setServiceIds((ids) =>
-                              e.target.checked
-                                ? [...ids, service.id]
-                                : ids.filter((id) => id !== service.id),
-                            )
+                          checked={form.serviceIds.includes(service.id)}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              serviceIds: event.target.checked
+                                ? [...form.serviceIds, service.id]
+                                : form.serviceIds.filter((id) => id !== service.id),
+                            })
                           }
                         />
                         {service.title}
@@ -877,36 +615,72 @@ export function FinanceTeamPanel({
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label>Início</Label>
-                <Input
-                  name="startsOn"
-                  type="date"
-                  defaultValue={editingRule?.starts_on ?? monthStart(month)}
-                  required
-                />
-              </div>
-              <div>
-                <Label>Fim (opcional)</Label>
-                <Input name="endsOn" type="date" defaultValue={editingRule?.ends_on ?? ""} />
-              </div>
-            </div>
-            <p className="text-xs text-admin-ink-muted">
-              Use o primeiro dia do mês. Alterações afetam apenas meses ainda não gerados.
-            </p>
-            <Button
-              type="submit"
-              disabled={
-                ruleMutation.isPending ||
-                !rulePayeeId ||
-                (ruleType !== "fixed_monthly" && !includeBrl && !includeEur) ||
-                (ruleType === "service_percent" && !serviceIds.length)
-              }
-            >
-              Salvar regra
+            <Button type="submit" disabled={!valid || saveMutation.isPending}>
+              Salvar
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={decisionOpen} onOpenChange={setDecisionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quando aplicar a alteração?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-admin-ink-muted">
+            {hasPaid
+              ? "Este mês já possui repasse pago. O valor pago fica congelado, a menos que você o estorne explicitamente."
+              : "O repasse pendente deste mês será recalculado sem criar duplicatas."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate({ mode: "next_month", reversePaid: false })}
+            >
+              Aplicar a partir do próximo mês
+            </Button>
+            <Button
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate({ mode: "current", reversePaid: hasPaid })}
+            >
+              {hasPaid ? "Estornar e atualizar mês atual" : "Atualizar mês atual"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!stateTarget} onOpenChange={(open) => !open && setStateTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {stateTarget?.action === "remove" ? "Remover pessoa" : "Pausar pessoa"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-admin-ink-muted">
+            O histórico pago será preservado. Novos repasses deixam de ser gerados.
+          </p>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={removePending}
+              onChange={(event) => setRemovePending(event.target.checked)}
+            />
+            Remover repasses pendentes deste mês
+          </label>
+          <Button
+            disabled={stateMutation.isPending}
+            onClick={() =>
+              stateTarget &&
+              stateMutation.mutate({
+                payeeId: stateTarget.member.payee.id,
+                action: stateTarget.action,
+                removePending,
+              })
+            }
+          >
+            Confirmar
+          </Button>
         </DialogContent>
       </Dialog>
     </div>

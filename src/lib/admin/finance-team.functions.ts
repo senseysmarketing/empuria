@@ -51,6 +51,12 @@ export type FinancePayout = {
   voided_at: string | null;
 };
 
+export type FinanceTeamMember = {
+  payee: FinancePayee;
+  rule: FinancePayoutRule | null;
+  payouts: { payout: FinancePayout; transaction: FinanceTransaction | null }[];
+};
+
 export type FinancePayoutProjection = {
   rule_id: string;
   payee_id: string;
@@ -149,7 +155,7 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
       p_actor: null,
     });
     if (ensureError) throw new Error(ensureError.message);
-    const [payeesQ, rulesQ, payoutsQ, projectionsQ, servicesQ, ruleServicesQ] = await Promise.all([
+    const [payeesQ, rulesQ, payoutsQ, servicesQ, ruleServicesQ] = await Promise.all([
       db
         .from("finance_payees")
         .select("id,name,type,profile_id,notes,is_active,archived_at")
@@ -166,14 +172,13 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
           "id,payee_id,rule_id,period_month,currency,base_amount_cents,percentage,amount_cents,finance_transaction_id,voided_at",
         )
         .eq("period_month", period),
-      db.rpc("finance_payout_projection", { p_month: period }),
       supabaseAdmin.from("services").select("id,title").order("title"),
       db.from("finance_payout_rule_services").select("rule_id,service_id"),
     ]);
-    for (const query of [payeesQ, rulesQ, payoutsQ, projectionsQ, servicesQ, ruleServicesQ]) {
+    for (const query of [payeesQ, rulesQ, payoutsQ, servicesQ, ruleServicesQ]) {
       if (query.error) throw new Error(query.error.message);
     }
-    const payouts = ((payoutsQ.data ?? []) as FinancePayout[]).filter((p) => !p.voided_at);
+    const payouts = (payoutsQ.data ?? []) as FinancePayout[];
     const transactionIds = payouts.map((payout) => payout.finance_transaction_id).filter(Boolean);
     const transactionsQ = transactionIds.length
       ? await db
@@ -184,30 +189,127 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
           .in("id", transactionIds)
       : { data: [], error: null };
     if (transactionsQ.error) throw new Error(transactionsQ.error.message);
+    const rules = ((rulesQ.data ?? []) as Omit<FinancePayoutRule, "service_ids">[]).map((r) => ({
+      ...r,
+      service_ids: (ruleServicesQ.data ?? [])
+        .filter((rs: { rule_id: string; service_id: string }) => rs.rule_id === r.id)
+        .map((rs: { service_id: string }) => rs.service_id),
+    }));
+    const txMap = new Map(
+      ((transactionsQ.data ?? []) as FinanceTransaction[]).map((tx) => [tx.id, tx]),
+    );
+    const totals = {
+      BRL: { payable: 0, paid: 0 },
+      EUR: { payable: 0, paid: 0 },
+    };
+    for (const payout of payouts) {
+      if (payout.voided_at || !payout.finance_transaction_id) continue;
+      const transaction = txMap.get(payout.finance_transaction_id);
+      if (transaction?.status === "paid") {
+        const currency =
+          (transaction.settled_currency ?? payout.currency) === "EUR" ? "EUR" : "BRL";
+        totals[currency].paid += transaction.settled_amount_cents ?? payout.amount_cents;
+      } else if (transaction?.status === "pending") {
+        const currency = payout.currency === "EUR" ? "EUR" : "BRL";
+        totals[currency].payable += payout.amount_cents;
+      }
+    }
+    const members: FinanceTeamMember[] = ((payeesQ.data ?? []) as FinancePayee[])
+      .filter((payee) => data.showArchived || !payee.archived_at)
+      .map((payee) => {
+        const ownRules = rules.filter((rule) => rule.payee_id === payee.id && !rule.archived_at);
+        const rule =
+          ownRules.find(
+            (item) => item.starts_on <= period && (!item.ends_on || item.ends_on >= period),
+          ) ??
+          ownRules.find((item) => item.starts_on <= period) ??
+          null;
+        const ownPayouts = payouts
+          .filter((payout) => payout.payee_id === payee.id && !payout.voided_at)
+          .map((payout) => ({
+            payout,
+            transaction: payout.finance_transaction_id
+              ? (txMap.get(payout.finance_transaction_id) ?? null)
+              : null,
+          }));
+        return { payee, rule, payouts: ownPayouts };
+      });
     return {
-      payees: ((payeesQ.data ?? []) as FinancePayee[]).filter(
-        (p) => data.showArchived || !p.archived_at,
-      ),
-      rules: ((rulesQ.data ?? []) as Omit<FinancePayoutRule, "service_ids">[])
-        .filter(
-          (r) =>
-            data.showArchived ||
-            (!r.archived_at &&
-              (payeesQ.data ?? []).some(
-                (p: FinancePayee) => p.id === r.payee_id && !p.archived_at,
-              )),
-        )
-        .map((r) => ({
-          ...r,
-          service_ids: (ruleServicesQ.data ?? [])
-            .filter((rs: { rule_id: string; service_id: string }) => rs.rule_id === r.id)
-            .map((rs: { service_id: string }) => rs.service_id),
-        })),
-      payouts,
-      projections: (projectionsQ.data ?? []) as FinancePayoutProjection[],
-      transactions: (transactionsQ.data ?? []) as FinanceTransaction[],
+      members,
+      totals,
       services: servicesQ.data ?? [],
     };
+  });
+
+const teamMemberInput = z
+  .object({
+    payeeId: z.string().uuid().nullable().optional(),
+    month: monthStartSchema,
+    mode: z.enum(["current", "next_month"]),
+    reversePaid: z.boolean().default(false),
+    name: z.string().trim().min(2).max(120),
+    type: payeeTypeSchema,
+    profileId: z.string().uuid().nullable().optional(),
+    notes: z.string().trim().max(500).nullable().optional(),
+    ruleType: ruleTypeSchema,
+    amountCents: z.number().int().min(0).max(2_147_483_647).nullable().optional(),
+    currency: currencySchema.nullable().optional(),
+    percentage: z.number().finite().positive().max(100).nullable().optional(),
+    includeBrl: z.boolean(),
+    includeEur: z.boolean(),
+    dayOfMonth: z.number().int().min(1).max(31).nullable().optional(),
+    serviceIds: z.array(z.string().uuid()).max(50),
+  })
+  .superRefine((input, ctx) => {
+    if (input.ruleType === "fixed_monthly") {
+      if (input.amountCents == null || !input.currency || !input.dayOfMonth)
+        ctx.addIssue({ code: "custom", message: "Informe valor, moeda e dia." });
+    } else if (
+      !input.percentage ||
+      (!input.includeBrl && !input.includeEur) ||
+      (input.ruleType === "service_percent" && !input.serviceIds.length)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Informe percentual, moeda e serviços quando necessário.",
+      });
+    }
+  });
+
+export const saveFinanceTeamMember = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) => teamMemberInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: id, error } = await db.rpc("finance_save_team_member", {
+      p_data: data,
+      p_actor: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    return { id: id as string };
+  });
+
+export const setFinanceTeamMemberState = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) =>
+    z
+      .object({
+        payeeId: z.string().uuid(),
+        month: monthStartSchema,
+        action: z.enum(["pause", "reactivate", "remove"]),
+        removePending: z.boolean().default(false),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await db.rpc("finance_set_team_member_state", {
+      p_payee_id: data.payeeId,
+      p_month: data.month,
+      p_action: data.action,
+      p_remove_pending: data.removePending,
+      p_actor: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const createFinancePayee = createServerFn({ method: "POST" })
