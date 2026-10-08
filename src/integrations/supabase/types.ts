@@ -1331,116 +1331,10 @@ export type Database = {
         }
         Relationships: []
       }
-      finance_month_closures: {
-        Row: {
-          closed_at: string | null
-          closed_by: string | null
-          created_at: string
-          final_snapshot: Json | null
-          id: string
-          period_month: string
-          prepared_at: string | null
-          prepared_by: string | null
-          preview_snapshot: Json | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          closed_at?: string | null
-          closed_by?: string | null
-          created_at?: string
-          final_snapshot?: Json | null
-          id?: string
-          period_month: string
-          prepared_at?: string | null
-          prepared_by?: string | null
-          preview_snapshot?: Json | null
-          status: string
-          updated_at?: string
-        }
-        Update: {
-          closed_at?: string | null
-          closed_by?: string | null
-          created_at?: string
-          final_snapshot?: Json | null
-          id?: string
-          period_month?: string
-          prepared_at?: string | null
-          prepared_by?: string | null
-          preview_snapshot?: Json | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "finance_month_closures_closed_by_fkey"
-            columns: ["closed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "finance_month_closures_prepared_by_fkey"
-            columns: ["prepared_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      finance_month_distributions: {
-        Row: {
-          amount_cents: number
-          closure_id: string
-          created_at: string
-          currency: string
-          finance_transaction_id: string | null
-          id: string
-          partner_code: string
-          partner_name: string
-          percentage: number
-        }
-        Insert: {
-          amount_cents: number
-          closure_id: string
-          created_at?: string
-          currency: string
-          finance_transaction_id?: string | null
-          id?: string
-          partner_code: string
-          partner_name: string
-          percentage: number
-        }
-        Update: {
-          amount_cents?: number
-          closure_id?: string
-          created_at?: string
-          currency?: string
-          finance_transaction_id?: string | null
-          id?: string
-          partner_code?: string
-          partner_name?: string
-          percentage?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "finance_month_distributions_closure_id_fkey"
-            columns: ["closure_id"]
-            isOneToOne: false
-            referencedRelation: "finance_month_closures"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "finance_month_distributions_finance_transaction_id_fkey"
-            columns: ["finance_transaction_id"]
-            isOneToOne: true
-            referencedRelation: "finance_transactions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       finance_payees: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -1452,6 +1346,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1463,6 +1359,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1474,6 +1372,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "finance_payees_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "finance_payees_created_by_fkey"
             columns: ["created_by"]
@@ -1490,56 +1395,102 @@ export type Database = {
           },
         ]
       }
+      finance_payout_rule_services: {
+        Row: {
+          rule_id: string
+          service_id: string
+        }
+        Insert: {
+          rule_id: string
+          service_id: string
+        }
+        Update: {
+          rule_id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_payout_rule_services_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "finance_payout_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payout_rule_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_payout_rules: {
         Row: {
           amount_cents: number | null
+          archived_at: string | null
+          archived_by: string | null
           created_at: string
           created_by: string | null
           currency: string | null
           day_of_month: number | null
           ends_on: string | null
           id: string
+          include_brl: boolean
+          include_eur: boolean
           is_active: boolean
           payee_id: string
           percentage: number | null
           rule_type: string
-          service_id: string | null
           starts_on: string
           updated_at: string
         }
         Insert: {
           amount_cents?: number | null
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string | null
           day_of_month?: number | null
           ends_on?: string | null
           id?: string
+          include_brl?: boolean
+          include_eur?: boolean
           is_active?: boolean
           payee_id: string
           percentage?: number | null
           rule_type: string
-          service_id?: string | null
           starts_on: string
           updated_at?: string
         }
         Update: {
           amount_cents?: number | null
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string | null
           day_of_month?: number | null
           ends_on?: string | null
           id?: string
+          include_brl?: boolean
+          include_eur?: boolean
           is_active?: boolean
           payee_id?: string
           percentage?: number | null
           rule_type?: string
-          service_id?: string | null
           starts_on?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "finance_payout_rules_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "finance_payout_rules_created_by_fkey"
             columns: ["created_by"]
@@ -1552,13 +1503,6 @@ export type Database = {
             columns: ["payee_id"]
             isOneToOne: false
             referencedRelation: "finance_payees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "finance_payout_rules_service_id_fkey"
-            columns: ["service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
             referencedColumns: ["id"]
           },
         ]
@@ -1577,6 +1521,9 @@ export type Database = {
           percentage: number | null
           period_month: string
           rule_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
         }
         Insert: {
           amount_cents: number
@@ -1591,6 +1538,9 @@ export type Database = {
           percentage?: number | null
           period_month: string
           rule_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Update: {
           amount_cents?: number
@@ -1605,8 +1555,18 @@ export type Database = {
           percentage?: number | null
           period_month?: string
           rule_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "finance_payouts_voided_by_fkey"
+            columns: ["voided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "finance_payouts_created_by_fkey"
             columns: ["created_by"]
@@ -1719,10 +1679,48 @@ export type Database = {
           },
         ]
       }
+      finance_recurring_skips: {
+        Row: {
+          created_at: string
+          period_month: string
+          reason: string | null
+          rule_id: string
+          skipped_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          period_month: string
+          reason?: string | null
+          rule_id: string
+          skipped_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          period_month?: string
+          reason?: string | null
+          rule_id?: string
+          skipped_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_recurring_skips_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "finance_recurring_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_recurring_skips_skipped_by_fkey"
+            columns: ["skipped_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_transactions: {
         Row: {
           account_id: string | null
-          adjustment_for_month: string | null
           amount_brl_cents: number | null
           amount_cents: number
           category_id: string | null
@@ -1752,7 +1750,6 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
-          adjustment_for_month?: string | null
           amount_brl_cents?: number | null
           amount_cents?: number
           category_id?: string | null
@@ -1782,7 +1779,6 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
-          adjustment_for_month?: string | null
           amount_brl_cents?: number | null
           amount_cents?: number
           category_id?: string | null
@@ -3954,9 +3950,9 @@ export type Database = {
         Args: { p_name: string; p_type: string }
         Returns: string
       }
-      finance_close_month: {
-        Args: { p_actor: string; p_month: string }
-        Returns: Json
+      finance_delete_pending_transaction: {
+        Args: { p_actor: string; p_id: string; p_reason?: string }
+        Returns: undefined
       }
       finance_dashboard_month: { Args: { p_month: string }; Returns: Json }
       finance_ensure_month: {
@@ -3972,7 +3968,6 @@ export type Database = {
         }
         Returns: string
       }
-      finance_month_is_closed: { Args: { p_month: string }; Returns: boolean }
       finance_month_snapshot: {
         Args: { p_include_projection?: boolean; p_month: string }
         Returns: Json
@@ -3993,9 +3988,13 @@ export type Database = {
           rule_id: string
         }[]
       }
-      finance_prepare_month: {
-        Args: { p_actor: string; p_month: string }
-        Returns: Json
+      finance_reverse_settlement: {
+        Args: { p_actor: string; p_id: string; p_reason: string }
+        Returns: undefined
+      }
+      finance_set_payout_rule_services: {
+        Args: { p_rule_id: string; p_service_ids: string[] }
+        Returns: undefined
       }
       finance_sync_order: { Args: { p_order_id: string }; Returns: undefined }
       finance_sync_pdv_sale: { Args: { p_sale_id: string }; Returns: undefined }
@@ -4176,12 +4175,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4205,11 +4204,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4230,11 +4229,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4255,11 +4254,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4272,11 +4271,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

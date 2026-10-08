@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { summarizePendingPayments } from "@/lib/admin/esteira-pending";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import QRCode from "qrcode";
@@ -284,7 +285,8 @@ function EsteiraPage() {
       return time >= today.getTime() && time < tomorrow.getTime();
     };
     const todayCount = orders.filter((o) => isToday(o.created_at)).length;
-    const waiting = orders.filter((o) => o.payment_status === "pendente").length;
+    const pending = summarizePendingPayments(orders);
+    const waiting = pending.count;
     const paidToday = orders.filter(
       (o) => o.payment_status === "aprovado" && !!o.paid_at && isToday(o.paid_at),
     ).length;
@@ -303,7 +305,17 @@ function EsteiraPage() {
       if (currency === "BRL") brl += amount;
       if (currency === "EUR") eur += amount;
     }
-    return { todayCount, waiting, paidToday, inExec, late, eur, brl };
+    return {
+      todayCount,
+      waiting,
+      paidToday,
+      inExec,
+      late,
+      eur,
+      brl,
+      pendingEur: pending.EUR,
+      pendingBrl: pending.BRL,
+    };
   }, [orders]);
 
   const showVoucher = async (code: string) => {
@@ -372,6 +384,35 @@ function EsteiraPage() {
           <Plus className="h-4 w-4" /> Criar pedido
         </Button>
       </header>
+
+      {summary.waiting > 0 && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-4 rounded-xl border-2 border-red-600 bg-red-50 p-5 text-red-950"
+        >
+          <div>
+            <p className="font-display text-lg font-bold">
+              ⚠ {summary.waiting} pedido(s) aguardando definição de pagamento
+            </p>
+            <p className="text-sm">
+              Dê baixa nos pedidos pagos ou cancele os que não serão concluídos.
+            </p>
+            <p className="mt-1 text-sm font-semibold">
+              BRL pendente: {formatMoney(summary.pendingBrl, "BRL")} · EUR pendente:{" "}
+              {formatMoney(summary.pendingEur, "EUR")}
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setPaymentFilter("pendente");
+              setPage(1);
+            }}
+          >
+            Ver pendentes
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <AdminStatCard

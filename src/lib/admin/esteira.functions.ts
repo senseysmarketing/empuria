@@ -87,12 +87,19 @@ export const confirmOrderPayment = createServerFn({ method: "POST" })
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireStaff])
   .handler(async ({ context }) => {
-    const { data } = await context.supabase
-      .from("orders")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(300);
-    return data ?? [];
+    const orders = [];
+    for (let page = 0; ; page += 1) {
+      const { data, error } = await context.supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(page * 1000, page * 1000 + 999);
+      if (error) throw new Error(error.message);
+      orders.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    return orders;
   });
 
 export const listPaymentAccounts = createServerFn({ method: "GET" })

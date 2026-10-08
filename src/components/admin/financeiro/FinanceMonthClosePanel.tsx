@@ -10,8 +10,6 @@ import {
   YAxis,
 } from "recharts";
 import { BentoCard } from "@/components/admin/BentoCard";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -19,13 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SettleTransactionPopover } from "./SettleTransactionPopover";
-import type { FinanceAccount } from "@/lib/admin/financeiro.functions";
 import type {
   FinanceCloseSnapshot,
   FinanceDashboardData,
-  FinanceDistribution,
-  FinanceMonthClosure,
 } from "@/lib/admin/finance-close.functions";
 
 type Currency = "BRL" | "EUR";
@@ -37,40 +31,15 @@ function money(cents: number, currency: Currency) {
   }).format(cents / 100);
 }
 
-const STATUS_LABEL = { open: "Aberto", ready: "Pronto para fechar", closed: "Fechado" };
-
 export function FinanceMonthClosePanel({
   month,
-  status,
-  closure,
   snapshot,
-  liveSnapshot,
-  distributions,
   analytics,
-  accounts,
-  prepare,
-  close,
-  settle,
-  createAccount,
-  onChanged,
-  busy,
 }: {
   month: string;
-  status: "open" | "ready" | "closed";
-  closure: FinanceMonthClosure | null;
   snapshot: FinanceCloseSnapshot;
-  liveSnapshot: FinanceCloseSnapshot;
-  distributions: FinanceDistribution[];
   analytics: FinanceDashboardData;
-  accounts: FinanceAccount[];
-  prepare: () => void;
-  close: () => void;
-  settle: React.ComponentProps<typeof SettleTransactionPopover>["settle"];
-  createAccount: React.ComponentProps<typeof SettleTransactionPopover>["createAccount"];
-  onChanged: () => void;
-  busy: boolean;
 }) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [currency, setCurrency] = useState<Currency>("BRL");
   const daily = analytics.daily.filter((row) => row.currency === currency);
   const maxIncome = daily.reduce(
@@ -81,125 +50,63 @@ export function FinanceMonthClosePanel({
     (best, row) => (row.expense_cents > best.expense_cents ? row : best),
     { day: "—", income_cents: 0, expense_cents: 0 },
   );
-
   return (
     <div className="space-y-4">
-      <BentoCard title={`Fechamento ${month} · ${STATUS_LABEL[status]}`}>
-        <div className="space-y-4 text-sm">
-          <p className="text-admin-ink-muted">
-            {status === "closed"
-              ? `Snapshot final de ${closure?.closed_at?.slice(0, 10) ?? "—"}. Baixas posteriores não alteram este resultado.`
-              : status === "ready"
-                ? `Revisão preparada em ${closure?.prepared_at?.slice(0, 10) ?? "—"}. Atualize a revisão antes de fechar se houver mudanças.`
-                : "Revise receitas, despesas e pendências antes de preparar o fechamento."}
-          </p>
-          <div className="grid gap-4 xl:grid-cols-2">
-            {(["BRL", "EUR"] as const).map((item) => {
-              const row = snapshot[item];
-              return (
-                <section key={item} className="rounded-lg border border-admin-border p-4">
-                  <h3 className="mb-3 font-semibold">Resultado {item}</h3>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <span>
-                      Receita realizada: <strong>{money(row.revenue_realized_cents, item)}</strong>
-                    </span>
-                    <span>
-                      Despesas operacionais:{" "}
-                      <strong>{money(row.operational_expenses_cents, item)}</strong>
-                    </span>
-                    <span>
-                      Equipe/Repasses: <strong>{money(row.team_payouts_cents, item)}</strong>
-                    </span>
-                    <span>
-                      Recorrências: <strong>{money(row.recurring_expenses_cents, item)}</strong>
-                    </span>
-                    {status !== "closed" && (
+      <BentoCard title={`Resultado ao vivo · ${month}`}>
+        <p className="mb-4 text-sm text-admin-ink-muted">
+          Valores recalculados com os lançamentos atuais. Rossini e Luana são apenas uma referência
+          informativa; nenhum repasse é gerado automaticamente.
+        </p>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {(["BRL", "EUR"] as const).map((item) => {
+            const row = snapshot[item];
+            const lines = [
+              ["Receita realizada", row.revenue_realized_cents, false],
+              ["Despesas operacionais", row.operational_expenses_cents, true],
+              ["Equipe / Repasses", row.team_payouts_cents, true],
+              ["Recorrências", row.recurring_expenses_cents, true],
+              ["Variáveis projetadas", row.projected_payouts_cents, true],
+            ] as const;
+            return (
+              <section key={item} className="rounded-lg border border-admin-border p-4">
+                <h3 className="mb-3 font-display font-semibold">Resultado {item}</h3>
+                <div className="space-y-2 text-sm">
+                  {lines.map(([label, amount, subtract]) => (
+                    <div key={label} className="flex justify-between gap-2">
                       <span>
-                        Variáveis projetadas:{" "}
-                        <strong>{money(row.projected_payouts_cents, item)}</strong>
+                        {subtract ? "− " : ""}
+                        {label}
                       </span>
-                    )}
-                    <span>
-                      Resultado: <strong>{money(row.result_cents, item)}</strong>
-                    </span>
-                    <span>
-                      Lucro distribuível:{" "}
-                      <strong>{money(row.distributable_profit_cents, item)}</strong>
-                    </span>
-                    <span>
-                      Rossini 70%: <strong>{money(row.rossini_cents, item)}</strong>
-                    </span>
-                    <span>
-                      Luana 30%: <strong>{money(row.luana_cents, item)}</strong>
-                    </span>
+                      <strong>{money(amount, item)}</strong>
+                    </div>
+                  ))}
+                  <div className="flex justify-between border-t border-admin-border pt-2 font-semibold">
+                    <span>Resultado atual</span>
+                    <span>{money(row.result_cents, item)}</span>
                   </div>
-                  <div className="mt-3 border-t border-admin-border pt-3 text-admin-ink-muted">
+                  <div className="flex justify-between">
+                    <span>Lucro atual</span>
+                    <strong>{money(row.distributable_profit_cents, item)}</strong>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 border-t border-admin-border pt-3">
+                    <div>
+                      Rossini 70%<strong className="block">{money(row.rossini_cents, item)}</strong>
+                    </div>
+                    <div>
+                      Luana 30%<strong className="block">{money(row.luana_cents, item)}</strong>
+                    </div>
+                  </div>
+                  <p className="border-t border-admin-border pt-2 text-xs text-admin-ink-muted">
                     A receber {money(row.receivable_cents, item)} · A pagar{" "}
                     {money(row.payable_cents, item)} · Vencidos anteriores{" "}
                     {money(row.overdue_previous_cents, item)}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-          {status === "closed" && (
-            <p className="text-admin-ink-muted">
-              Movimento atual após o fechamento: BRL {money(liveSnapshot.BRL.result_cents, "BRL")} ·
-              EUR {money(liveSnapshot.EUR.result_cents, "EUR")}. O snapshot acima permanece fixo.
-            </p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {status !== "closed" && (
-              <Button variant="outline" disabled={busy} onClick={prepare}>
-                {status === "ready" ? "Atualizar revisão" : "Preparar fechamento"}
-              </Button>
-            )}
-            {status === "ready" && (
-              <Button disabled={busy} onClick={() => setConfirmOpen(true)}>
-                Fechar mês
-              </Button>
-            )}
-          </div>
+                  </p>
+                </div>
+              </section>
+            );
+          })}
         </div>
       </BentoCard>
-
-      {status === "closed" && (
-        <BentoCard title="Distribuições societárias">
-          <div className="space-y-2 text-sm">
-            {distributions.length === 0 && (
-              <p className="text-admin-ink-muted">Sem lucro distribuível neste mês.</p>
-            )}
-            {distributions.map((distribution) => (
-              <div
-                key={distribution.id}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-admin-border py-2 last:border-0"
-              >
-                <span>
-                  {distribution.partner_name} · {distribution.currency} ·{" "}
-                  {money(distribution.amount_cents, distribution.currency)}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span>
-                    {distribution.transaction?.status === "paid"
-                      ? `Pago em ${distribution.transaction.paid_at?.slice(0, 10) ?? "—"}`
-                      : "A pagar"}
-                  </span>
-                  {distribution.transaction &&
-                    !["paid", "received", "canceled"].includes(distribution.transaction.status) && (
-                      <SettleTransactionPopover
-                        transaction={distribution.transaction}
-                        accounts={accounts}
-                        settle={settle}
-                        createAccount={createAccount}
-                        onDone={onChanged}
-                      />
-                    )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </BentoCard>
-      )}
 
       <div className="flex items-center gap-3">
         <h2 className="font-display text-xl font-semibold">Dashboard do mês</h2>
@@ -321,33 +228,6 @@ export function FinanceMonthClosePanel({
           })()}
         </BentoCard>
       </div>
-
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar fechamento definitivo</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-admin-ink-muted">
-            Este processo materializa repasses variáveis pendentes, congela o resultado de {month} e
-            cria obrigações Rossini/Luana por moeda. Pendências podem ser baixadas depois, mas o
-            snapshot não será recalculado.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-              Voltar
-            </Button>
-            <Button
-              disabled={busy}
-              onClick={() => {
-                setConfirmOpen(false);
-                close();
-              }}
-            >
-              Confirmar fechamento
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

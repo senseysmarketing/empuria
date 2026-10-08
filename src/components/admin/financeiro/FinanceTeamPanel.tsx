@@ -17,14 +17,22 @@ import {
 import { BentoCard } from "@/components/admin/BentoCard";
 import { SettleTransactionPopover } from "./SettleTransactionPopover";
 import type { FinanceAccount } from "@/lib/admin/financeiro.functions";
-import { createFinanceAccount, settleFinanceTransaction } from "@/lib/admin/financeiro.functions";
+import {
+  createFinanceAccount,
+  settleFinanceTransaction,
+  deleteFinancePendingTransaction,
+  reverseFinanceSettlement,
+} from "@/lib/admin/financeiro.functions";
 import {
   createFinancePayee,
   updateFinancePayee,
   toggleFinancePayee,
+  archiveFinancePayee,
   createFinancePayoutRule,
   updateFinancePayoutRule,
   toggleFinancePayoutRule,
+  archiveFinancePayoutRule,
+  searchFinancePayeeProfiles,
   endFinancePayoutRule,
   listFinanceTeamMonth,
   materializeFinancePayout,
@@ -74,26 +82,42 @@ export function FinanceTeamPanel({
   const createPayee = useServerFn(createFinancePayee);
   const updatePayee = useServerFn(updateFinancePayee);
   const togglePayee = useServerFn(toggleFinancePayee);
+  const archivePayee = useServerFn(archiveFinancePayee);
   const createRule = useServerFn(createFinancePayoutRule);
   const updateRule = useServerFn(updateFinancePayoutRule);
   const toggleRule = useServerFn(toggleFinancePayoutRule);
+  const archiveRule = useServerFn(archiveFinancePayoutRule);
+  const searchProfiles = useServerFn(searchFinancePayeeProfiles);
   const endRule = useServerFn(endFinancePayoutRule);
   const materialize = useServerFn(materializeFinancePayout);
   const settle = useServerFn(settleFinanceTransaction);
+  const deletePending = useServerFn(deleteFinancePendingTransaction);
+  const reverseSettlement = useServerFn(reverseFinanceSettlement);
   const createAccount = useServerFn(createFinanceAccount);
   const [payeeOpen, setPayeeOpen] = useState(false);
   const [editingPayee, setEditingPayee] = useState<FinancePayee | null>(null);
   const [payeeType, setPayeeType] = useState<PayeeType>("team");
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileQuery, setProfileQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [ruleOpen, setRuleOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<FinancePayoutRule | null>(null);
   const [rulePayeeId, setRulePayeeId] = useState("");
   const [ruleType, setRuleType] = useState<RuleType>("fixed_monthly");
   const [ruleCurrency, setRuleCurrency] = useState<Currency>("BRL");
-  const [serviceId, setServiceId] = useState("");
+  const [includeBrl, setIncludeBrl] = useState(true);
+  const [includeEur, setIncludeEur] = useState(true);
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [serviceSearch, setServiceSearch] = useState("");
 
   const teamQ = useQuery({
-    queryKey: ["finance-team", month],
-    queryFn: () => list({ data: { month } }),
+    queryKey: ["finance-team", month, showArchived],
+    queryFn: () => list({ data: { month, showArchived } }),
+  });
+  const profileQ = useQuery({
+    queryKey: ["finance-payee-profiles", profileQuery],
+    queryFn: () => searchProfiles({ data: { query: profileQuery.trim() } }),
+    enabled: payeeOpen && profileQuery.trim().length >= 2,
   });
   const changed = () => {
     qc.invalidateQueries({ queryKey: ["finance-team"] });
@@ -104,7 +128,7 @@ export function FinanceTeamPanel({
       const input = {
         name: String(form.get("name") ?? ""),
         type: payeeType,
-        profileId: String(form.get("profileId") ?? "").trim() || null,
+        profileId,
         notes: String(form.get("notes") ?? "").trim() || null,
       };
       return editingPayee
@@ -126,7 +150,9 @@ export function FinanceTeamPanel({
         amount: ruleType === "fixed_monthly" ? Number(form.get("amount") ?? 0) : null,
         currency: ruleType === "fixed_monthly" ? ruleCurrency : null,
         percentage: ruleType === "fixed_monthly" ? null : Number(form.get("percentage") ?? 0),
-        serviceId: ruleType === "service_percent" ? serviceId : null,
+        serviceIds: ruleType === "service_percent" ? serviceIds : [],
+        includeBrl,
+        includeEur,
         dayOfMonth: ruleType === "fixed_monthly" ? Number(form.get("dayOfMonth") ?? 1) : null,
         startsOn: String(form.get("startsOn") ?? ""),
         endsOn: String(form.get("endsOn") ?? "").trim() || null,
@@ -144,7 +170,7 @@ export function FinanceTeamPanel({
   });
   const actionMutation = useMutation({
     mutationFn: (action: {
-      kind: "payee" | "rule" | "end" | "materialize";
+      kind: "payee" | "rule" | "end" | "materialize" | "archivePayee" | "archiveRule";
       id: string;
       active?: boolean;
       currency?: Currency;
@@ -153,6 +179,8 @@ export function FinanceTeamPanel({
         return togglePayee({ data: { id: action.id, isActive: !!action.active } });
       if (action.kind === "rule")
         return toggleRule({ data: { id: action.id, isActive: !!action.active } });
+      if (action.kind === "archivePayee") return archivePayee({ data: { id: action.id } });
+      if (action.kind === "archiveRule") return archiveRule({ data: { id: action.id } });
       if (action.kind === "end")
         return endRule({ data: { id: action.id, endsOn: monthStart(month) } });
       return materialize({ data: { ruleId: action.id, month, currency: action.currency! } });
@@ -163,6 +191,32 @@ export function FinanceTeamPanel({
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro na ação"),
   });
+  const transactionMutation = useMutation({
+    mutationFn: async (input: {
+      id: string;
+      action: "delete" | "reverse";
+      reason: string | null;
+    }) => {
+      if (input.action === "delete")
+        return deletePending({ data: { id: input.id, reason: input.reason } });
+      return reverseSettlement({ data: { id: input.id, reason: input.reason ?? "" } });
+    },
+    onSuccess: () => {
+      toast.success("Repasse atualizado");
+      changed();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro no repasse"),
+  });
+  const actOnTransaction = (id: string, action: "delete" | "reverse") => {
+    if (action === "delete") {
+      if (window.confirm("Excluir este repasse pendente? Ele não será regenerado."))
+        transactionMutation.mutate({ id, action, reason: null });
+      return;
+    }
+    const reason = window.prompt("Motivo obrigatório do estorno da baixa:");
+    if (reason?.trim() && reason.trim().length >= 3)
+      transactionMutation.mutate({ id, action, reason: reason.trim() });
+  };
 
   const data = teamQ.data;
   const payeeMap = useMemo(
@@ -199,14 +253,24 @@ export function FinanceTeamPanel({
   function openPayee(payee: FinancePayee | null) {
     setEditingPayee(payee);
     setPayeeType(payee?.type ?? "team");
+    setProfileId(payee?.profile_id ?? null);
+    setProfileQuery("");
     setPayeeOpen(true);
   }
   function openRule(rule: FinancePayoutRule | null, payeeId?: string) {
     setEditingRule(rule);
-    setRulePayeeId(rule?.payee_id ?? payeeId ?? data?.payees[0]?.id ?? "");
+    setRulePayeeId(
+      rule?.payee_id ??
+        payeeId ??
+        data?.payees.find((payee) => payee.is_active && !payee.archived_at)?.id ??
+        "",
+    );
     setRuleType(rule?.rule_type ?? "fixed_monthly");
     setRuleCurrency((rule?.currency as Currency) ?? "BRL");
-    setServiceId(rule?.service_id ?? "");
+    setIncludeBrl(rule?.include_brl ?? true);
+    setIncludeEur(rule?.include_eur ?? true);
+    setServiceIds(rule?.service_ids ?? []);
+    setServiceSearch("");
     setRuleOpen(true);
   }
 
@@ -218,6 +282,14 @@ export function FinanceTeamPanel({
         <Button variant="outline" disabled={!data?.payees.length} onClick={() => openRule(null)}>
           Nova regra
         </Button>
+        <label className="ml-auto flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+          />
+          Mostrar arquivados
+        </label>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         {(["BRL", "EUR"] as const).map((currency) => (
@@ -253,25 +325,43 @@ export function FinanceTeamPanel({
                 <div className="text-admin-ink-muted">
                   {PAYEE_TYPES[payee.type]} ·{" "}
                   {data.rules.filter((rule) => rule.payee_id === payee.id).length} regra(s) ·{" "}
-                  {payee.is_active ? "Ativo" : "Pausado"}
+                  {payee.archived_at ? "Arquivado" : payee.is_active ? "Ativo" : "Pausado"}
                 </div>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={() => openPayee(payee)}>
                   Editar
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => openRule(null, payee.id)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!!payee.archived_at}
+                  onClick={() => openRule(null, payee.id)}
+                >
                   Nova regra
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
+                  disabled={!!payee.archived_at}
                   onClick={() =>
                     actionMutation.mutate({ kind: "payee", id: payee.id, active: !payee.is_active })
                   }
                 >
                   {payee.is_active ? "Pausar" : "Reativar"}
                 </Button>
+                {!payee.archived_at && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (window.confirm("Arquivar beneficiário e interromper novas projeções?"))
+                        actionMutation.mutate({ kind: "archivePayee", id: payee.id });
+                    }}
+                  >
+                    Arquivar
+                  </Button>
+                )}
               </div>
             </div>
           ))}
@@ -304,16 +394,26 @@ export function FinanceTeamPanel({
                     <div className="text-admin-ink-muted">
                       {RULE_TYPES[rule.rule_type]} · {rule.starts_on.slice(0, 7)}
                       {rule.ends_on ? ` até ${rule.ends_on.slice(0, 7)}` : ""} ·{" "}
-                      {rule.is_active ? "Ativa" : "Pausada"}
+                      {rule.archived_at ? "Arquivada" : rule.is_active ? "Ativa" : "Pausada"}
+                      {rule.rule_type !== "fixed_monthly" &&
+                        ` · ${rule.include_brl ? "BRL" : ""}${rule.include_brl && rule.include_eur ? "/" : ""}${rule.include_eur ? "EUR" : ""}`}
+                      {rule.rule_type === "service_percent" &&
+                        ` · ${rule.service_ids.length} serviço(s)`}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => openRule(rule)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!!rule.archived_at}
+                      onClick={() => openRule(rule)}
+                    >
                       Editar
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={!!rule.archived_at}
                       onClick={() =>
                         actionMutation.mutate({
                           kind: "rule",
@@ -324,7 +424,19 @@ export function FinanceTeamPanel({
                     >
                       {rule.is_active ? "Pausar" : "Reativar"}
                     </Button>
-                    {!rule.ends_on && (
+                    {!rule.archived_at && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (window.confirm("Arquivar regra e interromper novas projeções?"))
+                            actionMutation.mutate({ kind: "archiveRule", id: rule.id });
+                        }}
+                      >
+                        Arquivar
+                      </Button>
+                    )}
+                    {!rule.ends_on && !rule.archived_at && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -399,6 +511,25 @@ export function FinanceTeamPanel({
                             onDone={changed}
                           />
                         )}
+                      {transaction &&
+                        !["paid", "received", "canceled"].includes(transaction.status) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => actOnTransaction(transaction.id, "delete")}
+                          >
+                            Excluir repasse
+                          </Button>
+                        )}
+                      {transaction?.status === "paid" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => actOnTransaction(transaction.id, "reverse")}
+                        >
+                          Estornar baixa
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
@@ -428,6 +559,25 @@ export function FinanceTeamPanel({
                             onDone={changed}
                           />
                         )}
+                      {transaction &&
+                        !["paid", "received", "canceled"].includes(transaction.status) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => actOnTransaction(transaction.id, "delete")}
+                          >
+                            Excluir repasse
+                          </Button>
+                        )}
+                      {transaction?.status === "paid" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => actOnTransaction(transaction.id, "reverse")}
+                        >
+                          Estornar baixa
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
@@ -462,6 +612,25 @@ export function FinanceTeamPanel({
                             onDone={changed}
                           />
                         )}
+                      {transaction &&
+                        !["paid", "received", "canceled"].includes(transaction.status) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => actOnTransaction(transaction.id, "delete")}
+                          >
+                            Excluir repasse
+                          </Button>
+                        )}
+                      {transaction?.status === "paid" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => actOnTransaction(transaction.id, "reverse")}
+                        >
+                          Estornar baixa
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
@@ -504,12 +673,44 @@ export function FinanceTeamPanel({
               </Select>
             </div>
             <div>
-              <Label>ID de perfil (opcional)</Label>
+              <Label>Vincular a membro (opcional)</Label>
               <Input
-                name="profileId"
-                defaultValue={editingPayee?.profile_id ?? ""}
-                placeholder="Beneficiário não precisa de acesso ao sistema"
+                value={profileQuery}
+                onChange={(e) => setProfileQuery(e.target.value)}
+                placeholder="Buscar nome, e-mail ou telefone"
               />
+              {profileId && (
+                <div className="mt-1 text-xs text-admin-ink-muted">
+                  Perfil selecionado: {profileId}{" "}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setProfileId(null)}
+                  >
+                    Desvincular
+                  </Button>
+                </div>
+              )}
+              {profileQ.data && profileQuery.trim().length >= 2 && (
+                <div className="mt-1 max-h-36 overflow-y-auto rounded border border-admin-border">
+                  {profileQ.data.map((profile) => (
+                    <button
+                      key={profile.id}
+                      type="button"
+                      className="block w-full p-2 text-left text-xs hover:bg-admin-bg"
+                      onClick={() => {
+                        setProfileId(profile.id);
+                        setProfileQuery(
+                          `${profile.full_name ?? "Sem nome"} · ${profile.email ?? profile.phone ?? ""}`,
+                        );
+                      }}
+                    >
+                      {profile.full_name ?? "Sem nome"} · {profile.email ?? profile.phone ?? ""}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <Label>Notas</Label>
@@ -610,34 +811,70 @@ export function FinanceTeamPanel({
                 </div>
               </div>
             ) : (
-              <div>
-                <Label>Percentual</Label>
-                <Input
-                  name="percentage"
-                  type="number"
-                  min="0.0001"
-                  max="100"
-                  step="0.0001"
-                  defaultValue={editingRule?.percentage ?? ""}
-                  required
-                />
+              <div className="space-y-3">
+                <div>
+                  <Label>Percentual</Label>
+                  <Input
+                    name="percentage"
+                    type="number"
+                    min="0.0001"
+                    max="100"
+                    step="0.0001"
+                    defaultValue={editingRule?.percentage ?? ""}
+                    required
+                  />
+                </div>
+                <div className="flex gap-4 text-sm">
+                  <span>Recebe sobre:</span>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={includeBrl}
+                      onChange={(e) => setIncludeBrl(e.target.checked)}
+                    />
+                    BRL
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={includeEur}
+                      onChange={(e) => setIncludeEur(e.target.checked)}
+                    />
+                    EUR
+                  </label>
+                </div>
               </div>
             )}
             {ruleType === "service_percent" && (
               <div>
-                <Label>Serviço</Label>
-                <Select value={serviceId} onValueChange={setServiceId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {data?.services.map((service) => (
-                      <SelectItem key={service.id} value={service.id}>
+                <Label>Serviços ({serviceIds.length} selecionado(s))</Label>
+                <Input
+                  value={serviceSearch}
+                  onChange={(e) => setServiceSearch(e.target.value)}
+                  placeholder="Buscar serviço"
+                />
+                <div className="mt-1 max-h-40 space-y-1 overflow-y-auto rounded border border-admin-border p-2">
+                  {data?.services
+                    .filter((service) =>
+                      service.title.toLowerCase().includes(serviceSearch.toLowerCase()),
+                    )
+                    .map((service) => (
+                      <label key={service.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={serviceIds.includes(service.id)}
+                          onChange={(e) =>
+                            setServiceIds((ids) =>
+                              e.target.checked
+                                ? [...ids, service.id]
+                                : ids.filter((id) => id !== service.id),
+                            )
+                          }
+                        />
                         {service.title}
-                      </SelectItem>
+                      </label>
                     ))}
-                  </SelectContent>
-                </Select>
+                </div>
               </div>
             )}
             <div className="grid grid-cols-2 gap-2">
@@ -663,7 +900,8 @@ export function FinanceTeamPanel({
               disabled={
                 ruleMutation.isPending ||
                 !rulePayeeId ||
-                (ruleType === "service_percent" && !serviceId)
+                (ruleType !== "fixed_monthly" && !includeBrl && !includeEur) ||
+                (ruleType === "service_percent" && !serviceIds.length)
               }
             >
               Salvar regra

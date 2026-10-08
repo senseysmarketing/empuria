@@ -43,11 +43,7 @@ import { SettleTransactionPopover } from "@/components/admin/financeiro/SettleTr
 import { FinanceTeamPanel } from "@/components/admin/financeiro/FinanceTeamPanel";
 import { FinanceMonthClosePanel } from "@/components/admin/financeiro/FinanceMonthClosePanel";
 import { financeOriginLabel } from "@/lib/finance/origins";
-import {
-  closeFinanceMonth,
-  getFinanceDashboard,
-  prepareFinanceMonthClose,
-} from "@/lib/admin/finance-close.functions";
+import { getFinanceDashboard } from "@/lib/admin/finance-close.functions";
 import {
   createFinanceAccount,
   createFinanceCategory,
@@ -56,12 +52,16 @@ import {
   endFinanceRecurringRule,
   getFinanceOverview,
   listFinanceMeta,
+  listFinanceSettings,
   listFinanceRecurringRules,
   listFinanceTransactions,
   settleFinanceTransaction,
   toggleFinanceRecurringRule,
   updateFinanceRecurringRule,
-  updateFinanceTransactionStatus,
+  deleteFinancePendingTransaction,
+  reverseFinanceSettlement,
+  manageFinanceAccount,
+  manageFinanceCategory,
   type FinanceAccount,
   type FinanceCategory,
   type FinanceRecurringRule,
@@ -133,7 +133,8 @@ function FinanceiroContent() {
   const fetchTransactions = useServerFn(listFinanceTransactions);
   const fetchRecurring = useServerFn(listFinanceRecurringRules);
   const createTx = useServerFn(createFinanceTransaction);
-  const updateTxStatus = useServerFn(updateFinanceTransactionStatus);
+  const deletePending = useServerFn(deleteFinancePendingTransaction);
+  const reverseSettlement = useServerFn(reverseFinanceSettlement);
   const settleTx = useServerFn(settleFinanceTransaction);
   const createRule = useServerFn(createFinanceRecurringRule);
   const updateRule = useServerFn(updateFinanceRecurringRule);
@@ -141,11 +142,13 @@ function FinanceiroContent() {
   const toggleRule = useServerFn(toggleFinanceRecurringRule);
   const createCategory = useServerFn(createFinanceCategory);
   const createAccount = useServerFn(createFinanceAccount);
+  const fetchSettings = useServerFn(listFinanceSettings);
+  const manageAccount = useServerFn(manageFinanceAccount);
+  const manageCategory = useServerFn(manageFinanceCategory);
   const fetchDashboard = useServerFn(getFinanceDashboard);
-  const prepareMonth = useServerFn(prepareFinanceMonthClose);
-  const closeMonth = useServerFn(closeFinanceMonth);
 
   const metaQ = useQuery({ queryKey: ["finance-meta"], queryFn: () => fetchMeta() });
+  const settingsQ = useQuery({ queryKey: ["finance-settings"], queryFn: () => fetchSettings() });
   const overviewQ = useQuery({
     queryKey: ["finance-overview", month],
     queryFn: () => fetchOverview({ data: { month } }),
@@ -187,26 +190,26 @@ function FinanceiroContent() {
     qc.invalidateQueries({ queryKey: ["finance-transactions"] });
     qc.invalidateQueries({ queryKey: ["finance-recurring"] });
     qc.invalidateQueries({ queryKey: ["finance-meta"] });
+    qc.invalidateQueries({ queryKey: ["finance-settings"] });
     qc.invalidateQueries({ queryKey: ["finance-dashboard"] });
+    qc.invalidateQueries({ queryKey: ["finance-team"] });
   };
 
-  const closeMutation = useMutation({
-    mutationFn: (action: "prepare" | "close") =>
-      action === "prepare" ? prepareMonth({ data: { month } }) : closeMonth({ data: { month } }),
-    onSuccess: (_closure, action) => {
-      toast.success(action === "prepare" ? "Revisão preparada" : "Mês fechado");
-      refresh();
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro no fechamento"),
-  });
-
-  const statusMutation = useMutation({
-    mutationFn: (data: { id: string; status: "canceled" }) => updateTxStatus({ data }),
+  const deleteMutation = useMutation({
+    mutationFn: (data: { id: string; reason: string | null }) => deletePending({ data }),
     onSuccess: () => {
-      toast.success("Lancamento atualizado");
+      toast.success("Pendência excluída");
       refresh();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao atualizar lancamento"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao excluir pendência"),
+  });
+  const reverseMutation = useMutation({
+    mutationFn: (data: { id: string; reason: string }) => reverseSettlement({ data }),
+    onSuccess: () => {
+      toast.success("Baixa estornada");
+      refresh();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao estornar baixa"),
   });
 
   const categories = metaQ.data?.categories ?? [];
@@ -218,7 +221,6 @@ function FinanceiroContent() {
   );
   const isLoading =
     overviewQ.isLoading || transactionsQ.isLoading || metaQ.isLoading || dashboardQ.isLoading;
-  const monthClosed = dashboardQ.data?.status === "closed";
 
   const originOptions = useMemo(() => {
     const set = new Set(transactions.map((tx) => tx.source_module));
@@ -256,20 +258,20 @@ function FinanceiroContent() {
             )}
             Atualizar
           </Button>
-          {monthClosed ? (
-            <FinanceAdjustmentDialog month={month} createTx={createTx} onDone={refresh} />
-          ) : (
-            <NewTransactionDialog
-              categories={categories}
-              accounts={accounts}
-              createTx={createTx}
-              createAccount={createAccount}
-              onDone={refresh}
-            />
-          )}
+          <NewTransactionDialog
+            categories={categories}
+            accounts={accounts}
+            createTx={createTx}
+            createAccount={createAccount}
+            onDone={refresh}
+          />
           <FinanceSettingsDialog
+            categories={settingsQ.data?.categories ?? []}
+            accounts={settingsQ.data?.accounts ?? []}
             createCategory={createCategory}
             createAccount={createAccount}
+            manageCategory={manageCategory}
+            manageAccount={manageAccount}
             onDone={refresh}
           />
         </div>
@@ -325,21 +327,8 @@ function FinanceiroContent() {
             {dashboardQ.data && (
               <FinanceMonthClosePanel
                 month={month}
-                status={dashboardQ.data.status}
-                closure={dashboardQ.data.closure}
                 snapshot={dashboardQ.data.snapshot}
-                liveSnapshot={dashboardQ.data.liveSnapshot}
-                distributions={dashboardQ.data.distributions}
                 analytics={dashboardQ.data.analytics}
-                accounts={accounts}
-                prepare={() => closeMutation.mutate("prepare")}
-                close={() => closeMutation.mutate("close")}
-                busy={closeMutation.isPending}
-                settle={(data) => settleTx({ data })}
-                createAccount={async (name, currency) =>
-                  (await createAccount({ data: { name, type: "bank", currency } })).id
-                }
-                onChanged={refresh}
               />
             )}
             {(["BRL", "EUR"] as const).map((currency) => {
@@ -429,7 +418,15 @@ function FinanceiroContent() {
                     (await createAccount({ data: { name, type: "bank", currency } })).id
                   }
                   onDone={refresh}
-                  onCancel={(id) => statusMutation.mutate({ id, status: "canceled" })}
+                  onDelete={(id) => {
+                    if (window.confirm("Excluir esta pendência?"))
+                      deleteMutation.mutate({ id, reason: null });
+                  }}
+                  onReverse={(id) => {
+                    const reason = window.prompt("Motivo do estorno da baixa (obrigatório):");
+                    if (reason?.trim() && reason.trim().length >= 3)
+                      reverseMutation.mutate({ id, reason: reason.trim() });
+                  }}
                   compact
                 />
               </BentoCard>
@@ -510,7 +507,15 @@ function FinanceiroContent() {
                   (await createAccount({ data: { name, type: "bank", currency } })).id
                 }
                 onDone={refresh}
-                onCancel={(id) => statusMutation.mutate({ id, status: "canceled" })}
+                onDelete={(id) => {
+                  if (window.confirm("Excluir esta pendência?"))
+                    deleteMutation.mutate({ id, reason: null });
+                }}
+                onReverse={(id) => {
+                  const reason = window.prompt("Motivo do estorno da baixa (obrigatório):");
+                  if (reason?.trim() && reason.trim().length >= 3)
+                    reverseMutation.mutate({ id, reason: reason.trim() });
+                }}
               />
             )}
           </BentoCard>
@@ -633,7 +638,8 @@ function TransactionTable({
   settle,
   createAccount,
   onDone,
-  onCancel,
+  onDelete,
+  onReverse,
   compact = false,
 }: {
   rows: FinanceTransaction[];
@@ -641,7 +647,8 @@ function TransactionTable({
   settle: React.ComponentProps<typeof SettleTransactionPopover>["settle"];
   createAccount: React.ComponentProps<typeof SettleTransactionPopover>["createAccount"];
   onDone: () => void;
-  onCancel: (id: string) => void;
+  onDelete: (id: string) => void;
+  onReverse: (id: string) => void;
   compact?: boolean;
 }) {
   if (!rows.length)
@@ -661,16 +668,11 @@ function TransactionTable({
         </thead>
         <tbody>
           {rows.map((tx) => {
-            const canSettle =
-              ([
-                "manual",
-                "orders",
-                "team_payout",
-                "partner_distribution",
-                "month_adjustment",
-              ].includes(tx.source_module) ||
-                tx.source_module.startsWith("recurring:")) &&
-              !["received", "paid", "canceled"].includes(tx.status);
+            const supported =
+              ["manual", "orders", "team_payout"].includes(tx.source_module) ||
+              tx.source_module.startsWith("recurring:");
+            const canSettle = supported && ["planned", "pending", "overdue"].includes(tx.status);
+            const canReverse = supported && ["received", "paid"].includes(tx.status);
             return (
               <tr key={tx.id} className="border-b border-admin-border last:border-0">
                 <td className="max-w-[260px] py-3 pr-3">
@@ -713,14 +715,16 @@ function TransactionTable({
                           onDone={onDone}
                         />
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={tx.is_automatic || tx.status === "canceled"}
-                        onClick={() => onCancel(tx.id)}
-                      >
-                        Cancelar
-                      </Button>
+                      {canSettle && (
+                        <Button size="sm" variant="outline" onClick={() => onDelete(tx.id)}>
+                          Excluir
+                        </Button>
+                      )}
+                      {canReverse && (
+                        <Button size="sm" variant="outline" onClick={() => onReverse(tx.id)}>
+                          Estornar baixa
+                        </Button>
+                      )}
                     </div>
                   </td>
                 )}
@@ -819,114 +823,6 @@ function RecurringTable({
   );
 }
 
-function FinanceAdjustmentDialog({
-  month,
-  createTx,
-  onDone,
-}: {
-  month: string;
-  createTx: ReturnType<typeof useServerFn<typeof createFinanceTransaction>>;
-  onDone: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [type, setType] = useState<"income" | "expense">("expense");
-  const [currency, setCurrency] = useState<"BRL" | "EUR">("BRL");
-  const dateParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const today = `${dateParts.find((part) => part.type === "year")?.value}-${dateParts.find((part) => part.type === "month")?.value}-${dateParts.find((part) => part.type === "day")?.value}`;
-  const mutation = useMutation({
-    mutationFn: (form: FormData) =>
-      createTx({
-        data: {
-          type,
-          currency,
-          description: String(form.get("description") ?? ""),
-          amount: Number(form.get("amount") ?? 0),
-          dueDate: today,
-          status: "pending",
-          categoryId: null,
-          accountId: null,
-          paymentMethod: null,
-          notes: String(form.get("notes") ?? "") || null,
-          adjustmentForMonth: `${month}-01`,
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Ajuste registrado no mês atual");
-      setOpen(false);
-      onDone();
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao ajustar"),
-  });
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">Registrar ajuste</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Ajuste de {month}</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-admin-ink-muted">
-          O ajuste será lançado como pendência no mês atual ({today.slice(0, 7)}), com referência ao
-          mês fechado {month}. O snapshot antigo não muda.
-        </p>
-        <form
-          className="space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            mutation.mutate(new FormData(event.currentTarget));
-          }}
-        >
-          <Field label="Tipo">
-            <Select value={type} onValueChange={(value) => setType(value as "income" | "expense")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="income">Entrada</SelectItem>
-                <SelectItem value="expense">Saída</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Descrição">
-            <Input name="description" required minLength={3} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Valor">
-              <Input name="amount" type="number" min="0" step="0.01" required />
-            </Field>
-            <Field label="Moeda">
-              <Select
-                value={currency}
-                onValueChange={(value) => setCurrency(value as "BRL" | "EUR")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BRL">BRL</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <Field label="Observações">
-            <Textarea name="notes" />
-          </Field>
-          <Button type="submit" disabled={mutation.isPending}>
-            Registrar ajuste
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function NewTransactionDialog({
   categories,
   accounts,
@@ -959,11 +855,7 @@ function NewTransactionDialog({
           amount: Number(form.get("amount") ?? 0),
           currency,
           dueDate: String(form.get("dueDate") ?? ""),
-          status: String(form.get("status") ?? "pending") as
-            | "planned"
-            | "pending"
-            | "received"
-            | "paid",
+          status: String(form.get("status") ?? "pending") as "planned" | "pending",
           categoryId: categoryId || null,
           accountId: accountId || null,
           paymentMethod: emptyToNull(form.get("paymentMethod")),
@@ -1017,9 +909,6 @@ function NewTransactionDialog({
                   <SelectContent>
                     <SelectItem value="planned">Planejado</SelectItem>
                     <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value={type === "income" ? "received" : "paid"}>
-                      {type === "income" ? "Recebido" : "Pago"}
-                    </SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
@@ -1327,15 +1216,28 @@ function NewRecurringDialog({
 }
 
 function FinanceSettingsDialog({
+  categories,
+  accounts,
   createCategory,
   createAccount,
+  manageCategory,
+  manageAccount,
   onDone,
 }: {
+  categories: FinanceCategory[];
+  accounts: FinanceAccount[];
   createCategory: ReturnType<typeof useServerFn<typeof createFinanceCategory>>;
   createAccount: ReturnType<typeof useServerFn<typeof createFinanceAccount>>;
+  manageCategory: ReturnType<typeof useServerFn<typeof manageFinanceCategory>>;
+  manageAccount: ReturnType<typeof useServerFn<typeof manageFinanceAccount>>;
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<FinanceAccount | null>(null);
+  const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editType, setEditType] = useState("");
+  const [editCurrency, setEditCurrency] = useState("");
   const categoryMutation = useMutation({
     mutationFn: (form: FormData) =>
       createCategory({
@@ -1370,6 +1272,61 @@ function FinanceSettingsDialog({
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao criar conta"),
   });
+  const manageMutation = useMutation({
+    mutationFn: async (input: {
+      kind: "account" | "category";
+      id: string;
+      action: "edit" | "archive" | "reactivate" | "remove";
+    }) => {
+      if (input.kind === "account")
+        return manageAccount({
+          data: {
+            id: input.id,
+            action: input.action,
+            name: input.action === "edit" ? editName : undefined,
+            type:
+              input.action === "edit"
+                ? (editType as FinanceAccount["type"] as
+                    | "cash"
+                    | "bank"
+                    | "card"
+                    | "gateway"
+                    | "other")
+                : undefined,
+            currency: input.action === "edit" ? (editCurrency as "BRL" | "EUR" | "USD") : undefined,
+          },
+        });
+      return manageCategory({
+        data: {
+          id: input.id,
+          action: input.action,
+          name: input.action === "edit" ? editName : undefined,
+          type: input.action === "edit" ? (editType as "income" | "expense" | "both") : undefined,
+        },
+      });
+    },
+    onSuccess: (result) => {
+      toast.success(
+        result.archivedInstead ? "Item com histórico arquivado" : "Configuração atualizada",
+      );
+      setEditingAccount(null);
+      setEditingCategory(null);
+      onDone();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao atualizar"),
+  });
+  const manage = (
+    kind: "account" | "category",
+    id: string,
+    action: "edit" | "archive" | "reactivate" | "remove",
+  ) => {
+    if (
+      action === "remove" &&
+      !window.confirm("Remover este item? Se houver histórico, ele será arquivado.")
+    )
+      return;
+    manageMutation.mutate({ kind, id, action });
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -1378,7 +1335,7 @@ function FinanceSettingsDialog({
           <Settings className="h-4 w-4" /> Configurar
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Categorias e contas</DialogTitle>
         </DialogHeader>
@@ -1457,6 +1414,168 @@ function FinanceSettingsDialog({
               Criar conta
             </Button>
           </form>
+        </div>
+        <div className="mt-5 grid gap-6 md:grid-cols-2">
+          <section className="space-y-2">
+            <h3 className="font-display font-semibold">Categorias</h3>
+            {categories.map((category) => (
+              <div key={category.id} className="rounded-lg border border-admin-border p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span>
+                    {category.name} · {category.type} {category.is_system ? "· Sistema" : ""}{" "}
+                    {!category.is_active ? "· Arquivada" : ""}
+                  </span>
+                  {!category.is_system && (
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingCategory(category);
+                          setEditingAccount(null);
+                          setEditName(category.name);
+                          setEditType(category.type);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          manage(
+                            "category",
+                            category.id,
+                            category.is_active ? "archive" : "reactivate",
+                          )
+                        }
+                      >
+                        {category.is_active ? "Arquivar" : "Reativar"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => manage("category", category.id, "remove")}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                {editingCategory?.id === category.id && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Input
+                      className="min-w-36 flex-1"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                    />
+                    <select
+                      className="rounded border border-admin-border bg-admin-bg px-2"
+                      value={editType}
+                      onChange={(e) => setEditType(e.target.value)}
+                    >
+                      <option value="income">Entrada</option>
+                      <option value="expense">Saída</option>
+                      <option value="both">Ambos</option>
+                    </select>
+                    <Button
+                      size="sm"
+                      disabled={manageMutation.isPending}
+                      onClick={() => manage("category", category.id, "edit")}
+                    >
+                      Salvar
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-display font-semibold">Contas e caixas</h3>
+            {accounts.map((account) => (
+              <div key={account.id} className="rounded-lg border border-admin-border p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span>
+                    {account.name} · {account.type} · {account.currency}{" "}
+                    {!account.is_active ? "· Arquivada" : ""}
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingAccount(account);
+                        setEditingCategory(null);
+                        setEditName(account.name);
+                        setEditType(account.type);
+                        setEditCurrency(account.currency);
+                      }}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        manage("account", account.id, account.is_active ? "archive" : "reactivate")
+                      }
+                    >
+                      {account.is_active ? "Arquivar" : "Reativar"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => manage("account", account.id, "remove")}
+                    >
+                      Remover
+                    </Button>
+                  </div>
+                </div>
+                {editingAccount?.id === account.id && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Input
+                      className="min-w-36 flex-1"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                    />
+                    <select
+                      className="rounded border border-admin-border bg-admin-bg px-2"
+                      value={editType}
+                      onChange={(e) => setEditType(e.target.value)}
+                    >
+                      {["cash", "bank", "card", "gateway", "other"].map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="rounded border border-admin-border bg-admin-bg px-2"
+                      value={editCurrency}
+                      disabled={account.has_history}
+                      title={
+                        account.has_history ? "Conta com histórico: moeda bloqueada" : undefined
+                      }
+                      onChange={(e) => setEditCurrency(e.target.value)}
+                    >
+                      {["BRL", "EUR", "USD"].map((currency) => (
+                        <option key={currency} value={currency}>
+                          {currency}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      disabled={manageMutation.isPending}
+                      onClick={() => manage("account", account.id, "edit")}
+                    >
+                      Salvar
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
         </div>
       </DialogContent>
     </Dialog>
