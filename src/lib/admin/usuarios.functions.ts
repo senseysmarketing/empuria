@@ -20,6 +20,10 @@ export type UserRow = {
   password_setup_required: boolean;
   first_access_completed_at: string | null;
   profile_origin: string | null;
+  member_status: string;
+  member_next_step: string | null;
+  active_services: number;
+  pending_documents: number;
 };
 
 export const listUsers = createServerFn({ method: "POST" })
@@ -29,6 +33,18 @@ export const listUsers = createServerFn({ method: "POST" })
       .object({
         search: z.string().trim().max(120).optional().default(""),
         status: z.enum(["todos", "ativos", "bloqueados"]).default("todos"),
+        memberStatus: z
+          .enum([
+            "todos",
+            "novo",
+            "em_atendimento",
+            "aguardando_documentos",
+            "em_andamento",
+            "aguardando_cliente",
+            "concluido",
+            "inativo",
+          ])
+          .default("todos"),
         period: z.enum(["todos", "7d", "mes"]).default("todos"),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(5).max(100).default(25),
@@ -53,6 +69,7 @@ export const listUsers = createServerFn({ method: "POST" })
     }
     if (data.status === "ativos") q = q.eq("is_blocked", false);
     if (data.status === "bloqueados") q = q.eq("is_blocked", true);
+    if (data.memberStatus !== "todos") q = q.eq("member_status", data.memberStatus);
 
     const { data: profiles, error } = await q;
     if (error) throw new Error(error.message);
@@ -91,6 +108,10 @@ export const listUsers = createServerFn({ method: "POST" })
         password_setup_required: Boolean(p.password_setup_required),
         first_access_completed_at: p.first_access_completed_at ?? null,
         profile_origin: p.profile_origin ?? null,
+        member_status: p.member_status,
+        member_next_step: p.member_next_step,
+        active_services: 0,
+        pending_documents: 0,
       };
     });
 
@@ -107,7 +128,12 @@ export const listUsers = createServerFn({ method: "POST" })
     }
 
     const total = rows.length;
-    const totalActive = rows.filter((r) => !r.is_blocked).length;
+    const inProgress = rows.filter(
+      (r) => r.member_status === "em_atendimento" || r.member_status === "em_andamento",
+    ).length;
+    const awaitingDocuments = rows.filter(
+      (r) => r.member_status === "aguardando_documentos",
+    ).length;
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
@@ -115,11 +141,37 @@ export const listUsers = createServerFn({ method: "POST" })
 
     const start = (data.page - 1) * data.pageSize;
     const items = rows.slice(start, start + data.pageSize);
+    const ids = items.map((item) => item.id);
+    if (ids.length) {
+      const [ordersRes, docsRes] = await Promise.all([
+        supabaseAdmin
+          .from("orders")
+          .select("user_id,payment_status,delivery_status")
+          .in("user_id", ids),
+        supabaseAdmin.from("member_documents").select("user_id,status").in("user_id", ids),
+      ]);
+      if (ordersRes.error) throw new Error(ordersRes.error.message);
+      if (docsRes.error) throw new Error(docsRes.error.message);
+      for (const item of items) {
+        item.active_services = (ordersRes.data ?? []).filter(
+          (order) =>
+            order.user_id === item.id &&
+            order.payment_status === "aprovado" &&
+            order.delivery_status !== "concluido",
+        ).length;
+        item.pending_documents = (docsRes.data ?? []).filter(
+          (doc) =>
+            doc.user_id === item.id &&
+            (doc.status === "requested" || doc.status === "needs_replacement"),
+        ).length;
+      }
+    }
 
     return {
       items,
       total,
-      totalActive,
+      inProgress,
+      awaitingDocuments,
       newThisMonth,
       page: data.page,
       pageSize: data.pageSize,

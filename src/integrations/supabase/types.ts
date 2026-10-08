@@ -2196,6 +2196,111 @@ export type Database = {
           },
         ]
       }
+      member_documents: {
+        Row: {
+          admin_notes: string | null
+          category: string | null
+          created_at: string
+          file_name: string | null
+          file_size_bytes: number | null
+          id: string
+          member_message: string | null
+          mime_type: string | null
+          order_id: string | null
+          requested_by: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          storage_path: string | null
+          title: string
+          updated_at: string
+          uploaded_at: string | null
+          uploaded_by: string | null
+          user_id: string
+          visible_to_member: boolean
+        }
+        Insert: {
+          admin_notes?: string | null
+          category?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          member_message?: string | null
+          mime_type?: string | null
+          order_id?: string | null
+          requested_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_path?: string | null
+          title: string
+          updated_at?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+          user_id: string
+          visible_to_member?: boolean
+        }
+        Update: {
+          admin_notes?: string | null
+          category?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          member_message?: string | null
+          mime_type?: string | null
+          order_id?: string | null
+          requested_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_path?: string | null
+          title?: string
+          updated_at?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+          user_id?: string
+          visible_to_member?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_documents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_documents_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mercadopago_payments: {
         Row: {
           amount_cents: number
@@ -3330,6 +3435,10 @@ export type Database = {
           full_name: string | null
           id: string
           is_blocked: boolean
+          member_next_step: string | null
+          member_status: string
+          member_status_updated_at: string | null
+          member_status_updated_by: string | null
           password_setup_required: boolean
           phone: string | null
           phone_country_iso: string | null
@@ -3347,6 +3456,10 @@ export type Database = {
           full_name?: string | null
           id: string
           is_blocked?: boolean
+          member_next_step?: string | null
+          member_status?: string
+          member_status_updated_at?: string | null
+          member_status_updated_by?: string | null
           password_setup_required?: boolean
           phone?: string | null
           phone_country_iso?: string | null
@@ -3364,6 +3477,10 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_blocked?: boolean
+          member_next_step?: string | null
+          member_status?: string
+          member_status_updated_at?: string | null
+          member_status_updated_by?: string | null
           password_setup_required?: boolean
           phone?: string | null
           phone_country_iso?: string | null
@@ -3374,6 +3491,13 @@ export type Database = {
           {
             foreignKeyName: "profiles_created_by_staff_id_fkey"
             columns: ["created_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_member_status_updated_by_fkey"
+            columns: ["member_status_updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

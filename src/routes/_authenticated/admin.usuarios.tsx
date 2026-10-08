@@ -71,6 +71,7 @@ import {
   type UserRow as UserRowType,
 } from "@/lib/admin/usuarios.functions";
 import { UsuarioEditSheet } from "@/components/admin/UsuarioEditSheet";
+import { MemberDossierSheet } from "@/components/admin/MemberDossierSheet";
 
 export const Route = createFileRoute("/_authenticated/admin/usuarios")({
   component: UsuariosPage,
@@ -102,10 +103,10 @@ function UsuariosPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold text-admin-ink flex items-center gap-2">
-            <Users className="h-7 w-7 text-admin-accent" /> Passaportes Empuria
+            <Users className="h-7 w-7 text-admin-accent" /> Membros
           </h1>
           <p className="text-sm text-admin-ink-muted">
-            Gestão de clientes, primeiro acesso e impersonação segura.
+            Acompanhamento de membros, serviços, documentos e acesso ao portal.
           </p>
         </div>
       </header>
@@ -119,15 +120,27 @@ function PassaportesPanel() {
   const list = useServerFn(listUsers);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"todos" | "ativos" | "bloqueados">("todos");
+  const [memberStatus, setMemberStatus] = useState<
+    | "todos"
+    | "novo"
+    | "em_atendimento"
+    | "aguardando_documentos"
+    | "em_andamento"
+    | "aguardando_cliente"
+    | "concluido"
+    | "inativo"
+  >("todos");
   const [period, setPeriod] = useState<"todos" | "7d" | "mes">("todos");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const debounced = useDebounced(search, 300);
 
   const query = useQuery({
-    queryKey: ["admin-usuarios", debounced, status, period, page],
+    queryKey: ["admin-usuarios", debounced, status, memberStatus, period, page],
     queryFn: () =>
-      list({ data: { search: debounced, status, period, page, pageSize: PAGE_SIZE } }),
+      list({
+        data: { search: debounced, status, memberStatus, period, page, pageSize: PAGE_SIZE },
+      }),
   });
 
   const items = query.data?.items ?? [];
@@ -140,6 +153,7 @@ function PassaportesPanel() {
   const clearFilters = () => {
     setSearch("");
     setStatus("todos");
+    setMemberStatus("todos");
     setPeriod("todos");
     setPage(1);
   };
@@ -147,9 +161,26 @@ function PassaportesPanel() {
   return (
     <div className="space-y-6">
       {/* Cards de resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <AdminStatCard label="Ativos" value={query.data?.totalActive ?? 0} icon={Users} tone="green" />
-        <AdminStatCard label="Novos no mês" value={query.data?.newThisMonth ?? 0} icon={Sparkles} tone="blue" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <AdminStatCard label="Total" value={query.data?.total ?? 0} icon={Users} tone="blue" />
+        <AdminStatCard
+          label="Em andamento"
+          value={query.data?.inProgress ?? 0}
+          icon={Users}
+          tone="green"
+        />
+        <AdminStatCard
+          label="Aguardando docs"
+          value={query.data?.awaitingDocuments ?? 0}
+          icon={Users}
+          tone="amber"
+        />
+        <AdminStatCard
+          label="Novos no mês"
+          value={query.data?.newThisMonth ?? 0}
+          icon={Sparkles}
+          tone="blue"
+        />
       </div>
 
       {/* Card único com toolbar + tabela + paginação */}
@@ -158,14 +189,14 @@ function PassaportesPanel() {
         <div className="p-5 border-b border-admin-border space-y-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <h2 className="font-display text-lg text-admin-ink">Usuários</h2>
+              <h2 className="font-display text-lg text-admin-ink">Central de Membros</h2>
               <p className="text-xs text-admin-ink-muted">
-                {total} {total === 1 ? "usuário cadastrado" : "usuários cadastrados"}
+                {total} {total === 1 ? "membro cadastrado" : "membros cadastrados"}
               </p>
             </div>
             <div className="text-xs text-admin-ink-muted tabular-nums flex items-center gap-2">
               {query.isFetching && <Loader2 className="h-3 w-3 animate-spin" />}
-              {items.length} de {total} usuários
+              {items.length} de {total} membros
             </div>
           </div>
 
@@ -199,6 +230,27 @@ function PassaportesPanel() {
               </SelectContent>
             </Select>
             <Select
+              value={memberStatus}
+              onValueChange={(value: typeof memberStatus) => {
+                setMemberStatus(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[190px] h-9 bg-admin-bg border-admin-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Toda situação</SelectItem>
+                <SelectItem value="novo">Novo</SelectItem>
+                <SelectItem value="em_atendimento">Em atendimento</SelectItem>
+                <SelectItem value="aguardando_documentos">Aguardando docs</SelectItem>
+                <SelectItem value="em_andamento">Em andamento</SelectItem>
+                <SelectItem value="aguardando_cliente">Aguardando cliente</SelectItem>
+                <SelectItem value="concluido">Concluído</SelectItem>
+                <SelectItem value="inativo">Inativo</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
               value={period}
               onValueChange={(v: typeof period) => {
                 setPeriod(v);
@@ -228,9 +280,10 @@ function PassaportesPanel() {
           <table className="min-w-full text-sm">
             <thead className="bg-admin-bg text-[10px] uppercase tracking-wider text-admin-ink-muted">
               <tr>
-                <th className="p-3 text-left font-display">Usuário</th>
-                <th className="p-3 text-left font-display">Passaporte</th>
-                <th className="p-3 text-left font-display">Status</th>
+                <th className="p-3 text-left font-display">Membro</th>
+                <th className="p-3 text-left font-display">Situação</th>
+                <th className="p-3 text-center font-display">Serviços ativos</th>
+                <th className="p-3 text-center font-display">Docs pendentes</th>
                 <th className="p-3 text-right font-display">Último acesso</th>
                 <th className="p-3 text-right font-display">Ações</th>
               </tr>
@@ -238,15 +291,15 @@ function PassaportesPanel() {
             <tbody>
               {query.isLoading ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-admin-ink-muted">
+                  <td colSpan={6} className="p-8 text-center text-admin-ink-muted">
                     <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
                     Carregando…
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-admin-ink-muted text-sm">
-                    Nenhum usuário encontrado.
+                  <td colSpan={6} className="p-8 text-center text-admin-ink-muted text-sm">
+                    Nenhum membro encontrado.
                     <div className="mt-3">
                       <Button variant="outline" size="sm" onClick={clearFilters}>
                         Limpar filtros
@@ -264,7 +317,7 @@ function PassaportesPanel() {
         {/* Rodapé */}
         <div className="flex items-center justify-between gap-3 p-3 border-t border-admin-border flex-wrap">
           <div className="text-xs text-admin-ink-muted tabular-nums">
-            Mostrando {fromLabel}-{toLabel} de {total} usuários
+            Mostrando {fromLabel}-{toLabel} de {total} membros
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -413,6 +466,7 @@ function UserRow({ user }: { user: UserRowType }) {
   const impersonate = useServerFn(impersonateUser);
 
   const [editOpen, setEditOpen] = useState(false);
+  const [dossierOpen, setDossierOpen] = useState(false);
   const [blockConfirm, setBlockConfirm] = useState(false);
   const [emailDialog, setEmailDialog] = useState(false);
   const [newEmail, setNewEmail] = useState(user.email ?? "");
@@ -466,11 +520,18 @@ function UserRow({ user }: { user: UserRowType }) {
 
   return (
     <>
-      <tr className="border-t border-admin-border hover:bg-admin-bg/50 transition-colors">
+      <tr
+        className="cursor-pointer border-t border-admin-border hover:bg-admin-bg/50 transition-colors"
+        onClick={() => setDossierOpen(true)}
+      >
         <td className="p-3">
           <div className="flex items-center gap-3 min-w-0">
             {user.avatar_url ? (
-              <img src={user.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
+              <img
+                src={user.avatar_url}
+                alt=""
+                className="h-9 w-9 rounded-full object-cover shrink-0"
+              />
             ) : (
               <div className="h-9 w-9 rounded-full bg-gradient-to-br from-brown to-red-brand text-offwhite flex items-center justify-center font-display font-bold text-sm shrink-0">
                 {initial}
@@ -481,20 +542,18 @@ function UserRow({ user }: { user: UserRowType }) {
                 {user.full_name ?? "Sem nome"}
               </div>
               <div className="text-xs text-admin-ink-muted truncate">{user.email ?? "—"}</div>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  navigator.clipboard.writeText(code);
+                  toast.success("Passaporte copiado");
+                }}
+                className="mt-1 inline-flex items-center gap-1 text-[10px] text-admin-ink-muted"
+              >
+                <Copy className="h-3 w-3" /> {code}
+              </button>
             </div>
           </div>
-        </td>
-        <td className="p-3">
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(code);
-              toast.success("Passaporte copiado");
-            }}
-            className="inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-md bg-admin-bg border border-admin-border text-admin-ink-muted hover:text-admin-ink"
-            title="Copiar passaporte"
-          >
-            <Copy className="h-3 w-3" /> {code}
-          </button>
         </td>
         <td className="p-3">
           <div className="flex flex-wrap items-center gap-1">
@@ -503,6 +562,9 @@ function UserRow({ user }: { user: UserRowType }) {
             >
               {user.is_blocked ? "Bloqueado" : "Ativo"}
             </span>
+            <span className="text-[10px] font-display uppercase tracking-wider px-2 py-0.5 rounded-full bg-admin-accent-soft text-admin-accent">
+              {user.member_status.replaceAll("_", " ")}
+            </span>
             {user.password_setup_required && (
               <span className="text-[10px] font-display uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">
                 Primeiro acesso
@@ -510,10 +572,12 @@ function UserRow({ user }: { user: UserRowType }) {
             )}
           </div>
         </td>
+        <td className="p-3 text-center tabular-nums">{user.active_services}</td>
+        <td className="p-3 text-center tabular-nums">{user.pending_documents}</td>
         <td className="p-3 text-right text-xs text-admin-ink-muted tabular-nums">
           {relativeTime(user.last_sign_in_at)}
         </td>
-        <td className="p-3 text-right">
+        <td className="p-3 text-right" onClick={(event) => event.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -525,6 +589,9 @@ function UserRow({ user }: { user: UserRowType }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-admin-surface border-admin-border">
+              <DropdownMenuItem onClick={() => setDossierOpen(true)}>
+                <Eye className="h-4 w-4 mr-2" /> Abrir dossiê
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setEditOpen(true)}>
                 <Pencil className="h-4 w-4 mr-2" /> Editar perfil
               </DropdownMenuItem>
@@ -570,6 +637,26 @@ function UserRow({ user }: { user: UserRowType }) {
         open={editOpen}
         onClose={() => setEditOpen(false)}
         onSaved={refresh}
+      />
+      <MemberDossierSheet
+        userId={user.id}
+        open={dossierOpen}
+        onClose={() => setDossierOpen(false)}
+        onChanged={refresh}
+        onAccess={(action) => {
+          if (action === "reset") {
+            resetMut.mutate();
+            return;
+          }
+          setDossierOpen(false);
+          if (action === "edit") setEditOpen(true);
+          if (action === "block") setBlockConfirm(true);
+          if (action === "email") {
+            setNewEmail(user.email ?? "");
+            setEmailDialog(true);
+          }
+          if (action === "impersonate") setImpersonateOpen(true);
+        }}
       />
 
       <AlertDialog open={blockConfirm} onOpenChange={setBlockConfirm}>

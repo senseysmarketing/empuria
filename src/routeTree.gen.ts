@@ -35,6 +35,7 @@ import { Route as AuthenticatedAdminTriagemRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
 import { Route as AuthenticatedAdminWiseConciliacaoRouteImport } from './routes/_authenticated/admin.wise-conciliacao'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
+import { Route as AuthenticatedPortalDocumentosRouteImport } from './routes/_authenticated/portal.documentos'
 import { Route as AuthenticatedPortalIngressosRouteImport } from './routes/_authenticated/portal.ingressos'
 import { Route as AuthenticatedPortalLojaRouteImport } from './routes/_authenticated/portal.loja'
 import { Route as AuthenticatedPortalServicosRouteImport } from './routes/_authenticated/portal.servicos'
@@ -183,6 +184,12 @@ const AuthenticatedPortalIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedPortalRoute,
   } as any)
+const AuthenticatedPortalDocumentosRoute =
+  AuthenticatedPortalDocumentosRouteImport.update({
+    id: '/documentos',
+    path: '/documentos',
+    getParentRoute: () => AuthenticatedPortalRoute,
+  } as any)
 const AuthenticatedPortalIngressosRoute =
   AuthenticatedPortalIngressosRouteImport.update({
     id: '/ingressos',
@@ -245,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/admin/wise-conciliacao': typeof AuthenticatedAdminWiseConciliacaoRoute
+  '/portal/documentos': typeof AuthenticatedPortalDocumentosRoute
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
@@ -277,6 +285,7 @@ export interface FileRoutesByTo {
   '/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/admin/wise-conciliacao': typeof AuthenticatedAdminWiseConciliacaoRoute
+  '/portal/documentos': typeof AuthenticatedPortalDocumentosRoute
   '/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/portal/servicos': typeof AuthenticatedPortalServicosRoute
@@ -313,6 +322,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/triagem': typeof AuthenticatedAdminTriagemRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/_authenticated/admin/wise-conciliacao': typeof AuthenticatedAdminWiseConciliacaoRoute
+  '/_authenticated/portal/documentos': typeof AuthenticatedPortalDocumentosRoute
   '/_authenticated/portal/ingressos': typeof AuthenticatedPortalIngressosRoute
   '/_authenticated/portal/loja': typeof AuthenticatedPortalLojaRoute
   '/_authenticated/portal/servicos': typeof AuthenticatedPortalServicosRoute
@@ -349,6 +359,7 @@ export interface FileRouteTypes {
     | '/admin/triagem'
     | '/admin/usuarios'
     | '/admin/wise-conciliacao'
+    | '/portal/documentos'
     | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
@@ -381,6 +392,7 @@ export interface FileRouteTypes {
     | '/admin/triagem'
     | '/admin/usuarios'
     | '/admin/wise-conciliacao'
+    | '/portal/documentos'
     | '/portal/ingressos'
     | '/portal/loja'
     | '/portal/servicos'
@@ -416,6 +428,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/triagem'
     | '/_authenticated/admin/usuarios'
     | '/_authenticated/admin/wise-conciliacao'
+    | '/_authenticated/portal/documentos'
     | '/_authenticated/portal/ingressos'
     | '/_authenticated/portal/loja'
     | '/_authenticated/portal/servicos'
@@ -626,6 +639,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPortalIndexRouteImport
       parentRoute: typeof AuthenticatedPortalRoute
     }
+    '/_authenticated/portal/documentos': {
+      id: '/_authenticated/portal/documentos'
+      path: '/documentos'
+      fullPath: '/portal/documentos'
+      preLoaderRoute: typeof AuthenticatedPortalDocumentosRouteImport
+      parentRoute: typeof AuthenticatedPortalRoute
+    }
     '/_authenticated/portal/ingressos': {
       id: '/_authenticated/portal/ingressos'
       path: '/ingressos'
@@ -717,6 +737,7 @@ const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedPortalRouteChildren {
+  AuthenticatedPortalDocumentosRoute: typeof AuthenticatedPortalDocumentosRoute
   AuthenticatedPortalIngressosRoute: typeof AuthenticatedPortalIngressosRoute
   AuthenticatedPortalLojaRoute: typeof AuthenticatedPortalLojaRoute
   AuthenticatedPortalServicosRoute: typeof AuthenticatedPortalServicosRoute
@@ -724,6 +745,7 @@ interface AuthenticatedPortalRouteChildren {
 }
 
 const AuthenticatedPortalRouteChildren: AuthenticatedPortalRouteChildren = {
+  AuthenticatedPortalDocumentosRoute: AuthenticatedPortalDocumentosRoute,
   AuthenticatedPortalIngressosRoute: AuthenticatedPortalIngressosRoute,
   AuthenticatedPortalLojaRoute: AuthenticatedPortalLojaRoute,
   AuthenticatedPortalServicosRoute: AuthenticatedPortalServicosRoute,

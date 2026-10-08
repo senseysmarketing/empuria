@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const getPortalDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -8,8 +9,12 @@ export const getPortalDashboard = createServerFn({ method: "GET" })
     const userId = context.effectiveUserId ?? context.userId;
     const nowIso = new Date().toISOString();
 
-    const [profileRes, ordersRes, apptRes, suggestedRes] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    const [profileRes, ordersRes, apptRes, documentsRes] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id,full_name,avatar_url,created_at,member_status,member_next_step")
+        .eq("id", userId)
+        .maybeSingle(),
       supabase
         .from("orders")
         .select(
@@ -17,38 +22,38 @@ export const getPortalDashboard = createServerFn({ method: "GET" })
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(5),
       supabase
         .from("appointments")
-        .select("id, starts_at, ends_at, status, service_id, services(title, kind, meeting_address)")
+        .select(
+          "id, starts_at, ends_at, status, service_id, services(title, kind, meeting_address)",
+        )
         .eq("user_id", userId)
         .gte("starts_at", nowIso)
         .order("starts_at", { ascending: true })
-        .limit(5),
-      supabase
-        .from("services")
-        .select("id, slug, title, short_description, kind, price_cents, currency, image_url")
-        .eq("is_active", true)
-        .eq("category", "esteira1")
-        .limit(3),
+        .limit(1),
+      supabaseAdmin
+        .from("member_documents")
+        .select("id,status")
+        .eq("user_id", userId)
+        .eq("visible_to_member", true),
     ]);
-
-    const orders = ordersRes.data ?? [];
-    const activeOrders = orders.filter(
-      (o) => o.payment_status === "aprovado" && o.delivery_status !== "concluido",
-    );
-    const pendingPayment = orders.filter((o) => o.payment_status !== "aprovado").length;
+    if (profileRes.error) throw new Error(profileRes.error.message);
+    if (ordersRes.error) throw new Error(ordersRes.error.message);
+    if (apptRes.error) throw new Error(apptRes.error.message);
+    if (documentsRes.error) throw new Error(documentsRes.error.message);
+    const documents = documentsRes.data ?? [];
 
     return {
       profile: profileRes.data,
       nextAppointment: apptRes.data?.[0] ?? null,
-      upcomingAppointments: apptRes.data ?? [],
-      orders,
-      metrics: {
-        activeServices: activeOrders.length,
-        pendingPayment,
-        vouchers: orders.filter((o) => o.voucher_code).length,
+      orders: ordersRes.data ?? [],
+      documents: {
+        total: documents.length,
+        needsUpload: documents.filter(
+          (d) => d.status === "requested" || d.status === "needs_replacement",
+        ).length,
+        underReview: documents.filter((d) => d.status === "received").length,
       },
-      suggested: suggestedRes.data ?? [],
     };
   });
