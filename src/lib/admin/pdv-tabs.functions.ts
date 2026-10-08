@@ -6,7 +6,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { withPdvLog } from "./pdv-activity-log.server";
 
 export type PdvTabStatus = "aberta" | "fechada" | "cancelada" | "aguardando_pagamento";
-export type PdvTabPaymentMethod = "dinheiro" | "transferencia";
 
 export type PdvTabRecord = {
   id: string;
@@ -114,7 +113,6 @@ const closeSchema = z.object({
     type: z.enum(["none", "amount", "percent"]),
     value: z.number().min(0).max(100000),
   }),
-  paymentMethod: z.enum(["dinheiro", "transferencia"]),
   notes: z.string().trim().max(500).optional(),
 });
 
@@ -321,7 +319,6 @@ export const closePdvTab = createServerFn({ method: "POST" })
         action: "tab.close",
         actorId: context.userId,
         tabId: data.tabId,
-        paymentMethod: data.paymentMethod,
         route: "pdv.closeTab",
         params: data,
       },
@@ -331,7 +328,7 @@ export const closePdvTab = createServerFn({ method: "POST" })
           p_cashier_id: context.userId,
           p_discount_type: data.discount.type,
           p_discount_value: data.discount.value,
-          p_payment_method: data.paymentMethod,
+          p_payment_method: null,
           p_notes: data.notes ?? null,
         });
         if (error) throw new Error(error.message);

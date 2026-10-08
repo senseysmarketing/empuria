@@ -1,7 +1,20 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarClock, ChevronLeft, ChevronRight, Eye, FileSpreadsheet, Filter, Loader2, Lock, RotateCcw, Search, ShieldAlert, X } from "lucide-react";
+import {
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  FileSpreadsheet,
+  Filter,
+  Loader2,
+  Lock,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  X,
+} from "lucide-react";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +52,10 @@ import {
   listPdvCashiers,
   listPdvFilterOptions,
   listPdvSalesHistory,
+  listPdvSettlementAccounts,
   getPdvSale,
+  settlePdvSale,
+  reversePdvSalePayment,
   voidPdvSale,
   type PdvAuditRecord,
   type PdvProfileSummary,
@@ -49,10 +65,11 @@ import {
 } from "@/lib/admin/pdv-sales.functions";
 import { exportPdvHistoryXlsx } from "@/lib/admin/pdv-sales.export.functions";
 import { cn } from "@/lib/utils";
+import { PdvSettlePopover } from "./PdvSettlePopover";
 
 type Period = "hoje" | "ontem" | "7d" | "mes" | "mes_anterior" | "custom" | "todos";
 type Payment = "todos" | "dinheiro" | "cartao" | "pix" | "wise" | "transferencia";
-type Status = "todos" | "concluida" | "cancelada";
+type Status = "todos" | "pendente" | "concluida" | "cancelada";
 type PdvSaleDetail = {
   sale: PdvSaleRecord | null;
   items: PdvSaleItemRecord[];
@@ -80,7 +97,8 @@ function dateTime(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
-function paymentLabel(value: string) {
+function paymentLabel(value: string | null) {
+  if (!value) return "A definir";
   if (value === "cartao") return "Cartão";
   if (value === "pix") return "Pix";
   if (value === "wise") return "Wise";
@@ -89,6 +107,8 @@ function paymentLabel(value: string) {
 }
 
 function statusBadge(status: string) {
+  if (status === "pendente")
+    return <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-500">Pendente</Badge>;
   if (status === "cancelada") {
     return (
       <Badge className="border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/10">
@@ -98,7 +118,7 @@ function statusBadge(status: string) {
   }
   return (
     <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/10">
-      Concluida
+      Paga
     </Badge>
   );
 }
@@ -109,6 +129,9 @@ export function PdvHistoryPanel() {
   const fetchOptions = useServerFn(listPdvFilterOptions);
   const fetchSale = useServerFn(getPdvSale);
   const voidSale = useServerFn(voidPdvSale);
+  const settleSale = useServerFn(settlePdvSale);
+  const reversePayment = useServerFn(reversePdvSalePayment);
+  const fetchAccounts = useServerFn(listPdvSettlementAccounts);
   const exportXlsx = useServerFn(exportPdvHistoryXlsx);
   const qc = useQueryClient();
 
@@ -126,6 +149,8 @@ export function PdvHistoryPanel() {
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [voidTargetId, setVoidTargetId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
+  const [reverseTargetId, setReverseTargetId] = useState<string | null>(null);
+  const [reverseReason, setReverseReason] = useState("");
 
   const filters = useMemo(
     () => ({
@@ -141,7 +166,18 @@ export function PdvHistoryPanel() {
       page,
       pageSize: PAGE_SIZE,
     }),
-    [cashierId, categoryIds, dateFrom, dateTo, page, paymentMethod, period, productIds, search, status],
+    [
+      cashierId,
+      categoryIds,
+      dateFrom,
+      dateTo,
+      page,
+      paymentMethod,
+      period,
+      productIds,
+      search,
+      status,
+    ],
   );
 
   const exportFilters = useMemo(
@@ -173,6 +209,10 @@ export function PdvHistoryPanel() {
     queryKey: ["pdv-filter-options"],
     queryFn: () => fetchOptions(),
   });
+  const accountsQ = useQuery({
+    queryKey: ["pdv-settlement-accounts"],
+    queryFn: () => fetchAccounts(),
+  });
 
   const detailQ = useQuery({
     queryKey: ["pdv-sale-detail", selectedSaleId],
@@ -189,10 +229,44 @@ export function PdvHistoryPanel() {
       qc.invalidateQueries({ queryKey: ["pdv-sales-history"] });
       qc.invalidateQueries({ queryKey: ["pdv-sale-detail"] });
       qc.invalidateQueries({ queryKey: ["pdv-catalog"] });
+      qc.invalidateQueries({ queryKey: ["pdv-pending-sales"] });
+      qc.invalidateQueries({ queryKey: ["finance-dashboard"] });
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Erro ao anular venda"),
   });
+  const reverseMut = useMutation({
+    mutationFn: () => reversePayment({ data: { saleId: reverseTargetId!, reason: reverseReason } }),
+    onSuccess: () => {
+      toast.success("Baixa estornada. Venda novamente pendente; estoque preservado.");
+      setReverseTargetId(null);
+      setReverseReason("");
+      refreshSales();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao estornar baixa"),
+  });
+  const refreshSales = () => {
+    qc.invalidateQueries({ queryKey: ["pdv-sales-history"] });
+    qc.invalidateQueries({ queryKey: ["pdv-sale-detail"] });
+    qc.invalidateQueries({ queryKey: ["finance-dashboard"] });
+    qc.invalidateQueries({ queryKey: ["pdv-pending-sales"] });
+  };
+  const confirmSettlement = async (input: {
+    saleId: string;
+    paidAt: string;
+    settledAmount: number;
+    settledCurrency: "BRL" | "EUR";
+    accountId: string;
+    fxReferenceRate?: number | null;
+    fxReferenceDate?: string | null;
+    fxRate?: number | null;
+    fxSource?: string | null;
+  }) => {
+    await settleSale({ data: input });
+    toast.success("Pagamento confirmado. O Caixa usa a data da baixa.");
+    refreshSales();
+  };
 
   const data = historyQ.data;
   const detail = detailQ.data as PdvSaleDetail | undefined;
@@ -250,7 +324,9 @@ export function PdvHistoryPanel() {
               </p>
             </div>
             <div className="flex items-center gap-2 mt-1">
-              {historyQ.isFetching && <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />}
+              {historyQ.isFetching && (
+                <Loader2 className="h-4 w-4 animate-spin text-admin-accent" />
+              )}
               <span className="text-xs text-admin-ink-muted tabular-nums">
                 {rows.length} de {total} {total === 1 ? "venda" : "vendas"}
               </span>
@@ -262,7 +338,11 @@ export function PdvHistoryPanel() {
                 disabled={exporting}
                 title="Exportar resultados com os filtros aplicados"
               >
-                {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+                {exporting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                )}
                 Exportar Excel
               </Button>
             </div>
@@ -273,14 +353,25 @@ export function PdvHistoryPanel() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-admin-ink-muted" />
               <Input
                 value={search}
-                onChange={(event) => { setSearch(event.target.value); resetPage(); }}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  resetPage();
+                }}
                 placeholder="Buscar código, cliente, telefone, operador…"
                 className="pl-8 h-9 bg-admin-bg border-admin-border"
               />
             </div>
 
-            <Select value={period} onValueChange={(value: Period) => { setPeriod(value); resetPage(); }}>
-              <SelectTrigger className="w-[150px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+            <Select
+              value={period}
+              onValueChange={(value: Period) => {
+                setPeriod(value);
+                resetPage();
+              }}
+            >
+              <SelectTrigger className="w-[150px] h-9 bg-admin-bg border-admin-border">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="hoje">Hoje</SelectItem>
                 <SelectItem value="ontem">Ontem</SelectItem>
@@ -292,8 +383,16 @@ export function PdvHistoryPanel() {
               </SelectContent>
             </Select>
 
-            <Select value={paymentMethod} onValueChange={(value: Payment) => { setPaymentMethod(value); resetPage(); }}>
-              <SelectTrigger className="w-[150px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+            <Select
+              value={paymentMethod}
+              onValueChange={(value: Payment) => {
+                setPaymentMethod(value);
+                resetPage();
+              }}
+            >
+              <SelectTrigger className="w-[150px] h-9 bg-admin-bg border-admin-border">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Pagamento</SelectItem>
                 <SelectItem value="dinheiro">Dinheiro</SelectItem>
@@ -304,17 +403,34 @@ export function PdvHistoryPanel() {
               </SelectContent>
             </Select>
 
-            <Select value={status} onValueChange={(value: Status) => { setStatus(value); resetPage(); }}>
-              <SelectTrigger className="w-[140px] h-9 bg-admin-bg border-admin-border"><SelectValue /></SelectTrigger>
+            <Select
+              value={status}
+              onValueChange={(value: Status) => {
+                setStatus(value);
+                resetPage();
+              }}
+            >
+              <SelectTrigger className="w-[140px] h-9 bg-admin-bg border-admin-border">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Status</SelectItem>
-                <SelectItem value="concluida">Concluída</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="concluida">Paga</SelectItem>
                 <SelectItem value="cancelada">Anulada</SelectItem>
               </SelectContent>
             </Select>
 
-            <Select value={cashierId} onValueChange={(value) => { setCashierId(value); resetPage(); }}>
-              <SelectTrigger className="w-[170px] h-9 bg-admin-bg border-admin-border"><SelectValue placeholder="Operador" /></SelectTrigger>
+            <Select
+              value={cashierId}
+              onValueChange={(value) => {
+                setCashierId(value);
+                resetPage();
+              }}
+            >
+              <SelectTrigger className="w-[170px] h-9 bg-admin-bg border-admin-border">
+                <SelectValue placeholder="Operador" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos operadores</SelectItem>
                 {(cashiersQ.data ?? []).map((cashier) => (
@@ -328,21 +444,32 @@ export function PdvHistoryPanel() {
             <MultiSelectPopover
               label="Categorias"
               icon={<Filter className="h-3.5 w-3.5" />}
-              options={categories.map((c) => ({ value: c.id, label: `${c.emoji ?? ""} ${c.name}`.trim() }))}
+              options={categories.map((c) => ({
+                value: c.id,
+                label: `${c.emoji ?? ""} ${c.name}`.trim(),
+              }))}
               selected={categoryIds}
-              onChange={(ids) => { setCategoryIds(ids); resetPage(); }}
+              onChange={(ids) => {
+                setCategoryIds(ids);
+                resetPage();
+              }}
               emptyHint="Carregando…"
             />
 
             <MultiSelectPopover
               label="Itens"
               icon={<Filter className="h-3.5 w-3.5" />}
-              options={productsFiltered.map((p) => ({ value: p.id, label: `${p.emoji ?? ""} ${p.name}`.trim() }))}
+              options={productsFiltered.map((p) => ({
+                value: p.id,
+                label: `${p.emoji ?? ""} ${p.name}`.trim(),
+              }))}
               selected={productIds}
-              onChange={(ids) => { setProductIds(ids); resetPage(); }}
+              onChange={(ids) => {
+                setProductIds(ids);
+                resetPage();
+              }}
               emptyHint={categoryIds.length ? "Nenhum item nessas categorias" : "Carregando…"}
             />
-
           </div>
 
           {period === "custom" && (
@@ -352,7 +479,10 @@ export function PdvHistoryPanel() {
                 <Input
                   type="date"
                   value={dateFrom}
-                  onChange={(event) => { setDateFrom(event.target.value); resetPage(); }}
+                  onChange={(event) => {
+                    setDateFrom(event.target.value);
+                    resetPage();
+                  }}
                   className="h-9 bg-admin-bg border-admin-border"
                 />
               </div>
@@ -361,7 +491,10 @@ export function PdvHistoryPanel() {
                 <Input
                   type="date"
                   value={dateTo}
-                  onChange={(event) => { setDateTo(event.target.value); resetPage(); }}
+                  onChange={(event) => {
+                    setDateTo(event.target.value);
+                    resetPage();
+                  }}
                   className="h-9 bg-admin-bg border-admin-border"
                 />
               </div>
@@ -398,7 +531,9 @@ export function PdvHistoryPanel() {
                     <td className="p-3 whitespace-nowrap text-xs">{dateTime(sale.closed_at)}</td>
                     <td className="p-3">
                       <div className="max-w-[180px] truncate font-medium text-admin-ink">
-                        {sale.customer_name_snapshot ?? sale.customer?.full_name ?? "Cliente sem nome"}
+                        {sale.customer_name_snapshot ??
+                          sale.customer?.full_name ??
+                          "Cliente sem nome"}
                       </div>
                       <div className="max-w-[180px] truncate text-xs text-admin-ink-muted">
                         {sale.customer_phone_snapshot ?? sale.customer?.phone ?? "-"}
@@ -408,7 +543,9 @@ export function PdvHistoryPanel() {
                       {sale.cashier?.full_name ?? "Operador"}
                     </td>
                     <td className="p-3 text-center tabular-nums">{sale.item_count}</td>
-                    <td className="p-3 text-right tabular-nums">{money(sale.total_eur_cents, "EUR")}</td>
+                    <td className="p-3 text-right tabular-nums">
+                      {money(sale.total_eur_cents, "EUR")}
+                    </td>
                     <td className="p-3 text-admin-ink-soft">{paymentLabel(sale.payment_method)}</td>
                     <td className="p-3">{statusBadge(sale.status)}</td>
                     <td className="p-3 text-right">
@@ -421,12 +558,29 @@ export function PdvHistoryPanel() {
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
+                        {sale.status === "pendente" && (
+                          <PdvSettlePopover
+                            sale={sale}
+                            accounts={accountsQ.data ?? []}
+                            settle={confirmSettlement}
+                            onDone={refreshSales}
+                          />
+                        )}
+                        {sale.status === "concluida" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setReverseTargetId(sale.id)}
+                          >
+                            Estornar baixa
+                          </Button>
+                        )}
                         {canVoid ? (
                           <Button
                             size="sm"
                             variant="ghost"
                             title="Anular"
-                            disabled={sale.status === "cancelada"}
+                            disabled={sale.status !== "pendente"}
                             onClick={() => setVoidTargetId(sale.id)}
                           >
                             <RotateCcw className="h-3.5 w-3.5 text-red-500" />
@@ -452,7 +606,8 @@ export function PdvHistoryPanel() {
                         <CalendarClock className="h-8 w-8 text-admin-ink-muted" />
                         <p className="font-medium text-admin-ink">Nenhuma venda encontrada</p>
                         <p className="max-w-md text-xs">
-                          Ajuste os filtros ou volte para a aba Venda para registrar uma nova venda no caixa.
+                          Ajuste os filtros ou volte para a aba Venda para registrar uma nova venda
+                          no caixa.
                         </p>
                       </div>
                     </td>
@@ -476,7 +631,9 @@ export function PdvHistoryPanel() {
                   >
                     <ChevronLeft className="h-3.5 w-3.5" /> Anterior
                   </Button>
-                  <span className="tabular-nums">Página {page} de {totalPages}</span>
+                  <span className="tabular-nums">
+                    Página {page} de {totalPages}
+                  </span>
                   <Button
                     variant="outline"
                     size="sm"
@@ -531,15 +688,19 @@ export function PdvHistoryPanel() {
               <ShieldAlert className="h-5 w-5 text-red-400" /> Anular venda
             </DialogTitle>
             <DialogDescription>
-              Esta acao nao apaga o registro. A venda sera marcada como anulada, o estoque sera
-              revertido e a auditoria sera registrada.
+              Apenas vendas pendentes podem ser canceladas. O estoque será restaurado e a auditoria
+              registrada.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="rounded-lg border border-admin-border bg-admin-bg p-3 text-sm">
               <div className="font-mono text-admin-accent">{voidTarget?.sale_code ?? ""}</div>
               <div className="text-admin-ink-muted">
-                {voidTarget?.customer_name_snapshot ?? voidTarget?.customer?.full_name ?? detail?.sale?.customer_name_snapshot ?? detail?.customer?.full_name ?? "Cliente"}
+                {voidTarget?.customer_name_snapshot ??
+                  voidTarget?.customer?.full_name ??
+                  detail?.sale?.customer_name_snapshot ??
+                  detail?.customer?.full_name ??
+                  "Cliente"}
               </div>
             </div>
             <div className="space-y-1.5">
@@ -565,6 +726,31 @@ export function PdvHistoryPanel() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(reverseTargetId)}
+        onOpenChange={(open) => !open && setReverseTargetId(null)}
+      >
+        <DialogContent className="max-w-lg border-admin-border bg-admin-surface text-admin-ink">
+          <DialogHeader>
+            <DialogTitle>Estornar baixa</DialogTitle>
+            <DialogDescription>
+              O pagamento volta a pendente. O estoque não será alterado.
+            </DialogDescription>
+          </DialogHeader>
+          <Label>Motivo</Label>
+          <Textarea
+            value={reverseReason}
+            onChange={(event) => setReverseReason(event.target.value)}
+            placeholder="Explique o motivo do estorno"
+          />
+          <Button
+            disabled={reverseReason.trim().length < 3 || reverseMut.isPending}
+            onClick={() => reverseMut.mutate()}
+          >
+            Confirmar estorno
+          </Button>
         </DialogContent>
       </Dialog>
     </div>
@@ -595,7 +781,27 @@ function SaleDetailsContent({
           value={paymentLabel(sale.payment_method)}
           sub={dateTime(sale.closed_at)}
         />
-        <DetailTile label="Status" value={sale.status === "cancelada" ? "Anulada" : "Concluida"} />
+        <DetailTile
+          label="Status"
+          value={
+            sale.status === "cancelada"
+              ? "Anulada"
+              : sale.status === "pendente"
+                ? "Pendente"
+                : "Paga"
+          }
+        />
+        {sale.paid_at && (
+          <DetailTile
+            label="Baixa"
+            value={dateTime(sale.paid_at)}
+            sub={
+              sale.settled_currency && sale.settled_amount_cents
+                ? money(sale.settled_amount_cents, sale.settled_currency)
+                : null
+            }
+          />
+        )}
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -687,7 +893,7 @@ function SaleDetailsContent({
         {isAdmin ? (
           <Button
             variant="outline"
-            disabled={sale.status === "cancelada"}
+            disabled={sale.status !== "pendente"}
             className="border-red-500/30 text-red-400 hover:bg-red-500/10"
             onClick={onVoid}
           >
@@ -795,11 +1001,7 @@ function MultiSelectPopover({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 gap-1.5 bg-admin-bg border-admin-border"
-        >
+        <Button variant="outline" size="sm" className="h-9 gap-1.5 bg-admin-bg border-admin-border">
           {icon}
           {label}
           {selected.length > 0 && (
@@ -859,4 +1061,3 @@ function MultiSelectPopover({
     </Popover>
   );
 }
-

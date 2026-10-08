@@ -2925,7 +2925,18 @@ export type Database = {
           discount_value: number
           id: string
           notes: string | null
-          payment_method: string
+          payment_method: string | null
+          payment_amount_cents: number | null
+          payment_currency: string | null
+          settled_amount_cents: number | null
+          settled_currency: string | null
+          paid_at: string | null
+          payment_account_id: string | null
+          fx_reference_rate: number | null
+          fx_reference_date: string | null
+          fx_rate: number | null
+          fx_source: string | null
+          fx_locked_at: string | null
           sale_code: string
           status: string
           subtotal_brl_cents: number
@@ -2951,7 +2962,18 @@ export type Database = {
           discount_value?: number
           id?: string
           notes?: string | null
-          payment_method: string
+          payment_method?: string | null
+          payment_amount_cents?: number | null
+          payment_currency?: string | null
+          settled_amount_cents?: number | null
+          settled_currency?: string | null
+          paid_at?: string | null
+          payment_account_id?: string | null
+          fx_reference_rate?: number | null
+          fx_reference_date?: string | null
+          fx_rate?: number | null
+          fx_source?: string | null
+          fx_locked_at?: string | null
           sale_code: string
           status?: string
           subtotal_brl_cents?: number
@@ -2977,7 +2999,18 @@ export type Database = {
           discount_value?: number
           id?: string
           notes?: string | null
-          payment_method?: string
+          payment_method?: string | null
+          payment_amount_cents?: number | null
+          payment_currency?: string | null
+          settled_amount_cents?: number | null
+          settled_currency?: string | null
+          paid_at?: string | null
+          payment_account_id?: string | null
+          fx_reference_rate?: number | null
+          fx_reference_date?: string | null
+          fx_rate?: number | null
+          fx_source?: string | null
+          fx_locked_at?: string | null
           sale_code?: string
           status?: string
           subtotal_brl_cents?: number
@@ -4068,25 +4101,13 @@ export type Database = {
         Args: { p_actor_id: string; p_item_id: string; p_reason: string }
         Returns: undefined
       }
-      pdv_close_sale: {
-        Args: {
-          p_cashier_id: string
-          p_customer_id: string
-          p_discount_type: string
-          p_discount_value: number
-          p_items: Json
-          p_notes: string
-          p_payment_method: string
-        }
-        Returns: string
-      }
       pdv_close_tab: {
         Args: {
           p_cashier_id: string
           p_discount_type: string
           p_discount_value: number
           p_notes?: string
-          p_payment_method: string
+          p_payment_method: string | null
           p_tab_id: string
         }
         Returns: string
@@ -4107,6 +4128,25 @@ export type Database = {
       }
       pdv_void_sale: {
         Args: { p_admin_id: string; p_reason: string; p_sale_id: string }
+        Returns: undefined
+      }
+      pdv_settle_sale: {
+        Args: {
+          p_sale_id: string
+          p_actor_id: string
+          p_paid_at: string
+          p_settled_amount_cents: number
+          p_settled_currency: string
+          p_account_id: string
+          p_fx_reference_rate?: number | null
+          p_fx_reference_date?: string | null
+          p_fx_rate?: number | null
+          p_fx_source?: string | null
+        }
+        Returns: undefined
+      }
+      pdv_reverse_sale_payment: {
+        Args: { p_sale_id: string; p_actor_id: string; p_reason: string }
         Returns: undefined
       }
     }
