@@ -1,7 +1,5 @@
 -- Caixa simplificado: months remain editable; payouts retain immutable amounts,
 -- but pending occurrences can be voided and settlements reversed at the source.
-LOCK TABLE public.finance_month_closures, public.finance_month_distributions
-  IN ACCESS EXCLUSIVE MODE;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM public.finance_month_closures WHERE status = 'closed')
@@ -441,11 +439,13 @@ CREATE TRIGGER finance_system_category_guard BEFORE UPDATE OR DELETE
   ON public.finance_categories FOR EACH ROW
   EXECUTE FUNCTION public.finance_system_category_guard();
 
--- The user confirmed these 15 historical Wise EUR orders were actually paid.
--- Refuse to guess if the cohort or compatible account has changed.
+-- The production project has 15 historical Wise EUR orders that were paid.
+-- Preview branches created without data have no orders; skip the backfill there.
+-- Any nonempty dataset must still match the verified production cohort exactly.
 DO $$
-DECLARE v_count integer; v_total bigint; v_bad integer;
+DECLARE v_orders integer; v_count integer; v_total bigint; v_bad integer;
 BEGIN
+  SELECT count(*) INTO v_orders FROM public.orders;
   SELECT count(*),coalesce(sum(coalesce(payment_amount_cents,amount_cents)),0),
     count(*) FILTER (WHERE coalesce(payment_currency,currency) <> 'EUR'
       OR lower(coalesce(payment_method,'')) <> 'wise'
@@ -453,9 +453,11 @@ BEGIN
     INTO v_count,v_total,v_bad
   FROM public.orders
   WHERE payment_status = 'pendente' AND created_at < '2026-10-01'::timestamptz;
-  IF v_count <> 15 OR v_total <> 152500 OR v_bad <> 0 THEN
-    RAISE EXCEPTION 'Historical pending order cohort changed: count %, cents %, incompatible %',
-      v_count,v_total,v_bad;
+  IF v_orders > 0 THEN
+    IF v_count <> 15 OR v_total <> 152500 OR v_bad <> 0 THEN
+      RAISE EXCEPTION 'Historical pending order cohort changed: count %, cents %, incompatible %',
+        v_count,v_total,v_bad;
+    END IF;
   END IF;
 END $$;
 UPDATE public.orders o SET
