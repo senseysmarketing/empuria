@@ -1,11 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Reveal } from "@/components/Reveal";
 import { ServiceCard, type PublicService } from "@/components/services/ServiceCard";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 import { CheckoutModal } from "@/components/checkout/CheckoutModal";
 import { ServiceDetailsModal } from "@/components/services/ServiceDetailsModal";
 import { HomeEventsSection } from "@/components/events/HomeEventsSection";
@@ -42,7 +50,10 @@ export const Route = createFileRoute("/")({
           "O primeiro instituto de imigração brasileiro do mundo. Na Gran Via, 40, em Madrid. Recepção no aeroporto, consultoria imigratória, espaço físico de acolhimento e mais.",
       },
       { property: "og:title", content: "Instituto Empuria — A Casa do Brasileiro em Madrid" },
-      { property: "og:description", content: "Nenhum brasileiro está sozinho. Gran Via, 40 · Madrid." },
+      {
+        property: "og:description",
+        content: "Nenhum brasileiro está sozinho. Gran Via, 40 · Madrid.",
+      },
     ],
   }),
   component: HomePage,
@@ -70,6 +81,15 @@ function HomePage() {
   const [details, setDetails] = useState<PublicService | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [servicesCarousel, setServicesCarousel] = useState<CarouselApi>();
+  const [carouselPaused, setCarouselPaused] = useState(false);
+  useEffect(() => {
+    if (!servicesCarousel || carouselPaused || services.length < 2) return;
+    const timer = window.setInterval(() => {
+      if (servicesCarousel.canScrollNext()) servicesCarousel.scrollNext();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [servicesCarousel, carouselPaused, services.length]);
   const onBuy = (s: PublicService) => {
     setSelected(s);
     setOpen(true);
@@ -162,7 +182,11 @@ function HomePage() {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-sunset opacity-30 blur-3xl rounded-full" />
               <div className="relative aspect-[3/4] rounded-2xl overflow-hidden border-2 border-yellow-brand/30 shadow-warm">
-                <img src={heroWelcome.url} alt="Welcome Brazil Madrid — Lounge do Instituto Empuria na Gran Via, 40" className="w-full h-full object-cover" />
+                <img
+                  src={heroWelcome.url}
+                  alt="Welcome Brazil Madrid — Lounge do Instituto Empuria na Gran Via, 40"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="absolute -bottom-6 -left-6 bg-offwhite text-brown-deep px-5 py-3 rounded-md shadow-warm">
                 <div className="font-display font-extrabold text-xs uppercase tracking-widest text-orange-brand">
@@ -308,7 +332,14 @@ function HomePage() {
           {/* Carousel marquee */}
           <div className="lg:col-span-6 relative h-[520px] overflow-hidden rounded-2xl border border-yellow-brand/30">
             <div className="flex marquee-track gap-4 h-full" style={{ width: "200%" }}>
-              {[manifesto1.url, manifesto2.url, manifesto3.url, manifesto1.url, manifesto2.url, manifesto3.url].map((src, i) => (
+              {[
+                manifesto1.url,
+                manifesto2.url,
+                manifesto3.url,
+                manifesto1.url,
+                manifesto2.url,
+                manifesto3.url,
+              ].map((src, i) => (
                 <div
                   key={i}
                   className="relative h-full aspect-[3/4] shrink-0 rounded-xl overflow-hidden"
@@ -357,21 +388,41 @@ function HomePage() {
                 Chegada & Praticidade · Compra Direta
               </h3>
               <span className="font-body italic text-xs text-offwhite/60 hidden md:block">
-                Visualize, cadastre, confirme — só então geramos o pagamento.
+                Visualize, cadastre e confirme sua solicitação.
               </span>
             </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {services.slice(0, 6).map((s, i) => (
-                <Reveal key={s.id} delay={i * 70}>
-                  <ServiceCard
-                    service={s as PublicService}
-                    onBuy={onBuy}
-                    onDetails={onDetails}
-                    variant="dark"
-                  />
-                </Reveal>
-              ))}
-            </div>
+            <Carousel
+              opts={{ align: "start", loop: services.length > 3 }}
+              setApi={setServicesCarousel}
+              onMouseEnter={() => setCarouselPaused(true)}
+              onMouseLeave={() => setCarouselPaused(false)}
+              onFocusCapture={() => setCarouselPaused(true)}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setCarouselPaused(false);
+              }}
+              onPointerDown={() => setCarouselPaused(true)}
+              className="px-1"
+              aria-label="Serviços disponíveis"
+            >
+              <CarouselContent className="-ml-5">
+                {services.map((service) => (
+                  <CarouselItem key={service.id} className="pl-5 md:basis-1/2 lg:basis-1/3">
+                    <ServiceCard
+                      service={service as PublicService}
+                      onBuy={onBuy}
+                      onDetails={onDetails}
+                      variant="dark"
+                    />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              {services.length > 1 && (
+                <div className="mt-5 flex justify-end gap-2">
+                  <CarouselPrevious className="static translate-y-0 border-yellow-brand/40 bg-brown text-yellow-brand hover:bg-yellow-brand hover:text-brown" />
+                  <CarouselNext className="static translate-y-0 border-yellow-brand/40 bg-brown text-yellow-brand hover:bg-yellow-brand hover:text-brown" />
+                </div>
+              )}
+            </Carousel>
           </div>
 
           {/* Esteira 2 — High ticket */}
@@ -432,8 +483,8 @@ function HomePage() {
                 O Instituto Empuria reuniu em uma série de vídeos conteúdos extremamente úteis para
                 quem está planejando ou vivendo a mudança para a Espanha. São respostas práticas
                 para algumas das dúvidas que mais recebemos diariamente — organizadas para ajudar
-                você a tomar decisões com mais segurança e evitar erros comuns durante o processo
-                de adaptação.
+                você a tomar decisões com mais segurança e evitar erros comuns durante o processo de
+                adaptação.
               </p>
             </Reveal>
             <Reveal delay={300}>

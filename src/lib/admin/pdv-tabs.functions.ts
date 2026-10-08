@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { withPdvLog } from "./pdv-activity-log.server";
 
 export type PdvTabStatus = "aberta" | "fechada" | "cancelada" | "aguardando_pagamento";
-export type PdvTabPaymentMethod = "dinheiro" | "transferencia" | "wise";
+export type PdvTabPaymentMethod = "dinheiro" | "transferencia";
 
 export type PdvTabRecord = {
   id: string;

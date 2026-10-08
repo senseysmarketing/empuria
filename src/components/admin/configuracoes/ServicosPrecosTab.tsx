@@ -9,9 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import {
   listServicePrices,
   toggleServiceActive,
+  manageServiceArchive,
 } from "@/lib/admin/service-prices.functions";
 import { getServiceImage } from "@/lib/service-images";
-import { Pencil, Search } from "lucide-react";
+import { Archive, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { EditServicePriceDialog, type ServiceRow } from "./EditServicePriceDialog";
 
 function money(cents: number, currency = "EUR") {
@@ -33,8 +34,11 @@ function rulesSummary(s: ServiceRow): string {
 export function ServicosPrecosTab() {
   const fetchServices = useServerFn(listServicePrices);
   const toggleFn = useServerFn(toggleServiceActive);
+  const manageFn = useServerFn(manageServiceArchive);
   const qc = useQueryClient();
   const [editing, setEditing] = useState<ServiceRow | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
 
   const servicesQ = useQuery({
@@ -44,24 +48,44 @@ export function ServicosPrecosTab() {
 
   const services = useMemo(() => (servicesQ.data ?? []) as ServiceRow[], [servicesQ.data]);
   const totalActive = useMemo(
-    () => services.filter((s) => s.is_active).length,
+    () => services.filter((s) => s.is_active && !s.archived_at).length,
     [services],
   );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return services;
-    return services.filter(
+    const visible = services.filter((s) => showArchived || !s.archived_at);
+    if (!q) return visible;
+    return visible.filter(
       (s) =>
         s.title.toLowerCase().includes(q) ||
         s.slug.toLowerCase().includes(q) ||
         (s.category ?? "").toLowerCase().includes(q),
     );
-  }, [services, search]);
+  }, [services, search, showArchived]);
+
+  const manageMutation = useMutation({
+    mutationFn: (input: { id: string; action: "archive" | "restore" | "delete" }) =>
+      manageFn({ data: input }),
+    onSuccess: (result, input) => {
+      toast.success(
+        result.result === "deleted"
+          ? "Serviço excluído"
+          : result.result === "restored"
+            ? "Serviço restaurado como inativo"
+            : input.action === "delete"
+              ? "Este serviço possui histórico e foi arquivado para preservar os registros anteriores."
+              : "Serviço arquivado",
+      );
+      qc.invalidateQueries({ queryKey: ["config-service-prices"] });
+      qc.invalidateQueries({ queryKey: ["public-services"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Erro ao alterar serviço"),
+  });
 
   const toggleMutation = useMutation({
-    mutationFn: (vars: { id: string; is_active: boolean }) =>
-      toggleFn({ data: vars }),
+    mutationFn: (vars: { id: string; is_active: boolean }) => toggleFn({ data: vars }),
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: ["config-service-prices"] });
       const prev = qc.getQueryData<ServiceRow[]>(["config-service-prices"]);
@@ -106,6 +130,17 @@ export function ServicosPrecosTab() {
               className="pl-8 bg-admin-bg border-admin-border h-9"
             />
           </div>
+          <label className="flex items-center gap-2 text-xs text-admin-ink-muted">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(event) => setShowArchived(event.target.checked)}
+            />
+            Mostrar arquivados
+          </label>
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="h-4 w-4" /> Novo serviço
+          </Button>
         </div>
       </div>
 
@@ -129,7 +164,10 @@ export function ServicosPrecosTab() {
                 const showZeroWarn = s.is_active && cents === 0;
                 const img = getServiceImage({ image_url: s.image_url, kind: s.kind });
                 return (
-                  <tr key={s.id} className="border-t border-admin-border hover:bg-admin-bg/50 align-middle">
+                  <tr
+                    key={s.id}
+                    className="border-t border-admin-border hover:bg-admin-bg/50 align-middle"
+                  >
                     <td className="p-3">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-admin-border bg-admin-bg">
@@ -137,6 +175,11 @@ export function ServicosPrecosTab() {
                         </div>
                         <div className="min-w-0">
                           <div className="truncate font-medium text-admin-ink">{s.title}</div>
+                          {s.archived_at && (
+                            <span className="text-[10px] font-semibold text-amber-700">
+                              Arquivado
+                            </span>
+                          )}
                           <div className="mt-0.5 truncate text-[11px] text-admin-ink-muted">
                             {s.slug}
                             {s.category ? ` · ${s.category}` : ""}
@@ -152,34 +195,73 @@ export function ServicosPrecosTab() {
                     <td className="p-3 text-right tabular-nums">
                       <div className="text-admin-ink">{money(cents, "EUR")}</div>
                       {showZeroWarn && (
-                        <div className="mt-0.5 text-[10px] text-amber-600">
-                          Valor zerado
-                        </div>
+                        <div className="mt-0.5 text-[10px] text-amber-600">Valor zerado</div>
                       )}
                     </td>
                     <td className="p-3 text-admin-ink-muted">{rulesSummary(s)}</td>
                     <td className="p-3 text-center">
                       <div className="inline-flex items-center gap-2">
                         <Switch
-                          checked={s.is_active}
-                          onCheckedChange={(v) =>
-                            toggleMutation.mutate({ id: s.id, is_active: v })
-                          }
-                          disabled={toggleMutation.isPending}
+                          checked={s.is_active && !s.archived_at}
+                          onCheckedChange={(v) => toggleMutation.mutate({ id: s.id, is_active: v })}
+                          disabled={toggleMutation.isPending || !!s.archived_at}
                         />
                         <span className="text-[11px] text-admin-ink-muted">
-                          {s.is_active ? "Ativo" : "Inativo"}
+                          {s.archived_at ? "Arquivado" : s.is_active ? "Ativo" : "Inativo"}
                         </span>
                       </div>
                     </td>
                     <td className="p-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditing(s)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        {!s.archived_at && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Editar"
+                              onClick={() => setEditing(s)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Arquivar"
+                              disabled={manageMutation.isPending}
+                              onClick={() =>
+                                window.confirm(`Arquivar ${s.title}?`) &&
+                                manageMutation.mutate({ id: s.id, action: "archive" })
+                              }
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
+                        {s.archived_at && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Restaurar"
+                            disabled={manageMutation.isPending}
+                            onClick={() => manageMutation.mutate({ id: s.id, action: "restore" })}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Excluir se não houver histórico"
+                          disabled={manageMutation.isPending}
+                          onClick={() =>
+                            window.confirm(
+                              `Excluir ${s.title}? Se houver histórico, será arquivado.`,
+                            ) && manageMutation.mutate({ id: s.id, action: "delete" })
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -200,11 +282,13 @@ export function ServicosPrecosTab() {
 
       <EditServicePriceDialog
         service={editing}
-        open={!!editing}
-        onOpenChange={(o: boolean) => !o && setEditing(null)}
+        open={!!editing || creating}
+        onOpenChange={(o: boolean) => !o && (setEditing(null), setCreating(false))}
         onSaved={async () => {
           setEditing(null);
+          setCreating(false);
           await servicesQ.refetch();
+          qc.invalidateQueries({ queryKey: ["public-services"] });
         }}
       />
     </BentoCard>

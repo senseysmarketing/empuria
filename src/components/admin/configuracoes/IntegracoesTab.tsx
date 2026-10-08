@@ -45,7 +45,6 @@ import {
   saveUazapiSettings,
   testUazapiConfiguration,
 } from "@/lib/uazapi/uazapi.functions";
-import { WiseIntegrationCard } from "./WiseIntegrationCard";
 
 type IntegrationEvent = {
   id: string;
@@ -308,7 +307,6 @@ export function IntegracoesTab() {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <WiseIntegrationCard />
 
         <IntegrationCard
           icon={CreditCard}

@@ -130,7 +130,6 @@ export function UpsellSheet({
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [intent, setIntent] = useState<{
     orderId: string;
-    reference: string;
     amountCents: number;
     currency: string;
   } | null>(null);

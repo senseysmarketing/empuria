@@ -3,20 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import confetti from "canvas-confetti";
 import {
-  AlertTriangle,
   Banknote,
   CheckCircle2,
   Clock,
-  Copy,
   CreditCard,
-  ExternalLink,
   Loader2,
-  MessageCircle,
   Minus,
   Plus,
-  QrCode,
   ReceiptText,
-  RefreshCw,
   Search,
   UserPlus,
   X,
@@ -70,13 +64,6 @@ import {
   type PdvTabPaymentMethod,
   type PdvTabWithRelations,
 } from "@/lib/admin/pdv-tabs.functions";
-import {
-  cancelPdvWiseAttempt,
-  listPdvAwaitingPayments,
-  recheckPdvWiseAttempt,
-  requestPdvWisePayment,
-  type PdvWiseAttempt,
-} from "@/lib/admin/pdv-wise.functions";
 import { cn } from "@/lib/utils";
 
 type DiscountState = { type: "none" | "amount" | "percent"; value: number };
@@ -84,7 +71,6 @@ type DiscountState = { type: "none" | "amount" | "percent"; value: number };
 const PAYMENT_LABEL: Record<PdvTabPaymentMethod, string> = {
   dinheiro: "Dinheiro",
   transferencia: "Transferência bancária",
-  wise: "Wise",
 };
 
 function fireConfetti() {
@@ -156,10 +142,6 @@ export function PdvTabsPanel() {
   const cancelItem = useServerFn(cancelPdvTabItem);
   const closeTab = useServerFn(closePdvTab);
   const cancelTabFn = useServerFn(cancelPdvTab);
-  const requestWise = useServerFn(requestPdvWisePayment);
-  const cancelWise = useServerFn(cancelPdvWiseAttempt);
-  const recheckWise = useServerFn(recheckPdvWiseAttempt);
-  const fetchAwaiting = useServerFn(listPdvAwaitingPayments);
 
   const [search, setSearch] = useState("");
   const [catalogSearch, setCatalogSearch] = useState("");
@@ -178,25 +160,10 @@ export function PdvTabsPanel() {
   const [discount, setDiscount] = useState<DiscountState>({ type: "none", value: 0 });
   const [paymentMethod, setPaymentMethod] = useState<PdvTabPaymentMethod>("dinheiro");
   const [notes, setNotes] = useState("");
-  const [wiseModal, setWiseModal] = useState<{
-    attemptId: string;
-    reference: string;
-    amountCents: number;
-    paymentUrl: string | null;
-    customerName: string | null;
-    customerPhone: string | null;
-    tabCode: string;
-  } | null>(null);
 
   const tabsQ = useQuery({
     queryKey: ["pdv-tabs-workspace"],
     queryFn: () => fetchTabs(),
-  });
-
-  const awaitingQ = useQuery({
-    queryKey: ["pdv-awaiting-payments"],
-    queryFn: () => fetchAwaiting(),
-    refetchInterval: 15000,
   });
 
   const catalogQ = useQuery({
@@ -209,7 +176,6 @@ export function PdvTabsPanel() {
     qc.invalidateQueries({ queryKey: ["pdv-catalog"] });
     qc.invalidateQueries({ queryKey: ["pdv-sales-history"] });
     qc.invalidateQueries({ queryKey: ["pdv-cashiers"] });
-    qc.invalidateQueries({ queryKey: ["pdv-awaiting-payments"] });
   };
 
   const openMut = useMutation({
@@ -303,73 +269,6 @@ export function PdvTabsPanel() {
       toast.error(error instanceof Error ? error.message : "Erro ao cancelar comanda"),
   });
 
-  const requestWiseMut = useMutation({
-    mutationFn: (tabId: string) =>
-      requestWise({
-        data: {
-          tabId,
-          discount,
-          notes: notes || undefined,
-        },
-      }),
-    onSuccess: (result, tabId) => {
-      const tab = tabs.find((t) => t.id === tabId);
-      setWiseModal({
-        attemptId: result.attemptId,
-        reference: result.reference,
-        amountCents: result.amountEurCents,
-        paymentUrl: result.paymentUrl,
-        customerName: result.customerName,
-        customerPhone: result.customerPhone,
-        tabCode: tab?.tab_code ?? "",
-      });
-      setCloseDialogOpen(false);
-      setDiscount({ type: "none", value: 0 });
-      setNotes("");
-      setPaymentMethod("dinheiro");
-      invalidate();
-      if (result.manualOnly) {
-        toast.warning("Link Wise nao configurado. Configure em Configuracoes > Wise.");
-      } else {
-        toast.success("Link Wise gerado.");
-      }
-    },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao gerar link Wise"),
-  });
-
-  const cancelWiseMut = useMutation({
-    mutationFn: ({ attemptId, reason }: { attemptId: string; reason: string }) =>
-      cancelWise({ data: { attemptId, reason } }),
-    onSuccess: () => {
-      toast.success("Cobranca cancelada. Comanda reaberta.");
-      setWiseModal(null);
-      invalidate();
-    },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao cancelar cobranca"),
-  });
-
-  const recheckWiseMut = useMutation({
-    mutationFn: (attemptId: string) => recheckWise({ data: { attemptId } }),
-    onSuccess: (data) => {
-      if (data.status === "paid") {
-        toast.success("Pagamento confirmado!");
-        setWiseModal(null);
-        fireConfetti();
-      } else if (data.status === "pending_conciliation") {
-        toast.warning("Pagamento divergente, em conciliacao.");
-      } else if (data.status === "cancelled") {
-        toast.info("Cobranca cancelada.");
-        setWiseModal(null);
-      } else {
-        toast.info("Ainda aguardando pagamento.");
-      }
-      invalidate();
-    },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao verificar"),
-  });
   useEffect(() => {
     if (
       !openCustomerDialog &&
@@ -433,14 +332,7 @@ export function PdvTabsPanel() {
     qtyMut.isPending ||
     cancelItemMut.isPending ||
     closeMut.isPending ||
-    cancelTabMut.isPending ||
-    requestWiseMut.isPending;
-  const awaitingAttempts = (awaitingQ.data ?? []) as PdvWiseAttempt[];
-  const tabCodeById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const tab of tabs) map.set(tab.id, tab.tab_code);
-    return map;
-  }, [tabs]);
+    cancelTabMut.isPending;
 
   return (
     <div className="space-y-4">
@@ -511,10 +403,13 @@ export function PdvTabsPanel() {
                           </span>
                         </div>
                         <p className="mt-2 truncate font-display text-base text-admin-ink">
-                          {tab.customer_name_snapshot ?? tab.customer?.full_name ?? "Cliente sem nome"}
+                          {tab.customer_name_snapshot ??
+                            tab.customer?.full_name ??
+                            "Cliente sem nome"}
                         </p>
                         <p className="truncate text-xs text-admin-ink-muted">
-                          {tab.customer_phone_snapshot ?? tab.customer?.phone ?? "Sem telefone"} · {totals.qty} itens
+                          {tab.customer_phone_snapshot ?? tab.customer?.phone ?? "Sem telefone"} ·{" "}
+                          {totals.qty} itens
                         </p>
                       </div>
                       <Avatar className="h-9 w-9">
@@ -543,75 +438,6 @@ export function PdvTabsPanel() {
           )}
         </div>
       </BentoCard>
-
-      {awaitingAttempts.length > 0 && (
-        <BentoCard padded={false}>
-          <div className="px-4 py-3 border-b border-amber-500/40 bg-amber-500/5 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <h2 className="font-display text-sm text-admin-ink">
-              Comandas aguardando pagamento Wise
-            </h2>
-            <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/15">
-              {awaitingAttempts.length}
-            </Badge>
-          </div>
-          <div className="divide-y divide-admin-border">
-            {awaitingAttempts.map((att) => {
-              const code = tabCodeById.get(att.tab_id) ?? att.reference;
-              return (
-                <div
-                  key={att.id}
-                  className="px-4 py-2 flex items-center gap-3 hover:bg-amber-500/5"
-                >
-                  <span className="font-mono text-[11px] text-amber-700 bg-amber-500/15 rounded px-1.5 py-0.5 shrink-0">
-                    {code}
-                  </span>
-                  <span className="text-sm text-admin-ink truncate flex-1 min-w-0">
-                    {att.customer_name_snapshot ?? "Cliente"}
-                  </span>
-                  <span className="text-[11px] text-admin-ink-muted tabular-nums hidden sm:inline">
-                    {shortTime(att.created_at)}
-                  </span>
-                  <span className="font-display text-sm text-amber-600 tabular-nums shrink-0 w-20 text-right">
-                    {money(att.amount_eur_cents)}
-                  </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs px-2"
-                      onClick={() =>
-                        setWiseModal({
-                          attemptId: att.id,
-                          reference: att.reference,
-                          amountCents: att.amount_eur_cents,
-                          paymentUrl: att.payment_url,
-                          customerName: att.customer_name_snapshot,
-                          customerPhone: att.customer_phone_snapshot,
-                          tabCode: tabCodeById.get(att.tab_id) ?? "",
-                        })
-                      }
-                    >
-                      Abrir
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0"
-                      title="Verificar pagamento"
-                      disabled={recheckWiseMut.isPending}
-                      onClick={() => recheckWiseMut.mutate(att.id)}
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </BentoCard>
-      )}
-
 
       {selectedTab && (
         <div className="grid grid-cols-12 gap-4">
@@ -643,19 +469,16 @@ export function PdvTabsPanel() {
               search={catalogSearch}
               pendingProductId={
                 addMut.isPending
-                  ? addMut.variables?.id ?? null
+                  ? (addMut.variables?.id ?? null)
                   : qtyMut.isPending
-                    ? activeItems(selectedTab).find(
-                        (it) => it.id === qtyMut.variables?.itemId,
-                      )?.product_id ?? null
+                    ? (activeItems(selectedTab).find((it) => it.id === qtyMut.variables?.itemId)
+                        ?.product_id ?? null)
                     : null
               }
               onAdd={(item) => {
                 if (isBusy) return;
                 setSelectedTabId(selectedTab.id);
-                const existing = activeItems(selectedTab).find(
-                  (it) => it.product_id === item.id,
-                );
+                const existing = activeItems(selectedTab).find((it) => it.product_id === item.id);
                 if (existing) {
                   qtyMut.mutate({ itemId: existing.id, qty: existing.qty + 1 });
                 } else {
@@ -674,10 +497,14 @@ export function PdvTabsPanel() {
                       {selectedTab.tab_code}
                     </Badge>
                     <h3 className="mt-2 truncate font-display text-xl text-admin-ink">
-                      {selectedTab.customer_name_snapshot ?? selectedTab.customer?.full_name ?? "Cliente sem nome"}
+                      {selectedTab.customer_name_snapshot ??
+                        selectedTab.customer?.full_name ??
+                        "Cliente sem nome"}
                     </h3>
                     <p className="truncate text-xs text-admin-ink-muted">
-                      {selectedTab.customer_phone_snapshot ?? selectedTab.customer?.phone ?? "Sem telefone"}
+                      {selectedTab.customer_phone_snapshot ??
+                        selectedTab.customer?.phone ??
+                        "Sem telefone"}
                     </p>
                   </div>
                   {canCancelSelectedTab && (
@@ -713,77 +540,76 @@ export function PdvTabsPanel() {
                   activeItems(selectedTab).map((item) => {
                     const isRemoving =
                       cancelItemMut.isPending && cancelItemMut.variables?.itemId === item.id;
-                    const isUpdatingQty =
-                      qtyMut.isPending && qtyMut.variables?.itemId === item.id;
+                    const isUpdatingQty = qtyMut.isPending && qtyMut.variables?.itemId === item.id;
                     return (
-                    <div
-                      key={item.id}
-                      className="group relative rounded-lg border border-admin-border bg-admin-surface-2 p-3"
-                    >
-                      <button
-                        disabled={isBusy}
-                        onClick={() =>
-                          cancelItemMut.mutate({
-                            itemId: item.id,
-                            reason: "Removido pelo operador",
-                          })
-                        }
-                        className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-admin-ink-muted hover:bg-red-brand/10 hover:text-red-brand disabled:opacity-50"
-                        aria-label="Remover item"
+                      <div
+                        key={item.id}
+                        className="group relative rounded-lg border border-admin-border bg-admin-surface-2 p-3"
                       >
-                        {isRemoving ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <X className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                      <div className="flex items-start gap-2 pr-7">
-                        <span className="text-xl">{item.product_emoji_snapshot ?? "•"}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-admin-ink">
-                            {item.product_name_snapshot}
-                          </p>
-                          <p className="text-[11px] text-admin-ink-muted">
-                            {item.added_by_profile?.full_name ?? "Equipe"} ·{" "}
-                            {shortTime(item.created_at)}
-                          </p>
+                        <button
+                          disabled={isBusy}
+                          onClick={() =>
+                            cancelItemMut.mutate({
+                              itemId: item.id,
+                              reason: "Removido pelo operador",
+                            })
+                          }
+                          className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-admin-ink-muted hover:bg-red-brand/10 hover:text-red-brand disabled:opacity-50"
+                          aria-label="Remover item"
+                        >
+                          {isRemoving ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <X className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <div className="flex items-start gap-2 pr-7">
+                          <span className="text-xl">{item.product_emoji_snapshot ?? "•"}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-admin-ink">
+                              {item.product_name_snapshot}
+                            </p>
+                            <p className="text-[11px] text-admin-ink-muted">
+                              {item.added_by_profile?.full_name ?? "Equipe"} ·{" "}
+                              {shortTime(item.created_at)}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            disabled={item.qty <= 1 || isBusy}
-                            onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty - 1 })}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-7 text-center text-xs tabular-nums inline-flex items-center justify-center">
-                            {isUpdatingQty ? (
-                              <Loader2 className="h-3 w-3 animate-spin text-admin-accent" />
-                            ) : (
-                              item.qty
-                            )}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            disabled={isBusy}
-                            onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty + 1 })}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-display text-sm text-admin-ink tabular-nums">
-                            {money(item.total_eur_cents)}
+                        <div className="mt-2 flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              disabled={item.qty <= 1 || isBusy}
+                              onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty - 1 })}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-7 text-center text-xs tabular-nums inline-flex items-center justify-center">
+                              {isUpdatingQty ? (
+                                <Loader2 className="h-3 w-3 animate-spin text-admin-accent" />
+                              ) : (
+                                item.qty
+                              )}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              disabled={isBusy}
+                              onClick={() => qtyMut.mutate({ itemId: item.id, qty: item.qty + 1 })}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-display text-sm text-admin-ink tabular-nums">
+                              {money(item.total_eur_cents)}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
                     );
                   })
                 )}
@@ -910,7 +736,7 @@ export function PdvTabsPanel() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
                 variant={paymentMethod === "dinheiro" ? "default" : "outline"}
@@ -928,15 +754,6 @@ export function PdvTabsPanel() {
               >
                 <CreditCard className="h-4 w-4" />
                 Transferência
-              </Button>
-              <Button
-                type="button"
-                variant={paymentMethod === "wise" ? "default" : "outline"}
-                onClick={() => setPaymentMethod("wise")}
-                className={cn(paymentMethod === "wise" && "bg-amber-500 text-white")}
-              >
-                <QrCode className="h-4 w-4" />
-                Wise
               </Button>
             </div>
 
@@ -975,27 +792,15 @@ export function PdvTabsPanel() {
               onClick={(event) => {
                 event.preventDefault();
                 if (!selectedTab) return;
-                if (paymentMethod === "wise") {
-                  requestWiseMut.mutate(selectedTab.id);
-                } else {
-                  closeMut.mutate(selectedTab.id);
-                }
+                closeMut.mutate(selectedTab.id);
               }}
-              className={cn(
-                "text-white",
-                paymentMethod === "wise" ? "bg-amber-500 hover:bg-amber-500/90" : "bg-admin-accent",
-              )}
+              className="bg-admin-accent text-white"
             >
-              {closeMut.isPending || requestWiseMut.isPending
-                ? "Processando..."
-                : paymentMethod === "wise"
-                  ? "Gerar link Wise"
-                  : "Confirmar fechamento"}
+              {closeMut.isPending ? "Processando..." : "Confirmar fechamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
 
       <AlertDialog
         open={cancelTabTarget !== null}
@@ -1037,132 +842,6 @@ export function PdvTabsPanel() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={wiseModal !== null} onOpenChange={(open) => !open && setWiseModal(null)}>
-        <DialogContent className="sm:max-w-md border-amber-500/40 bg-admin-bg text-admin-ink">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-display">
-              <QrCode className="h-5 w-5 text-amber-500" />
-              Pagamento Wise gerado
-            </DialogTitle>
-            <DialogDescription>
-              Compartilhe o link com o cliente. A comanda fica bloqueada ate o pagamento ser
-              confirmado pelo webhook ou voce verificar manualmente.
-            </DialogDescription>
-          </DialogHeader>
-          {wiseModal && (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-admin-border bg-admin-bg/60 p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-admin-ink-muted">Comanda</span>
-                  <span className="font-mono">{wiseModal.tabCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-admin-ink-muted">Cliente</span>
-                  <span className="text-right">{wiseModal.customerName ?? "-"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-admin-ink-muted">Referência</span>
-                  <span className="font-mono text-xs">{wiseModal.reference}</span>
-                </div>
-                <div className="flex justify-between border-t border-admin-border pt-2">
-                  <span className="text-xs uppercase tracking-widest text-admin-ink-muted">
-                    Total
-                  </span>
-                  <span className="font-display text-xl text-amber-600">
-                    {money(wiseModal.amountCents)}
-                  </span>
-                </div>
-              </div>
-
-              {wiseModal.paymentUrl ? (
-                <>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        if (wiseModal.paymentUrl) {
-                          navigator.clipboard.writeText(wiseModal.paymentUrl);
-                          toast.success("Link copiado.");
-                        }
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                      Copiar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        if (wiseModal.paymentUrl)
-                          window.open(wiseModal.paymentUrl, "_blank", "noopener");
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Abrir Wise
-                    </Button>
-                  </div>
-                  {wiseModal.customerPhone && (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {
-                        const phone = (wiseModal.customerPhone ?? "").replace(/\D/g, "");
-                        const msg = encodeURIComponent(
-                          `Ola ${wiseModal.customerName ?? ""}! Segue o link para pagamento Wise (${money(
-                            wiseModal.amountCents,
-                          )}) - referencia ${wiseModal.reference}: ${wiseModal.paymentUrl}`,
-                        );
-                        window.open(`https://wa.me/${phone}?text=${msg}`, "_blank", "noopener");
-                      }}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Enviar por WhatsApp
-                    </Button>
-                  )}
-                </>
-              ) : (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
-                  Link Wise nao configurado. Configure em Configuracoes &gt; Wise para gerar o link
-                  automaticamente.
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2 border-t border-admin-border">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  disabled={recheckWiseMut.isPending}
-                  onClick={() => recheckWiseMut.mutate(wiseModal.attemptId)}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Verificar agora
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 border-red-brand/40 text-red-brand hover:bg-red-brand/10"
-                  disabled={cancelWiseMut.isPending}
-                  onClick={() =>
-                    cancelWiseMut.mutate({
-                      attemptId: wiseModal.attemptId,
-                      reason: "Reaberta para edicao",
-                    })
-                  }
-                >
-                  <XCircle className="h-4 w-4" />
-                  Cancelar/Reabrir
-                </Button>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="ghost" className="w-full" onClick={() => setWiseModal(null)}>
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog
         open={successInfo !== null}
         onOpenChange={(open) => {
@@ -1194,7 +873,9 @@ export function PdvTabsPanel() {
                 <span>{PAYMENT_LABEL[successInfo.paymentMethod]}</span>
               </div>
               <div className="flex justify-between border-t border-admin-border pt-2">
-                <span className="text-xs uppercase tracking-widest text-admin-ink-muted">Total</span>
+                <span className="text-xs uppercase tracking-widest text-admin-ink-muted">
+                  Total
+                </span>
                 <span className="font-display text-xl text-admin-accent">
                   {money(successInfo.totalCents)}
                 </span>
@@ -1212,6 +893,5 @@ export function PdvTabsPanel() {
         </DialogContent>
       </Dialog>
     </div>
-
   );
 }

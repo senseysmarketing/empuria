@@ -24,9 +24,9 @@ export type DetailedService = {
   id: string;
   slug: string;
   title: string;
-  short_description?: string | null;
+  short_description: string | null;
   description?: string | null;
-  kind: string;
+  kind: string | null;
   price_cents: number;
   currency: string;
   online_price_cents?: number | null;
@@ -50,7 +50,7 @@ export function ServiceDetailsModal<T extends DetailedService>({
   onBuy: (s: T) => void;
 }) {
   if (!service) return null;
-  const Icon = ICONS[service.kind] ?? MapPin;
+  const Icon = ICONS[service.kind ?? ""] ?? MapPin;
   const price = new Intl.NumberFormat("pt-PT", {
     style: "currency",
     currency: service.online_currency ?? service.currency,
