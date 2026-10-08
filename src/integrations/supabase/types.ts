@@ -3992,8 +3992,31 @@ export type Database = {
         Args: { p_actor: string; p_id: string; p_reason: string }
         Returns: undefined
       }
+      finance_save_team_member: {
+        Args: { p_actor: string; p_data: Json }
+        Returns: string
+      }
+      finance_set_team_member_state: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_month: string
+          p_payee_id: string
+          p_remove_pending: boolean
+        }
+        Returns: undefined
+      }
       finance_set_payout_rule_services: {
         Args: { p_rule_id: string; p_service_ids: string[] }
+        Returns: undefined
+      }
+      finance_sync_team_payouts: {
+        Args: {
+          p_actor?: string
+          p_month: string
+          p_payee_id?: string
+          p_revive_voided?: boolean
+        }
         Returns: undefined
       }
       finance_sync_order: { Args: { p_order_id: string }; Returns: undefined }

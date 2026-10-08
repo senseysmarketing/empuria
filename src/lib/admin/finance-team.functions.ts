@@ -202,6 +202,18 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
       BRL: { payable: 0, paid: 0 },
       EUR: { payable: 0, paid: 0 },
     };
+    for (const payout of payouts) {
+      if (payout.voided_at || !payout.finance_transaction_id) continue;
+      const transaction = txMap.get(payout.finance_transaction_id);
+      if (transaction?.status === "paid") {
+        const currency =
+          (transaction.settled_currency ?? payout.currency) === "EUR" ? "EUR" : "BRL";
+        totals[currency].paid += transaction.settled_amount_cents ?? payout.amount_cents;
+      } else if (transaction?.status === "pending") {
+        const currency = payout.currency === "EUR" ? "EUR" : "BRL";
+        totals[currency].payable += payout.amount_cents;
+      }
+    }
     const members: FinanceTeamMember[] = ((payeesQ.data ?? []) as FinancePayee[])
       .filter((payee) => data.showArchived || !payee.archived_at)
       .map((payee) => {
@@ -220,16 +232,6 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
               ? (txMap.get(payout.finance_transaction_id) ?? null)
               : null,
           }));
-        for (const { payout, transaction } of ownPayouts) {
-          if (!transaction || !["BRL", "EUR"].includes(payout.currency)) continue;
-          if (transaction.status === "paid") {
-            const currency = transaction.settled_currency === "EUR" ? "EUR" : "BRL";
-            totals[currency].paid += transaction.settled_amount_cents ?? payout.amount_cents;
-          } else if (transaction.status === "pending") {
-            const currency = payout.currency === "EUR" ? "EUR" : "BRL";
-            totals[currency].payable += payout.amount_cents;
-          }
-        }
         return { payee, rule, payouts: ownPayouts };
       });
     return {
