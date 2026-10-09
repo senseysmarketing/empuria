@@ -10,7 +10,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Settings,
   WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,20 +37,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
-import { FinanceAccountCombobox } from "@/components/admin/financeiro/FinanceAccountCombobox";
 import { SettleTransactionPopover } from "@/components/admin/financeiro/SettleTransactionPopover";
 import { FinanceTeamPanel } from "@/components/admin/financeiro/FinanceTeamPanel";
 import { FinanceMonthClosePanel } from "@/components/admin/financeiro/FinanceMonthClosePanel";
 import { financeOriginLabel } from "@/lib/finance/origins";
 import { getFinanceDashboard } from "@/lib/admin/finance-close.functions";
 import {
-  createFinanceAccount,
-  createFinanceCategory,
   createFinanceRecurringRule,
   createFinanceTransaction,
   endFinanceRecurringRule,
   listFinanceMeta,
-  listFinanceSettings,
   listFinanceRecurringRules,
   listFinanceTransactions,
   settleFinanceTransaction,
@@ -59,9 +54,6 @@ import {
   updateFinanceRecurringRule,
   deleteFinancePendingTransaction,
   reverseFinanceSettlement,
-  manageFinanceAccount,
-  manageFinanceCategory,
-  type FinanceAccount,
   type FinanceCategory,
   type FinanceRecurringRule,
   type FinanceTransaction,
@@ -118,7 +110,6 @@ function FinanceiroContent() {
   const [month, setMonth] = useState(defaultMonth());
   const [tab, setTab] = useState("resumo");
   const [newOpen, setNewOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState({
     search: "",
@@ -142,23 +133,12 @@ function FinanceiroContent() {
   const updateRule = useServerFn(updateFinanceRecurringRule);
   const endRule = useServerFn(endFinanceRecurringRule);
   const toggleRule = useServerFn(toggleFinanceRecurringRule);
-  const createCategory = useServerFn(createFinanceCategory);
-  const createAccount = useServerFn(createFinanceAccount);
-  const fetchSettings = useServerFn(listFinanceSettings);
-  const manageAccount = useServerFn(manageFinanceAccount);
-  const manageCategory = useServerFn(manageFinanceCategory);
   const fetchDashboard = useServerFn(getFinanceDashboard);
 
   const metaQ = useQuery({
     queryKey: ["finance-meta"],
     queryFn: () => fetchMeta(),
     enabled: tab !== "resumo" || newOpen,
-    staleTime: 5 * 60_000,
-  });
-  const settingsQ = useQuery({
-    queryKey: ["finance-settings"],
-    queryFn: () => fetchSettings(),
-    enabled: settingsOpen,
     staleTime: 5 * 60_000,
   });
   const dashboardQ = useQuery({
@@ -211,7 +191,6 @@ function FinanceiroContent() {
   const refreshConfiguration = () => {
     refresh();
     qc.invalidateQueries({ queryKey: ["finance-meta"], refetchType: "active" });
-    qc.invalidateQueries({ queryKey: ["finance-settings"], refetchType: "active" });
   };
 
   const deleteMutation = useMutation({
@@ -232,7 +211,6 @@ function FinanceiroContent() {
   });
 
   const categories = metaQ.data?.categories ?? [];
-  const accounts = metaQ.data?.accounts ?? [];
   const transactions = useMemo(
     () => (transactionsQ.data?.rows ?? []) as FinanceTransaction[],
     [transactionsQ.data?.rows],
@@ -252,8 +230,7 @@ function FinanceiroContent() {
     dashboardQ.error ??
     (tab !== "resumo" ? metaQ.error : null) ??
     (tab === "lancamentos" ? transactionsQ.error : null) ??
-    (tab === "recorrencias" ? recurringQ.error : null) ??
-    settingsQ.error;
+    (tab === "recorrencias" ? recurringQ.error : null);
 
   return (
     <div className="space-y-6">
@@ -265,7 +242,7 @@ function FinanceiroContent() {
           <div>
             <h1 className="font-display text-4xl font-bold tracking-tight">Financeiro & Caixa</h1>
             <p className="mt-1 text-sm text-admin-ink-muted">
-              Controle mensal de entradas, saidas, contas e recorrencias.
+              Controle mensal de entradas, saídas e recorrências.
             </p>
           </div>
         </div>
@@ -292,19 +269,7 @@ function FinanceiroContent() {
           <NewTransactionDialog
             onOpenChange={setNewOpen}
             categories={categories}
-            accounts={accounts}
             createTx={createTx}
-            createAccount={createAccount}
-            onDone={refreshConfiguration}
-          />
-          <FinanceSettingsDialog
-            onOpenChange={setSettingsOpen}
-            categories={settingsQ.data?.categories ?? []}
-            accounts={settingsQ.data?.accounts ?? []}
-            createCategory={createCategory}
-            createAccount={createAccount}
-            manageCategory={manageCategory}
-            manageAccount={manageAccount}
             onDone={refreshConfiguration}
           />
         </div>
@@ -480,11 +445,7 @@ function FinanceiroContent() {
             ) : (
               <TransactionTable
                 rows={transactions}
-                accounts={accounts}
                 settle={(data) => settleTx({ data })}
-                createAccount={async (name, currency) =>
-                  (await createAccount({ data: { name, type: "bank", currency } })).id
-                }
                 onDone={refresh}
                 onDelete={(id) => {
                   if (window.confirm("Excluir esta pendência?"))
@@ -501,14 +462,13 @@ function FinanceiroContent() {
         </TabsContent>
 
         <TabsContent value="equipe" className="mt-0 space-y-4">
-          <FinanceTeamPanel month={month} accounts={accounts} onChanged={refreshConfiguration} />
+          <FinanceTeamPanel month={month} onChanged={refreshConfiguration} />
         </TabsContent>
 
         <TabsContent value="recorrencias" className="mt-0 space-y-4">
           <div className="flex justify-end">
             <NewRecurringDialog
               categories={categories}
-              accounts={accounts}
               createRule={createRule}
               updateRule={updateRule}
               onDone={refresh}
@@ -524,7 +484,6 @@ function FinanceiroContent() {
               <RecurringTable
                 rows={recurringQ.data ?? []}
                 categories={categories}
-                accounts={accounts}
                 createRule={createRule}
                 updateRule={updateRule}
                 month={month}
@@ -589,18 +548,14 @@ function MetricCard({
 
 function TransactionTable({
   rows,
-  accounts,
   settle,
-  createAccount,
   onDone,
   onDelete,
   onReverse,
   compact = false,
 }: {
   rows: FinanceTransaction[];
-  accounts: FinanceAccount[];
   settle: React.ComponentProps<typeof SettleTransactionPopover>["settle"];
-  createAccount: React.ComponentProps<typeof SettleTransactionPopover>["createAccount"];
   onDone: () => void;
   onDelete: (id: string) => void;
   onReverse: (id: string) => void;
@@ -640,7 +595,7 @@ function TransactionTable({
                 <td className="max-w-[260px] py-3 pr-3">
                   <p className="truncate font-medium text-admin-ink">{tx.description}</p>
                   <p className="truncate text-xs text-admin-ink-muted">
-                    {tx.category_name ?? "Sem categoria"} · {tx.account_name ?? "Sem conta"}
+                    {tx.category_name ?? "Sem categoria"}
                   </p>
                 </td>
                 <td className="py-3 pr-3">
@@ -680,9 +635,7 @@ function TransactionTable({
                       {canSettle && (
                         <SettleTransactionPopover
                           transaction={tx}
-                          accounts={accounts}
                           settle={settle}
-                          createAccount={createAccount}
                           onDone={onDone}
                         />
                       )}
@@ -713,7 +666,6 @@ function RecurringTable({
   onToggle,
   onEnd,
   categories,
-  accounts,
   createRule,
   updateRule,
   month,
@@ -723,7 +675,6 @@ function RecurringTable({
   onToggle: (id: string, isActive: boolean) => void;
   onEnd: (id: string) => void;
   categories: FinanceCategory[];
-  accounts: FinanceAccount[];
   createRule: ReturnType<typeof useServerFn<typeof createFinanceRecurringRule>>;
   updateRule: ReturnType<typeof useServerFn<typeof updateFinanceRecurringRule>>;
   month: string;
@@ -766,7 +717,6 @@ function RecurringTable({
                   <NewRecurringDialog
                     rule={rule}
                     categories={categories}
-                    accounts={accounts}
                     createRule={createRule}
                     updateRule={updateRule}
                     month={month}
@@ -797,23 +747,18 @@ function RecurringTable({
 function NewTransactionDialog({
   onOpenChange,
   categories,
-  accounts,
   createTx,
-  createAccount,
   onDone,
 }: {
   onOpenChange: (open: boolean) => void;
   categories: FinanceCategory[];
-  accounts: FinanceAccount[];
   createTx: ReturnType<typeof useServerFn<typeof createFinanceTransaction>>;
-  createAccount: ReturnType<typeof useServerFn<typeof createFinanceAccount>>;
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<"income" | "expense">("income");
   const [currency, setCurrency] = useState<"BRL" | "EUR" | "USD">("BRL");
   const [categoryId, setCategoryId] = useState("");
-  const [accountId, setAccountId] = useState("");
   const [orderWizardOpen, setOrderWizardOpen] = useState(false);
   const orderCategoryId = categories.find(
     (category) => category.is_system && category.name === "Pedidos/Servicos",
@@ -830,7 +775,6 @@ function NewTransactionDialog({
           dueDate: String(form.get("dueDate") ?? ""),
           status: "pending",
           categoryId: categoryId || null,
-          accountId: accountId || null,
           paymentMethod: emptyToNull(form.get("paymentMethod")),
           notes: emptyToNull(form.get("notes")),
         },
@@ -935,7 +879,6 @@ function NewTransactionDialog({
                       value={currency}
                       onValueChange={(value) => {
                         setCurrency(value as typeof currency);
-                        setAccountId("");
                       }}
                     >
                       <SelectTrigger>
@@ -955,21 +898,6 @@ function NewTransactionDialog({
                     type="date"
                     defaultValue={new Date().toISOString().slice(0, 10)}
                     required
-                  />
-                </Field>
-                <Field label="Conta">
-                  <FinanceAccountCombobox
-                    accounts={accounts}
-                    currency={currency}
-                    value={accountId}
-                    onChange={setAccountId}
-                    onCreate={async (name, accountCurrency) => {
-                      const result = await createAccount({
-                        data: { name, type: "bank", currency: accountCurrency },
-                      });
-                      await onDone();
-                      return result.id;
-                    }}
                   />
                 </Field>
                 <Field label="Metodo">
@@ -1003,7 +931,6 @@ function NewTransactionDialog({
 
 function NewRecurringDialog({
   categories,
-  accounts,
   createRule,
   updateRule,
   month,
@@ -1011,7 +938,6 @@ function NewRecurringDialog({
   onDone,
 }: {
   categories: FinanceCategory[];
-  accounts: FinanceAccount[];
   createRule: ReturnType<typeof useServerFn<typeof createFinanceRecurringRule>>;
   updateRule: ReturnType<typeof useServerFn<typeof updateFinanceRecurringRule>>;
   month: string;
@@ -1022,7 +948,6 @@ function NewRecurringDialog({
   const [type, setType] = useState<"income" | "expense">(rule?.type ?? "expense");
   const [currency, setCurrency] = useState<"BRL" | "EUR">(rule?.currency === "EUR" ? "EUR" : "BRL");
   const [categoryId, setCategoryId] = useState(rule?.category_id ?? "");
-  const [accountId, setAccountId] = useState(rule?.account_id ?? "");
   const mutation = useMutation({
     mutationFn: (form: FormData) => {
       const data = {
@@ -1031,7 +956,6 @@ function NewRecurringDialog({
         amount: Number(form.get("amount") ?? 0),
         currency,
         categoryId: categoryId || null,
-        accountId: accountId || null,
         dayOfMonth: Number(form.get("dayOfMonth") ?? 1),
         startsOn: `${String(form.get("startsOn") ?? month).slice(0, 7)}-01`,
         endsOn: form.get("endsOn") ? `${String(form.get("endsOn")).slice(0, 7)}-01` : null,
@@ -1099,7 +1023,6 @@ function NewRecurringDialog({
                 value={currency}
                 onValueChange={(value) => {
                   setCurrency(value as "BRL" | "EUR");
-                  setAccountId("");
                 }}
               >
                 <SelectTrigger>
@@ -1134,7 +1057,7 @@ function NewRecurringDialog({
               <Input name="endsOn" type="month" defaultValue={rule?.ends_on?.slice(0, 7) ?? ""} />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div>
             <Field label="Categoria">
               <Select
                 value={categoryId || "none"}
@@ -1157,26 +1080,6 @@ function NewRecurringDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Conta">
-              <Select
-                value={accountId || "none"}
-                onValueChange={(value) => setAccountId(value === "none" ? "" : value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sem conta" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem conta</SelectItem>
-                  {accounts
-                    .filter((item) => item.is_active && item.currency === currency)
-                    .map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </Field>
           </div>
           <Button type="submit" disabled={mutation.isPending} className="w-full">
             {mutation.isPending ? "Salvando..." : "Salvar recorrencia"}
@@ -1184,426 +1087,6 @@ function NewRecurringDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function FinanceSettingsDialog({
-  onOpenChange,
-  categories,
-  accounts,
-  createCategory,
-  createAccount,
-  manageCategory,
-  manageAccount,
-  onDone,
-}: {
-  onOpenChange: (open: boolean) => void;
-  categories: FinanceCategory[];
-  accounts: FinanceAccount[];
-  createCategory: ReturnType<typeof useServerFn<typeof createFinanceCategory>>;
-  createAccount: ReturnType<typeof useServerFn<typeof createFinanceAccount>>;
-  manageCategory: ReturnType<typeof useServerFn<typeof manageFinanceCategory>>;
-  manageAccount: ReturnType<typeof useServerFn<typeof manageFinanceAccount>>;
-  onDone: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<FinanceAccount | null>(null);
-  const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editType, setEditType] = useState("");
-  const [editCurrency, setEditCurrency] = useState("");
-  const categoryMutation = useMutation({
-    mutationFn: (form: FormData) =>
-      createCategory({
-        data: {
-          name: String(form.get("name") ?? ""),
-          type: String(form.get("type") ?? "both") as "income" | "expense" | "both",
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Categoria criada");
-      onDone();
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao criar categoria"),
-  });
-  const accountMutation = useMutation({
-    mutationFn: (form: FormData) =>
-      createAccount({
-        data: {
-          name: String(form.get("name") ?? ""),
-          type: String(form.get("type") ?? "cash") as
-            | "cash"
-            | "bank"
-            | "card"
-            | "gateway"
-            | "other",
-          currency: String(form.get("currency") ?? "BRL") as "BRL" | "EUR" | "USD",
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Conta criada");
-      onDone();
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao criar conta"),
-  });
-  const manageMutation = useMutation({
-    mutationFn: async (input: {
-      kind: "account" | "category";
-      id: string;
-      action: "edit" | "archive" | "reactivate" | "remove";
-    }) => {
-      if (input.kind === "account")
-        return manageAccount({
-          data: {
-            id: input.id,
-            action: input.action,
-            name: input.action === "edit" ? editName : undefined,
-            type:
-              input.action === "edit"
-                ? (editType as FinanceAccount["type"] as
-                    | "cash"
-                    | "bank"
-                    | "card"
-                    | "gateway"
-                    | "other")
-                : undefined,
-            currency: input.action === "edit" ? (editCurrency as "BRL" | "EUR" | "USD") : undefined,
-          },
-        });
-      return manageCategory({
-        data: {
-          id: input.id,
-          action: input.action,
-          name: input.action === "edit" ? editName : undefined,
-          type: input.action === "edit" ? (editType as "income" | "expense" | "both") : undefined,
-        },
-      });
-    },
-    onSuccess: (result) => {
-      toast.success(
-        result.archivedInstead ? "Item com histórico arquivado" : "Configuração atualizada",
-      );
-      setEditingAccount(null);
-      setEditingCategory(null);
-      onDone();
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao atualizar"),
-  });
-  const manage = (
-    kind: "account" | "category",
-    id: string,
-    action: "edit" | "archive" | "reactivate" | "remove",
-  ) => {
-    if (
-      action === "remove" &&
-      !window.confirm("Remover este item? Se houver histórico, ele será arquivado.")
-    )
-      return;
-    manageMutation.mutate({ kind, id, action });
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        onOpenChange(next);
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Settings className="h-4 w-4" /> Configurar
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Categorias e contas</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-5 md:grid-cols-2">
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              categoryMutation.mutate(new FormData(e.currentTarget));
-              e.currentTarget.reset();
-            }}
-          >
-            <h3 className="font-display text-sm uppercase tracking-wide text-admin-ink-muted">
-              Categoria
-            </h3>
-            <Field label="Nome">
-              <Input name="name" required />
-            </Field>
-            <Field label="Tipo">
-              <Select name="type" defaultValue="both">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="income">Entrada</SelectItem>
-                  <SelectItem value="expense">Saida</SelectItem>
-                  <SelectItem value="both">Ambos</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Button type="submit" variant="outline" className="w-full">
-              Criar categoria
-            </Button>
-          </form>
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              accountMutation.mutate(new FormData(e.currentTarget));
-              e.currentTarget.reset();
-            }}
-          >
-            <h3 className="font-display text-sm uppercase tracking-wide text-admin-ink-muted">
-              Conta ou caixa
-            </h3>
-            <Field label="Nome">
-              <Input name="name" required />
-            </Field>
-            <Field label="Tipo">
-              <Select name="type" defaultValue="cash">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Caixa</SelectItem>
-                  <SelectItem value="bank">Banco</SelectItem>
-                  <SelectItem value="card">Cartao</SelectItem>
-                  <SelectItem value="gateway">Gateway</SelectItem>
-                  <SelectItem value="other">Outro</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Moeda">
-              <Select name="currency" defaultValue="BRL">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BRL">BRL</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Button type="submit" variant="outline" className="w-full">
-              Criar conta
-            </Button>
-          </form>
-        </div>
-        <div className="mt-5 grid gap-6 md:grid-cols-2">
-          <section className="space-y-2">
-            <h3 className="font-display font-semibold">Categorias</h3>
-            {categories.map((category) => (
-              <div key={category.id} className="rounded-lg border border-admin-border p-3 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span>
-                    {category.name} · {category.type} {category.is_system ? "· Sistema" : ""}{" "}
-                    {!category.is_active ? "· Arquivada" : ""}
-                  </span>
-                  {!category.is_system && (
-                    <div className="flex flex-wrap gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingCategory(category);
-                          setEditingAccount(null);
-                          setEditName(category.name);
-                          setEditType(category.type);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          manage(
-                            "category",
-                            category.id,
-                            category.is_active ? "archive" : "reactivate",
-                          )
-                        }
-                      >
-                        {category.is_active ? "Arquivar" : "Reativar"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => manage("category", category.id, "remove")}
-                      >
-                        Remover
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                {editingCategory?.id === category.id && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Input
-                      className="min-w-36 flex-1"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                    />
-                    <select
-                      className="rounded border border-admin-border bg-admin-bg px-2"
-                      value={editType}
-                      onChange={(e) => setEditType(e.target.value)}
-                    >
-                      <option value="income">Entrada</option>
-                      <option value="expense">Saída</option>
-                      <option value="both">Ambos</option>
-                    </select>
-                    <Button
-                      size="sm"
-                      disabled={manageMutation.isPending}
-                      onClick={() => manage("category", category.id, "edit")}
-                    >
-                      Salvar
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </section>
-          <section className="space-y-2">
-            <h3 className="font-display font-semibold">Contas e caixas</h3>
-            {accounts.map((account) => (
-              <div key={account.id} className="rounded-lg border border-admin-border p-3 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span>
-                    {account.name} · {account.type} · {account.currency}{" "}
-                    {!account.is_active ? "· Arquivada" : ""}
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setEditingAccount(account);
-                        setEditingCategory(null);
-                        setEditName(account.name);
-                        setEditType(account.type);
-                        setEditCurrency(account.currency);
-                      }}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        manage("account", account.id, account.is_active ? "archive" : "reactivate")
-                      }
-                    >
-                      {account.is_active ? "Arquivar" : "Reativar"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => manage("account", account.id, "remove")}
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                </div>
-                {editingAccount?.id === account.id && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Input
-                      className="min-w-36 flex-1"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                    />
-                    <select
-                      className="rounded border border-admin-border bg-admin-bg px-2"
-                      value={editType}
-                      onChange={(e) => setEditType(e.target.value)}
-                    >
-                      {["cash", "bank", "card", "gateway", "other"].map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className="rounded border border-admin-border bg-admin-bg px-2"
-                      value={editCurrency}
-                      disabled={account.has_history}
-                      title={
-                        account.has_history ? "Conta com histórico: moeda bloqueada" : undefined
-                      }
-                      onChange={(e) => setEditCurrency(e.target.value)}
-                    >
-                      {["BRL", "EUR", "USD"].map((currency) => (
-                        <option key={currency} value={currency}>
-                          {currency}
-                        </option>
-                      ))}
-                    </select>
-                    <Button
-                      size="sm"
-                      disabled={manageMutation.isPending}
-                      onClick={() => manage("account", account.id, "edit")}
-                    >
-                      Salvar
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </section>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CategoryAccountFields({
-  categories,
-  accounts,
-  type,
-}: {
-  categories: FinanceCategory[];
-  accounts: FinanceAccount[];
-  type: "income" | "expense";
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <Field label="Categoria">
-        <Select name="categoryId">
-          <SelectTrigger>
-            <SelectValue placeholder="Selecionar" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories
-              .filter((c) => c.type === type || c.type === "both")
-              .map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </Field>
-      <Field label="Conta">
-        <Select name="accountId">
-          <SelectTrigger>
-            <SelectValue placeholder="Selecionar" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id}>
-                {account.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-    </div>
   );
 }
 

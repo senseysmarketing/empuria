@@ -52,7 +52,6 @@ import {
   listPdvCashiers,
   listPdvFilterOptions,
   listPdvSalesHistory,
-  listPdvSettlementAccounts,
   getPdvSale,
   settlePdvSale,
   reversePdvSalePayment,
@@ -131,7 +130,6 @@ export function PdvHistoryPanel() {
   const voidSale = useServerFn(voidPdvSale);
   const settleSale = useServerFn(settlePdvSale);
   const reversePayment = useServerFn(reversePdvSalePayment);
-  const fetchAccounts = useServerFn(listPdvSettlementAccounts);
   const exportXlsx = useServerFn(exportPdvHistoryXlsx);
   const qc = useQueryClient();
 
@@ -209,10 +207,6 @@ export function PdvHistoryPanel() {
     queryKey: ["pdv-filter-options"],
     queryFn: () => fetchOptions(),
   });
-  const accountsQ = useQuery({
-    queryKey: ["pdv-settlement-accounts"],
-    queryFn: () => fetchAccounts(),
-  });
 
   const detailQ = useQuery({
     queryKey: ["pdv-sale-detail", selectedSaleId],
@@ -257,7 +251,6 @@ export function PdvHistoryPanel() {
     paidAt: string;
     settledAmount: number;
     settledCurrency: "BRL" | "EUR";
-    accountId: string;
     fxReferenceRate?: number | null;
     fxReferenceDate?: string | null;
     fxRate?: number | null;
@@ -561,7 +554,6 @@ export function PdvHistoryPanel() {
                         {sale.status === "pendente" && (
                           <PdvSettlePopover
                             sale={sale}
-                            accounts={accountsQ.data ?? []}
                             settle={confirmSettlement}
                             onDone={refreshSales}
                           />

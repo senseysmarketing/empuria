@@ -18,22 +18,18 @@ import { getEurBrlReferenceRate } from "@/lib/finance/fx.functions";
 import type { PdvSaleRecord } from "@/lib/admin/pdv-sales.functions";
 
 type Currency = "BRL" | "EUR";
-type Account = { id: string; name: string; currency: string; is_active: boolean };
 
 export function PdvSettlePopover({
   sale,
-  accounts,
   settle,
   onDone,
 }: {
   sale: PdvSaleRecord;
-  accounts: Account[];
   settle: (input: {
     saleId: string;
     paidAt: string;
     settledAmount: number;
     settledCurrency: Currency;
-    accountId: string;
     fxReferenceRate?: number | null;
     fxReferenceDate?: string | null;
     fxRate?: number | null;
@@ -48,7 +44,6 @@ export function PdvSettlePopover({
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
   const [currency, setCurrency] = useState<Currency>(baseCurrency);
   const [amount, setAmount] = useState(baseAmount.toFixed(2));
-  const [accountId, setAccountId] = useState("");
   const [fxRate, setFxRate] = useState("");
   const [saving, setSaving] = useState(false);
   const conversion = currency !== baseCurrency;
@@ -58,7 +53,6 @@ export function PdvSettlePopover({
     setPaidAt(new Date().toISOString().slice(0, 10));
     setCurrency(baseCurrency);
     setAmount(baseAmount.toFixed(2));
-    setAccountId("");
     setFxRate("");
   }, [open, baseCurrency, baseAmount]);
 
@@ -78,12 +72,10 @@ export function PdvSettlePopover({
     setAmount((baseCurrency === "EUR" ? baseAmount * rate : baseAmount / rate).toFixed(2));
   }, [baseAmount, baseCurrency, conversion, fxRate]);
 
-  const selectedAccount = accounts.find((account) => account.id === accountId);
   const canSave =
     !saving &&
     paidAt &&
     Number(amount) > 0 &&
-    selectedAccount?.currency === currency &&
     (!conversion || Number(fxRate) > 0) &&
     !fxQ.isFetching;
 
@@ -112,7 +104,6 @@ export function PdvSettlePopover({
               value={currency}
               onValueChange={(value: Currency) => {
                 setCurrency(value);
-                setAccountId("");
                 setFxRate("");
                 setAmount(baseAmount.toFixed(2));
               }}
@@ -156,23 +147,6 @@ export function PdvSettlePopover({
             onChange={(event) => setAmount(event.target.value)}
           />
         </div>
-        <div>
-          <Label>Conta {currency}</Label>
-          <Select value={accountId} onValueChange={setAccountId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione uma conta ativa" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts
-                .filter((account) => account.currency === currency)
-                .map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
         <Button
           className="w-full"
           disabled={!canSave}
@@ -184,7 +158,6 @@ export function PdvSettlePopover({
                 paidAt,
                 settledAmount: Number(amount),
                 settledCurrency: currency,
-                accountId,
                 fxReferenceRate: conversion && fxQ.data?.ok ? fxQ.data.rate : null,
                 fxReferenceDate: conversion && fxQ.data?.ok ? fxQ.data.date : null,
                 fxRate: conversion ? Number(fxRate) : null,
