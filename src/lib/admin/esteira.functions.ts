@@ -54,6 +54,7 @@ export const listOrders = createServerFn({ method: "GET" })
         .from("orders")
         .select("*")
         .is("deleted_at", null)
+        .in("payment_status", ["pendente", "aprovado"])
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
         .range(page * 1000, page * 1000 + 999);
@@ -76,12 +77,15 @@ export const updateOrder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const patch = { executed_at: new Date().toISOString() };
-    const { error } = await context.supabase
+    const { data: updated, error } = await context.supabase
       .from("orders")
       .update(patch as never)
       .eq("id", data.id)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
     if (error) throw new Error(error.message);
+    if (!updated) throw new Error("Pedido não encontrado ou excluído.");
     return { ok: true };
   });
 
@@ -243,9 +247,6 @@ export const createOrderFull = createServerFn({ method: "POST" })
         ? "aprovado"
         : "pendente";
 
-    const voucher =
-      payment_status === "aprovado" ? `EMP-${Date.now().toString(36).toUpperCase()}` : null;
-
     const insertPayload: Record<string, unknown> = {
       user_id: data.user_id ?? null,
       customer_name: data.customer_name,
@@ -280,41 +281,15 @@ export const createOrderFull = createServerFn({ method: "POST" })
               `${data.paid_at ?? new Date().toISOString().slice(0, 10)}T12:00:00.000Z`,
             ).toISOString()
           : null,
-      voucher_code: voucher,
     };
-    const { data: order, error } = await context.supabase
-      .from("orders")
-      .insert(insertPayload as never)
-      .select("id")
-      .single();
-
-    if (error || !order) throw new Error(error?.message ?? "Erro ao criar pedido");
-
-    // Audit log
-    await supabaseAdmin.from("audit_logs").insert({
-      actor_id: context.userId,
-      module: "esteira",
-      entity_type: "order",
-      entity_id: order.id,
-      action:
-        data.initiated_from === "financeiro"
-          ? "order.create.financeiro"
-          : `order.create.${data.payment_method}`,
-      new_data: {
-        amount_cents: data.amount_cents,
-        currency: data.currency,
-        payment_amount_cents: data.payment_amount_cents,
-        payment_currency: data.payment_currency,
-        settled_amount_cents: data.settled_amount_cents ?? null,
-        settled_currency: data.settled_currency ?? null,
-        fx_reference_rate: data.fx_reference_rate ?? null,
-        fx_rate: data.fx_rate ?? null,
-        payment_method: data.payment_method,
-        reason: data.reason ?? null,
-      },
-    });
-
-    return { id: order.id };
+    const { data: orderId, error } = await supabaseAdmin.rpc("esteira_create_order", {
+      p_payload: insertPayload,
+      p_actor: context.userId,
+      p_initiated_from: data.initiated_from,
+      p_reason: data.reason ?? null,
+    } as never);
+    if (error || !orderId) throw new Error(error?.message ?? "Erro ao criar pedido");
+    return { id: orderId };
   });
 
 // --- Order actions ----------------------------------------------------------
@@ -429,6 +404,7 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
       .from("orders")
       .select("amount_cents,currency,payment_amount_cents,payment_currency,payment_status")
       .eq("id", data.id)
+      .is("deleted_at", null)
       .single();
     if (orderErr || !order) throw new Error(orderErr?.message ?? "Pedido nao encontrado");
     const orderRow = order as unknown as {
@@ -441,10 +417,13 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
     if (orderRow.payment_status === "aprovado") {
       throw new Error("Pedido ja esta pago.");
     }
-    if (orderRow.payment_status === "estornado") {
-      throw new Error("Pedido estornado. Crie um novo pedido para cobrar novamente.");
+    if (orderRow.payment_status !== "pendente") {
+      throw new Error("Somente pedidos pendentes podem receber link de pagamento.");
     }
     const payCurrency = orderRow.payment_currency ?? orderRow.currency;
+    if ((orderRow.payment_amount_cents ?? orderRow.amount_cents) <= 0) {
+      throw new Error("Cortesia sem cobrança não pode gerar link de pagamento.");
+    }
     if (payCurrency !== "BRL") {
       throw new Error("Mercado Pago Brasil exige cobranca em BRL. Ajuste a moeda do pedido.");
     }
@@ -459,7 +438,9 @@ export const generatePaymentLink = createServerFn({ method: "POST" })
         payment_currency: payCurrency,
         payment_status: "pendente",
       } as never)
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .is("deleted_at", null)
+      .eq("payment_status", "pendente");
     if (error) throw new Error(error.message);
 
     // Reuse an active link if one already exists; otherwise create a new token.

@@ -10,9 +10,10 @@ export function summarizePendingPayments(
   const summary = { count: 0, BRL: 0, EUR: 0 };
   for (const order of orders) {
     if (order.payment_status !== "pendente") continue;
-    summary.count += 1;
     const currency = order.payment_currency ?? order.currency;
     const amount = order.payment_amount_cents ?? order.amount_cents ?? 0;
+    if (amount <= 0) continue;
+    summary.count += 1;
     if (currency === "BRL" || currency === "EUR") summary[currency] += amount;
   }
   return summary;

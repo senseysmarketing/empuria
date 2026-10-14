@@ -40,6 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
   paid: "Pago",
   pending: "Pendente",
   cancelled: "Cancelado",
+  deleted: "Excluído",
   voided: "Anulado",
 };
 
@@ -47,6 +48,7 @@ const STATUS_TONE: Record<string, string> = {
   paid: "bg-emerald-100 text-emerald-800 border-emerald-200",
   pending: "bg-amber-100 text-amber-800 border-amber-200",
   cancelled: "bg-red-100 text-red-800 border-red-200",
+  deleted: "bg-zinc-200 text-zinc-700 border-zinc-300",
   voided: "bg-zinc-200 text-zinc-700 border-zinc-300",
 };
 
@@ -139,6 +141,7 @@ export function HistoricoTab({ filters }: { filters: ReportFilters }) {
               <SelectItem value="paid">Pago</SelectItem>
               <SelectItem value="pending">Pendente</SelectItem>
               <SelectItem value="cancelled">Cancelado</SelectItem>
+              <SelectItem value="deleted">Excluído</SelectItem>
               <SelectItem value="voided">Anulado</SelectItem>
             </SelectContent>
           </Select>

@@ -3995,6 +3995,15 @@ export type Database = {
         Returns: undefined
       }
       email_exists: { Args: { p_email: string }; Returns: boolean }
+      esteira_create_order: {
+        Args: {
+          p_payload: Json
+          p_actor: string
+          p_initiated_from?: string
+          p_reason?: string | null
+        }
+        Returns: string
+      }
       esteira_delete_order: {
         Args: { p_order_id: string; p_actor: string; p_reason?: string | null }
         Returns: undefined

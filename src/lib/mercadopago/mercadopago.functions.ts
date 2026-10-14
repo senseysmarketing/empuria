@@ -334,7 +334,7 @@ async function mpFetch<T>(
 }
 
 async function loadOrder(orderId: string, userId: string, allowStaff = false) {
-  const { data, error } = await db.from("orders").select("*").eq("id", orderId).single();
+  const { data, error } = await db.from("orders").select("*").eq("id", orderId).is("deleted_at", null).single();
   if (error || !data) throw new Error(error?.message ?? "Pedido nao encontrado.");
   const order = data as OrderRow;
   if (!allowStaff && order.user_id !== userId) throw new Error("Pedido nao encontrado.");
@@ -482,7 +482,9 @@ async function syncOrderFromPayment(row: MercadoPagoPaymentRow) {
     .from("orders")
     .select("id, slot_id, service_metadata, payment_status")
     .eq("id", row.order_id)
+    .is("deleted_at", null)
     .maybeSingle();
+  if (!order) throw new Error("Pedido excluído ou não encontrado.");
   if (status === "recusado" && order?.slot_id && order.payment_status === "pendente") {
     const metadata = (order.service_metadata ?? {}) as Record<string, unknown>;
     if (!metadata.slot_released_after_payment_failure) {
@@ -501,7 +503,7 @@ async function syncOrderFromPayment(row: MercadoPagoPaymentRow) {
     }
   }
 
-  const { error } = await db.from("orders").update(patch).eq("id", row.order_id);
+  const { error } = await db.from("orders").update(patch).eq("id", row.order_id).is("deleted_at", null);
   if (error) throw new Error(error.message);
 
   // Mark any active public payment link for this order as paid.
@@ -1019,7 +1021,7 @@ import { resolvePaymentLinkForCharge } from "@/lib/payments/payment-links.functi
 
 async function loadOrderForPublicCharge(token: string): Promise<OrderRow> {
   const { order } = await resolvePaymentLinkForCharge(token);
-  const { data, error } = await db.from("orders").select("*").eq("id", order.id).single();
+  const { data, error } = await db.from("orders").select("*").eq("id", order.id).is("deleted_at", null).single();
   if (error || !data) throw new Error(error?.message ?? "Pedido nao encontrado.");
   return data as OrderRow;
 }

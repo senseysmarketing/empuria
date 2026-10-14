@@ -42,6 +42,7 @@ export async function assertMemberOrder(userId: string, orderId: string | null |
     .select("id")
     .eq("id", orderId)
     .eq("user_id", userId)
+    .is("deleted_at", null)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Serviço não pertence a este membro");
