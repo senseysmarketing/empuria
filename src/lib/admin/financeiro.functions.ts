@@ -268,6 +268,21 @@ export const deleteFinancePendingTransaction = createServerFn({ method: "POST" }
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    const { data: source, error: sourceError } = await db
+      .from("finance_transactions")
+      .select("source_module,source_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (sourceError || !source) throw new Error("Lançamento não encontrado.");
+    if (source.source_module === "orders" && source.source_id) {
+      const { error } = await db.rpc("esteira_delete_order", {
+        p_order_id: source.source_id,
+        p_actor: context.userId,
+        p_reason: data.reason ?? null,
+      });
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
     const { error } = await db.rpc("finance_delete_pending_transaction", {
       p_id: data.id,
       p_actor: context.userId,

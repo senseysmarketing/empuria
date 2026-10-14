@@ -10,7 +10,7 @@ const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const confirmPaymentSchema = z.object({
   orderId: z.string().uuid(),
   paidAt: isoDateSchema,
-  settledAmountCents: z.number().int().min(0),
+  settledAmountCents: z.number().int().positive(),
   settledCurrency: currencySchema,
   fxReferenceRate: z.number().positive().nullable().optional(),
   fxReferenceDate: isoDateSchema.nullable().optional(),
@@ -24,49 +24,19 @@ export async function confirmOrderPaymentInternal(
   actorId: string,
 ) {
   const data = confirmPaymentSchema.parse(input);
-  const { data: current, error: currentError } = await supabaseAdmin
-    .from("orders")
-    .select(
-      "id,payment_status,payment_amount_cents,payment_currency,amount_cents,currency,notes,fx_reference_rate,fx_reference_date,fx_rate,fx_source,fx_locked_at",
-    )
-    .eq("id", data.orderId)
-    .maybeSingle();
-  if (currentError || !current) throw new Error("Pedido não encontrado.");
-  if (current.currency !== data.settledCurrency && !data.fxRate)
-    throw new Error("Cotação aplicada obrigatória para conversão.");
-
-  const paidAt = new Date(`${data.paidAt}T12:00:00.000Z`).toISOString();
-  const patch = {
-    payment_status: "aprovado",
-    payment_method: "manual",
-    settled_amount_cents: data.settledAmountCents,
-    settled_currency: data.settledCurrency,
-    payment_account_id: null,
-    paid_at: paidAt,
-    fx_reference_rate:
-      data.fxReferenceRate === undefined ? current.fx_reference_rate : data.fxReferenceRate,
-    fx_reference_date:
-      data.fxReferenceDate === undefined ? current.fx_reference_date : data.fxReferenceDate,
-    fx_rate: data.fxRate === undefined ? current.fx_rate : data.fxRate,
-    fx_source: data.fxSource === undefined ? current.fx_source : data.fxSource,
-    fx_locked_at: data.fxRate === undefined ? current.fx_locked_at : data.fxRate ? paidAt : null,
-    voucher_code: `EMP-${Date.now().toString(36).toUpperCase()}`,
-    notes: data.notes ? [current.notes, data.notes].filter(Boolean).join("\n") : current.notes,
-  };
-  const { error } = await supabaseAdmin
-    .from("orders")
-    .update(patch as never)
-    .eq("id", data.orderId);
+  const { error } = await supabaseAdmin.rpc("esteira_settle_order", {
+    p_order_id: data.orderId,
+    p_actor: actorId,
+    p_paid_at: data.paidAt,
+    p_amount_cents: data.settledAmountCents,
+    p_currency: data.settledCurrency,
+    p_fx_reference_rate: data.fxReferenceRate ?? null,
+    p_fx_reference_date: data.fxReferenceDate ?? null,
+    p_fx_rate: data.fxRate ?? null,
+    p_fx_source: data.fxSource ?? null,
+    p_note: data.notes ?? null,
+  } as never);
   if (error) throw new Error(error.message);
-  await supabaseAdmin.from("audit_logs").insert({
-    actor_id: actorId,
-    module: "esteira",
-    entity_type: "order",
-    entity_id: data.orderId,
-    action: "order.payment.confirm",
-    old_data: current,
-    new_data: patch,
-  });
   return { ok: true };
 }
 
@@ -83,6 +53,7 @@ export const listOrders = createServerFn({ method: "GET" })
       const { data, error } = await context.supabase
         .from("orders")
         .select("*")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
         .range(page * 1000, page * 1000 + 999);
@@ -108,7 +79,8 @@ export const updateOrder = createServerFn({ method: "POST" })
     const { error } = await context.supabase
       .from("orders")
       .update(patch as never)
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .is("deleted_at", null);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -243,6 +215,16 @@ export const createOrderFull = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => fullOrderSchema.parse(d))
   .handler(async ({ data, context }) => {
+    if (
+      data.payment_method === "gratuito" &&
+      (data.amount_cents !== 0 || data.payment_amount_cents !== 0)
+    )
+      throw new Error("Cortesia exige valor comercial e cobrança iguais a zero.");
+    if (
+      data.payment_method === "received" &&
+      (data.settled_amount_cents == null || data.settled_amount_cents <= 0)
+    )
+      throw new Error("Informe o valor efetivamente recebido.");
     if (data.currency !== data.payment_currency && !data.fx_rate)
       throw new Error("Cotação aplicada obrigatória para conversão.");
     if (
@@ -279,11 +261,13 @@ export const createOrderFull = createServerFn({ method: "POST" })
       payment_currency: data.payment_currency,
       payment_amount_cents: data.payment_amount_cents,
       settled_amount_cents:
-        payment_status === "aprovado"
+        data.payment_method === "received"
           ? (data.settled_amount_cents ?? data.payment_amount_cents)
           : null,
       settled_currency:
-        payment_status === "aprovado" ? (data.settled_currency ?? data.payment_currency) : null,
+        data.payment_method === "received"
+          ? (data.settled_currency ?? data.payment_currency)
+          : null,
       payment_account_id: null,
       fx_reference_rate: data.fx_reference_rate ?? null,
       fx_reference_date: data.fx_reference_date ?? null,
@@ -291,7 +275,7 @@ export const createOrderFull = createServerFn({ method: "POST" })
       fx_source: data.fx_source ?? null,
       fx_locked_at: data.fx_rate ? new Date().toISOString() : null,
       paid_at:
-        payment_status === "aprovado"
+        data.payment_method === "received"
           ? new Date(
               `${data.paid_at ?? new Date().toISOString().slice(0, 10)}T12:00:00.000Z`,
             ).toISOString()
@@ -341,8 +325,8 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        reason: z.string().trim().min(3).max(280),
-        settledAmountCents: z.number().int().min(0),
+        reason: z.string().trim().max(280).optional(),
+        settledAmountCents: z.number().int().positive(),
         settledCurrency: currencySchema,
         paidAt: isoDateSchema,
         fxReferenceRate: z.number().positive().nullable().optional(),
@@ -369,34 +353,27 @@ export const markOrderPaidManual = createServerFn({ method: "POST" })
     );
   });
 
-export const cancelOrder = createServerFn({ method: "POST" })
+export const deleteOrder = createServerFn({ method: "POST" })
   .middleware([requireModule("esteira")])
   .inputValidator((d) =>
     z
       .object({
         id: z.string().uuid(),
-        reason: z.string().trim().min(3).max(280),
+        reason: z.string().trim().max(280).optional(),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("orders")
-      .update({ payment_status: "recusado" })
-      .eq("id", data.id);
+    const { error } = await supabaseAdmin.rpc("esteira_delete_order", {
+      p_order_id: data.id,
+      p_actor: context.userId,
+      p_reason: data.reason ?? null,
+    } as never);
     if (error) throw new Error(error.message);
-    await supabaseAdmin.from("audit_logs").insert({
-      actor_id: context.userId,
-      module: "esteira",
-      entity_type: "order",
-      entity_id: data.id,
-      action: "order.cancel",
-      new_data: { reason: data.reason },
-    });
     return { ok: true };
   });
 
-export const refundOrder = createServerFn({ method: "POST" })
+export const reverseOrderPayment = createServerFn({ method: "POST" })
   .middleware([requireModule("esteira")])
   .inputValidator((d) =>
     z
@@ -407,19 +384,32 @@ export const refundOrder = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .update({ payment_status: "estornado" })
-      .eq("id", data.id);
-    if (error) throw new Error(error.message);
-    await supabaseAdmin.from("audit_logs").insert({
-      actor_id: context.userId,
-      module: "esteira",
-      entity_type: "order",
-      entity_id: data.id,
-      action: "order.refund",
-      new_data: { reason: data.reason },
+      .select("payment_status,payment_method,deleted_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (
+      orderError ||
+      !order ||
+      order.deleted_at ||
+      order.payment_status !== "aprovado" ||
+      order.payment_method === "gratuito"
+    )
+      throw new Error("Somente baixa recebida de pedido ativo pode ser estornada.");
+    const { data: mirror, error: mirrorError } = await supabaseAdmin
+      .from("finance_transactions")
+      .select("id")
+      .eq("source_module", "orders")
+      .eq("source_id", data.id)
+      .maybeSingle();
+    if (mirrorError || !mirror) throw new Error("Lançamento financeiro não encontrado.");
+    const { error } = await supabaseAdmin.rpc("finance_reverse_settlement", {
+      p_id: mirror.id,
+      p_actor: context.userId,
+      p_reason: data.reason,
     });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 

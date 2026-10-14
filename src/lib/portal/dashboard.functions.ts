@@ -21,6 +21,7 @@ export const getPortalDashboard = createServerFn({ method: "GET" })
           "id,service_title,payment_status,delivery_status,amount_cents,currency,voucher_code,created_at,service_id,slot_id",
         )
         .eq("user_id", userId)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(5),
       supabase

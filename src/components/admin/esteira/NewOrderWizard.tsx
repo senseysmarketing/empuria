@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Search, UserPlus } from "lucide-react";
@@ -31,7 +31,7 @@ import { listServicesAdmin } from "@/lib/admin/slots.functions";
 import { getEurBrlReferenceRate } from "@/lib/finance/fx.functions";
 
 type Currency = "BRL" | "EUR";
-type PaymentState = "pending" | "received" | "gratuito";
+type PaymentState = "pendente" | "received" | "gratuito";
 type Customer = {
   id: string | null;
   full_name: string | null;
@@ -83,12 +83,14 @@ export function NewOrderWizard({
   const [paymentCurrency, setPaymentCurrency] = useState<Currency>("EUR");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [fxRate, setFxRate] = useState("");
-  const [paymentState, setPaymentState] = useState<PaymentState>("pending");
+  const [paymentState, setPaymentState] = useState<PaymentState>("pendente");
   const [settledAmount, setSettledAmount] = useState("");
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [confirmFree, setConfirmFree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState(false);
 
   const { data: services = [] } = useQuery({
@@ -121,11 +123,12 @@ export function NewOrderWizard({
       setPaymentCurrency("EUR");
       setPaymentAmount("");
       setFxRate("");
-      setPaymentState("pending");
+      setPaymentState("pendente");
       setSettledAmount("");
       setNotes("");
       setConfirmFree(false);
       setCreated(false);
+      setFormError(null);
     }
   }, [open]);
 
@@ -169,17 +172,32 @@ export function NewOrderWizard({
   }, [paymentState, paymentAmount]);
   useEffect(() => {
     if (isFree) setPaymentState("gratuito");
-    else if (paymentState === "gratuito") setPaymentState("pending");
+    else if (paymentState === "gratuito") setPaymentState("pendente");
   }, [isFree, paymentState]);
 
-  const canSubmit =
-    !!customer &&
-    commercialAmount !== "" &&
-    paymentAmount !== "" &&
-    (!conversion || Number(fxRate) > 0) &&
-    (serviceMode === "cadastrado" ? !!service : title.trim().length >= 2) &&
-    (!isFree || confirmFree) &&
-    (paymentState !== "received" || settledAmount !== "");
+  const validationMessage = !customer
+    ? "Selecione ou crie um cliente."
+    : serviceMode === "cadastrado" && !service
+      ? "Selecione um serviço."
+      : serviceMode === "avulso" && title.trim().length < 2
+        ? "Informe o título do serviço."
+        : commercialAmount === "" ||
+            !Number.isFinite(Number(commercialAmount)) ||
+            Number(commercialAmount) < 0
+          ? "Informe um valor comercial válido."
+          : paymentAmount === "" ||
+              !Number.isFinite(Number(paymentAmount)) ||
+              Number(paymentAmount) < 0
+            ? "Informe uma cobrança prevista válida."
+            : conversion && !(Number(fxRate) > 0)
+              ? "Informe a cotação aplicada para a conversão."
+              : isFree && !confirmFree
+                ? "Confirme que o pedido é gratuito."
+                : !isFree && paymentCents <= 0
+                  ? "A cobrança deve ser maior que zero."
+                  : paymentState === "received" && (!paidAt || !(settledCents > 0))
+                    ? "Informe data e valor recebido válidos."
+                    : null;
 
   const selectService = (id: string) => {
     const selected = (services as Service[]).find((item) => item.id === id);
@@ -211,7 +229,14 @@ export function NewOrderWizard({
   };
 
   const submit = async () => {
-    if (!canSubmit || !customer) return;
+    if (submittingRef.current) return;
+    if (validationMessage || !customer) {
+      setFormError(validationMessage ?? "Selecione um cliente.");
+      toast.error(validationMessage ?? "Selecione um cliente.");
+      return;
+    }
+    submittingRef.current = true;
+    setFormError(null);
     setSubmitting(true);
     try {
       await createOrder({
@@ -242,8 +267,11 @@ export function NewOrderWizard({
       onCreated();
       toast.success("Pedido criado e sincronizado");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erro ao criar pedido");
+      const message = error instanceof Error ? error.message : "Erro ao criar pedido";
+      setFormError(message);
+      toast.error(message);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -443,7 +471,7 @@ export function NewOrderWizard({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">A receber</SelectItem>
+                  <SelectItem value="pendente">A receber</SelectItem>
                   <SelectItem value="received">Já recebido</SelectItem>
                   <SelectItem value="gratuito" disabled={!isFree}>
                     Gratuito
@@ -487,6 +515,11 @@ export function NewOrderWizard({
                 </>
               )}
             </div>
+            {(formError || validationMessage) && (
+              <p role="alert" className="text-sm text-amber-800">
+                {formError ?? validationMessage}
+              </p>
+            )}
           </div>
         )}
         {step === 4 && created && (
@@ -529,7 +562,7 @@ export function NewOrderWizard({
                   Próximo
                 </Button>
               ) : (
-                <Button disabled={!canSubmit || submitting} onClick={submit}>
+                <Button disabled={submitting} onClick={submit}>
                   {submitting ? "Criando..." : "Criar pedido"}
                 </Button>
               )}
