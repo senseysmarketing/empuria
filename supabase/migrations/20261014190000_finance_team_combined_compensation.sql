@@ -11,7 +11,7 @@ ALTER TABLE public.finance_payout_rules ADD CONSTRAINT finance_payout_rules_shap
     AND amount_cents IS NULL AND currency IS NULL AND day_of_month IS NULL)
 );
 
-CREATE TABLE public.finance_payout_skips (
+CREATE TABLE IF NOT EXISTS public.finance_payout_skips (
   rule_id uuid NOT NULL REFERENCES public.finance_payout_rules(id),
   period_month date NOT NULL CHECK (extract(day FROM period_month) = 1),
   currency text NOT NULL CHECK (currency IN ('BRL','EUR')),
@@ -188,7 +188,7 @@ BEGIN
 END $$;
 
 -- New API is additive. The old save RPC remains callable by the published UI.
-CREATE FUNCTION public.finance_save_team_compensation(p_data jsonb,p_actor uuid)
+CREATE OR REPLACE FUNCTION public.finance_save_team_compensation(p_data jsonb,p_actor uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 DECLARE v_payee_id uuid;
   v_payee public.finance_payees%ROWTYPE;
@@ -341,7 +341,7 @@ BEGIN
   RETURN v_payee_id;
 END $$;
 
-CREATE FUNCTION public.finance_skip_goal_commission(p_rule_id uuid,p_month date,p_actor uuid)
+CREATE OR REPLACE FUNCTION public.finance_skip_goal_commission(p_rule_id uuid,p_month date,p_actor uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 DECLARE v_rule public.finance_payout_rules%ROWTYPE;
   v_payout public.finance_payouts%ROWTYPE;
@@ -376,7 +376,7 @@ BEGIN
       'finance.goal_commission.skip',jsonb_build_object('month',p_month,'currency',v_rule.currency));
 END $$;
 
-CREATE FUNCTION public.finance_set_team_rule_state(p_rule_id uuid,p_month date,
+CREATE OR REPLACE FUNCTION public.finance_set_team_rule_state(p_rule_id uuid,p_month date,
   p_action text,p_remove_pending boolean,p_actor uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 DECLARE v_rule public.finance_payout_rules%ROWTYPE;
@@ -425,6 +425,33 @@ DECLARE v_old uuid:='522ba577-cb4a-41e2-a8c3-4667f58a6795';
   v_canonical uuid:='e052e873-f1c8-490b-8a44-493bd36483ea';
   v_actor uuid:='37110d33-3ba0-42b4-8a1f-cab7d1a4d30e';
 BEGIN
+  -- Supabase Preview may clone production after this guarded reconciliation
+  -- has already run, then replay this file from the repository. Only a fully
+  -- reconciled state (including its audit marker) may be skipped.
+  IF EXISTS (SELECT 1 FROM public.finance_payees
+      WHERE id=v_old AND archived_at IS NOT NULL AND NOT is_active)
+    AND EXISTS (SELECT 1 FROM public.finance_payees
+      WHERE id=v_canonical AND archived_at IS NULL AND is_active)
+    AND EXISTS (SELECT 1 FROM public.finance_payout_rules
+      WHERE id='4a576573-1e03-4dff-811a-f623e44ce936' AND payee_id=v_canonical)
+    AND EXISTS (SELECT 1 FROM public.finance_payouts
+      WHERE id='c0a9eb72-a4e1-46f7-8158-bc3c07a918c1' AND payee_id=v_canonical)
+    AND NOT EXISTS (SELECT 1 FROM public.finance_payout_rules WHERE payee_id=v_old)
+    AND NOT EXISTS (SELECT 1 FROM public.finance_payouts WHERE payee_id=v_old)
+    AND EXISTS (SELECT 1 FROM public.audit_logs
+      WHERE entity_id=v_old AND action='finance.team_payee.consolidate'
+        AND new_data->>'canonical_payee_id'=v_canonical::text)
+  THEN RETURN; END IF;
+
+  -- Empty Preview seeds do not contain these production records. Any partial
+  -- set still falls through to the strict preflight and aborts.
+  IF NOT EXISTS (SELECT 1 FROM public.finance_payees WHERE id IN (v_old,v_canonical))
+    AND NOT EXISTS (SELECT 1 FROM public.finance_payout_rules WHERE id IN
+      ('4a576573-1e03-4dff-811a-f623e44ce936','43c786ce-12d0-472b-9d56-34e9d2496653'))
+    AND NOT EXISTS (SELECT 1 FROM public.finance_payouts WHERE id IN
+      ('c0a9eb72-a4e1-46f7-8158-bc3c07a918c1','897cb778-928b-4188-b478-6a89ac7ee904'))
+  THEN RETURN; END IF;
+
   IF (SELECT count(*) FROM public.finance_payees WHERE id IN (v_old,v_canonical)
       AND name='Gabriel Facioli' AND type='team' AND profile_id IS NULL
       AND archived_at IS NULL AND created_by=v_actor)<>2
