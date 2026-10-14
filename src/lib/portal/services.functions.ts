@@ -13,43 +13,41 @@ export const getMyServices = createServerFn({ method: "GET" })
         "id,service_id,service_title,amount_cents,currency,payment_status,delivery_status,voucher_code,service_metadata,slot_id,host_profile_id,assigned_staff_id,created_at,executed_at",
       )
       .eq("user_id", userId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     const list = orders ?? [];
-    const serviceIds = Array.from(new Set(list.map((o) => o.service_id).filter(Boolean) as string[]));
+    const serviceIds = Array.from(
+      new Set(list.map((o) => o.service_id).filter(Boolean) as string[]),
+    );
     const slotIds = list.map((o) => o.slot_id).filter(Boolean) as string[];
     const hostIds = list.map((o) => o.host_profile_id).filter(Boolean) as string[];
 
-    const [{ data: services }, { data: slots }, { data: hosts }, { data: docs }] = await Promise.all([
-      serviceIds.length
-        ? supabase
-            .from("services")
-            .select("id,slug,kind,title,meeting_address,short_description,document_checklist")
-            .in("id", serviceIds)
-        : Promise.resolve({ data: [] as never[] }),
-      slotIds.length
-        ? supabase
-            .from("availability_slots")
-            .select("id,starts_at,ends_at")
-            .in("id", slotIds)
-        : Promise.resolve({ data: [] as never[] }),
-      hostIds.length
-        ? supabase
-            .from("profiles")
-            .select("id,full_name,avatar_url,phone")
-            .in("id", hostIds)
-        : Promise.resolve({ data: [] as never[] }),
-      list.length
-        ? supabase
-            .from("order_documents")
-            .select("*")
-            .in(
-              "order_id",
-              list.map((o) => o.id),
-            )
-            .order("position", { ascending: true })
-        : Promise.resolve({ data: [] as never[] }),
-    ]);
+    const [{ data: services }, { data: slots }, { data: hosts }, { data: docs }] =
+      await Promise.all([
+        serviceIds.length
+          ? supabase
+              .from("services")
+              .select("id,slug,kind,title,meeting_address,short_description,document_checklist")
+              .in("id", serviceIds)
+          : Promise.resolve({ data: [] as never[] }),
+        slotIds.length
+          ? supabase.from("availability_slots").select("id,starts_at,ends_at").in("id", slotIds)
+          : Promise.resolve({ data: [] as never[] }),
+        hostIds.length
+          ? supabase.from("profiles").select("id,full_name,avatar_url,phone").in("id", hostIds)
+          : Promise.resolve({ data: [] as never[] }),
+        list.length
+          ? supabase
+              .from("order_documents")
+              .select("*")
+              .in(
+                "order_id",
+                list.map((o) => o.id),
+              )
+              .order("position", { ascending: true })
+          : Promise.resolve({ data: [] as never[] }),
+      ]);
 
     return {
       orders: list,
@@ -62,9 +60,7 @@ export const getMyServices = createServerFn({ method: "GET" })
 
 export const toggleOrderDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    z.object({ id: z.string().uuid(), checked: z.boolean() }).parse(d),
-  )
+  .inputValidator((d) => z.object({ id: z.string().uuid(), checked: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("order_documents")
@@ -84,6 +80,7 @@ export const markDocumentsReady = createServerFn({ method: "POST" })
       .from("orders")
       .select("id,user_id")
       .eq("id", data.orderId)
+      .is("deleted_at", null)
       .single();
     if (!order || order.user_id !== userId) throw new Error("Pedido não encontrado");
     const { error } = await supabase

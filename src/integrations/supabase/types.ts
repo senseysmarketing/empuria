@@ -2492,6 +2492,8 @@ export type Database = {
           currency: string
           customer_email: string | null
           customer_name: string
+          deleted_at: string | null
+          deleted_by: string | null
           delivery_status: Database["public"]["Enums"]["order_delivery_status"]
           executed_at: string | null
           external_reference: string | null
@@ -2533,6 +2535,8 @@ export type Database = {
           currency?: string
           customer_email?: string | null
           customer_name: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           delivery_status?: Database["public"]["Enums"]["order_delivery_status"]
           executed_at?: string | null
           external_reference?: string | null
@@ -2574,6 +2578,8 @@ export type Database = {
           currency?: string
           customer_email?: string | null
           customer_name?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           delivery_status?: Database["public"]["Enums"]["order_delivery_status"]
           executed_at?: string | null
           external_reference?: string | null
@@ -3989,6 +3995,25 @@ export type Database = {
         Returns: undefined
       }
       email_exists: { Args: { p_email: string }; Returns: boolean }
+      esteira_delete_order: {
+        Args: { p_order_id: string; p_actor: string; p_reason?: string | null }
+        Returns: undefined
+      }
+      esteira_settle_order: {
+        Args: {
+          p_order_id: string
+          p_actor: string
+          p_paid_at: string
+          p_amount_cents: number
+          p_currency: string
+          p_fx_reference_rate?: number | null
+          p_fx_reference_date?: string | null
+          p_fx_rate?: number | null
+          p_fx_source?: string | null
+          p_note?: string | null
+        }
+        Returns: undefined
+      }
       finance_account_id_for_payment: {
         Args: { p_currency: string; p_payment_method: string }
         Returns: string

@@ -3,26 +3,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { summarizePendingPayments } from "@/lib/admin/esteira-pending";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import QRCode from "qrcode";
 import {
   listOrders,
   updateOrder,
   markOrderPaidManual,
-  cancelOrder,
-  refundOrder,
+  deleteOrder,
+  reverseOrderPayment,
 } from "@/lib/admin/esteira.functions";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -33,12 +25,8 @@ import {
 import {
   CheckCircle2,
   Plus,
-  QrCode,
-  MoreHorizontal,
-  Copy,
-  Ban,
   RotateCcw,
-  AlertTriangle,
+  Trash2,
   ShoppingCart,
   Clock,
   Loader2,
@@ -66,9 +54,19 @@ const formatMoney = (cents: number | null | undefined, currency = "EUR") =>
 const STATUS_COLOR: Record<string, string> = {
   pendente: "bg-amber-100 text-amber-900",
   aprovado: "bg-emerald-100 text-emerald-900",
-  recusado: "bg-red-100 text-red-900",
+  recusado: "bg-slate-100 text-slate-700",
   estornado: "bg-slate-200 text-slate-700",
 };
+
+function paymentLabel(order: Order) {
+  if (order.payment_status === "aprovado" && order.payment_method === "gratuito") return "Gratuito";
+  if (order.payment_status === "aprovado") return "Recebido";
+  if (order.payment_status === "pendente") return "Pendente";
+  return order.payment_status === "estornado" ? "Estornado" : "Cancelado";
+}
+
+const clipped = (value: string, limit: number) =>
+  value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
 
 const DELIVERY_COLOR: Record<string, string> = {
   aguardando_pagamento: "bg-amber-50 text-amber-800",
@@ -81,7 +79,7 @@ const DELIVERY_COLOR: Record<string, string> = {
 const PAYMENT_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Todos pagamentos" },
   { value: "pendente", label: "Pendente" },
-  { value: "aprovado", label: "Aprovado" },
+  { value: "aprovado", label: "Recebido / Gratuito" },
   { value: "recusado", label: "Recusado" },
   { value: "estornado", label: "Estornado" },
 ];
@@ -108,7 +106,6 @@ type Order = {
     | "processando"
     | "agendado"
     | "concluido";
-  voucher_code: string | null;
   created_at: string;
   executed_at: string | null;
   amount_cents?: number;
@@ -124,19 +121,15 @@ type Order = {
   fx_rate?: number | null;
   fx_source?: string | null;
   payment_method?: string | null;
-  payment_provider_reference?: string | null;
   notes?: string | null;
 };
 
 function EsteiraPage() {
-  // Módulo Esteira já é validado pelo middleware — qualquer staff com acesso pode cancelar/estornar.
-  const canAction = (_key: string) => true;
-
   const fetchOrders = useServerFn(listOrders);
   const update = useServerFn(updateOrder);
   const markManual = useServerFn(markOrderPaidManual);
-  const cancel = useServerFn(cancelOrder);
-  const refund = useServerFn(refundOrder);
+  const remove = useServerFn(deleteOrder);
+  const reverse = useServerFn(reverseOrderPayment);
   const fetchFx = useServerFn(getEurBrlReferenceRate);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -144,14 +137,13 @@ function EsteiraPage() {
   const [deliveryFilter, setDeliveryFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [voucherUrl, setVoucherUrl] = useState<string | null>(null);
-  const [voucherCode, setVoucherCode] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [selected, setSelected] = useState<Order | null>(null);
   const [actionPrompt, setActionPrompt] = useState<{
-    kind: "manual" | "cancel" | "refund";
+    kind: "manual" | "delete" | "reverse";
     order: Order;
   } | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const [reasonInput, setReasonInput] = useState("");
   const [settledAmount, setSettledAmount] = useState("");
   const [settledCurrency, setSettledCurrency] = useState<"BRL" | "EUR">("EUR");
@@ -166,8 +158,11 @@ function EsteiraPage() {
     queryFn: () => fetchOrders() as unknown as Promise<Order[]>,
   });
   const settlementOrder = actionPrompt?.kind === "manual" ? actionPrompt.order : null;
-  const settlementBaseCurrency = (settlementOrder?.currency ?? "EUR") as "BRL" | "EUR";
-  const settlementBaseAmountCents = settlementOrder?.amount_cents ?? 0;
+  const settlementBaseCurrency = (settlementOrder?.payment_currency ??
+    settlementOrder?.currency ??
+    "EUR") as "BRL" | "EUR";
+  const settlementBaseAmountCents =
+    settlementOrder?.payment_amount_cents ?? settlementOrder?.amount_cents ?? 0;
   const settlementConversion = !!settlementOrder && settlementBaseCurrency !== settledCurrency;
   const settlementFxQ = useQuery({
     queryKey: [
@@ -217,8 +212,7 @@ function EsteiraPage() {
       if (paymentFilter !== "all" && o.payment_status !== paymentFilter) return false;
       if (deliveryFilter !== "all" && o.delivery_status !== deliveryFilter) return false;
       if (q) {
-        const hay =
-          `${o.customer_name} ${o.customer_email ?? ""} ${o.service_title} ${o.voucher_code ?? ""}`.toLowerCase();
+        const hay = `${o.customer_name} ${o.customer_email ?? ""} ${o.service_title}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -246,7 +240,11 @@ function EsteiraPage() {
       setPage(1);
     };
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ["orders"] });
+  const refresh = () => {
+    for (const key of ["orders", "finance-transactions", "finance-dashboard"]) {
+      qc.invalidateQueries({ queryKey: [key], refetchType: "active" });
+    }
+  };
 
   // Summary tiles
   const summary = useMemo(() => {
@@ -265,11 +263,6 @@ function EsteiraPage() {
       (o) => o.payment_status === "aprovado" && !!o.paid_at && isToday(o.paid_at),
     ).length;
     const inExec = orders.filter((o) => o.delivery_status === "processando").length;
-    const late = orders.filter(
-      (o) =>
-        o.payment_status === "pendente" &&
-        new Date(o.created_at).getTime() < Date.now() - 1000 * 60 * 60 * 48,
-    ).length;
     let eur = 0;
     let brl = 0;
     for (const o of orders) {
@@ -284,7 +277,6 @@ function EsteiraPage() {
       waiting,
       paidToday,
       inExec,
-      late,
       eur,
       brl,
       pendingEur: pending.EUR,
@@ -292,35 +284,44 @@ function EsteiraPage() {
     };
   }, [orders]);
 
-  const showVoucher = async (code: string) => {
-    const dataUrl = await QRCode.toDataURL(code, { width: 320, margin: 2 });
-    setVoucherUrl(dataUrl);
-    setVoucherCode(code);
-  };
-
   const markExecuted = async (id: string) => {
-    await update({ data: { id, executed: true } });
-    toast.success("Marcado como executado");
-    refresh();
-  };
-
-  const copy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copiado`);
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      await update({ data: { id, executed: true } });
+      toast.success("Marcado como executado");
+      setSelected(null);
+      refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao marcar execução");
+    } finally {
+      setActionBusy(false);
+    }
   };
 
   const runPrompt = async () => {
-    if (!actionPrompt || reasonInput.trim().length < 3) {
-      toast.error("Motivo obrigatório (mín. 3 caracteres)");
+    if (!actionPrompt || actionBusy) return;
+    if (actionPrompt.kind === "reverse" && reasonInput.trim().length < 3) {
+      toast.error("Motivo do estorno obrigatório (mín. 3 caracteres)");
       return;
     }
+    if (
+      actionPrompt.kind === "manual" &&
+      (!paidAt ||
+        !(Number(settledAmount) > 0) ||
+        (settlementConversion && !(Number(settlementFxRate) > 0)))
+    ) {
+      toast.error("Informe data, valor e cotação válida quando houver conversão.");
+      return;
+    }
+    setActionBusy(true);
     try {
       const { kind, order } = actionPrompt;
       if (kind === "manual")
         await markManual({
           data: {
             id: order.id,
-            reason: reasonInput,
+            reason: reasonInput || undefined,
             settledAmountCents: Math.round(Number(settledAmount) * 100),
             settledCurrency,
             paidAt,
@@ -330,14 +331,23 @@ function EsteiraPage() {
             fxSource: settlementConversion ? (settlementFxSource ?? "MANUAL") : undefined,
           },
         });
-      if (kind === "cancel") await cancel({ data: { id: order.id, reason: reasonInput } });
-      if (kind === "refund") await refund({ data: { id: order.id, reason: reasonInput } });
-      toast.success("Ação registrada");
+      if (kind === "delete")
+        await remove({ data: { id: order.id, reason: reasonInput || undefined } });
+      if (kind === "reverse") await reverse({ data: { id: order.id, reason: reasonInput } });
+      toast.success(
+        kind === "manual"
+          ? "Baixa confirmada"
+          : kind === "reverse"
+            ? "Baixa estornada"
+            : "Pedido excluído",
+      );
       setActionPrompt(null);
       setReasonInput("");
       refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      setActionBusy(false);
     }
   };
 
@@ -368,7 +378,7 @@ function EsteiraPage() {
               ⚠ {summary.waiting} pedido(s) aguardando definição de pagamento
             </p>
             <p className="text-sm">
-              Dê baixa nos pedidos pagos ou cancele os que não serão concluídos.
+              Dê baixa nos pedidos pagos ou exclua os que não serão concluídos.
             </p>
             <p className="mt-1 text-sm font-semibold">
               BRL pendente: {formatMoney(summary.pendingBrl, "BRL")} · EUR pendente:{" "}
@@ -407,7 +417,6 @@ function EsteiraPage() {
           tone="green"
         />
         <AdminStatCard label="Em execução" value={summary.inExec} icon={Loader2} tone="blue" />
-        <AdminStatCard label="Atrasados" value={summary.late} icon={AlertTriangle} tone="red" />
         <AdminStatCard
           label="Receita BRL"
           value={formatMoney(summary.brl, "BRL")}
@@ -444,7 +453,7 @@ function EsteiraPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Buscar por cliente, e-mail, serviço ou voucher…"
+                placeholder="Buscar por cliente, e-mail ou serviço…"
                 className="pl-8 bg-admin-bg border-admin-border h-9"
               />
             </div>
@@ -479,29 +488,31 @@ function EsteiraPage() {
           <div className="p-8 text-center text-admin-ink-muted text-sm">Carregando…</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-admin-bg text-[10px] uppercase tracking-wider text-admin-ink-muted">
-                <tr>
-                  <th className="text-left p-3 font-display">Cliente</th>
-                  <th className="text-left p-3 font-display">Serviço</th>
-                  <th className="text-right p-3 font-display">Valor</th>
-                  <th className="text-left p-3 font-display">Pagamento</th>
-                  <th className="text-left p-3 font-display">Execução</th>
-                  <th className="text-left p-3 font-display">Voucher</th>
-                  <th className="text-left p-3 font-display">Data</th>
-                  <th className="text-right p-3 font-display">Ações</th>
+            <table className="w-full min-w-[980px] text-sm">
+              <thead className="text-left text-xs uppercase tracking-wide text-admin-ink-muted">
+                <tr className="border-b border-admin-border">
+                  <th className="py-3 pl-3 pr-3">Cliente</th>
+                  <th className="py-3 pr-3">Serviço</th>
+                  <th className="py-3 pr-3 text-right">Valor</th>
+                  <th className="py-3 pr-3">Pagamento</th>
+                  <th className="py-3 pr-3">Execução</th>
+                  <th className="py-3 pr-3">Data</th>
+                  <th className="py-3 pl-3 pr-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {paged.map((o) => (
                   <tr
                     key={o.id}
-                    className="border-t border-admin-border hover:bg-admin-bg/50 cursor-pointer"
+                    className="border-b border-admin-border last:border-0 hover:bg-admin-bg/50 cursor-pointer"
                     onClick={() => setSelected(o)}
                   >
-                    <td className="p-3">
-                      <div className="text-admin-ink flex items-center gap-2">
-                        {o.customer_name}
+                    <td className="max-w-[230px] py-3 pl-3 pr-3">
+                      <div
+                        className="text-admin-ink flex min-w-0 items-center gap-2 whitespace-nowrap"
+                        title={o.customer_name}
+                      >
+                        <span className="truncate font-medium">{clipped(o.customer_name, 28)}</span>
                         {!o.user_id && (
                           <span className="text-[9px] uppercase bg-amber-100 text-amber-800 px-1.5 rounded">
                             sem conta
@@ -509,11 +520,23 @@ function EsteiraPage() {
                         )}
                       </div>
                       {o.customer_email && (
-                        <div className="text-xs text-admin-ink-muted">{o.customer_email}</div>
+                        <div
+                          className="truncate whitespace-nowrap text-xs text-admin-ink-muted"
+                          title={o.customer_email}
+                        >
+                          {clipped(o.customer_email, 32)}
+                        </div>
                       )}
                     </td>
-                    <td className="p-3 text-admin-ink-soft">{o.service_title}</td>
-                    <td className="p-3 text-right tabular-nums">
+                    <td
+                      className="max-w-[260px] py-3 pr-3 text-admin-ink-soft"
+                      title={o.service_title}
+                    >
+                      <span className="block truncate whitespace-nowrap">
+                        {clipped(o.service_title, 40)}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums whitespace-nowrap">
                       <div>{formatMoney(o.amount_cents, o.currency)}</div>
                       {o.settled_amount_cents != null && (
                         <div className="text-xs text-admin-ink-muted">
@@ -526,19 +549,21 @@ function EsteiraPage() {
                         </div>
                       )}
                     </td>
-                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3 pr-3" onClick={(e) => e.stopPropagation()}>
                       <span
-                        className={`inline-block px-2 py-1 rounded text-xs uppercase tracking-wider ${
-                          STATUS_COLOR[o.payment_status]
+                        className={`inline-flex rounded-full px-2 py-1 text-xs whitespace-nowrap ${
+                          o.payment_method === "gratuito"
+                            ? "bg-slate-100 text-slate-700"
+                            : STATUS_COLOR[o.payment_status]
                         }`}
                       >
-                        {o.payment_status}
+                        {paymentLabel(o)}
                       </span>
                     </td>
-                    <td className="p-3">
+                    <td className="py-3 pr-3">
                       {o.delivery_status && (
                         <span
-                          className={`inline-block px-2 py-1 rounded text-[10px] uppercase tracking-wider ${
+                          className={`inline-flex rounded-full px-2 py-1 text-[10px] whitespace-nowrap ${
                             DELIVERY_COLOR[o.delivery_status] ?? "bg-slate-100 text-slate-700"
                           }`}
                         >
@@ -546,44 +571,18 @@ function EsteiraPage() {
                         </span>
                       )}
                     </td>
-                    <td className="p-3">
-                      {o.voucher_code ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            showVoucher(o.voucher_code!);
-                          }}
-                          className="text-xs font-mono text-admin-accent hover:underline inline-flex items-center gap-1"
-                        >
-                          <QrCode className="h-3 w-3" /> {o.voucher_code}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-admin-ink-muted">—</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-xs text-admin-ink-muted">
+                    <td className="py-3 pr-3 text-xs text-admin-ink-muted whitespace-nowrap">
                       {new Date(o.created_at).toLocaleDateString("pt-BR")}
                     </td>
-                    <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button size="sm" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {o.payment_provider_reference && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                navigator.clipboard.writeText(o.payment_provider_reference ?? "");
-                                toast.success("Referência copiada");
-                              }}
-                            >
-                              <Copy className="h-4 w-4 mr-2" /> Copiar referência
-                            </DropdownMenuItem>
-                          )}
-                          {o.payment_status !== "aprovado" && (
-                            <DropdownMenuItem
+                    <td className="py-3 pl-3 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-2 whitespace-nowrap">
+                        {o.payment_status === "pendente" &&
+                          (o.payment_amount_cents ?? o.amount_cents ?? 0) > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionBusy}
+                              className="whitespace-nowrap"
                               onClick={() => {
                                 setActionPrompt({ kind: "manual", order: o });
                                 setReasonInput("");
@@ -600,43 +599,53 @@ function EsteiraPage() {
                                 setSettlementFxSource(o.fx_source ?? null);
                               }}
                             >
-                              <CheckCircle2 className="h-4 w-4 mr-2" /> Confirmar pagamento
-                            </DropdownMenuItem>
+                              <CheckCircle2 className="mr-1 h-4 w-4" />
+                              Dar baixa
+                            </Button>
                           )}
-                          {!o.executed_at && o.payment_status === "aprovado" && (
-                            <DropdownMenuItem onClick={() => markExecuted(o.id)}>
-                              <CheckCircle2 className="h-4 w-4 mr-2" /> Marcar executado
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          {canAction("esteira.cancel_order") && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setActionPrompt({ kind: "cancel", order: o });
-                                setReasonInput("");
-                              }}
-                            >
-                              <Ban className="h-4 w-4 mr-2" /> Cancelar
-                            </DropdownMenuItem>
-                          )}
-                          {canAction("esteira.refund_order") && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setActionPrompt({ kind: "refund", order: o });
-                                setReasonInput("");
-                              }}
-                            >
-                              <RotateCcw className="h-4 w-4 mr-2" /> Estornar
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        {o.payment_status === "aprovado" && o.payment_method !== "gratuito" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={actionBusy}
+                            className="whitespace-nowrap"
+                            onClick={() => {
+                              setActionPrompt({ kind: "reverse", order: o });
+                              setReasonInput("");
+                            }}
+                          >
+                            <RotateCcw className="mr-1 h-4 w-4" />
+                            Estornar baixa
+                          </Button>
+                        )}
+                        {(o.payment_status === "pendente" ||
+                          o.payment_status === "recusado" ||
+                          o.payment_status === "estornado" ||
+                          (o.payment_status === "aprovado" &&
+                            o.payment_method === "gratuito" &&
+                            !o.executed_at &&
+                            o.delivery_status !== "concluido")) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={actionBusy}
+                            className="whitespace-nowrap"
+                            onClick={() => {
+                              setActionPrompt({ kind: "delete", order: o });
+                              setReasonInput("");
+                            }}
+                          >
+                            <Trash2 className="mr-1 h-4 w-4" />
+                            Excluir
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-admin-ink-muted text-sm">
+                    <td colSpan={7} className="p-8 text-center text-admin-ink-muted text-sm">
                       {orders.length === 0 ? (
                         "Nenhum pedido ainda"
                       ) : (
@@ -705,26 +714,6 @@ function EsteiraPage() {
 
       <NewOrderWizard open={wizardOpen} onOpenChange={setWizardOpen} onCreated={refresh} />
 
-      <Dialog open={!!voucherUrl} onOpenChange={(o) => !o && setVoucherUrl(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Voucher {voucherCode}</DialogTitle>
-          </DialogHeader>
-          {voucherUrl && (
-            <div className="flex flex-col items-center gap-3">
-              <img src={voucherUrl} alt="QR Code" className="rounded-lg" />
-              <a
-                href={voucherUrl}
-                download={`${voucherCode}.png`}
-                className="text-sm text-admin-accent hover:underline"
-              >
-                Baixar PNG
-              </a>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -768,18 +757,18 @@ function EsteiraPage() {
                 <Row label="Cotação aplicada" value={Number(selected.fx_rate).toFixed(4)} />
               )}
               <Row label="Método" value={selected.payment_method ?? "—"} />
-              <Row label="Pagamento" value={selected.payment_status} />
+              <Row label="Pagamento" value={paymentLabel(selected)} />
               <Row label="Execução" value={selected.delivery_status ?? "—"} />
-              <Row label="Voucher" value={selected.voucher_code ?? "—"} />
-              <Row
-                label="Referência pagamento"
-                value={selected.payment_provider_reference ?? "—"}
-              />
               {selected.notes && <Row label="Notas" value={selected.notes} />}
-              <p className="text-xs text-muted-foreground border-t pt-3">
-                Aba de Agenda / Documentos / Histórico chega quando a migração de campos for
-                aplicada.
-              </p>
+              {!selected.executed_at && selected.payment_status === "aprovado" && (
+                <Button
+                  variant="outline"
+                  disabled={actionBusy}
+                  onClick={() => markExecuted(selected.id)}
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Marcar executado
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>
@@ -790,10 +779,10 @@ function EsteiraPage() {
           <DialogHeader>
             <DialogTitle>
               {actionPrompt?.kind === "manual"
-                ? "Confirmar pagamento"
-                : actionPrompt?.kind === "cancel"
-                  ? "Cancelar pedido"
-                  : "Estornar pedido"}
+                ? "Dar baixa"
+                : actionPrompt?.kind === "delete"
+                  ? "Excluir pedido"
+                  : "Estornar baixa"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -874,25 +863,40 @@ function EsteiraPage() {
               </>
             )}
             <p className="text-sm text-muted-foreground">
-              Informe o motivo (ficará registrado em audit_logs).
+              {actionPrompt?.kind === "delete"
+                ? "O pedido sairá da operação e das pendências, mas seu histórico e documentos serão preservados. Pedidos recebidos exigem estorno antes da exclusão."
+                : actionPrompt?.kind === "reverse"
+                  ? "Informe o motivo obrigatório do estorno. O pedido voltará a pendente."
+                  : "Observação opcional da baixa."}
             </p>
-            <textarea
-              value={reasonInput}
-              onChange={(e) => setReasonInput(e.target.value)}
-              rows={3}
-              className="w-full border rounded p-2 text-sm"
-            />
+            {actionPrompt?.kind !== "delete" && (
+              <textarea
+                value={reasonInput}
+                onChange={(e) => setReasonInput(e.target.value)}
+                rows={3}
+                className="w-full border rounded p-2 text-sm"
+                placeholder={
+                  actionPrompt?.kind === "reverse" ? "Motivo do estorno" : "Observação opcional"
+                }
+              />
+            )}
             <Button
               disabled={
-                actionPrompt?.kind === "manual" &&
-                (!settledAmount ||
-                  (settlementConversion && !settlementFxRate) ||
-                  settlementFxQ.isFetching)
+                actionBusy ||
+                (actionPrompt?.kind === "manual" &&
+                  (!settledAmount ||
+                    (settlementConversion && !settlementFxRate) ||
+                    settlementFxQ.isFetching)) ||
+                (actionPrompt?.kind === "reverse" && reasonInput.trim().length < 3)
               }
               onClick={runPrompt}
               className="w-full bg-admin-accent hover:bg-admin-accent/90"
             >
-              Confirmar
+              {actionBusy
+                ? "Processando..."
+                : actionPrompt?.kind === "delete"
+                  ? "Confirmar exclusão"
+                  : "Confirmar"}
             </Button>
           </div>
         </DialogContent>
