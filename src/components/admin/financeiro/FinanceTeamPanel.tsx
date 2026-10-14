@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { BentoCard } from "@/components/admin/BentoCard";
 import { SettleTransactionPopover } from "./SettleTransactionPopover";
+import { ConfirmFinancialAction } from "./ConfirmFinancialAction";
 import {
   settleFinanceTransaction,
   reverseFinanceSettlement,
@@ -50,6 +51,10 @@ type FormValues = {
   notes: string | null;
   rules: RuleValues[];
 };
+type TeamAction =
+  | { kind: "reverse"; transactionId: string }
+  | { kind: "skip"; ruleId: string }
+  | { kind: "rule"; ruleId: string; action: "pause" | "reactivate" | "remove" };
 
 const PAYEE_TYPES: Record<FinancePayee["type"], string> = {
   team: "Equipe",
@@ -132,9 +137,13 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [stateTarget, setStateTarget] = useState<{
     member: FinanceTeamMember;
-    action: "pause" | "remove";
+    action: "pause" | "reactivate" | "remove";
   } | null>(null);
   const [removePending, setRemovePending] = useState(true);
+  const [teamAction, setTeamAction] = useState<TeamAction | null>(null);
+  const [teamActionError, setTeamActionError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [stateError, setStateError] = useState<string | null>(null);
 
   const teamQ = useQuery({
     queryKey: ["finance-team", month, showArchived],
@@ -158,9 +167,10 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
       toast.success("Pessoa e remunerações salvas");
       setFormOpen(false);
       setDecisionOpen(false);
+      setFormError(null);
       changed();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao salvar"),
+    onError: (error) => setFormError(error instanceof Error ? error.message : "Erro ao salvar"),
   });
   const stateMutation = useMutation({
     mutationFn: (input: {
@@ -171,39 +181,67 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
     onSuccess: () => {
       toast.success("Situação atualizada");
       setStateTarget(null);
+      setStateError(null);
       changed();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao atualizar"),
+    onError: (error) => setStateError(error instanceof Error ? error.message : "Erro ao atualizar"),
   });
   const reverseMutation = useMutation({
-    mutationFn: (input: { id: string; reason: string }) => reverse({ data: input }),
+    mutationFn: (id: string) =>
+      reverse({ data: { id, reason: "Estorno solicitado em Equipe e Repasses" } }),
     onSuccess: () => {
       toast.success("Baixa estornada; repasse será recalculado");
+      setTeamAction(null);
+      setTeamActionError(null);
       changed();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao estornar"),
+    onError: (error) =>
+      setTeamActionError(error instanceof Error ? error.message : "Erro ao estornar"),
   });
   const skipMutation = useMutation({
     mutationFn: (ruleId: string) => skipGoal({ data: { ruleId, month: `${month}-01` } }),
     onSuccess: () => {
       toast.success("Comissão encerrada sem pagamento neste mês");
+      setTeamAction(null);
+      setTeamActionError(null);
       changed();
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao encerrar comissão"),
+      setTeamActionError(error instanceof Error ? error.message : "Erro ao encerrar comissão"),
   });
   const ruleStateMutation = useMutation({
     mutationFn: (input: { ruleId: string; action: "pause" | "reactivate" | "remove" }) =>
       setRuleState({ data: { ...input, month: `${month}-01`, removePending: true } }),
     onSuccess: () => {
       toast.success("Remuneração atualizada");
+      setTeamAction(null);
+      setTeamActionError(null);
       changed();
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao atualizar remuneração"),
+      setTeamActionError(error instanceof Error ? error.message : "Erro ao atualizar remuneração"),
   });
 
+  const actionBusy =
+    reverseMutation.isPending || skipMutation.isPending || ruleStateMutation.isPending;
+  function promptAction(action: TeamAction) {
+    setTeamActionError(null);
+    setTeamAction(action);
+  }
+  function promptMemberState(member: FinanceTeamMember, action: "pause" | "reactivate" | "remove") {
+    setStateError(null);
+    setRemovePending(true);
+    setStateTarget({ member, action });
+  }
+  function confirmAction() {
+    if (!teamAction || actionBusy) return;
+    if (teamAction.kind === "reverse") reverseMutation.mutate(teamAction.transactionId);
+    else if (teamAction.kind === "skip") skipMutation.mutate(teamAction.ruleId);
+    else ruleStateMutation.mutate({ ruleId: teamAction.ruleId, action: teamAction.action });
+  }
+
   function openForm(member: FinanceTeamMember | null) {
+    setFormError(null);
     const payee = member?.payee;
     setEditing(member);
     setForm({
@@ -338,19 +376,36 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
                                   : ""}
                               </span>
                               {!payee.archived_at && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={ruleStateMutation.isPending}
-                                  onClick={() =>
-                                    ruleStateMutation.mutate({
-                                      ruleId: rule.id,
-                                      action: rule.is_active ? "pause" : "reactivate",
-                                    })
-                                  }
-                                >
-                                  {rule.is_active ? "Pausar modalidade" : "Reativar modalidade"}
-                                </Button>
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={actionBusy}
+                                    onClick={() =>
+                                      promptAction({
+                                        kind: "rule",
+                                        ruleId: rule.id,
+                                        action: rule.is_active ? "pause" : "reactivate",
+                                      })
+                                    }
+                                  >
+                                    {rule.is_active ? "Pausar modalidade" : "Reativar modalidade"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={actionBusy}
+                                    onClick={() =>
+                                      promptAction({
+                                        kind: "rule",
+                                        ruleId: rule.id,
+                                        action: "remove",
+                                      })
+                                    }
+                                  >
+                                    Remover modalidade
+                                  </Button>
+                                </>
                               )}
                             </div>
                           ))
@@ -377,13 +432,7 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
                         variant="outline"
                         disabled={stateMutation.isPending}
                         onClick={() =>
-                          payee.is_active
-                            ? (setRemovePending(true), setStateTarget({ member, action: "pause" }))
-                            : stateMutation.mutate({
-                                payeeId: payee.id,
-                                action: "reactivate",
-                                removePending: false,
-                              })
+                          promptMemberState(member, payee.is_active ? "pause" : "reactivate")
                         }
                       >
                         {payee.is_active ? "Pausar" : "Reativar"}
@@ -393,10 +442,7 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          setRemovePending(true);
-                          setStateTarget({ member, action: "remove" });
-                        }}
+                        onClick={() => promptMemberState(member, "remove")}
                       >
                         Remover
                       </Button>
@@ -454,11 +500,8 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={skipMutation.isPending}
-                            onClick={() => {
-                              if (window.confirm("Encerrar esta comissão sem pagamento neste mês?"))
-                                skipMutation.mutate(payout.rule_id);
-                            }}
+                            disabled={actionBusy}
+                            onClick={() => promptAction({ kind: "skip", ruleId: payout.rule_id })}
                           >
                             Sem comissão neste mês
                           </Button>
@@ -467,11 +510,10 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => {
-                            const reason = window.prompt("Motivo obrigatório do estorno da baixa:");
-                            if (reason?.trim() && reason.trim().length >= 3)
-                              reverseMutation.mutate({ id: transaction.id, reason: reason.trim() });
-                          }}
+                          disabled={actionBusy}
+                          onClick={() =>
+                            promptAction({ kind: "reverse", transactionId: transaction.id })
+                          }
                         >
                           Estornar baixa
                         </Button>
@@ -485,7 +527,7 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
         </div>
       </BentoCard>
 
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+      <Dialog open={formOpen} onOpenChange={(open) => !saveMutation.isPending && setFormOpen(open)}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -497,6 +539,8 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
             onSubmit={(event) => {
               event.preventDefault();
               if (!valid) return;
+              if (saveMutation.isPending) return;
+              setFormError(null);
               if (editing && financialChanged(form, editing.rules)) setDecisionOpen(true);
               else saveMutation.mutate({ mode: "current" });
             }}
@@ -739,6 +783,11 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
                 Adicionar remuneração
               </Button>
             </div>
+            {formError && (
+              <p role="alert" className="text-sm text-red-700">
+                {formError}
+              </p>
+            )}
             <Button type="submit" disabled={!valid || saveMutation.isPending}>
               Salvar pessoa
             </Button>
@@ -746,7 +795,10 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
         </DialogContent>
       </Dialog>
 
-      <Dialog open={decisionOpen} onOpenChange={setDecisionOpen}>
+      <Dialog
+        open={decisionOpen}
+        onOpenChange={(open) => !saveMutation.isPending && setDecisionOpen(open)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Quando aplicar a alteração?</DialogTitle>
@@ -756,17 +808,28 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
               ? "Uma modalidade alterada já tem repasse pago. Estorne essa baixa explicitamente antes de atualizar o mês atual."
               : "O repasse pendente deste mês será recalculado sem criar duplicatas."}
           </p>
+          {formError && (
+            <p role="alert" className="text-sm text-red-700">
+              {formError}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
               disabled={saveMutation.isPending}
-              onClick={() => saveMutation.mutate({ mode: "next_month" })}
+              onClick={() => {
+                setFormError(null);
+                saveMutation.mutate({ mode: "next_month" });
+              }}
             >
               Aplicar a partir do próximo mês
             </Button>
             <Button
               disabled={saveMutation.isPending || hasPaid}
-              onClick={() => saveMutation.mutate({ mode: "current" })}
+              onClick={() => {
+                setFormError(null);
+                saveMutation.mutate({ mode: "current" });
+              }}
             >
               Atualizar mês atual
             </Button>
@@ -774,32 +837,49 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!stateTarget} onOpenChange={(open) => !open && setStateTarget(null)}>
+      <Dialog
+        open={!!stateTarget}
+        onOpenChange={(open) => !open && !stateMutation.isPending && setStateTarget(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {stateTarget?.action === "remove" ? "Remover pessoa" : "Pausar pessoa"}
+              {stateTarget?.action === "remove"
+                ? "Remover pessoa"
+                : stateTarget?.action === "reactivate"
+                  ? "Reativar pessoa"
+                  : "Pausar pessoa"}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-admin-ink-muted">
-            O histórico pago será preservado. Novos repasses deixam de ser gerados.
+            {stateTarget?.action === "reactivate"
+              ? "As remunerações ativas voltarão a gerar repasses. O histórico pago será preservado."
+              : "O histórico pago será preservado. Novos repasses deixam de ser gerados."}
           </p>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={removePending}
-              onChange={(event) => setRemovePending(event.target.checked)}
-            />
-            Remover repasses pendentes deste mês
-          </label>
+          {stateTarget?.action !== "reactivate" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={removePending}
+                onChange={(event) => setRemovePending(event.target.checked)}
+              />
+              Remover repasses pendentes deste mês
+            </label>
+          )}
+          {stateError && (
+            <p role="alert" className="text-sm text-red-700">
+              {stateError}
+            </p>
+          )}
           <Button
             disabled={stateMutation.isPending}
             onClick={() =>
               stateTarget &&
+              !stateMutation.isPending &&
               stateMutation.mutate({
                 payeeId: stateTarget.member.payee.id,
                 action: stateTarget.action,
-                removePending,
+                removePending: stateTarget.action === "reactivate" ? false : removePending,
               })
             }
           >
@@ -807,6 +887,38 @@ export function FinanceTeamPanel({ month, onChanged }: { month: string; onChange
           </Button>
         </DialogContent>
       </Dialog>
+      <ConfirmFinancialAction
+        open={!!teamAction}
+        title={
+          teamAction?.kind === "reverse"
+            ? "Estornar baixa"
+            : teamAction?.kind === "skip"
+              ? "Sem comissão neste mês"
+              : teamAction?.action === "remove"
+                ? "Remover modalidade"
+                : teamAction?.action === "pause"
+                  ? "Pausar modalidade"
+                  : "Reativar modalidade"
+        }
+        description={
+          teamAction?.kind === "reverse"
+            ? "A baixa voltará a pendente e o estorno ficará registrado na auditoria."
+            : teamAction?.kind === "skip"
+              ? "A comissão deste mês será encerrada sem pagamento. Nenhuma baixa será criada."
+              : teamAction?.action === "remove"
+                ? "Somente esta modalidade será removida. As demais remunerações, pagamentos e histórico serão preservados. O repasse pendente deste mês será removido."
+                : teamAction?.action === "pause"
+                  ? "Esta modalidade deixará de gerar repasses. O repasse pendente deste mês será removido; pagamentos anteriores serão preservados."
+                  : "Esta modalidade voltará a gerar repasses a partir do mês atual."
+        }
+        busy={actionBusy}
+        error={teamActionError}
+        onClose={() => {
+          setTeamAction(null);
+          setTeamActionError(null);
+        }}
+        onConfirm={confirmAction}
+      />
     </div>
   );
 }
