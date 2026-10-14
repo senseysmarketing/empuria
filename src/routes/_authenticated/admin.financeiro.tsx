@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
 import { SettleTransactionPopover } from "@/components/admin/financeiro/SettleTransactionPopover";
+import { ConfirmFinancialAction } from "@/components/admin/financeiro/ConfirmFinancialAction";
 import { FinanceTeamPanel } from "@/components/admin/financeiro/FinanceTeamPanel";
 import { FinanceMonthClosePanel } from "@/components/admin/financeiro/FinanceMonthClosePanel";
 import { financeOriginLabel } from "@/lib/finance/origins";
@@ -110,6 +111,11 @@ function FinanceiroContent() {
   const [month, setMonth] = useState(defaultMonth());
   const [tab, setTab] = useState("resumo");
   const [newOpen, setNewOpen] = useState(false);
+  const [financialAction, setFinancialAction] = useState<{
+    kind: "delete" | "reverse";
+    id: string;
+  } | null>(null);
+  const [financialActionError, setFinancialActionError] = useState<string | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState({
     search: "",
@@ -184,6 +190,12 @@ function FinanceiroContent() {
       "finance-recurring",
       "finance-dashboard",
       "finance-team",
+      "orders",
+      "member-dossier",
+      "reports-historico",
+      "reports-overview",
+      "reports-vendas",
+      "reports-servicos",
     ]) {
       qc.invalidateQueries({ queryKey: [key], refetchType: "active" });
     }
@@ -194,20 +206,24 @@ function FinanceiroContent() {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: (data: { id: string; reason: string | null }) => deletePending({ data }),
+    mutationFn: (data: { id: string }) => deletePending({ data }),
     onSuccess: () => {
       toast.success("Pendência excluída");
+      setFinancialAction(null);
       refresh();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao excluir pendência"),
+    onError: (e) =>
+      setFinancialActionError(e instanceof Error ? e.message : "Erro ao excluir pendência"),
   });
   const reverseMutation = useMutation({
-    mutationFn: (data: { id: string; reason: string }) => reverseSettlement({ data }),
+    mutationFn: (data: { id: string }) => reverseSettlement({ data }),
     onSuccess: () => {
       toast.success("Baixa estornada");
+      setFinancialAction(null);
       refresh();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao estornar baixa"),
+    onError: (e) =>
+      setFinancialActionError(e instanceof Error ? e.message : "Erro ao estornar baixa"),
   });
 
   const categories = metaQ.data?.categories ?? [];
@@ -448,17 +464,37 @@ function FinanceiroContent() {
                 settle={(data) => settleTx({ data })}
                 onDone={refresh}
                 onDelete={(id) => {
-                  if (window.confirm("Excluir esta pendência?"))
-                    deleteMutation.mutate({ id, reason: null });
+                  setFinancialAction({ kind: "delete", id });
+                  setFinancialActionError(null);
                 }}
                 onReverse={(id) => {
-                  const reason = window.prompt("Motivo do estorno da baixa (obrigatório):");
-                  if (reason?.trim() && reason.trim().length >= 3)
-                    reverseMutation.mutate({ id, reason: reason.trim() });
+                  setFinancialAction({ kind: "reverse", id });
+                  setFinancialActionError(null);
                 }}
               />
             )}
           </BentoCard>
+          <ConfirmFinancialAction
+            open={!!financialAction}
+            title={financialAction?.kind === "delete" ? "Excluir lançamento" : "Estornar baixa"}
+            description={
+              financialAction?.kind === "delete"
+                ? "A pendência sairá da operação. Pedidos preservam histórico e documentos."
+                : "A baixa voltará a pendente e o estorno ficará registrado na auditoria."
+            }
+            busy={deleteMutation.isPending || reverseMutation.isPending}
+            error={financialActionError}
+            onClose={() => {
+              setFinancialAction(null);
+              setFinancialActionError(null);
+            }}
+            onConfirm={() => {
+              if (!financialAction) return;
+              if (financialAction.kind === "delete")
+                deleteMutation.mutate({ id: financialAction.id });
+              else reverseMutation.mutate({ id: financialAction.id });
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="equipe" className="mt-0 space-y-4">
@@ -588,8 +624,10 @@ function TransactionTable({
             const supported =
               ["manual", "orders", "team_payout"].includes(tx.source_module) ||
               tx.source_module.startsWith("recurring:");
-            const canSettle = supported && tx.status === "pending";
-            const canReverse = supported && ["received", "paid"].includes(tx.status);
+            const canSettle = supported && tx.status === "pending" && !tx.is_courtesy;
+            const canReverse =
+              supported && ["received", "paid"].includes(tx.status) && !tx.is_courtesy;
+            const canDelete = (canSettle || tx.is_courtesy_deletable) && supported;
             return (
               <tr key={tx.id} className="border-b border-admin-border last:border-0">
                 <td className="max-w-[260px] py-3 pr-3">
@@ -612,9 +650,11 @@ function TransactionTable({
                 </td>
                 <td className="py-3 pr-3">
                   <span
-                    className={`inline-flex rounded-full px-2 py-1 text-xs ${statusClass(tx.status)}`}
+                    className={`inline-flex rounded-full px-2 py-1 text-xs ${statusClass(tx.is_courtesy ? "received" : tx.status)}`}
                   >
-                    {STATUS_LABEL[tx.status] ?? tx.status}
+                    {tx.is_courtesy
+                      ? "Recebido · Cortesia"
+                      : (STATUS_LABEL[tx.status] ?? tx.status)}
                     {isPastDue ? " · vencido" : ""}
                   </span>
                 </td>
@@ -639,7 +679,7 @@ function TransactionTable({
                           onDone={onDone}
                         />
                       )}
-                      {canSettle && (
+                      {canDelete && (
                         <Button size="sm" variant="outline" onClick={() => onDelete(tx.id)}>
                           Excluir
                         </Button>

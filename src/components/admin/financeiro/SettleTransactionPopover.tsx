@@ -32,55 +32,107 @@ function transactionBase(transaction: FinanceTransaction) {
   return { currency, amountCents } as { currency: Currency; amountCents: number };
 }
 
+type SettlementData = {
+  id: string;
+  paidAt: string;
+  settledAmount: number;
+  settledCurrency: Currency;
+  fxReferenceRate?: number | null;
+  fxReferenceDate?: string | null;
+  fxRate?: number | null;
+  fxSource?: string | null;
+  notes?: string | null;
+};
+
 export function SettleTransactionPopover({
   transaction,
   settle,
   onDone,
 }: {
   transaction: FinanceTransaction;
-  settle: (data: {
-    id: string;
-    paidAt: string;
-    settledAmount: number;
-    settledCurrency: Currency;
-    fxReferenceRate?: number | null;
-    fxReferenceDate?: string | null;
-    fxRate?: number | null;
-    fxSource?: string | null;
-    notes?: string | null;
-  }) => Promise<unknown>;
+  settle: (data: SettlementData) => Promise<unknown>;
+  onDone: () => void;
+}) {
+  const base = transactionBase(transaction);
+  return (
+    <SettlementPopover
+      id={transaction.id}
+      amountCents={transaction.amount_cents}
+      currency={transaction.currency === "EUR" ? "EUR" : "BRL"}
+      baseCurrency={base.currency}
+      baseAmountCents={base.amountCents}
+      initialReferenceRate={transaction.fx_reference_rate}
+      initialReferenceDate={transaction.fx_date}
+      initialRate={transaction.fx_rate}
+      initialSource={transaction.fx_source}
+      settle={settle}
+      onDone={onDone}
+    />
+  );
+}
+
+export function SettlementPopover({
+  id,
+  amountCents,
+  currency: initialCurrency,
+  baseCurrency,
+  baseAmountCents,
+  initialReferenceRate,
+  initialReferenceDate,
+  initialRate,
+  initialSource,
+  settle,
+  onDone,
+}: {
+  id: string;
+  amountCents: number;
+  currency: Currency;
+  baseCurrency: Currency;
+  baseAmountCents: number;
+  initialReferenceRate: number | null;
+  initialReferenceDate: string | null;
+  initialRate: number | null;
+  initialSource: string | null;
+  settle: (data: SettlementData) => Promise<unknown>;
   onDone: () => void;
 }) {
   const fetchFx = useServerFn(getEurBrlReferenceRate);
-  const base = useMemo(() => transactionBase(transaction), [transaction]);
+  const base = useMemo(
+    () => ({ currency: baseCurrency, amountCents: baseAmountCents }),
+    [baseCurrency, baseAmountCents],
+  );
   const [open, setOpen] = useState(false);
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
-  const [amount, setAmount] = useState(String(transaction.amount_cents / 100));
-  const [currency, setCurrency] = useState<Currency>(
-    transaction.currency === "EUR" ? "EUR" : "BRL",
-  );
-  const [fxReferenceRate, setFxReferenceRate] = useState<number | null>(
-    transaction.fx_reference_rate,
-  );
-  const [fxReferenceDate, setFxReferenceDate] = useState<string | null>(transaction.fx_date);
-  const [fxRate, setFxRate] = useState(transaction.fx_rate ? String(transaction.fx_rate) : "");
-  const [fxSource, setFxSource] = useState<string | null>(transaction.fx_source);
+  const [amount, setAmount] = useState(String(amountCents / 100));
+  const [currency, setCurrency] = useState<Currency>(initialCurrency);
+  const [fxReferenceRate, setFxReferenceRate] = useState<number | null>(initialReferenceRate);
+  const [fxReferenceDate, setFxReferenceDate] = useState<string | null>(initialReferenceDate);
+  const [fxRate, setFxRate] = useState(initialRate ? String(initialRate) : "");
+  const [fxSource, setFxSource] = useState<string | null>(initialSource);
   const conversion = base.currency !== currency;
 
   useEffect(() => {
     if (!open) return;
-    const initialCurrency = transaction.currency === "EUR" ? "EUR" : "BRL";
     setPaidAt(new Date().toISOString().slice(0, 10));
-    setAmount(String(transaction.amount_cents / 100));
+    setAmount(String(amountCents / 100));
     setCurrency(initialCurrency);
-    setFxReferenceRate(transaction.fx_reference_rate);
-    setFxReferenceDate(transaction.fx_date);
-    setFxRate(transaction.fx_rate ? String(transaction.fx_rate) : "");
-    setFxSource(transaction.fx_source);
-  }, [open, transaction]);
+    setFxReferenceRate(initialReferenceRate);
+    setFxReferenceDate(initialReferenceDate);
+    setFxRate(initialRate ? String(initialRate) : "");
+    setFxSource(initialSource);
+  }, [
+    open,
+    id,
+    amountCents,
+    initialCurrency,
+    initialReferenceRate,
+    initialReferenceDate,
+    initialRate,
+    initialSource,
+  ]);
 
   const fxQ = useQuery({
-    queryKey: ["settlement-eur-brl-reference", transaction.id, paidAt, base.currency, currency],
+    queryKey: ["settlement-eur-brl-reference", id, paidAt, base.currency, currency],
     queryFn: () => fetchFx({ data: { date: paidAt } }),
     enabled: open && conversion,
     staleTime: 30 * 60 * 1000,
@@ -118,7 +170,7 @@ export function SettleTransactionPopover({
   const mutation = useMutation({
     mutationFn: () =>
       settle({
-        id: transaction.id,
+        id,
         paidAt,
         settledAmount: Number(amount),
         settledCurrency: currency,
@@ -142,11 +194,16 @@ export function SettleTransactionPopover({
           <CheckCircle2 className="h-4 w-4" /> Dar baixa
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-3">
+      <PopoverContent
+        side="bottom"
+        align="end"
+        avoidCollisions={false}
+        className="w-[min(20rem,calc(100vw-1rem))] max-h-[min(70vh,var(--radix-popover-content-available-height,70vh))] space-y-3 overflow-y-auto"
+      >
         <div>
           <strong className="text-sm">Dar baixa</strong>
           <p className="text-xs text-muted-foreground">
-            Previsto: {formatMoney(transaction.amount_cents, transaction.currency)}
+            Previsto: {formatMoney(amountCents, initialCurrency)}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2">

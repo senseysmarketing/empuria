@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { summarizePendingPayments } from "@/lib/admin/esteira-pending";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,7 +13,6 @@ import {
 import { BentoCard } from "@/components/admin/BentoCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
@@ -39,7 +38,8 @@ import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { toast } from "sonner";
 
 import { NewOrderWizard } from "@/components/admin/esteira/NewOrderWizard";
-import { getEurBrlReferenceRate } from "@/lib/finance/fx.functions";
+import { SettlementPopover } from "@/components/admin/financeiro/SettleTransactionPopover";
+import { ConfirmFinancialAction } from "@/components/admin/financeiro/ConfirmFinancialAction";
 
 export const Route = createFileRoute("/_authenticated/admin/esteira")({
   component: EsteiraPage,
@@ -129,7 +129,6 @@ function EsteiraPage() {
   const markManual = useServerFn(markOrderPaidManual);
   const remove = useServerFn(deleteOrder);
   const reverse = useServerFn(reverseOrderPayment);
-  const fetchFx = useServerFn(getEurBrlReferenceRate);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
@@ -139,74 +138,17 @@ function EsteiraPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [selected, setSelected] = useState<Order | null>(null);
   const [actionPrompt, setActionPrompt] = useState<{
-    kind: "manual" | "delete" | "reverse";
+    kind: "delete" | "reverse";
     order: Order;
   } | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const actionBusyRef = useRef(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [reasonInput, setReasonInput] = useState("");
-  const [settledAmount, setSettledAmount] = useState("");
-  const [settledCurrency, setSettledCurrency] = useState<"BRL" | "EUR">("EUR");
-  const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
-  const [settlementFxReferenceRate, setSettlementFxReferenceRate] = useState<number | null>(null);
-  const [settlementFxReferenceDate, setSettlementFxReferenceDate] = useState<string | null>(null);
-  const [settlementFxRate, setSettlementFxRate] = useState("");
-  const [settlementFxSource, setSettlementFxSource] = useState<string | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
     queryFn: () => fetchOrders() as unknown as Promise<Order[]>,
   });
-  const settlementOrder = actionPrompt?.kind === "manual" ? actionPrompt.order : null;
-  const settlementBaseCurrency = (settlementOrder?.payment_currency ??
-    settlementOrder?.currency ??
-    "EUR") as "BRL" | "EUR";
-  const settlementBaseAmountCents =
-    settlementOrder?.payment_amount_cents ?? settlementOrder?.amount_cents ?? 0;
-  const settlementConversion = !!settlementOrder && settlementBaseCurrency !== settledCurrency;
-  const settlementFxQ = useQuery({
-    queryKey: [
-      "order-settlement-eur-brl-reference",
-      settlementOrder?.id,
-      paidAt,
-      settlementBaseCurrency,
-      settledCurrency,
-    ],
-    queryFn: () => fetchFx({ data: { date: paidAt } }),
-    enabled: settlementConversion,
-    staleTime: 30 * 60 * 1000,
-  });
-
-  useEffect(() => {
-    if (!settlementConversion) {
-      setSettlementFxReferenceRate(null);
-      setSettlementFxReferenceDate(null);
-      setSettlementFxRate("");
-      setSettlementFxSource(null);
-      if (settlementOrder) setSettledAmount((settlementBaseAmountCents / 100).toFixed(2));
-      return;
-    }
-    if (settlementFxQ.data?.ok) {
-      setSettlementFxReferenceRate(settlementFxQ.data.rate);
-      setSettlementFxReferenceDate(settlementFxQ.data.date);
-      setSettlementFxRate(String(settlementFxQ.data.rate));
-      setSettlementFxSource(settlementFxQ.data.source);
-    } else if (settlementFxQ.data && !settlementFxQ.data.ok) {
-      setSettlementFxReferenceRate(null);
-      setSettlementFxReferenceDate(null);
-      setSettlementFxSource("MANUAL");
-    }
-  }, [settlementBaseAmountCents, settlementConversion, settlementFxQ.data, settlementOrder]);
-
-  useEffect(() => {
-    const rate = Number(settlementFxRate);
-    if (!settlementConversion || !rate) return;
-    const baseAmount = settlementBaseAmountCents / 100;
-    const converted = settlementBaseCurrency === "EUR" ? baseAmount * rate : baseAmount / rate;
-    setSettledAmount(converted.toFixed(2));
-  }, [settlementBaseAmountCents, settlementBaseCurrency, settlementConversion, settlementFxRate]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -317,58 +259,19 @@ function EsteiraPage() {
   };
 
   const runPrompt = async () => {
-    if (!actionPrompt || actionBusyRef.current || actionSuccess) return;
-    if (actionPrompt.kind === "reverse" && reasonInput.trim().length < 3) {
-      setActionError("Motivo do estorno obrigatório (mín. 3 caracteres).");
-      return;
-    }
-    if (
-      actionPrompt.kind === "manual" &&
-      (!paidAt ||
-        !(Number(settledAmount) > 0) ||
-        (settlementConversion && !(Number(settlementFxRate) > 0)))
-    ) {
-      setActionError("Informe data, valor e cotação válida quando houver conversão.");
-      return;
-    }
+    if (!actionPrompt || actionBusyRef.current) return;
     actionBusyRef.current = true;
     setActionError(null);
     setActionBusy(true);
     try {
       const { kind, order } = actionPrompt;
-      if (kind === "manual")
-        await markManual({
-          data: {
-            id: order.id,
-            reason: reasonInput || undefined,
-            settledAmountCents: Math.round(Number(settledAmount) * 100),
-            settledCurrency,
-            paidAt,
-            fxReferenceRate: settlementConversion ? settlementFxReferenceRate : undefined,
-            fxReferenceDate: settlementConversion ? settlementFxReferenceDate : undefined,
-            fxRate: settlementConversion && settlementFxRate ? Number(settlementFxRate) : undefined,
-            fxSource: settlementConversion ? (settlementFxSource ?? "MANUAL") : undefined,
-          },
-        });
-      if (kind === "delete")
-        await remove({ data: { id: order.id, reason: reasonInput || undefined } });
-      if (kind === "reverse") await reverse({ data: { id: order.id, reason: reasonInput } });
-      const success =
-        kind === "manual"
-          ? "Baixa confirmada"
-          : kind === "reverse"
-            ? "Baixa estornada"
-            : "Pedido excluído";
-      setActionSuccess(success);
+      if (kind === "delete") await remove({ data: { id: order.id } });
+      if (kind === "reverse") await reverse({ data: { id: order.id } });
+      const success = kind === "reverse" ? "Baixa estornada" : "Pedido excluído";
       toast.success(success);
-      setReasonInput("");
-      try {
-        await refresh();
-      } catch {
-        setActionError(
-          "A ação foi concluída, mas a atualização automática falhou. Recarregue a página.",
-        );
-      }
+      setActionPrompt(null);
+      setSelected(null);
+      await refresh();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Não foi possível concluir a ação.";
       setActionError(message);
@@ -607,32 +510,39 @@ function EsteiraPage() {
                         {o.payment_status === "pendente" &&
                           !isCourtesy(o) &&
                           !o.payment_provider_payment_id && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={actionBusy}
-                              className="whitespace-nowrap"
-                              onClick={() => {
-                                setActionPrompt({ kind: "manual", order: o });
-                                setActionError(null);
-                                setActionSuccess(null);
-                                setReasonInput("");
-                                setSettledCurrency(
-                                  (o.payment_currency ?? o.currency ?? "EUR") as "BRL" | "EUR",
-                                );
-                                setSettledAmount(
-                                  String((o.payment_amount_cents ?? o.amount_cents ?? 0) / 100),
-                                );
-                                setPaidAt(new Date().toISOString().slice(0, 10));
-                                setSettlementFxReferenceRate(o.fx_reference_rate ?? null);
-                                setSettlementFxReferenceDate(o.fx_reference_date ?? null);
-                                setSettlementFxRate(o.fx_rate ? String(o.fx_rate) : "");
-                                setSettlementFxSource(o.fx_source ?? null);
+                            <SettlementPopover
+                              id={o.id}
+                              amountCents={o.payment_amount_cents ?? o.amount_cents ?? 0}
+                              currency={
+                                (o.payment_currency ?? o.currency ?? "EUR") as "BRL" | "EUR"
+                              }
+                              baseCurrency={
+                                (o.payment_currency ?? o.currency ?? "EUR") as "BRL" | "EUR"
+                              }
+                              baseAmountCents={o.payment_amount_cents ?? o.amount_cents ?? 0}
+                              initialReferenceRate={o.fx_reference_rate ?? null}
+                              initialReferenceDate={o.fx_reference_date ?? null}
+                              initialRate={o.fx_rate ?? null}
+                              initialSource={o.fx_source ?? null}
+                              settle={(data) =>
+                                markManual({
+                                  data: {
+                                    id: data.id,
+                                    paidAt: data.paidAt,
+                                    settledAmountCents: Math.round(data.settledAmount * 100),
+                                    settledCurrency: data.settledCurrency,
+                                    fxReferenceRate: data.fxReferenceRate,
+                                    fxReferenceDate: data.fxReferenceDate,
+                                    fxRate: data.fxRate,
+                                    fxSource: data.fxSource,
+                                  },
+                                })
+                              }
+                              onDone={() => {
+                                setSelected(null);
+                                void refresh();
                               }}
-                            >
-                              <CheckCircle2 className="mr-1 h-4 w-4" />
-                              Dar baixa
-                            </Button>
+                            />
                           )}
                         {o.payment_status === "aprovado" &&
                           !isCourtesy(o) &&
@@ -645,8 +555,6 @@ function EsteiraPage() {
                               onClick={() => {
                                 setActionPrompt({ kind: "reverse", order: o });
                                 setActionError(null);
-                                setActionSuccess(null);
-                                setReasonInput("");
                               }}
                             >
                               <RotateCcw className="mr-1 h-4 w-4" />
@@ -666,8 +574,6 @@ function EsteiraPage() {
                               onClick={() => {
                                 setActionPrompt({ kind: "delete", order: o });
                                 setActionError(null);
-                                setActionSuccess(null);
-                                setReasonInput("");
                               }}
                             >
                               <Trash2 className="mr-1 h-4 w-4" />
@@ -809,158 +715,22 @@ function EsteiraPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <ConfirmFinancialAction
         open={!!actionPrompt}
-        onOpenChange={(o) => !o && !actionBusy && setActionPrompt(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {actionPrompt?.kind === "manual"
-                ? "Dar baixa"
-                : actionPrompt?.kind === "delete"
-                  ? "Excluir pedido"
-                  : "Estornar baixa"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            {actionError && (
-              <p
-                role="alert"
-                className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900"
-              >
-                {actionError}
-              </p>
-            )}
-            {actionSuccess && (
-              <p
-                role="status"
-                className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900"
-              >
-                {actionSuccess}. A tabela e o Financeiro foram atualizados.
-              </p>
-            )}
-            {actionPrompt?.kind === "manual" && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Data</Label>
-                    <Input
-                      type="date"
-                      value={paidAt}
-                      onChange={(event) => setPaidAt(event.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label>Valor realizado</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={settledAmount}
-                      onChange={(event) => setSettledAmount(event.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Moeda</Label>
-                  <Select
-                    value={settledCurrency}
-                    onValueChange={(value) => {
-                      setSettledCurrency(value as "BRL" | "EUR");
-                      setSettlementFxReferenceRate(null);
-                      setSettlementFxReferenceDate(null);
-                      setSettlementFxRate("");
-                      setSettlementFxSource(value === settlementBaseCurrency ? null : "MANUAL");
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="BRL">BRL</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {settlementConversion && (
-                  <div className="space-y-2 rounded-lg bg-muted p-3 text-sm">
-                    <div>
-                      Valor de referência:{" "}
-                      {formatMoney(settlementBaseAmountCents, settlementBaseCurrency)}
-                    </div>
-                    <div>
-                      <Label>PTAX EUR/BRL</Label>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {settlementFxQ.isFetching
-                          ? "Buscando referência…"
-                          : settlementFxReferenceRate
-                            ? `${settlementFxReferenceRate.toFixed(4)} em ${settlementFxReferenceDate}`
-                            : "Referência indisponível — informe a cotação manualmente."}
-                      </p>
-                    </div>
-                    <div>
-                      <Label>Cotação aplicada</Label>
-                      <Input
-                        type="number"
-                        min="0.0001"
-                        step="0.0001"
-                        value={settlementFxRate}
-                        onChange={(event) => {
-                          setSettlementFxRate(event.target.value);
-                          if (!settlementFxReferenceRate) setSettlementFxSource("MANUAL");
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-            <p className="text-sm text-muted-foreground">
-              {actionPrompt?.kind === "delete"
-                ? "O pedido sairá da operação e das pendências, mas seu histórico e documentos serão preservados. Pedidos recebidos exigem estorno antes da exclusão."
-                : actionPrompt?.kind === "reverse"
-                  ? "Informe o motivo obrigatório do estorno. O pedido voltará a pendente."
-                  : "Observação opcional da baixa."}
-            </p>
-            {actionPrompt?.kind !== "delete" && (
-              <textarea
-                value={reasonInput}
-                onChange={(e) => setReasonInput(e.target.value)}
-                rows={3}
-                className="w-full border rounded p-2 text-sm"
-                placeholder={
-                  actionPrompt?.kind === "reverse" ? "Motivo do estorno" : "Observação opcional"
-                }
-              />
-            )}
-            <Button
-              disabled={
-                actionBusy ||
-                !!actionSuccess ||
-                (actionPrompt?.kind === "manual" &&
-                  (!settledAmount ||
-                    (settlementConversion && !settlementFxRate) ||
-                    settlementFxQ.isFetching)) ||
-                (actionPrompt?.kind === "reverse" && reasonInput.trim().length < 3)
-              }
-              onClick={runPrompt}
-              className="w-full bg-admin-accent hover:bg-admin-accent/90"
-            >
-              {actionBusy
-                ? "Processando..."
-                : actionPrompt?.kind === "delete"
-                  ? "Confirmar exclusão"
-                  : "Confirmar"}
-            </Button>
-            {actionSuccess && (
-              <Button variant="outline" className="w-full" onClick={() => setActionPrompt(null)}>
-                Concluir
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        title={actionPrompt?.kind === "delete" ? "Excluir pedido" : "Estornar baixa"}
+        description={
+          actionPrompt?.kind === "delete"
+            ? "O pedido sairá da operação e das pendências; histórico e documentos serão preservados."
+            : "O pedido voltará a pendente. O estorno ficará registrado na auditoria."
+        }
+        busy={actionBusy}
+        error={actionError}
+        onClose={() => {
+          setActionPrompt(null);
+          setActionError(null);
+        }}
+        onConfirm={runPrompt}
+      />
     </div>
   );
 }
