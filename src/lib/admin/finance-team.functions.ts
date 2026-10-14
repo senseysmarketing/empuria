@@ -9,7 +9,8 @@ const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 const monthStartSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/);
 const currencySchema = z.enum(["BRL", "EUR"]);
 const payeeTypeSchema = z.enum(["team", "contractor", "partner", "supplier", "other"]);
-const ruleTypeSchema = z.enum(["fixed_monthly", "revenue_percent", "service_percent"]);
+const ruleTypeSchema = z.enum(["fixed_monthly", "goal_cap", "revenue_percent", "service_percent"]);
+const legacyRuleTypeSchema = z.enum(["fixed_monthly", "revenue_percent", "service_percent"]);
 
 export type FinancePayee = {
   id: string;
@@ -53,7 +54,8 @@ export type FinancePayout = {
 
 export type FinanceTeamMember = {
   payee: FinancePayee;
-  rule: FinancePayoutRule | null;
+  rules: FinancePayoutRule[];
+  skipped_rule_ids: string[];
   payouts: { payout: FinancePayout; transaction: FinanceTransaction | null }[];
 };
 
@@ -112,7 +114,7 @@ const ruleInput = z
     if (rule.endsOn && rule.endsOn < rule.startsOn) {
       ctx.addIssue({ code: "custom", message: "Fim anterior ao início." });
     }
-    if (rule.ruleType === "fixed_monthly") {
+    if (rule.ruleType === "fixed_monthly" || rule.ruleType === "goal_cap") {
       if (rule.amount == null || !rule.currency || !rule.dayOfMonth) {
         ctx.addIssue({ code: "custom", message: "Valor, moeda e vencimento são obrigatórios." });
       }
@@ -122,13 +124,17 @@ const ruleInput = z
     ) {
       ctx.addIssue({ code: "custom", message: "Percentual e serviço são obrigatórios." });
     }
-    if (rule.ruleType !== "fixed_monthly" && !rule.includeBrl && !rule.includeEur) {
+    if (
+      !["fixed_monthly", "goal_cap"].includes(rule.ruleType) &&
+      !rule.includeBrl &&
+      !rule.includeEur
+    ) {
       ctx.addIssue({ code: "custom", message: "Selecione BRL, EUR ou ambas." });
     }
   });
 
 function rulePatch(data: z.infer<typeof ruleInput>) {
-  const fixed = data.ruleType === "fixed_monthly";
+  const fixed = data.ruleType === "fixed_monthly" || data.ruleType === "goal_cap";
   return {
     payee_id: data.payeeId,
     rule_type: data.ruleType,
@@ -155,7 +161,7 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
       p_actor: null,
     });
     if (ensureError) throw new Error(ensureError.message);
-    const [payeesQ, rulesQ, payoutsQ, servicesQ, ruleServicesQ] = await Promise.all([
+    const [payeesQ, rulesQ, payoutsQ, servicesQ, ruleServicesQ, skipsQ] = await Promise.all([
       db
         .from("finance_payees")
         .select("id,name,type,profile_id,notes,is_active,archived_at")
@@ -174,8 +180,9 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
         .eq("period_month", period),
       supabaseAdmin.from("services").select("id,title").order("title"),
       db.from("finance_payout_rule_services").select("rule_id,service_id"),
+      db.from("finance_payout_skips").select("rule_id").eq("period_month", period),
     ]);
-    for (const query of [payeesQ, rulesQ, payoutsQ, servicesQ, ruleServicesQ]) {
+    for (const query of [payeesQ, rulesQ, payoutsQ, servicesQ, ruleServicesQ, skipsQ]) {
       if (query.error) throw new Error(query.error.message);
     }
     const payouts = (payoutsQ.data ?? []) as FinancePayout[];
@@ -218,12 +225,9 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
       .filter((payee) => data.showArchived || !payee.archived_at)
       .map((payee) => {
         const ownRules = rules.filter((rule) => rule.payee_id === payee.id && !rule.archived_at);
-        const rule =
-          ownRules.find(
-            (item) => item.starts_on <= period && (!item.ends_on || item.ends_on >= period),
-          ) ??
-          ownRules.find((item) => item.starts_on <= period) ??
-          null;
+        const currentRules = ownRules.filter(
+          (item) => item.starts_on <= period && (!item.ends_on || item.ends_on >= period),
+        );
         const ownPayouts = payouts
           .filter((payout) => payout.payee_id === payee.id && !payout.voided_at)
           .map((payout) => ({
@@ -232,7 +236,16 @@ export const listFinanceTeamMonth = createServerFn({ method: "POST" })
               ? (txMap.get(payout.finance_transaction_id) ?? null)
               : null,
           }));
-        return { payee, rule, payouts: ownPayouts };
+        return {
+          payee,
+          rules: currentRules,
+          skipped_rule_ids: currentRules
+            .filter((rule) =>
+              (skipsQ.data ?? []).some((skip: { rule_id: string }) => skip.rule_id === rule.id),
+            )
+            .map((rule) => rule.id),
+          payouts: ownPayouts,
+        };
       });
     return {
       members,
@@ -251,7 +264,7 @@ const teamMemberInput = z
     type: payeeTypeSchema,
     profileId: z.string().uuid().nullable().optional(),
     notes: z.string().trim().max(500).nullable().optional(),
-    ruleType: ruleTypeSchema,
+    ruleType: legacyRuleTypeSchema,
     amountCents: z.number().int().min(0).max(2_147_483_647).nullable().optional(),
     currency: currencySchema.nullable().optional(),
     percentage: z.number().finite().positive().max(100).nullable().optional(),
@@ -286,6 +299,96 @@ export const saveFinanceTeamMember = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     return { id: id as string };
+  });
+
+const compensationRuleInput = z
+  .object({
+    id: z.string().uuid().nullable(),
+    ruleType: ruleTypeSchema,
+    amountCents: z.number().int().min(0).max(2_147_483_647).nullable(),
+    currency: currencySchema.nullable(),
+    percentage: z.number().finite().positive().max(100).nullable(),
+    includeBrl: z.boolean(),
+    includeEur: z.boolean(),
+    dayOfMonth: z.number().int().min(1).max(31).nullable(),
+    serviceIds: z.array(z.string().uuid()).max(50),
+  })
+  .superRefine((rule, ctx) => {
+    if (rule.ruleType === "fixed_monthly" || rule.ruleType === "goal_cap") {
+      if (rule.amountCents === null || !rule.currency || !rule.dayOfMonth) {
+        ctx.addIssue({ code: "custom", message: "Informe valor, moeda e vencimento." });
+      }
+    } else if (
+      !rule.percentage ||
+      (!rule.includeBrl && !rule.includeEur) ||
+      (rule.ruleType === "service_percent" && !rule.serviceIds.length)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Informe percentual, moeda e serviços quando necessário.",
+      });
+    }
+  });
+
+export const saveFinanceTeamCompensation = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) =>
+    z
+      .object({
+        payeeId: z.string().uuid().nullable(),
+        month: monthStartSchema,
+        mode: z.enum(["current", "next_month"]),
+        name: z.string().trim().min(2).max(120),
+        type: payeeTypeSchema,
+        notes: z.string().trim().max(500).nullable(),
+        rules: z.array(compensationRuleInput).min(1).max(12),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: id, error } = await db.rpc("finance_save_team_compensation", {
+      p_data: data,
+      p_actor: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    return { id: id as string };
+  });
+
+export const skipFinanceGoalCommission = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) => z.object({ ruleId: z.string().uuid(), month: monthStartSchema }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await db.rpc("finance_skip_goal_commission", {
+      p_rule_id: data.ruleId,
+      p_month: data.month,
+      p_actor: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const setFinanceTeamRuleState = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) =>
+    z
+      .object({
+        ruleId: z.string().uuid(),
+        month: monthStartSchema,
+        action: z.enum(["pause", "reactivate", "remove"]),
+        removePending: z.boolean(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await db.rpc("finance_set_team_rule_state", {
+      p_rule_id: data.ruleId,
+      p_month: data.month,
+      p_action: data.action,
+      p_remove_pending: data.removePending,
+      p_actor: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const setFinanceTeamMemberState = createServerFn({ method: "POST" })
