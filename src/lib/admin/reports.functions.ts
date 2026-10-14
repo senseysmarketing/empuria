@@ -1406,7 +1406,7 @@ export const getReportsHistorico = createServerFn({ method: "POST" })
       const { data: orders } = await db
         .from("orders")
         .select(
-          "id,created_at,customer_name,customer_email,service_title,amount_cents,currency,payment_status,payment_method,external_reference,payment_provider_reference",
+          "id,created_at,customer_name,customer_email,service_title,amount_cents,currency,payment_status,payment_method,external_reference,payment_provider_reference,deleted_at",
         )
         .gte("created_at", startTs)
         .lte("created_at", endTs)
@@ -1426,7 +1426,7 @@ export const getReportsHistorico = createServerFn({ method: "POST" })
           description: (o.service_title as string) ?? "Pedido",
           total_cents: Number(o.amount_cents ?? 0),
           currency: (o.currency as string) ?? "EUR",
-          status: normalizeOrderStatus(o.payment_status as string),
+          status: o.deleted_at ? "deleted" : normalizeOrderStatus(o.payment_status as string),
           payment_method: (o.payment_method as string) ?? null,
         });
       }

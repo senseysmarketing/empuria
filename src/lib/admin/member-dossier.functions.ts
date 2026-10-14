@@ -33,6 +33,7 @@ export const getMemberDossier = createServerFn({ method: "POST" })
           "id,service_id,service_title,created_at,payment_status,delivery_status,amount_cents,currency,paid_at",
         )
         .eq("user_id", data.userId)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false }),
       supabaseAdmin
         .from("member_documents")

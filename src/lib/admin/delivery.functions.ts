@@ -34,8 +34,9 @@ export const updateDelivery = createServerFn({ method: "POST" })
     if (data.assigned_staff_id !== undefined) patch.assigned_staff_id = data.assigned_staff_id;
     if (data.notes !== undefined) patch.notes = data.notes;
     if (data.delivery_status === "concluido") patch.executed_at = new Date().toISOString();
-    const { error } = await context.supabase.from("orders").update(patch).eq("id", data.orderId);
+    const { data: updated, error } = await context.supabase.from("orders").update(patch).eq("id", data.orderId).is("deleted_at", null).select("id").maybeSingle();
     if (error) throw new Error(error.message);
+    if (!updated) throw new Error("Pedido não encontrado ou excluído.");
     return { ok: true };
   });
 

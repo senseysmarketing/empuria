@@ -147,7 +147,8 @@ export const listUsers = createServerFn({ method: "POST" })
         supabaseAdmin
           .from("orders")
           .select("user_id,payment_status,delivery_status")
-          .in("user_id", ids),
+          .in("user_id", ids)
+          .is("deleted_at", null),
         supabaseAdmin.from("member_documents").select("user_id,status").in("user_id", ids),
       ]);
       if (ordersRes.error) throw new Error(ordersRes.error.message);

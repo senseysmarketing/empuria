@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { summarizePendingPayments } from "@/lib/admin/esteira-pending";
 import { useServerFn } from "@tanstack/react-start";
@@ -54,15 +54,14 @@ const formatMoney = (cents: number | null | undefined, currency = "EUR") =>
 const STATUS_COLOR: Record<string, string> = {
   pendente: "bg-amber-100 text-amber-900",
   aprovado: "bg-emerald-100 text-emerald-900",
-  recusado: "bg-slate-100 text-slate-700",
-  estornado: "bg-slate-200 text-slate-700",
 };
 
+const isCourtesy = (order: Order) => (order.payment_amount_cents ?? order.amount_cents ?? 0) === 0;
+
 function paymentLabel(order: Order) {
-  if (order.payment_status === "aprovado" && order.payment_method === "gratuito") return "Gratuito";
+  if (isCourtesy(order)) return "Cortesia";
   if (order.payment_status === "aprovado") return "Recebido";
-  if (order.payment_status === "pendente") return "Pendente";
-  return order.payment_status === "estornado" ? "Estornado" : "Cancelado";
+  return "Pendente";
 }
 
 const clipped = (value: string, limit: number) =>
@@ -79,9 +78,8 @@ const DELIVERY_COLOR: Record<string, string> = {
 const PAYMENT_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Todos pagamentos" },
   { value: "pendente", label: "Pendente" },
-  { value: "aprovado", label: "Recebido / Gratuito" },
-  { value: "recusado", label: "Recusado" },
-  { value: "estornado", label: "Estornado" },
+  { value: "aprovado", label: "Recebido" },
+  { value: "courtesy", label: "Cortesia" },
 ];
 
 const DELIVERY_OPTIONS: { value: string; label: string }[] = [
@@ -121,6 +119,7 @@ type Order = {
   fx_rate?: number | null;
   fx_source?: string | null;
   payment_method?: string | null;
+  payment_provider_payment_id?: string | null;
   notes?: string | null;
 };
 
@@ -144,6 +143,9 @@ function EsteiraPage() {
     order: Order;
   } | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const actionBusyRef = useRef(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [reasonInput, setReasonInput] = useState("");
   const [settledAmount, setSettledAmount] = useState("");
   const [settledCurrency, setSettledCurrency] = useState<"BRL" | "EUR">("EUR");
@@ -209,7 +211,13 @@ function EsteiraPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return orders.filter((o) => {
-      if (paymentFilter !== "all" && o.payment_status !== paymentFilter) return false;
+      if (paymentFilter === "courtesy" && !isCourtesy(o)) return false;
+      if (
+        paymentFilter !== "all" &&
+        paymentFilter !== "courtesy" &&
+        (o.payment_status !== paymentFilter || isCourtesy(o))
+      )
+        return false;
       if (deliveryFilter !== "all" && o.delivery_status !== deliveryFilter) return false;
       if (q) {
         const hay = `${o.customer_name} ${o.customer_email ?? ""} ${o.service_title}`.toLowerCase();
@@ -240,10 +248,19 @@ function EsteiraPage() {
       setPage(1);
     };
 
-  const refresh = () => {
-    for (const key of ["orders", "finance-transactions", "finance-dashboard"]) {
-      qc.invalidateQueries({ queryKey: [key], refetchType: "active" });
-    }
+  const refresh = async () => {
+    await Promise.all(
+      [
+        "orders",
+        "finance-transactions",
+        "finance-dashboard",
+        "member-dossier",
+        "reports-historico",
+        "reports-overview",
+        "reports-vendas",
+        "reports-servicos",
+      ].map((key) => qc.invalidateQueries({ queryKey: [key], refetchType: "active" })),
+    );
   };
 
   // Summary tiles
@@ -300,9 +317,9 @@ function EsteiraPage() {
   };
 
   const runPrompt = async () => {
-    if (!actionPrompt || actionBusy) return;
+    if (!actionPrompt || actionBusyRef.current || actionSuccess) return;
     if (actionPrompt.kind === "reverse" && reasonInput.trim().length < 3) {
-      toast.error("Motivo do estorno obrigatório (mín. 3 caracteres)");
+      setActionError("Motivo do estorno obrigatório (mín. 3 caracteres).");
       return;
     }
     if (
@@ -311,9 +328,11 @@ function EsteiraPage() {
         !(Number(settledAmount) > 0) ||
         (settlementConversion && !(Number(settlementFxRate) > 0)))
     ) {
-      toast.error("Informe data, valor e cotação válida quando houver conversão.");
+      setActionError("Informe data, valor e cotação válida quando houver conversão.");
       return;
     }
+    actionBusyRef.current = true;
+    setActionError(null);
     setActionBusy(true);
     try {
       const { kind, order } = actionPrompt;
@@ -334,19 +353,28 @@ function EsteiraPage() {
       if (kind === "delete")
         await remove({ data: { id: order.id, reason: reasonInput || undefined } });
       if (kind === "reverse") await reverse({ data: { id: order.id, reason: reasonInput } });
-      toast.success(
+      const success =
         kind === "manual"
           ? "Baixa confirmada"
           : kind === "reverse"
             ? "Baixa estornada"
-            : "Pedido excluído",
-      );
-      setActionPrompt(null);
+            : "Pedido excluído";
+      setActionSuccess(success);
+      toast.success(success);
       setReasonInput("");
-      refresh();
+      try {
+        await refresh();
+      } catch {
+        setActionError(
+          "A ação foi concluída, mas a atualização automática falhou. Recarregue a página.",
+        );
+      }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro");
+      const message = e instanceof Error ? e.message : "Não foi possível concluir a ação.";
+      setActionError(message);
+      toast.error(message);
     } finally {
+      actionBusyRef.current = false;
       setActionBusy(false);
     }
   };
@@ -552,7 +580,7 @@ function EsteiraPage() {
                     <td className="py-3 pr-3" onClick={(e) => e.stopPropagation()}>
                       <span
                         className={`inline-flex rounded-full px-2 py-1 text-xs whitespace-nowrap ${
-                          o.payment_method === "gratuito"
+                          isCourtesy(o)
                             ? "bg-slate-100 text-slate-700"
                             : STATUS_COLOR[o.payment_status]
                         }`}
@@ -577,7 +605,8 @@ function EsteiraPage() {
                     <td className="py-3 pl-3 pr-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-2 whitespace-nowrap">
                         {o.payment_status === "pendente" &&
-                          (o.payment_amount_cents ?? o.amount_cents ?? 0) > 0 && (
+                          !isCourtesy(o) &&
+                          !o.payment_provider_payment_id && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -585,6 +614,8 @@ function EsteiraPage() {
                               className="whitespace-nowrap"
                               onClick={() => {
                                 setActionPrompt({ kind: "manual", order: o });
+                                setActionError(null);
+                                setActionSuccess(null);
                                 setReasonInput("");
                                 setSettledCurrency(
                                   (o.payment_currency ?? o.currency ?? "EUR") as "BRL" | "EUR",
@@ -603,42 +634,46 @@ function EsteiraPage() {
                               Dar baixa
                             </Button>
                           )}
-                        {o.payment_status === "aprovado" && o.payment_method !== "gratuito" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={actionBusy}
-                            className="whitespace-nowrap"
-                            onClick={() => {
-                              setActionPrompt({ kind: "reverse", order: o });
-                              setReasonInput("");
-                            }}
-                          >
-                            <RotateCcw className="mr-1 h-4 w-4" />
-                            Estornar baixa
-                          </Button>
-                        )}
-                        {(o.payment_status === "pendente" ||
-                          o.payment_status === "recusado" ||
-                          o.payment_status === "estornado" ||
-                          (o.payment_status === "aprovado" &&
-                            o.payment_method === "gratuito" &&
-                            !o.executed_at &&
-                            o.delivery_status !== "concluido")) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={actionBusy}
-                            className="whitespace-nowrap"
-                            onClick={() => {
-                              setActionPrompt({ kind: "delete", order: o });
-                              setReasonInput("");
-                            }}
-                          >
-                            <Trash2 className="mr-1 h-4 w-4" />
-                            Excluir
-                          </Button>
-                        )}
+                        {o.payment_status === "aprovado" &&
+                          !isCourtesy(o) &&
+                          !o.payment_provider_payment_id && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionBusy}
+                              className="whitespace-nowrap"
+                              onClick={() => {
+                                setActionPrompt({ kind: "reverse", order: o });
+                                setActionError(null);
+                                setActionSuccess(null);
+                                setReasonInput("");
+                              }}
+                            >
+                              <RotateCcw className="mr-1 h-4 w-4" />
+                              Estornar baixa
+                            </Button>
+                          )}
+                        {!o.payment_provider_payment_id &&
+                          !o.executed_at &&
+                          o.delivery_status !== "concluido" &&
+                          (o.payment_status === "pendente" ||
+                            (o.payment_status === "aprovado" && isCourtesy(o))) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionBusy}
+                              className="whitespace-nowrap"
+                              onClick={() => {
+                                setActionPrompt({ kind: "delete", order: o });
+                                setActionError(null);
+                                setActionSuccess(null);
+                                setReasonInput("");
+                              }}
+                            >
+                              <Trash2 className="mr-1 h-4 w-4" />
+                              Excluir
+                            </Button>
+                          )}
                       </div>
                     </td>
                   </tr>
@@ -774,7 +809,10 @@ function EsteiraPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!actionPrompt} onOpenChange={(o) => !o && setActionPrompt(null)}>
+      <Dialog
+        open={!!actionPrompt}
+        onOpenChange={(o) => !o && !actionBusy && setActionPrompt(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -786,6 +824,22 @@ function EsteiraPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {actionError && (
+              <p
+                role="alert"
+                className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900"
+              >
+                {actionError}
+              </p>
+            )}
+            {actionSuccess && (
+              <p
+                role="status"
+                className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900"
+              >
+                {actionSuccess}. A tabela e o Financeiro foram atualizados.
+              </p>
+            )}
             {actionPrompt?.kind === "manual" && (
               <>
                 <div className="grid grid-cols-2 gap-3">
@@ -883,6 +937,7 @@ function EsteiraPage() {
             <Button
               disabled={
                 actionBusy ||
+                !!actionSuccess ||
                 (actionPrompt?.kind === "manual" &&
                   (!settledAmount ||
                     (settlementConversion && !settlementFxRate) ||
@@ -898,6 +953,11 @@ function EsteiraPage() {
                   ? "Confirmar exclusão"
                   : "Confirmar"}
             </Button>
+            {actionSuccess && (
+              <Button variant="outline" className="w-full" onClick={() => setActionPrompt(null)}>
+                Concluir
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -70,6 +70,7 @@ async function loadOrderById(orderId: string): Promise<OrderRow | null> {
       "id,customer_name,service_title,external_reference,payment_provider_reference,amount_cents,currency,payment_amount_cents,payment_currency,payment_status,delivery_status",
     )
     .eq("id", orderId)
+    .is("deleted_at", null)
     .maybeSingle();
   return (data as OrderRow | null) ?? null;
 }
@@ -104,8 +105,11 @@ export async function resolvePaymentLinkForCharge(token: string): Promise<{
       .eq("id", link.id);
     throw new Error("Pedido ja foi pago.");
   }
-  if (order.payment_status === "estornado") {
-    throw new Error("Pedido estornado. Nao e possivel cobrar novamente.");
+  if (order.payment_status !== "pendente") {
+    throw new Error("Pedido não está pendente para cobrança.");
+  }
+  if ((order.payment_amount_cents ?? order.amount_cents) <= 0) {
+    throw new Error("Cortesia sem cobrança não aceita pagamento.");
   }
   return { link, order };
 }
