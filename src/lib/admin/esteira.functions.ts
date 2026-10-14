@@ -354,7 +354,7 @@ export const reverseOrderPayment = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        reason: z.string().trim().min(3).max(280),
+        reason: z.string().trim().min(3).max(280).optional(),
       })
       .parse(d),
   )
@@ -382,7 +382,7 @@ export const reverseOrderPayment = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.rpc("finance_reverse_settlement", {
       p_id: mirror.id,
       p_actor: context.userId,
-      p_reason: data.reason,
+      p_reason: data.reason ?? "Estorno solicitado pelo administrador",
     });
     if (error) throw new Error(error.message);
     return { ok: true };

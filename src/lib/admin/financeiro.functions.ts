@@ -42,6 +42,8 @@ export type FinanceTransaction = {
   notes: string | null;
   created_at: string;
   category_name?: string | null;
+  is_courtesy?: boolean;
+  is_courtesy_deletable?: boolean;
 };
 
 export type FinanceRecurringRule = {
@@ -199,9 +201,72 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
 
     const { data: rows, error, count } = await query;
     if (error) throw new Error(error.message);
+    let courtesies: FinanceTransaction[] = [];
+    if (
+      ["all", "received"].includes(data.status) &&
+      ["all", "income"].includes(data.type) &&
+      (!data.sourceModule || data.sourceModule === "orders")
+    ) {
+      const { data: courtesyOrders, error: ordersError } = await db
+        .from("orders")
+        .select("id,executed_at,delivery_status,payment_provider_payment_id")
+        .eq("payment_status", "aprovado")
+        .eq("payment_method", "gratuito")
+        .eq("amount_cents", 0)
+        .is("deleted_at", null)
+        .gte("created_at", start)
+        .lt("created_at", new Date(Date.parse(`${end}T00:00:00Z`) + 86_400_000).toISOString());
+      if (ordersError) throw new Error(ordersError.message);
+      const ids = (courtesyOrders ?? []).map((order: { id: string }) => order.id);
+      const deletableIds = new Set(
+        (courtesyOrders ?? [])
+          .filter(
+            (order: {
+              id: string;
+              executed_at: string | null;
+              delivery_status: string;
+              payment_provider_payment_id: string | null;
+            }) =>
+              !order.executed_at &&
+              order.delivery_status !== "concluido" &&
+              !order.payment_provider_payment_id,
+          )
+          .map((order: { id: string }) => order.id),
+      );
+      if (ids.length) {
+        let courtesyQuery = db
+          .from("finance_transactions")
+          .select(
+            "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
+          )
+          .eq("source_module", "orders")
+          .eq("status", "canceled")
+          .eq("amount_cents", 0)
+          .in("source_id", ids);
+        if (data.search)
+          courtesyQuery = courtesyQuery.ilike(
+            "description",
+            `%${data.search.replace(/[%_]/g, "")}%`,
+          );
+        if (data.categoryId) courtesyQuery = courtesyQuery.eq("category_id", data.categoryId);
+        const { data: courtesyRows, error: courtesyError } = await courtesyQuery;
+        if (courtesyError) throw new Error(courtesyError.message);
+        courtesies = (courtesyRows ?? []).map((row: FinanceTransaction) => ({
+          ...row,
+          status: "received",
+          is_courtesy: true,
+          is_courtesy_deletable: !!row.source_id && deletableIds.has(row.source_id),
+        }));
+      }
+    }
     return {
-      rows: withNames((rows ?? []) as FinanceTransaction[], categories),
-      count: count ?? 0,
+      rows: withNames(
+        [...((rows ?? []) as FinanceTransaction[]), ...courtesies].sort((a, b) =>
+          b.due_date.localeCompare(a.due_date),
+        ),
+        categories,
+      ),
+      count: (count ?? 0) + courtesies.length,
     };
   });
 
@@ -295,13 +360,15 @@ export const deleteFinancePendingTransaction = createServerFn({ method: "POST" }
 export const reverseFinanceSettlement = createServerFn({ method: "POST" })
   .middleware([requireModule("financeiro")])
   .inputValidator((d) =>
-    z.object({ id: z.string().uuid(), reason: z.string().trim().min(3).max(500) }).parse(d),
+    z
+      .object({ id: z.string().uuid(), reason: z.string().trim().min(3).max(500).optional() })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { error } = await db.rpc("finance_reverse_settlement", {
       p_id: data.id,
       p_actor: context.userId,
-      p_reason: data.reason,
+      p_reason: data.reason ?? null,
     });
     if (error) throw new Error(error.message);
     return { ok: true };
