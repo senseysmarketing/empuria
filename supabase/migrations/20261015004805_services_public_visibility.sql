@@ -3,11 +3,13 @@ ALTER TABLE public.services
   ADD COLUMN is_public boolean NOT NULL DEFAULT false;
 
 DO $$
-DECLARE v_expected integer;
+DECLARE
+  v_expected integer;
+  v_total integer;
 BEGIN
-  -- A fresh Preview may not contain production rows. A populated database must
-  -- contain the four exact services confirmed before this migration.
-  IF EXISTS (SELECT 1 FROM public.services) THEN
+  SELECT count(*) INTO v_total FROM public.services;
+  IF v_total = 4 THEN
+    -- Production: publish only the four exact services verified in preflight.
     SELECT count(*) INTO v_expected
     FROM public.services s
     JOIN (VALUES
@@ -33,6 +35,32 @@ BEGIN
     IF (SELECT count(*) FROM public.services WHERE is_public) <> 4 THEN
       RAISE EXCEPTION 'Public services backfill count differs';
     END IF;
+  ELSIF v_total = 6 THEN
+    -- Empty Preview branches replay the original six-service seed. Its UUIDs are
+    -- generated at insertion, so verify the complete seed by slug and values.
+    SELECT count(*) INTO v_expected
+    FROM public.services s
+    JOIN (VALUES
+      ('conta-bancaria', 14500),
+      ('recepcao-aeroporto', 12000),
+      ('reuniao-presencial', 18000),
+      ('tour-economico', 4500),
+      ('tour-raiz', 9800),
+      ('vale-transporte', 6500)
+    ) AS expected(slug, online_price_cents)
+      ON s.slug = expected.slug
+      AND s.online_price_cents = expected.online_price_cents
+      AND s.currency = 'EUR' AND s.online_currency = 'BRL'
+      AND s.is_active AND s.archived_at IS NULL;
+    IF v_expected <> 6 THEN
+      RAISE EXCEPTION 'Preview seed baseline differs; refusing automatic publication';
+    END IF;
+    UPDATE public.services SET is_public = true;
+    IF (SELECT count(*) FROM public.services WHERE is_public) <> 6 THEN
+      RAISE EXCEPTION 'Preview services backfill count differs';
+    END IF;
+  ELSIF v_total <> 0 THEN
+    RAISE EXCEPTION 'Public services baseline differs; refusing automatic publication';
   END IF;
 END $$;
 
