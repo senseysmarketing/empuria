@@ -12,14 +12,14 @@ Fonte remota: `supabase_migrations.schema_migrations.statements[1]`; fonte local
 ## Ação versionada neste PR
 
 - Renomeados somente os 43 pares cuja equivalência integral do SQL foi comprovada por MD5 (36) ou pela única quebra de linha final (7). O conteúdo operacional não foi editado.
-- Incluído `20260522154648_original_admin_role.sql` com o SQL integral guardado em `statements[1]` da produção. O arquivo local guardado `20260522154651` permanece intacto e não foi tratado como equivalente.
+- Incluído `20260522154648_original_admin_role.sql` para representar a versão remota. Após o primeiro teste real do Preview, a atribuição do papel admin nesse arquivo recebeu um guard de existência em `auth.users`: a produção contém o usuário e o papel, mas um Preview vazio não contém o usuário, e o `VALUES` original falha na FK `user_roles_user_id_fkey`. O SQL original da produção está preservado em `supabase_migrations.schema_migrations.statements[1]` e no commit inicial desta branch (`d9f4a34`); a divergência do arquivo local é intencional e limitada à capacidade de replay em um banco vazio. O arquivo local `20260522154651` permanece intacto e não foi tratado como equivalente.
 - Nenhuma linha de `supabase_migrations.schema_migrations` foi inserida, apagada ou alterada para forçar o alinhamento. As quatro versões locais extras permanecem visíveis para o Preview avaliar; não foram marcadas como aplicadas.
 
 | Versão remota | Arquivo local original | MD5 remoto | Evidência |
 |---|---|---|---|
 | 20260522153739 | 20260522153742_91f23602-a04e-4187-8bef-b9927e878c05.sql | `b825883a589d51fa04a0cc102a4d2278` | SQL byte a byte |
 | 20260522154125 | 20260522154127_fdf99399-52e1-46ec-a161-70162f50ac99.sql | `b76f03a6e9eb3cb4aac61fbe123274fe` | SQL byte a byte |
-| 20260522154648 | sem par | `1e12386422fa3a025e836ae4f364cb79` | não equivalente |
+| 20260522154648 | sem par | `1e12386422fa3a025e836ae4f364cb79` | guard de replay para usuário ausente no Preview; SQL local intencionalmente diferente |
 | 20260522160451 | 20260522160453_4be728fc-71f6-41cd-940e-f2c898218302.sql | `ceba0e3e045f174ce278d98f27ed2142` | SQL byte a byte |
 | 20260522164515 | 20260522164519_7199fc9d-bf98-4cec-81b4-7552a2476aeb.sql | `f5052364e7b22cdaca4c18f2a41bbf4e` | SQL byte a byte |
 | 20260522164724 | 20260522164727_e9acdf4c-f49e-4134-9a57-1c10c352b00a.sql | `43e8a711b16613a363a9656a15d2522d` | SQL byte a byte |
