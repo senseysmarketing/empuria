@@ -22,6 +22,7 @@ import {
   createServiceImageUploadUrl,
 } from "@/lib/admin/service-prices.functions";
 import { getServiceImage } from "@/lib/service-images";
+import { ConfirmFinancialAction } from "@/components/admin/financeiro/ConfirmFinancialAction";
 import { Loader2, Save, Upload, RotateCcw } from "lucide-react";
 
 export type ServiceRow = {
@@ -38,6 +39,7 @@ export type ServiceRow = {
   online_currency: string | null;
   display_price_note: string | null;
   is_active: boolean;
+  is_public: boolean;
   requires_slot: boolean;
   requires_documents: boolean;
   duration_minutes: number | null;
@@ -68,11 +70,14 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [priceInput, setPriceInput] = useState("0,00");
   const [isActive, setIsActive] = useState(true);
+  const [isPublic, setIsPublic] = useState(false);
   const [requiresSlot, setRequiresSlot] = useState(false);
   const [requiresDocuments, setRequiresDocuments] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [note, setNote] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [confirmFree, setConfirmFree] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const draftImageId = useRef<string>(crypto.randomUUID());
 
@@ -83,6 +88,9 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
     setImageUrl(service?.image_url ?? null);
     setPriceInput(centsToInput(service?.online_price_cents ?? service?.price_cents));
     setIsActive(service?.is_active ?? true);
+    setIsPublic(service?.is_public ?? false);
+    setConfirmFree(false);
+    setSaveError(null);
     setRequiresSlot(Boolean(service?.requires_slot));
     setRequiresDocuments(Boolean(service?.requires_documents));
     setDuration(Number(service?.duration_minutes ?? 0));
@@ -132,13 +140,6 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
       if (requiresSlot && (!duration || duration <= 0)) {
         throw new Error("Informe uma duração maior que zero para serviços com agendamento.");
       }
-      if (isActive && cents === 0) {
-        const ok = window.confirm(
-          "Este serviço está ativo com valor R$ 0,00. Deseja salvar mesmo assim?",
-        );
-        if (!ok) throw new Error("Salvamento cancelado.");
-      }
-
       const input = {
         title: title.trim(),
         short_description: shortDesc.trim() || null,
@@ -148,6 +149,7 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
         online_currency: "EUR" as const,
         display_price_note: note.trim() || null,
         is_active: isActive,
+        is_public: isPublic,
         requires_slot: requiresSlot,
         requires_documents: requiresDocuments,
         duration_minutes: requiresSlot ? Number(duration) : null,
@@ -156,25 +158,39 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
     },
     onSuccess: async () => {
       toast.success(service ? "Serviço atualizado" : "Serviço criado");
+      setConfirmFree(false);
+      setSaveError(null);
       await onSaved();
     },
     onError: (error) => {
       const msg = error instanceof Error ? error.message : "Erro ao salvar serviço";
-      if (msg !== "Salvamento cancelado.") toast.error(msg);
+      setSaveError(msg);
     },
   });
+
+  function save() {
+    if (mutation.isPending || uploading) return;
+    setSaveError(null);
+    const parsedPrice = Number(priceInput.replace(",", "."));
+    const cents = Math.round((Number.isFinite(parsedPrice) ? parsedPrice : 0) * 100);
+    if (isActive && cents === 0 && !confirmFree) {
+      setConfirmFree(true);
+      return;
+    }
+    mutation.mutate();
+  }
 
   const previewSrc = imageUrl || getServiceImage({ image_url: null, kind: service?.kind ?? null });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             {service ? `Editar ${service.title}` : "Novo serviço"}
           </DialogTitle>
           <DialogDescription>
-            Ajuste o conteúdo público, imagem de capa, valor e regras de venda.
+            Ajuste a visibilidade, imagem de capa, valor e regras de venda.
           </DialogDescription>
         </DialogHeader>
 
@@ -277,15 +293,25 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
 
           <div className="flex items-center justify-between rounded-lg border border-admin-border px-3 py-2">
             <div>
-              <Label className="text-sm">Status</Label>
+              <Label className="text-sm">Serviço ativo</Label>
               <p className="text-xs text-admin-ink-muted">
-                Serviços inativos não aparecem no site.
+                Serviços inativos não entram em novas vendas.
               </p>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-admin-ink-muted">{isActive ? "Ativo" : "Inativo"}</span>
               <Switch checked={isActive} onCheckedChange={setIsActive} />
             </div>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-admin-border px-3 py-2">
+            <div>
+              <Label className="text-sm">Exibir no site</Label>
+              <p className="text-xs text-admin-ink-muted">
+                Somente serviços ativos e públicos aparecem no site e na loja.
+              </p>
+            </div>
+            <Switch checked={isPublic} onCheckedChange={setIsPublic} />
           </div>
 
           <div className="space-y-3 rounded-lg border border-admin-border p-3">
@@ -344,11 +370,20 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
           </div>
         </div>
 
+        {saveError && (
+          <p role="alert" className="text-sm text-red-700">
+            {saveError}
+          </p>
+        )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            disabled={mutation.isPending}
+            onClick={() => onOpenChange(false)}
+          >
             Cancelar
           </Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
+          <Button onClick={save} disabled={mutation.isPending || uploading} className="gap-2">
             {mutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -358,6 +393,20 @@ export function EditServicePriceDialog({ service, open, onOpenChange, onSaved }:
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ConfirmFinancialAction
+        open={confirmFree}
+        title="Confirmar serviço gratuito"
+        description="Este serviço está ativo com valor € 0,00. Deseja salvá-lo assim?"
+        busy={mutation.isPending}
+        error={saveError}
+        onClose={() => {
+          if (!mutation.isPending) {
+            setConfirmFree(false);
+            setSaveError(null);
+          }
+        }}
+        onConfirm={save}
+      />
     </Dialog>
   );
 }

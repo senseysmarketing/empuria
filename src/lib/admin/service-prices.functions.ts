@@ -35,7 +35,7 @@ export const listServicePrices = createServerFn({ method: "GET" })
     const { data, error } = await db
       .from("services")
       .select(
-        "id,slug,title,short_description,description,category,kind,price_cents,currency,online_price_cents,online_currency,display_price_note,is_active,requires_slot,requires_documents,duration_minutes,image_url,archived_at,archived_by",
+        "id,slug,title,short_description,description,category,kind,price_cents,currency,online_price_cents,online_currency,display_price_note,is_active,is_public,requires_slot,requires_documents,duration_minutes,image_url,archived_at,archived_by",
       )
       .order("category", { ascending: true })
       .order("title", { ascending: true });
@@ -53,6 +53,7 @@ const serviceInput = z.object({
   online_currency: z.literal("EUR").default("EUR"),
   display_price_note: z.string().trim().max(180).nullable().optional(),
   is_active: z.boolean(),
+  is_public: z.boolean(),
   requires_slot: z.boolean(),
   requires_documents: z.boolean(),
   duration_minutes: z
@@ -76,6 +77,7 @@ function servicePatch(data: z.infer<typeof serviceInput>) {
     online_currency: "EUR",
     display_price_note: data.display_price_note ?? null,
     is_active: data.is_active,
+    is_public: data.is_public,
     requires_slot: data.requires_slot,
     requires_documents: data.requires_documents,
     duration_minutes: data.requires_slot ? (data.duration_minutes ?? null) : null,

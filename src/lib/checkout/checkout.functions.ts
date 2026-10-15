@@ -25,6 +25,15 @@ export const getSlotsForService = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
+    const { data: service } = await supabaseAdmin
+      .from("services")
+      .select("id")
+      .eq("id", data.serviceId)
+      .eq("is_active", true)
+      .eq("is_public", true)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (!service) return [];
     const from = data.from ?? new Date().toISOString();
     const to = data.to ?? new Date(Date.now() + 1000 * 60 * 60 * 24 * 60).toISOString();
     const { data: slots } = await supabaseAdmin
@@ -69,6 +78,7 @@ export const createCheckoutIntent = createServerFn({ method: "POST" })
       .select("*")
       .eq("slug", data.serviceSlug)
       .eq("is_active", true)
+      .eq("is_public", true)
       .is("archived_at", null)
       .single();
     if (svcErr || !service) throw new Error("Serviço indisponível");
