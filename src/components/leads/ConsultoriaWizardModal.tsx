@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { SuccessFinale } from "./SuccessFinale";
 
 type Country = "espanha" | "brasil" | "europa" | "outro";
-type Visa = "residencia" | "cidadania" | "relocation" | "outros";
+type Visa = "residencia" | "cidadania" | "tramites" | "outros";
 type Timeline = "ate_3m" | "3_6m" | "6_12m" | "mais_12m";
 type Budget = "ate_2k" | "2_5k" | "5_10k" | "mais_10k";
 
@@ -50,28 +50,55 @@ export function ConsultoriaWizardModal({
   const [answers, setAnswers] = useState<Answers>(empty);
   const [submitted, setSubmitted] = useState<{ firstName: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const submitInFlight = useRef(false);
+  const choiceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submit = useServerFn(submitConsultoriaLead);
 
   const totalSteps = 4;
   const progress = ((submitted ? totalSteps : step) / totalSteps) * 100;
 
   const reset = () => {
+    if (choiceTimer.current) clearTimeout(choiceTimer.current);
+    choiceTimer.current = null;
     setStep(0);
     setAnswers(empty);
     setSubmitted(null);
     setLoading(false);
+    submitInFlight.current = false;
   };
 
   const handleClose = (v: boolean) => {
+    if (!v && submitInFlight.current) return;
+    if (!v && choiceTimer.current) clearTimeout(choiceTimer.current);
+    choiceTimer.current = null;
     if (!v) setTimeout(reset, 250);
     onOpenChange(v);
   };
 
   const next = () => setStep((s) => Math.min(s + 1, totalSteps - 1));
-  const back = () => setStep((s) => Math.max(s - 1, 0));
+  const back = () => {
+    if (choiceTimer.current) clearTimeout(choiceTimer.current);
+    choiceTimer.current = null;
+    setStep((s) => Math.max(s - 1, 0));
+  };
+  const advanceAfterChoice = () => {
+    if (choiceTimer.current) clearTimeout(choiceTimer.current);
+    choiceTimer.current = setTimeout(() => {
+      choiceTimer.current = null;
+      next();
+    }, 180);
+  };
 
   const onSubmit = async () => {
-    if (!answers.current_country || !answers.target_visa || !answers.timeline || !answers.budget_range) return;
+    if (submitInFlight.current) return;
+    if (
+      !answers.current_country ||
+      !answers.target_visa ||
+      !answers.timeline ||
+      !answers.budget_range
+    )
+      return;
+    submitInFlight.current = true;
     setLoading(true);
     try {
       const res = await submit({
@@ -87,9 +114,12 @@ export function ConsultoriaWizardModal({
         },
       });
       setSubmitted({ firstName: res.firstName });
+      setLoading(false);
+      submitInFlight.current = false;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao enviar — tente novamente");
       setLoading(false);
+      submitInFlight.current = false;
     }
   };
 
@@ -109,7 +139,12 @@ export function ConsultoriaWizardModal({
         <div className="px-8 py-10 min-h-[420px] relative">
           <AnimatePresence mode="wait">
             {submitted ? (
-              <motion.div key="success" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <motion.div
+                key="success"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
                 <SuccessFinale firstName={submitted.firstName} onClose={() => handleClose(false)} />
               </motion.div>
             ) : (
@@ -126,19 +161,19 @@ export function ConsultoriaWizardModal({
                 </div>
 
                 {step === 0 && (
-                  <StepBlock title="Onde você está morando agora?">
+                  <StepBlock title="Como podemos ajudar você?">
                     {[
-                      { v: "espanha", label: "Já estou na Espanha" },
-                      { v: "brasil", label: "Ainda estou no Brasil" },
-                      { v: "europa", label: "Outro país da Europa" },
-                      { v: "outro", label: "Outro país" },
+                      { v: "residencia", label: "Visto ou autorização de residência" },
+                      { v: "cidadania", label: "Cidadania" },
+                      { v: "tramites", label: "Trâmites e documentação" },
+                      { v: "outros", label: "Outro assunto" },
                     ].map((o) => (
                       <BigChoice
                         key={o.v}
-                        selected={answers.current_country === o.v}
+                        selected={answers.target_visa === o.v}
                         onClick={() => {
-                          setAnswers({ ...answers, current_country: o.v as Country });
-                          setTimeout(next, 180);
+                          setAnswers({ ...answers, target_visa: o.v as Visa });
+                          advanceAfterChoice();
                         }}
                       >
                         {o.label}
@@ -148,19 +183,19 @@ export function ConsultoriaWizardModal({
                 )}
 
                 {step === 1 && (
-                  <StepBlock title="Qual é a sua principal necessidade hoje?">
+                  <StepBlock title="Em qual país você está atualmente?">
                     {[
-                      { v: "residencia", label: "Visto de Residência" },
-                      { v: "cidadania", label: "Cidadania" },
-                      { v: "relocation", label: "Relocation completo" },
-                      { v: "outros", label: "Outros" },
+                      { v: "brasil", label: "Brasil" },
+                      { v: "espanha", label: "Espanha" },
+                      { v: "europa", label: "Outro país da Europa" },
+                      { v: "outro", label: "Outro país" },
                     ].map((o) => (
                       <BigChoice
                         key={o.v}
-                        selected={answers.target_visa === o.v}
+                        selected={answers.current_country === o.v}
                         onClick={() => {
-                          setAnswers({ ...answers, target_visa: o.v as Visa });
-                          setTimeout(next, 180);
+                          setAnswers({ ...answers, current_country: o.v as Country });
+                          advanceAfterChoice();
                         }}
                       >
                         {o.label}
@@ -170,7 +205,7 @@ export function ConsultoriaWizardModal({
                 )}
 
                 {step === 2 && (
-                  <StepBlock title="Prazo & orçamento para os trâmites">
+                  <StepBlock title="Planejamento">
                     <div className="space-y-4">
                       <div>
                         <Label className="text-xs uppercase tracking-wider text-brown/60 mb-2 block">
@@ -207,7 +242,9 @@ export function ConsultoriaWizardModal({
                             <PillChoice
                               key={o.v}
                               selected={answers.budget_range === o.v}
-                              onClick={() => setAnswers({ ...answers, budget_range: o.v as Budget })}
+                              onClick={() =>
+                                setAnswers({ ...answers, budget_range: o.v as Budget })
+                              }
                             >
                               {o.label}
                             </PillChoice>
@@ -225,7 +262,9 @@ export function ConsultoriaWizardModal({
                     </p>
                     <div className="grid gap-3">
                       <div>
-                        <Label className="text-xs uppercase tracking-wider text-brown/60">Nome completo</Label>
+                        <Label className="text-xs uppercase tracking-wider text-brown/60">
+                          Nome completo
+                        </Label>
                         <Input
                           value={answers.full_name}
                           onChange={(e) => setAnswers({ ...answers, full_name: e.target.value })}
@@ -236,7 +275,9 @@ export function ConsultoriaWizardModal({
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                          <Label className="text-xs uppercase tracking-wider text-brown/60">E-mail</Label>
+                          <Label className="text-xs uppercase tracking-wider text-brown/60">
+                            E-mail
+                          </Label>
                           <Input
                             type="email"
                             value={answers.email}
@@ -247,7 +288,9 @@ export function ConsultoriaWizardModal({
                           />
                         </div>
                         <div>
-                          <Label className="text-xs uppercase tracking-wider text-brown/60">WhatsApp</Label>
+                          <Label className="text-xs uppercase tracking-wider text-brown/60">
+                            WhatsApp
+                          </Label>
                           <PhoneInput
                             value={answers.phone}
                             onChange={(e164) => setAnswers({ ...answers, phone: e164 ?? "" })}
@@ -321,7 +364,9 @@ export function ConsultoriaWizardModal({
 function StepBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-5">
-      <h2 className="font-display font-bold text-2xl md:text-3xl text-brown leading-tight">{title}</h2>
+      <h2 className="font-display font-bold text-2xl md:text-3xl text-brown leading-tight">
+        {title}
+      </h2>
       <div className="space-y-2">{children}</div>
     </div>
   );

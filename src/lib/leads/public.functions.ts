@@ -9,7 +9,7 @@ const schema = z.object({
   email: z.string().trim().email().max(255),
   phone: z.string().trim().min(6).max(30),
   current_country: z.enum(["espanha", "brasil", "europa", "outro"]),
-  target_visa: z.enum(["residencia", "cidadania", "relocation", "outros"]),
+  target_visa: z.enum(["residencia", "cidadania", "tramites", "outros"]),
   timeline: z.enum(["ate_3m", "3_6m", "6_12m", "mais_12m"]),
   budget_range: z.enum(["ate_2k", "2_5k", "5_10k", "mais_10k"]),
   message: z.string().trim().max(1000).optional().nullable(),

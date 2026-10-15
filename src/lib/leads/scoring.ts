@@ -17,17 +17,17 @@ export const BUDGET_LABEL: Record<Budget, string> = {
 };
 
 export const COUNTRY_LABEL: Record<string, string> = {
-  espanha: "Já estou na Espanha",
-  brasil: "Ainda estou no Brasil",
+  espanha: "Espanha",
+  brasil: "Brasil",
   europa: "Outro país da Europa",
   outro: "Outro país",
 };
 
 export const VISA_LABEL: Record<string, string> = {
-  residencia: "Visto de Residência",
+  residencia: "Visto ou autorização de residência",
   cidadania: "Cidadania",
-  relocation: "Relocation completo",
-  outros: "Outros",
+  tramites: "Trâmites e documentação",
+  outros: "Outro assunto",
 };
 
 export function scoreLead(timeline: Timeline | null, budget: Budget | null): number {
@@ -43,7 +43,8 @@ export function temperatureOf(score: number): Temperature {
 }
 
 export function temperatureChip(temp: Temperature) {
-  if (temp === "alta") return { icon: "🔥", label: "Alta urgência", cls: "bg-orange-100 text-orange-900" };
+  if (temp === "alta")
+    return { icon: "🔥", label: "Alta urgência", cls: "bg-orange-100 text-orange-900" };
   if (temp === "media") return { icon: "⚡", label: "Média", cls: "bg-amber-100 text-amber-900" };
   return { icon: "❄️", label: "Baixa", cls: "bg-slate-100 text-slate-700" };
 }
