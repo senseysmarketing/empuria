@@ -438,13 +438,11 @@ function HomePage() {
                     Exclusivo · High-Ticket
                   </div>
                   <h3 className="font-display font-extrabold text-3xl md:text-4xl uppercase leading-tight">
-                    Consultoria Imigratória
-                    <br />
-                    <span className="text-yellow-brand">& Relocation.</span>
+                    Consultoria Imigratória <span className="text-yellow-brand">Especializada</span>
                   </h3>
                   <p className="font-body text-base mt-5 text-offwhite/80 max-w-xl leading-relaxed">
-                    Para processos de Visto, Autorização de Residência e mudança familiar completa,
-                    nosso time de especialistas oferece um acompanhamento técnico de alto nível.
+                    Orientação para vistos, residência, cidadania e trâmites documentais, com
+                    acompanhamento especializado para cada etapa do processo.
                   </p>
                 </div>
                 <div className="md:col-span-4 flex md:justify-end">
@@ -453,7 +451,7 @@ function HomePage() {
                     onClick={() => setWizardOpen(true)}
                     className="inline-flex items-center gap-2 bg-orange-brand hover:bg-yellow-brand hover:text-brown text-offwhite px-7 py-4 rounded-md font-display font-bold text-sm uppercase tracking-widest transition-all hover:shadow-warm w-full md:w-auto justify-center"
                   >
-                    Aplicar para Consultoria <ArrowRight className="w-4 h-4" />
+                    Solicitar consultoria <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
