@@ -80,4 +80,4 @@ VALUES (
     'application/pdf', 'image/jpeg', 'image/png', 'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ]
-);
+) ON CONFLICT (id) DO NOTHING;
