@@ -3553,6 +3553,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_active: boolean
+          is_public: boolean
           kind: Database["public"]["Enums"]["service_kind"] | null
           meeting_address: string | null
           online_currency: string
@@ -3579,6 +3580,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean
+          is_public?: boolean
           kind?: Database["public"]["Enums"]["service_kind"] | null
           meeting_address?: string | null
           online_currency?: string
@@ -3605,6 +3607,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean
+          is_public?: boolean
           kind?: Database["public"]["Enums"]["service_kind"] | null
           meeting_address?: string | null
           online_currency?: string

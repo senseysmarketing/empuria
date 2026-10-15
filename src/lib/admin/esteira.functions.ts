@@ -219,6 +219,17 @@ export const createOrderFull = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => fullOrderSchema.parse(d))
   .handler(async ({ data, context }) => {
+    if (data.service_id) {
+      const { data: service, error: serviceError } = await supabaseAdmin
+        .from("services")
+        .select("id")
+        .eq("id", data.service_id)
+        .eq("is_active", true)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (serviceError || !service)
+        throw new Error("Serviço cadastrado indisponível para nova venda");
+    }
     if (
       data.payment_method === "gratuito" &&
       (data.amount_cents !== 0 || data.payment_amount_cents !== 0)

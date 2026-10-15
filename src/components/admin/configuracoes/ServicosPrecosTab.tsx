@@ -14,6 +14,7 @@ import {
 import { getServiceImage } from "@/lib/service-images";
 import { Archive, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { EditServicePriceDialog, type ServiceRow } from "./EditServicePriceDialog";
+import { ConfirmFinancialAction } from "@/components/admin/financeiro/ConfirmFinancialAction";
 
 function money(cents: number, currency = "EUR") {
   return new Intl.NumberFormat("pt-PT", { style: "currency", currency }).format(cents / 100);
@@ -40,6 +41,19 @@ export function ServicosPrecosTab() {
   const [creating, setCreating] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
+  const [actionTarget, setActionTarget] = useState<{
+    id: string;
+    title: string;
+    action: "archive" | "delete";
+  } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const refreshServices = () => {
+    qc.invalidateQueries({ queryKey: ["config-service-prices"] });
+    qc.invalidateQueries({ queryKey: ["public-services"] });
+    qc.invalidateQueries({ queryKey: ["admin-services-wizard"] });
+    qc.invalidateQueries({ queryKey: ["finance-team"] });
+  };
 
   const servicesQ = useQuery({
     queryKey: ["config-service-prices"],
@@ -77,11 +91,15 @@ export function ServicosPrecosTab() {
               ? "Este serviço possui histórico e foi arquivado para preservar os registros anteriores."
               : "Serviço arquivado",
       );
-      qc.invalidateQueries({ queryKey: ["config-service-prices"] });
-      qc.invalidateQueries({ queryKey: ["public-services"] });
+      setActionTarget(null);
+      setActionError(null);
+      refreshServices();
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao alterar serviço"),
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Erro ao alterar serviço";
+      if (actionTarget) setActionError(message);
+      else toast.error(message);
+    },
   });
 
   const toggleMutation = useMutation({
@@ -102,7 +120,7 @@ export function ServicosPrecosTab() {
       toast.success(vars.is_active ? "Serviço ativado" : "Serviço desativado");
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["config-service-prices"] });
+      refreshServices();
     },
   });
 
@@ -210,6 +228,9 @@ export function ServicosPrecosTab() {
                           {s.archived_at ? "Arquivado" : s.is_active ? "Ativo" : "Inativo"}
                         </span>
                       </div>
+                      <div className="mt-1 text-[11px] text-admin-ink-muted">
+                        {s.is_public ? "Público" : "Interno"}
+                      </div>
                     </td>
                     <td className="p-3 text-right">
                       <div className="flex justify-end gap-1">
@@ -228,10 +249,10 @@ export function ServicosPrecosTab() {
                               size="sm"
                               title="Arquivar"
                               disabled={manageMutation.isPending}
-                              onClick={() =>
-                                window.confirm(`Arquivar ${s.title}?`) &&
-                                manageMutation.mutate({ id: s.id, action: "archive" })
-                              }
+                              onClick={() => {
+                                setActionError(null);
+                                setActionTarget({ id: s.id, title: s.title, action: "archive" });
+                              }}
                             >
                               <Archive className="h-3.5 w-3.5" />
                             </Button>
@@ -253,11 +274,10 @@ export function ServicosPrecosTab() {
                           size="sm"
                           title="Excluir se não houver histórico"
                           disabled={manageMutation.isPending}
-                          onClick={() =>
-                            window.confirm(
-                              `Excluir ${s.title}? Se houver histórico, será arquivado.`,
-                            ) && manageMutation.mutate({ id: s.id, action: "delete" })
-                          }
+                          onClick={() => {
+                            setActionError(null);
+                            setActionTarget({ id: s.id, title: s.title, action: "delete" });
+                          }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -288,7 +308,26 @@ export function ServicosPrecosTab() {
           setEditing(null);
           setCreating(false);
           await servicesQ.refetch();
-          qc.invalidateQueries({ queryKey: ["public-services"] });
+          refreshServices();
+        }}
+      />
+      <ConfirmFinancialAction
+        open={!!actionTarget}
+        title={actionTarget?.action === "archive" ? "Arquivar serviço" : "Excluir serviço"}
+        description={
+          actionTarget?.action === "archive"
+            ? `Arquivar ${actionTarget.title}? Ele sairá das novas vendas, mas o histórico será preservado.`
+            : `Excluir ${actionTarget?.title}? Se houver histórico, o serviço será arquivado em vez de apagado.`
+        }
+        busy={manageMutation.isPending}
+        error={actionError}
+        onClose={() => {
+          setActionTarget(null);
+          setActionError(null);
+        }}
+        onConfirm={() => {
+          if (!actionTarget || manageMutation.isPending) return;
+          manageMutation.mutate({ id: actionTarget.id, action: actionTarget.action });
         }}
       />
     </BentoCard>

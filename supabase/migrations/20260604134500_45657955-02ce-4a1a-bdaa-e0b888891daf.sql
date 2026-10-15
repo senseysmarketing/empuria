@@ -1,1 +1,0 @@
-UPDATE public.integration_settings SET pix_expiration_minutes = 30 WHERE provider = 'mercadopago';

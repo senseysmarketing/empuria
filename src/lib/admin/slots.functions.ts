@@ -4,9 +4,7 @@ import { requireStaff } from "./auth";
 
 export const listSlots = createServerFn({ method: "POST" })
   .middleware([requireStaff])
-  .inputValidator((d) =>
-    z.object({ serviceId: z.string().uuid().optional() }).parse(d),
-  )
+  .inputValidator((d) => z.object({ serviceId: z.string().uuid().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const q = context.supabase
       .from("availability_slots")
@@ -24,6 +22,8 @@ export const listServicesAdmin = createServerFn({ method: "GET" })
     const { data } = await context.supabase
       .from("services")
       .select("id,title,kind,requires_slot,price_cents,online_price_cents,online_currency,currency")
+      .eq("is_active", true)
+      .is("archived_at", null)
       .order("title");
     return data ?? [];
   });
@@ -31,13 +31,15 @@ export const listServicesAdmin = createServerFn({ method: "GET" })
 export const createSlot = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) =>
-    z.object({
-      service_id: z.string().uuid(),
-      starts_at: z.string(),
-      ends_at: z.string(),
-      capacity: z.number().int().min(1).max(50),
-      notes: z.string().max(200).optional(),
-    }).parse(d),
+    z
+      .object({
+        service_id: z.string().uuid(),
+        starts_at: z.string(),
+        ends_at: z.string(),
+        capacity: z.number().int().min(1).max(50),
+        notes: z.string().max(200).optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const start = new Date(data.starts_at);
@@ -58,9 +60,7 @@ export const createSlot = createServerFn({ method: "POST" })
 
 export const toggleSlot = createServerFn({ method: "POST" })
   .middleware([requireStaff])
-  .inputValidator((d) =>
-    z.object({ id: z.string().uuid(), is_active: z.boolean() }).parse(d),
-  )
+  .inputValidator((d) => z.object({ id: z.string().uuid(), is_active: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("availability_slots")
@@ -74,10 +74,7 @@ export const deleteSlot = createServerFn({ method: "POST" })
   .middleware([requireStaff])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("availability_slots")
-      .delete()
-      .eq("id", data.id);
+    const { error } = await context.supabase.from("availability_slots").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

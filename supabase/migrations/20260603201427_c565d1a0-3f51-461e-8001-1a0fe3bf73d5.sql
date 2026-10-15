@@ -1,1 +1,0 @@
-UPDATE public.profiles SET password_setup_required = true WHERE created_by_admin = true AND first_access_completed_at IS NULL AND password_setup_required = false;
