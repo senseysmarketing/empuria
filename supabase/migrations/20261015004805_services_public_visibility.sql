@@ -30,6 +30,9 @@ BEGIN
       '2a2195c5-dab4-4523-a541-18b603396627',
       'e078b5e1-dbcc-4d97-aa8f-03f3600417ee'
     );
+    IF (SELECT count(*) FROM public.services WHERE is_public) <> 4 THEN
+      RAISE EXCEPTION 'Public services backfill count differs';
+    END IF;
   END IF;
 END $$;
 
