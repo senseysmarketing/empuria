@@ -32,6 +32,7 @@ type CrmColumnRow = {
   type: "system" | "custom";
   position: number;
   is_locked: boolean;
+  is_active: boolean;
 };
 type CrmLeadRow = {
   id: string;
@@ -254,16 +255,6 @@ async function listAssignableUsers(db: any): Promise<CrmUser[]> {
     .sort((a: CrmUser, b: CrmUser) => a.full_name.localeCompare(b.full_name, "pt-BR"));
 }
 
-function normalizeColumnKey(label: string) {
-  return label
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/(^_|_$)/g, "")
-    .slice(0, 48);
-}
-
 const crmLeadCardFields = [
   "id",
   "full_name",
@@ -313,11 +304,7 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
       inboxRes,
       lateRes,
     ] = await Promise.all([
-      db
-        .from("crm_columns")
-        .select("*")
-        .eq("is_active", true)
-        .order("position", { ascending: true }),
+      db.from("crm_columns").select("*").order("position", { ascending: true }),
       db.from("crm_distribution_settings").select("*").eq("is_active", true).maybeSingle(),
       db.from("crm_distribution_members").select("*").order("position", { ascending: true }),
       listAssignableUsers(db),
@@ -343,7 +330,10 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
     if (distributionRes.error) throw new Error(distributionRes.error.message);
 
     return {
-      columns: (columnsRes.data ?? []) as CrmColumnRow[],
+      columns: ((columnsRes.data ?? []) as CrmColumnRow[]).filter((column) => column.is_active),
+      archivedColumns: ((columnsRes.data ?? []) as CrmColumnRow[]).filter(
+        (column) => !column.is_active,
+      ),
       distribution: distributionRes.data ?? null,
       distributionMembers: membersRes.data ?? [],
       users,
@@ -531,10 +521,24 @@ export const updateCrmLeadColumn = createServerFn({ method: "POST" })
     const [{ data: lead, error: leadError }, { data: column, error: columnError }] =
       await Promise.all([
         db.from("leads").select("id, pipeline_stage, crm_column_id").eq("id", data.leadId).single(),
-        db.from("crm_columns").select("id, key, label, type").eq("id", data.columnId).single(),
+        db
+          .from("crm_columns")
+          .select("id, key, label, type")
+          .eq("id", data.columnId)
+          .eq("is_active", true)
+          .single(),
       ]);
     if (leadError) throw new Error(leadError.message);
-    if (columnError) throw new Error(columnError.message);
+    if (columnError) throw new Error("Coluna de destino indisponivel ou arquivada.");
+    if (lead.crm_column_id && lead.crm_column_id !== data.columnId) {
+      const { data: source, error: sourceError } = await db
+        .from("crm_columns")
+        .select("is_active")
+        .eq("id", lead.crm_column_id)
+        .single();
+      if (sourceError || !source?.is_active)
+        throw new Error("Restaure a coluna arquivada antes de mover seus leads.");
+    }
 
     const patch: Record<string, unknown> = {
       crm_column_id: data.columnId,
@@ -911,59 +915,67 @@ export const sendCrmFollowupMessage = createServerFn({ method: "POST" })
     };
   });
 
+export const getCrmLeadConversation = createServerFn({ method: "GET" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) => z.object({ leadId: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await (supabaseAdmin as any)
+      .from("crm_conversations")
+      .select("id")
+      .eq("provider", "whatsapp")
+      .eq("lead_id", data.leadId)
+      .order("last_message_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: false })
+      .limit(1);
+    if (error) throw new Error("Nao foi possivel localizar a conversa deste lead.");
+    return { conversationId: rows?.[0]?.id ?? null };
+  });
+
+export const listCrmColumnCounts = createServerFn({ method: "GET" })
+  .middleware([requireModule("crm")])
+  .handler(async () => {
+    const { data, error } = await (supabaseAdmin as any)
+      .from("crm_columns")
+      .select("id, leads(count)");
+    if (error) throw new Error("Nao foi possivel consultar as contagens das colunas.");
+    return Object.fromEntries(
+      (data ?? []).map((row: any) => [row.id, Number(row.leads?.[0]?.count ?? 0)]),
+    ) as Record<string, number>;
+  });
+
 export const saveCrmColumn = createServerFn({ method: "POST" })
   .middleware([requireModule("crm")])
   .inputValidator((d) =>
     z
       .object({
+        action: z.enum(["create", "rename", "archive", "restore", "delete"]),
         id: z.string().uuid().optional(),
-        label: z.string().trim().min(2).max(60),
-        position: z.number().int().min(1).max(899),
+        label: z.string().trim().min(2).max(60).optional(),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const db = context.supabase as any;
-    const key = normalizeColumnKey(data.label);
-    const payload = {
-      key,
-      label: data.label,
-      type: "custom",
-      position: data.position,
-      is_active: true,
-      is_locked: false,
-      created_by: context.userId,
-    };
-
-    const query = data.id
-      ? db
-          .from("crm_columns")
-          .update({ label: data.label, position: data.position })
-          .eq("id", data.id)
-          .eq("is_locked", false)
-      : db.from("crm_columns").insert(payload);
-    const { error } = await query;
+    if ((data.action === "create" || data.action === "rename") !== Boolean(data.label))
+      throw new Error("Informe um nome valido para a coluna.");
+    if (data.action !== "create" && !data.id) throw new Error("Coluna nao informada.");
+    const { data: id, error } = await (supabaseAdmin as any).rpc("crm_column_manage", {
+      p_action: data.action,
+      p_column_id: data.id ?? null,
+      p_label: data.label ?? null,
+      p_actor: context.userId,
+    });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, id: id as string };
   });
 
-export const deactivateCrmColumn = createServerFn({ method: "POST" })
+export const reorderCrmColumns = createServerFn({ method: "POST" })
   .middleware([requireModule("crm")])
-  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const db = context.supabase as any;
-    const { data: novo } = await db.from("crm_columns").select("id").eq("key", "novo").single();
-    const { error } = await db
-      .from("leads")
-      .update({ crm_column_id: novo?.id ?? null, pipeline_stage: "novo" })
-      .eq("crm_column_id", data.id);
+  .inputValidator((d) => z.object({ ids: z.array(z.string().uuid()).min(1).max(100) }).parse(d))
+  .handler(async ({ data }) => {
+    const { error } = await (supabaseAdmin as any).rpc("crm_column_reorder", {
+      p_ids: data.ids,
+    });
     if (error) throw new Error(error.message);
-    const { error: columnError } = await db
-      .from("crm_columns")
-      .update({ is_active: false })
-      .eq("id", data.id)
-      .eq("is_locked", false);
-    if (columnError) throw new Error(columnError.message);
     return { ok: true };
   });
 
