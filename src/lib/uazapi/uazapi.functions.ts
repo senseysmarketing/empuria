@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireModule } from "@/lib/admin/auth";
 import type { Json } from "@/integrations/supabase/types";
@@ -8,10 +7,17 @@ import {
   normalizePhone as normalizeE164Phone,
   phoneToWhatsAppJid,
 } from "@/lib/phone/phone.utils";
+import {
+  belongsToUazapiInstance,
+  confirmedInstanceWebhook,
+  equalSecret,
+  redactUazapiValue,
+  uazapiEventType,
+} from "@/lib/uazapi/uazapi.webhook";
 
 
 type WhatsAppMode = "disabled" | "suggestion" | "automatic";
-type UazapiConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
+type UazapiConnectionStatus = "disconnected" | "connecting" | "connected" | "hibernated" | "error";
 
 type UazapiSetting = {
   provider: "whatsapp";
@@ -48,6 +54,7 @@ type UazapiEventRow = {
 type ProcessResult = {
   ok: boolean;
   status: string;
+  httpStatus?: number;
   eventId?: string;
   message?: string;
 };
@@ -56,23 +63,14 @@ const db = supabaseAdmin as unknown as {
   from: (table: string) => any;
 };
 
-const DEFAULT_UAZAPI_BASE_URL = "https://api.uazapi.com";
+const DEFAULT_UAZAPI_BASE_URL = "https://senseys.uazapi.com";
 const DEFAULT_INSTANCE_NAME = "instituto-empuria";
+const PUBLIC_WEBHOOK_URL = "https://institutoempuria.net/api/webhooks/uazapi";
 const UAZAPI_EVENTS = ["messages", "messages_update", "connection"] as const;
 const UAZAPI_EXCLUDED_MESSAGES = ["wasSentByApi", "isGroupYes"] as const;
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function emptyToNull(value?: string | null) {
-  const clean = (value ?? "").trim();
-  return clean ? clean : null;
-}
-
-function normalizeBaseUrl(value?: string | null) {
-  const clean = (value ?? DEFAULT_UAZAPI_BASE_URL).trim().replace(/\/+$/, "");
-  return clean || DEFAULT_UAZAPI_BASE_URL;
 }
 
 function asString(value: unknown) {
@@ -157,12 +155,17 @@ function safeJson(value: unknown): Json {
   return JSON.parse(JSON.stringify(value ?? {})) as Json;
 }
 
-function maskedSetting(setting: UazapiSetting): UazapiSetting {
+function publicSetting(setting: UazapiSetting) {
   return {
-    ...setting,
-    webhook_secret: setting.webhook_secret ? "********" : null,
-    uazapi_admin_token: setting.uazapi_admin_token ? "********" : null,
-    uazapi_instance_token: setting.uazapi_instance_token ? "********" : null,
+    is_enabled: setting.is_enabled,
+    last_event_at: setting.last_event_at,
+    uazapi_connection_status: setting.uazapi_connection_status,
+    uazapi_profile_name: setting.uazapi_profile_name,
+    uazapi_phone: setting.uazapi_phone,
+    uazapi_webhook_configured_at: setting.uazapi_webhook_configured_at,
+    uazapi_last_qr_at: setting.uazapi_last_qr_at,
+    has_instance: Boolean(setting.uazapi_instance_id || setting.uazapi_instance_token),
+    has_webhook: Boolean(setting.uazapi_webhook_configured_at),
   };
 }
 
@@ -196,8 +199,28 @@ async function getUazapiSetting(includeSecrets = false): Promise<UazapiSetting> 
     .eq("provider", "whatsapp")
     .maybeSingle();
   if (error) throw new Error(error.message);
-  const row = { ...fallbackSetting(), ...(data ?? {}) } as UazapiSetting;
-  return includeSecrets ? row : maskedSetting(row);
+  const row = {
+    ...fallbackSetting(),
+    ...(data ?? {}),
+    uazapi_base_url: DEFAULT_UAZAPI_BASE_URL,
+    uazapi_instance_name: DEFAULT_INSTANCE_NAME,
+    uazapi_admin_token: null,
+    uazapi_instance_token: null,
+    webhook_secret: null,
+  } as UazapiSetting;
+  if (!includeSecrets) return row;
+  const { data: secrets, error: secretError } = await db
+    .from("uazapi_connection_secrets")
+    .select("admin_token, instance_token, webhook_secret")
+    .eq("provider", "whatsapp")
+    .maybeSingle();
+  if (secretError) throw new Error("Nao foi possivel carregar as credenciais da Uazapi.");
+  return {
+    ...row,
+    uazapi_admin_token: secrets?.admin_token ?? null,
+    uazapi_instance_token: secrets?.instance_token ?? null,
+    webhook_secret: secrets?.webhook_secret ?? null,
+  };
 }
 
 async function uazapiFetch<T>(
@@ -219,37 +242,56 @@ async function uazapiFetch<T>(
     );
   }
 
-  const response = await fetch(`${normalizeBaseUrl(setting.uazapi_base_url)}${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      [options.auth === "admin" ? "admintoken" : "token"]: token,
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${DEFAULT_UAZAPI_BASE_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers: {
+        "Content-Type": "application/json",
+        [options.auth === "admin" ? "admintoken" : "token"]: token,
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    throw new Error("Nao foi possivel acessar a Uazapi. Tente novamente em instantes.");
+  }
   const text = await response.text();
-  const json = text ? JSON.parse(text) : {};
+  let json: unknown = {};
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    if (response.ok) throw new Error("Resposta invalida da Uazapi.");
+  }
   if (!response.ok) {
-    const message =
-      asString((json as Record<string, unknown>).error) ??
-      asString((json as Record<string, unknown>).message) ??
-      `Uazapi respondeu HTTP ${response.status}`;
-    throw new Error(message);
+    if (response.status === 401 || response.status === 403)
+      throw new Error("A Uazapi recusou a credencial desta instancia.");
+    if (response.status === 429)
+      throw new Error("Limite de chamadas da Uazapi atingido. Aguarde e tente novamente.");
+    throw new Error(`Uazapi indisponivel ou recusou a operacao (HTTP ${response.status}).`);
   }
   return json as T;
 }
 
 function extractInstance(payload: Record<string, unknown>) {
-  const instance = (payload.instance ?? payload) as Record<string, unknown>;
-  const status =
-    asString(instance.status) ??
-    (asBool(deepFind(payload, ["connected"])) ? "connected" : null) ??
-    "disconnected";
+  const instance = (payload.instance && typeof payload.instance === "object"
+    ? payload.instance
+    : payload) as Record<string, unknown>;
+  const rawStatus = asString(instance.status) ?? asString(payload.status);
+  const status = (
+    ["disconnected", "connecting", "connected", "hibernated", "error"].includes(rawStatus ?? "")
+      ? rawStatus
+      : asBool(payload.connected) === true
+        ? "connected"
+        : asBool(payload.connected) === false
+          ? "disconnected"
+          : null
+  ) as UazapiConnectionStatus | null;
   return {
     id: asString(instance.id) ?? asString(payload.instanceId),
     token: asString(instance.token) ?? asString(payload.token),
     name: asString(instance.name) ?? asString(payload.name),
-    status: status as UazapiConnectionStatus,
+    status,
     profileName: asString(instance.profileName),
     profilePicUrl: asString(instance.profilePicUrl),
     phone:
@@ -263,93 +305,119 @@ function extractInstance(payload: Record<string, unknown>) {
 
 async function saveInstanceSnapshot(payload: Record<string, unknown>) {
   const instance = extractInstance(payload);
-  const patch: Record<string, unknown> = {
-    uazapi_connection_status: instance.status,
-  };
+  const patch: Record<string, unknown> = {};
+  if (instance.status) patch.uazapi_connection_status = instance.status;
   if (instance.id) patch.uazapi_instance_id = instance.id;
-  if (instance.token) patch.uazapi_instance_token = instance.token;
-  if (instance.name) patch.uazapi_instance_name = instance.name;
   if (instance.profileName) patch.uazapi_profile_name = instance.profileName;
   if (instance.profilePicUrl) patch.uazapi_profile_pic_url = instance.profilePicUrl;
   if (instance.phone) patch.uazapi_phone = instance.phone;
+  if (instance.status === "disconnected") {
+    patch.uazapi_profile_name = null;
+    patch.uazapi_phone = null;
+  }
   if (instance.status === "connected") patch.uazapi_last_connection_at = nowIso();
-  const { error } = await db.from("integration_settings").update(patch).eq("provider", "whatsapp");
-  if (error) throw new Error(error.message);
+  if (Object.keys(patch).length) {
+    const { error } = await db.from("integration_settings").update(patch).eq("provider", "whatsapp");
+    if (error) throw new Error(error.message);
+  }
   return instance;
 }
 
-function webhookUrlWithSecret(webhookUrl: string, secret: string | null) {
-  const url = new URL(webhookUrl);
-  if (secret) url.searchParams.set("token", secret);
+function webhookUrlWithSecret(secret: string) {
+  const url = new URL(PUBLIC_WEBHOOK_URL);
+  url.searchParams.set("token", secret);
   return url.toString();
 }
 
 async function ensureUazapiInstance(setting: UazapiSetting) {
-  if (setting.uazapi_instance_token) return setting;
-
   const all = await uazapiFetch<unknown>(setting, "/instance/all", { auth: "admin" });
   const instances = Array.isArray(all) ? all : ((all as Record<string, unknown>).instances ?? []);
-  const existing = Array.isArray(instances)
-    ? instances.find((item) => {
-        const instance = item as Record<string, unknown>;
-        return asString(instance.name) === setting.uazapi_instance_name;
-      })
-    : null;
+  if (!Array.isArray(instances)) throw new Error("Lista de instancias Uazapi invalida.");
+  const matches = instances.filter(
+    (item) => item && typeof item === "object" &&
+      asString((item as Record<string, unknown>).name) === DEFAULT_INSTANCE_NAME,
+  );
+  if (matches.length > 1)
+    throw new Error("Ha mais de uma instancia com o nome esperado; operacao interrompida.");
+  const existing = matches[0] as Record<string, unknown> | undefined;
 
   const payload = existing
-    ? (existing as Record<string, unknown>)
+    ? existing
     : await uazapiFetch<Record<string, unknown>>(setting, "/instance/create", {
         auth: "admin",
         method: "POST",
-        body: {
-          name: setting.uazapi_instance_name,
-          adminField01: "instituto-empuria",
-          adminField02: "created-by-admin-settings",
-        },
+        body: { name: DEFAULT_INSTANCE_NAME },
       });
 
   const instance = extractInstance(payload);
+  if (instance.name !== DEFAULT_INSTANCE_NAME || !instance.token || !instance.id)
+    throw new Error("Nao foi possivel confirmar identidade e token da instancia Uazapi.");
+  if (setting.uazapi_instance_id && setting.uazapi_instance_id !== instance.id)
+    throw new Error("A instancia encontrada nao corresponde a configuracao existente.");
+  if (setting.uazapi_instance_token && setting.uazapi_instance_token !== instance.token)
+    throw new Error("O token da instancia existente mudou; operacao interrompida.");
   const next: UazapiSetting = {
     ...setting,
-    uazapi_instance_id: instance.id ?? setting.uazapi_instance_id,
-    uazapi_instance_token: instance.token ?? setting.uazapi_instance_token,
-    uazapi_instance_name: instance.name ?? setting.uazapi_instance_name,
+    uazapi_instance_id: instance.id,
+    uazapi_instance_token: instance.token,
+    uazapi_instance_name: DEFAULT_INSTANCE_NAME,
     uazapi_connection_status: instance.status ?? setting.uazapi_connection_status,
   };
 
+  const { error: tokenError } = await db
+    .from("uazapi_connection_secrets")
+    .update({ instance_token: instance.token })
+    .eq("provider", "whatsapp");
+  if (tokenError) throw new Error("Nao foi possivel guardar o token da instancia.");
   const { error } = await db
     .from("integration_settings")
     .update({
       uazapi_instance_id: next.uazapi_instance_id,
-      uazapi_instance_token: next.uazapi_instance_token,
-      uazapi_instance_name: next.uazapi_instance_name,
+      uazapi_instance_name: DEFAULT_INSTANCE_NAME,
       uazapi_connection_status: next.uazapi_connection_status,
     })
     .eq("provider", "whatsapp");
   if (error) throw new Error(error.message);
-  if (!next.uazapi_instance_token) throw new Error("A Uazapi nao retornou token da instancia.");
   return next;
 }
 
-async function configureInstanceWebhook(setting: UazapiSetting, publicWebhookUrl: string) {
-  if (!setting.webhook_secret) {
-    throw new Error("Configure um segredo de webhook antes de conectar o WhatsApp.");
-  }
-  const response = await uazapiFetch<unknown>(setting, "/webhook", {
+async function ensureWebhookSecret(setting: UazapiSetting) {
+  if (setting.webhook_secret) return setting;
+  const { data, error } = await db.from("uazapi_connection_secrets")
+    .update({
+      webhook_secret: Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join(""),
+    })
+    .eq("provider", "whatsapp")
+    .is("webhook_secret", null)
+    .select("webhook_secret")
+    .maybeSingle();
+  if (error) throw new Error("Nao foi possivel guardar o segredo do webhook.");
+  if (data?.webhook_secret) return { ...setting, webhook_secret: data.webhook_secret };
+  const current = await getUazapiSetting(true);
+  if (!current.webhook_secret) throw new Error("Segredo do webhook indisponivel.");
+  return current;
+}
+
+async function configureInstanceWebhook(setting: UazapiSetting) {
+  if (!setting.webhook_secret) throw new Error("Segredo do webhook indisponivel.");
+  const expectedUrl = webhookUrlWithSecret(setting.webhook_secret);
+  await uazapiFetch<unknown>(setting, "/webhook", {
     auth: "instance",
     method: "POST",
     body: {
       enabled: true,
-      url: webhookUrlWithSecret(publicWebhookUrl, setting.webhook_secret),
+      url: expectedUrl,
       events: UAZAPI_EVENTS,
       excludeMessages: UAZAPI_EXCLUDED_MESSAGES,
       addUrlEvents: false,
       addUrlTypesMessages: false,
     },
   });
-  const first = Array.isArray(response)
-    ? (response[0] as Record<string, unknown> | undefined)
-    : null;
+  const response = await uazapiFetch<unknown>(setting, "/webhook", { auth: "instance" });
+  const first = confirmedInstanceWebhook(response, expectedUrl, UAZAPI_EVENTS);
+  if (!first) throw new Error("A Uazapi nao confirmou o webhook da instancia.");
   const { error } = await db
     .from("integration_settings")
     .update({
@@ -358,14 +426,14 @@ async function configureInstanceWebhook(setting: UazapiSetting, publicWebhookUrl
     })
     .eq("provider", "whatsapp");
   if (error) throw new Error(error.message);
-  return response;
+  return first;
 }
 
 export const getUazapiAdminOverview = createServerFn({ method: "GET" })
   .middleware([requireModule("configuracoes")])
   .handler(async () => {
-    const [{ data: setting }, { data: events }, { count: errorCount }] = await Promise.all([
-      Promise.resolve({ data: await getUazapiSetting(false) }),
+    const [setting, { data: events }, { count: errorCount }] = await Promise.all([
+      getUazapiSetting(true),
       db
         .from("integration_events")
         .select(
@@ -381,118 +449,76 @@ export const getUazapiAdminOverview = createServerFn({ method: "GET" })
         .eq("status", "error"),
     ]);
     return {
-      setting,
+      setting: publicSetting(setting),
       events: (events ?? []) as UazapiEventRow[],
       errorCount: errorCount ?? 0,
-      webhookUrl: "/api/webhooks/uazapi",
     };
   });
 
-export const saveUazapiSettings = createServerFn({ method: "POST" })
-  .middleware([requireModule("configuracoes")])
-  .inputValidator((d) =>
-    z
-      .object({
-        is_enabled: z.boolean(),
-        uazapi_base_url: z.string().trim().url().max(500).optional().nullable(),
-        uazapi_admin_token: z.string().trim().min(8).max(500).optional().nullable(),
-        uazapi_instance_name: z.string().trim().min(3).max(80),
-        webhook_secret: z.string().trim().min(8).max(240).optional().nullable(),
-        whatsapp_mode: z.enum(["disabled", "suggestion", "automatic"]).default("suggestion"),
-      })
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const update: Record<string, unknown> = {
-      provider: "whatsapp",
-      is_enabled: data.is_enabled,
-      uazapi_base_url: normalizeBaseUrl(data.uazapi_base_url),
-      uazapi_instance_name: data.uazapi_instance_name,
-      whatsapp_mode: data.whatsapp_mode,
-    };
-    if (data.uazapi_admin_token) update.uazapi_admin_token = data.uazapi_admin_token;
-    if (data.webhook_secret) update.webhook_secret = data.webhook_secret;
-
-    const { error } = await db
-      .from("integration_settings")
-      .upsert(update, { onConflict: "provider" });
-    if (error) throw new Error(error.message);
-
-    await supabaseAdmin.from("audit_logs").insert({
-      actor_id: context.userId,
-      action: "uazapi.settings.save",
-      module: "configuracoes",
-      entity_type: "integration_settings",
-      new_data: {
-        ...update,
-        uazapi_admin_token: data.uazapi_admin_token ? "[updated]" : "[unchanged]",
-        webhook_secret: data.webhook_secret ? "[updated]" : "[unchanged]",
-      } as Json,
-    });
-    return { ok: true };
+async function startUazapiConnection() {
+  let setting = await getUazapiSetting(true);
+  if (!setting.uazapi_admin_token) throw new Error("Credencial administrativa indisponivel no servidor.");
+  setting = await ensureUazapiInstance(setting);
+  setting = await ensureWebhookSecret(setting);
+  const { error: enableError } = await db.from("integration_settings")
+    .update({ is_enabled: true, whatsapp_mode: "suggestion" })
+    .eq("provider", "whatsapp");
+  if (enableError) throw new Error("Nao foi possivel ativar o recebimento do webhook.");
+  await configureInstanceWebhook(setting);
+  const response = await uazapiFetch<Record<string, unknown>>(setting, "/instance/connect", {
+    auth: "instance",
+    method: "POST",
+    body: {},
   });
+  const instance = await saveInstanceSnapshot(response);
+  if (instance.status === "error" || instance.status === "hibernated")
+    throw new Error("A Uazapi nao iniciou o pareamento. Atualize o estado e tente novamente.");
+  const qrcode = instance.qrcode ?? asString(deepFind(response, ["qrcode", "qrCode"]));
+  const paircode = instance.paircode ?? asString(deepFind(response, ["paircode", "pairCode"]));
+  const status = instance.status === "connected" ? "connected" : "connecting";
+  const { error: statusError } = await db.from("integration_settings").update({
+    uazapi_connection_status: status,
+    uazapi_last_qr_at: nowIso(),
+  }).eq("provider", "whatsapp");
+  if (statusError) throw new Error("Conexao iniciada, mas o estado nao foi salvo.");
+  return {
+    ok: true,
+    status,
+    qrcode,
+    paircode,
+    message: qrcode ? "QR Code gerado. Aguardando pareamento." : "Conexao iniciada. Atualize o status em instantes.",
+  };
+}
 
-export const testUazapiConfiguration = createServerFn({ method: "GET" })
-  .middleware([requireModule("configuracoes")])
-  .handler(async () => {
-    const setting = await getUazapiSetting(true);
-    const missing = [
-      ...(!setting.uazapi_admin_token ? ["admin_token"] : []),
-      ...(!setting.webhook_secret ? ["webhook_secret"] : []),
-    ];
-    if (missing.length) {
-      return { ok: false, missing, message: "Configuracao incompleta." };
-    }
-    await uazapiFetch(setting, "/instance/all", { auth: "admin" });
-    return { ok: true, missing: [], message: "Credenciais Uazapi respondendo corretamente." };
-  });
+let connectionInFlight: ReturnType<typeof startUazapiConnection> | null = null;
 
 export const generateUazapiQrCode = createServerFn({ method: "POST" })
   .middleware([requireModule("configuracoes")])
-  .inputValidator((d) => z.object({ webhookUrl: z.string().trim().url() }).parse(d))
-  .handler(async ({ data }) => {
-    let setting = await getUazapiSetting(true);
-    if (!setting.is_enabled) throw new Error("Ative a integracao antes de gerar o QR Code.");
-    setting = await ensureUazapiInstance(setting);
-    await configureInstanceWebhook(setting, data.webhookUrl);
-
-    const response = await uazapiFetch<Record<string, unknown>>(setting, "/instance/connect", {
-      auth: "instance",
-      method: "POST",
-      body: {},
-    });
-    const instance = await saveInstanceSnapshot(response);
-    const qrcode = instance.qrcode ?? asString(deepFind(response, ["qrcode", "qrCode"]));
-    const paircode = instance.paircode ?? asString(deepFind(response, ["paircode", "pairCode"]));
-
-    await db
-      .from("integration_settings")
-      .update({
-        uazapi_connection_status: instance.status === "connected" ? "connected" : "connecting",
-        uazapi_last_qr_at: nowIso(),
-      })
-      .eq("provider", "whatsapp");
-
-    return {
-      ok: true,
-      status: instance.status,
-      qrcode,
-      paircode,
-      message: qrcode ? "QR Code gerado." : "Conexao iniciada. Atualize o status em instantes.",
-    };
+  .handler(async () => {
+    if (connectionInFlight) return connectionInFlight;
+    const operation = startUazapiConnection();
+    connectionInFlight = operation;
+    try {
+      return await operation;
+    } finally {
+      if (connectionInFlight === operation) connectionInFlight = null;
+    }
   });
 
 export const refreshUazapiStatus = createServerFn({ method: "GET" })
   .middleware([requireModule("configuracoes")])
   .handler(async () => {
-    const setting = await getUazapiSetting(true);
+    let setting = await getUazapiSetting(true);
     if (!setting.uazapi_instance_token) {
-      return { ok: true, status: "disconnected" as const, qrcode: null, paircode: null };
+      if (!setting.uazapi_admin_token)
+        return { ok: true, status: "disconnected" as const, qrcode: null, paircode: null };
+      setting = await ensureUazapiInstance(setting);
     }
     const response = await uazapiFetch<Record<string, unknown>>(setting, "/instance/status", {
       auth: "instance",
     });
     const instance = await saveInstanceSnapshot(response);
+    if (!instance.status) throw new Error("A Uazapi nao informou um estado de conexao valido.");
     return {
       ok: true,
       status: instance.status,
@@ -508,15 +534,19 @@ export const disconnectUazapiInstance = createServerFn({ method: "POST" })
   .handler(async () => {
     const setting = await getUazapiSetting(true);
     if (!setting.uazapi_instance_token) return { ok: true, status: "disconnected" as const };
-    const response = await uazapiFetch<Record<string, unknown>>(setting, "/instance/disconnect", {
+    await uazapiFetch<Record<string, unknown>>(setting, "/instance/disconnect", {
       auth: "instance",
       method: "POST",
     });
-    await saveInstanceSnapshot(response);
-    await db
+    const { error } = await db
       .from("integration_settings")
-      .update({ uazapi_connection_status: "disconnected" })
+      .update({
+        uazapi_connection_status: "disconnected",
+        uazapi_profile_name: null,
+        uazapi_phone: null,
+      })
       .eq("provider", "whatsapp");
+    if (error) throw new Error("Instancia desconectada, mas nao foi possivel salvar o estado.");
     return { ok: true, status: "disconnected" as const };
   });
 
@@ -533,19 +563,16 @@ export async function validateUazapiWebhookSecret(request: Request) {
     new URL(request.url).searchParams.get("token"),
   ].filter(Boolean);
   return {
-    ok: candidates.some((candidate) => candidate === setting.webhook_secret),
+    ok: candidates.some((candidate) => equalSecret(candidate as string, setting.webhook_secret as string)),
     message: "Invalid WhatsApp webhook secret",
   };
 }
 
 function parseWebhookPayload(payload: Record<string, unknown>, fallbackEventId: string) {
   const message = firstObjectWithMessageShape(payload);
-  const eventType =
-    asString(payload.event) ??
-    asString(payload.type) ??
-    asString(payload.event_type) ??
-    (message ? "messages" : "unknown");
+  const eventType = uazapiEventType(payload, Boolean(message));
   const providerEventId =
+    (eventType === "connection" ? asString(payload.event_id) : null) ??
     asString(message?.messageid) ??
     asString(payload.id) ??
     asString(payload.event_id) ??
@@ -749,14 +776,24 @@ export async function processUazapiWebhook(
   payload: Record<string, unknown>,
   fallbackEventId: string,
 ): Promise<ProcessResult> {
+  const setting = await getUazapiSetting(true);
+  if (!belongsToUazapiInstance(payload, {
+    token: setting.uazapi_instance_token,
+    id: setting.uazapi_instance_id,
+    name: DEFAULT_INSTANCE_NAME,
+    baseUrl: DEFAULT_UAZAPI_BASE_URL,
+  })) {
+    return { ok: false, status: "unauthorized", httpStatus: 401, message: "Unrecognized Uazapi instance" };
+  }
   const parsed = parseWebhookPayload(payload, fallbackEventId);
+  const safePayload = redactUazapiValue(payload) as Record<string, unknown>;
   const { data: eventInsert, error: eventErr } = await db
     .from("integration_events")
     .insert({
       provider: "whatsapp",
       event_type: parsed.eventType,
       provider_event_id: parsed.providerEventId,
-      payload,
+      payload: safePayload,
       status: "received",
     })
     .select("id")
@@ -771,8 +808,12 @@ export async function processUazapiWebhook(
 
   const eventId = eventInsert.id as string;
   try {
-    if (parsed.eventType.includes("connection")) {
-      await saveInstanceSnapshot(payload);
+    if (parsed.eventType === "connection") {
+      const live = await uazapiFetch<Record<string, unknown>>(setting, "/instance/status", {
+        auth: "instance",
+      });
+      const snapshot = await saveInstanceSnapshot(live);
+      if (!snapshot.status) throw new Error("A Uazapi nao informou um estado de conexao valido.");
       await db
         .from("integration_events")
         .update({ status: "processed", processed_at: nowIso() })
@@ -786,8 +827,8 @@ export async function processUazapiWebhook(
 
     const result =
       parsed.fromMe && !parsed.wasSentByApi && !parsed.isGroup
-        ? await recordManualOutboundMessage(parsed, payload)
-        : await recordInboundMessage(parsed, payload);
+        ? await recordManualOutboundMessage(parsed, safePayload)
+        : await recordInboundMessage(parsed, safePayload);
     await db
       .from("integration_events")
       .update({
@@ -804,8 +845,8 @@ export async function processUazapiWebhook(
       .update({ last_event_at: nowIso() })
       .eq("provider", "whatsapp");
     return { ok: true, status: result.status, eventId };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro ao processar webhook Uazapi";
+  } catch {
+    const message = "Erro ao processar webhook Uazapi";
     await db
       .from("integration_events")
       .update({ status: "error", processed_at: nowIso(), error_message: message })
@@ -852,6 +893,6 @@ export async function sendUazapiTextInternal({
     providerMessageId:
       asString(deepFind(response, ["messageid", "messageId", "id"])) ?? trackId ?? null,
     status: asString(deepFind(response, ["status", "response"])) ?? "sent",
-    raw: response,
+    raw: redactUazapiValue(response),
   };
 }
