@@ -15,13 +15,16 @@ export const Route = createFileRoute("/api/webhooks/uazapi")({
         let payload: Record<string, unknown>;
         try {
           payload = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+          if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+            return Response.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
+          }
         } catch {
           return Response.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
         }
 
         const fallbackEventId = createHash("sha256").update(raw).digest("hex");
         const result = await processUazapiWebhook(payload, fallbackEventId);
-        return Response.json(result, { status: result.ok ? 200 : 500 });
+        return Response.json(result, { status: result.httpStatus ?? (result.ok ? 200 : 500) });
       },
       GET: async () =>
         Response.json({

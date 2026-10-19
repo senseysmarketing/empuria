@@ -1,4 +1,4 @@
-import { useMemo, useState, type ElementType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -23,6 +23,16 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   CalendarDays,
   Copy,
   CreditCard,
@@ -42,8 +52,6 @@ import {
   generateUazapiQrCode,
   getUazapiAdminOverview,
   refreshUazapiStatus,
-  saveUazapiSettings,
-  testUazapiConfiguration,
 } from "@/lib/uazapi/uazapi.functions";
 
 type IntegrationEvent = {
@@ -79,18 +87,14 @@ type MercadoPagoSetting = {
 
 type UazapiSetting = {
   is_enabled: boolean;
-  webhook_secret: string | null;
+  has_instance: boolean;
+  has_webhook: boolean;
   last_event_at: string | null;
-  uazapi_base_url: string;
-  uazapi_admin_token: string | null;
-  uazapi_instance_token: string | null;
-  uazapi_instance_name: string;
-  uazapi_connection_status: "disconnected" | "connecting" | "connected" | "error";
+  uazapi_connection_status: "disconnected" | "connecting" | "connected" | "hibernated" | "error";
   uazapi_profile_name: string | null;
   uazapi_phone: string | null;
   uazapi_webhook_configured_at: string | null;
   uazapi_last_qr_at: string | null;
-  whatsapp_mode: "disabled" | "suggestion" | "automatic";
 };
 
 const PLANNED_INTEGRATIONS = [
@@ -118,8 +122,6 @@ export function IntegracoesTab() {
   const saveMp = useServerFn(saveMercadoPagoSettings);
   const testMp = useServerFn(testMercadoPagoConfiguration);
   const fetchUazapiOverview = useServerFn(getUazapiAdminOverview);
-  const saveUazapi = useServerFn(saveUazapiSettings);
-  const testUazapi = useServerFn(testUazapiConfiguration);
   const generateQr = useServerFn(generateUazapiQrCode);
   const refreshWaStatus = useServerFn(refreshUazapiStatus);
   const disconnectWa = useServerFn(disconnectUazapiInstance);
@@ -131,12 +133,11 @@ export function IntegracoesTab() {
   const [mpPixEnabled, setMpPixEnabled] = useState(true);
   const [mpBoletoEnabled, setMpBoletoEnabled] = useState(true);
   const [mpCardEnabled, setMpCardEnabled] = useState(false);
-  const [waEnabled, setWaEnabled] = useState(false);
   const [waConfigOpen, setWaConfigOpen] = useState(false);
   const [waEventsOpen, setWaEventsOpen] = useState(false);
-  const [waMode, setWaMode] = useState<"disabled" | "suggestion" | "automatic">("suggestion");
   const [waQrCode, setWaQrCode] = useState<string | null>(null);
   const [waPairCode, setWaPairCode] = useState<string | null>(null);
+  const [waActionError, setWaActionError] = useState<string | null>(null);
 
   const mpQ = useQuery({
     queryKey: ["mercadopago-admin-overview"],
@@ -153,22 +154,13 @@ export function IntegracoesTab() {
 
   const waQ = useQuery({
     queryKey: ["uazapi-admin-overview"],
-    queryFn: async () => {
-      const data = await fetchUazapiOverview();
-      setWaEnabled(!!data.setting.is_enabled);
-      setWaMode(data.setting.whatsapp_mode);
-      return data;
-    },
+    queryFn: () => fetchUazapiOverview(),
   });
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const mpWebhookUrl = useMemo(
     () => `${origin}${mpQ.data?.webhookUrl ?? "/api/webhooks/mercadopago"}`,
     [origin, mpQ.data?.webhookUrl],
-  );
-  const waWebhookUrl = useMemo(
-    () => `${origin}${waQ.data?.webhookUrl ?? "/api/webhooks/uazapi"}`,
-    [origin, waQ.data?.webhookUrl],
   );
 
   const saveMpMutation = useMutation({
@@ -202,26 +194,6 @@ export function IntegracoesTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar Mercado Pago"),
   });
 
-  const saveWaMutation = useMutation({
-    mutationFn: (form: FormData) =>
-      saveUazapi({
-        data: {
-          is_enabled: waEnabled,
-          uazapi_base_url: emptyToNull(form.get("uazapi_base_url")),
-          uazapi_admin_token: emptyToNull(form.get("uazapi_admin_token")),
-          uazapi_instance_name:
-            String(form.get("uazapi_instance_name") ?? "").trim() || "instituto-empuria",
-          webhook_secret: emptyToNull(form.get("webhook_secret")),
-          whatsapp_mode: waMode,
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Configuracao Uazapi salva");
-      waQ.refetch();
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar Uazapi"),
-  });
-
   const testMpMutation = useMutation({
     mutationFn: () => testMp(),
     onSuccess: (result) => {
@@ -234,51 +206,42 @@ export function IntegracoesTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar Mercado Pago"),
   });
 
-  const testWaMutation = useMutation({
-    mutationFn: () => testUazapi(),
-    onSuccess: (result) => {
-      if (result.ok) toast.success(result.message);
-      else
-        toast.error(
-          result.missing.length ? `Faltando: ${result.missing.join(", ")}` : result.message,
-        );
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao testar Uazapi"),
-  });
-
   const generateQrMutation = useMutation({
-    mutationFn: () => generateQr({ data: { webhookUrl: waWebhookUrl } }),
+    mutationFn: () => generateQr(),
     onSuccess: (result) => {
+      setWaActionError(null);
       setWaQrCode(result.qrcode ?? null);
       setWaPairCode(result.paircode ?? null);
       toast.success(result.message);
       waQ.refetch();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao gerar QR Code"),
+    onError: (e) => setWaActionError(e instanceof Error ? e.message : "Erro ao gerar QR Code"),
   });
 
   const refreshWaMutation = useMutation({
     mutationFn: () => refreshWaStatus(),
     onSuccess: (result) => {
-      setWaQrCode(result.qrcode ?? null);
-      setWaPairCode(result.paircode ?? null);
+      setWaActionError(null);
+      setWaQrCode((current) => result.status === "connecting" ? result.qrcode ?? current : null);
+      setWaPairCode((current) => result.status === "connecting" ? result.paircode ?? current : null);
       toast.success(
         result.status === "connected" ? "WhatsApp conectado" : "Status do WhatsApp atualizado",
       );
       waQ.refetch();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao atualizar status"),
+    onError: (e) => setWaActionError(e instanceof Error ? e.message : "Erro ao atualizar status"),
   });
 
   const disconnectWaMutation = useMutation({
     mutationFn: () => disconnectWa(),
     onSuccess: () => {
+      setWaActionError(null);
       setWaQrCode(null);
       setWaPairCode(null);
       toast.success("WhatsApp desconectado");
       waQ.refetch();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao desconectar WhatsApp"),
+    onError: (e) => setWaActionError(e instanceof Error ? e.message : "Erro ao desconectar WhatsApp"),
   });
 
   const mpSetting = mpQ.data?.setting as MercadoPagoSetting | undefined;
@@ -295,14 +258,27 @@ export function IntegracoesTab() {
   const waSetting = waQ.data?.setting as UazapiSetting | undefined;
   const waEvents = (waQ.data?.events ?? []) as IntegrationEvent[];
   const waErrorCount = waQ.data?.errorCount ?? 0;
-  const waStatus = cardStatus(waEnabled, waErrorCount);
+  const waStatus = cardStatus(Boolean(waSetting?.is_enabled), waErrorCount);
   const waConnection = connectionStatus(waSetting?.uazapi_connection_status);
   const waWebhook = webhookStatus({
-    enabled: waEnabled,
-    hasSecret: Boolean(waSetting?.webhook_secret),
+    enabled: Boolean(waSetting?.is_enabled),
+    hasSecret: Boolean(waSetting?.has_webhook),
     lastEventAt: waSetting?.last_event_at,
     errorCount: waErrorCount,
   });
+  const refetchWa = waQ.refetch;
+
+  useEffect(() => {
+    if (!waConfigOpen || waSetting?.uazapi_connection_status !== "connecting") return;
+    const timer = window.setInterval(() => {
+      refreshWaStatus().then((result) => {
+        setWaQrCode((current) => result.status === "connecting" ? result.qrcode ?? current : null);
+        setWaPairCode((current) => result.status === "connecting" ? result.paircode ?? current : null);
+        void refetchWa();
+      }).catch(() => undefined);
+    }, 12000);
+    return () => window.clearInterval(timer);
+  }, [waConfigOpen, waSetting?.uazapi_connection_status, refreshWaStatus, refetchWa]);
 
   return (
     <div className="space-y-5">
@@ -349,14 +325,14 @@ export function IntegracoesTab() {
           badge={<Badge className={waStatus.className}>{waStatus.label}</Badge>}
           details={[
             ["Status", waStatus.label],
-            ["Instancia", waSetting?.uazapi_instance_token ? "configurada" : "nao configurada"],
+            ["Instancia", waSetting?.has_instance ? "configurada" : "nao configurada"],
             ["Conexao", waConnection],
             ["Ultimo evento", formatRelativeDate(waSetting?.last_event_at)],
           ]}
           actions={
             <>
               <Button type="button" size="sm" onClick={() => setWaConfigOpen(true)}>
-                Configurar
+                Conexao WhatsApp
               </Button>
               <Button
                 type="button"
@@ -423,17 +399,18 @@ export function IntegracoesTab() {
 
       <UazapiConfigDialog
         open={waConfigOpen}
-        onOpenChange={setWaConfigOpen}
-        enabled={waEnabled}
-        setEnabled={setWaEnabled}
-        mode={waMode}
-        setMode={setWaMode}
-        webhookUrl={waWebhookUrl}
+        onOpenChange={(open) => {
+          setWaConfigOpen(open);
+          if (!open) {
+            setWaQrCode(null);
+            setWaPairCode(null);
+            setWaActionError(null);
+          }
+        }}
         setting={waSetting}
         qrCode={waQrCode}
         pairCode={waPairCode}
-        saveMutation={saveWaMutation}
-        testMutation={testWaMutation}
+        error={waActionError}
         generateQrMutation={generateQrMutation}
         refreshMutation={refreshWaMutation}
         disconnectMutation={disconnectWaMutation}
@@ -719,16 +696,10 @@ function MercadoPagoConfigDialog({
 function UazapiConfigDialog({
   open,
   onOpenChange,
-  enabled,
-  setEnabled,
-  mode,
-  setMode,
-  webhookUrl,
   setting,
   qrCode,
   pairCode,
-  saveMutation,
-  testMutation,
+  error,
   generateQrMutation,
   refreshMutation,
   disconnectMutation,
@@ -736,125 +707,70 @@ function UazapiConfigDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  enabled: boolean;
-  setEnabled: (enabled: boolean) => void;
-  mode: "disabled" | "suggestion" | "automatic";
-  setMode: (mode: "disabled" | "suggestion" | "automatic") => void;
-  webhookUrl: string;
   setting: UazapiSetting | undefined;
   qrCode: string | null;
   pairCode: string | null;
-  saveMutation: { mutate: (form: FormData) => void; isPending: boolean };
-  testMutation: { mutate: () => void; isPending: boolean };
+  error: string | null;
   generateQrMutation: { mutate: () => void; isPending: boolean };
   refreshMutation: { mutate: () => void; isPending: boolean };
-  disconnectMutation: { mutate: () => void; isPending: boolean };
+  disconnectMutation: { mutateAsync: () => Promise<unknown>; isPending: boolean };
   webhookStatus: string;
 }) {
-  const qrSrc = qrCode ? qrImageSrc(qrCode) : null;
+  const [confirmDisconnectOpen, setConfirmDisconnectOpen] = useState(false);
+  const qrExpired = Boolean(setting?.uazapi_last_qr_at &&
+    Date.now() - new Date(setting.uazapi_last_qr_at).getTime() > 120000);
+  const qrSrc = qrCode && !qrExpired ? qrImageSrc(qrCode) : null;
   const connected = setting?.uazapi_connection_status === "connected";
+  const connecting = setting?.uazapi_connection_status === "connecting";
+  const busy = generateQrMutation.isPending || refreshMutation.isPending ||
+    disconnectMutation.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-admin-border bg-admin-surface text-admin-ink sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Configurar WhatsApp / Uazapi</DialogTitle>
-          <DialogDescription className="text-admin-ink-muted">
-            Conexao do WhatsApp para inbox, follow-ups manuais e registros do CRM.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-admin-border bg-admin-surface text-admin-ink sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">Conexao WhatsApp</DialogTitle>
+            <DialogDescription className="text-admin-ink-muted">
+              Escaneie o QR Code para conectar o numero. O modo de operacao permanece em sugestao/manual.
+            </DialogDescription>
+          </DialogHeader>
 
-        <form
-          className="grid gap-4 lg:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            saveMutation.mutate(new FormData(e.currentTarget));
-          }}
-        >
-          <SwitchPanel
-            title="Ativar WhatsApp"
-            description="Webhooks e envios pelo CRM so funcionam com integracao ativa e segredo configurado."
-            checked={enabled}
-            onCheckedChange={setEnabled}
-          />
-
-          <Field label="Modo de operacao">
-            <Select value={mode} onValueChange={(value) => setMode(value as typeof mode)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="disabled">Desativado</SelectItem>
-                <SelectItem value="suggestion">Sugestao/manual</SelectItem>
-                <SelectItem value="automatic">Automatico</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Base URL Uazapi">
-            <Input
-              name="uazapi_base_url"
-              type="url"
-              placeholder="https://api.uazapi.com"
-              defaultValue={setting?.uazapi_base_url ?? "https://api.uazapi.com"}
-            />
-          </Field>
-          <Field label="Admin token Uazapi">
-            <Input
-              name="uazapi_admin_token"
-              type="password"
-              placeholder={
-                setting?.uazapi_admin_token
-                  ? "Preenchido - deixe em branco para manter"
-                  : "Token administrativo"
-              }
-            />
-          </Field>
-          <Field label="Segredo do webhook">
-            <Input
-              name="webhook_secret"
-              type="password"
-              placeholder={
-                setting?.webhook_secret
-                  ? "Preenchido - deixe em branco para manter"
-                  : "Token secreto"
-              }
-            />
-          </Field>
-          <Field label="Nome da instancia">
-            <Input
-              name="uazapi_instance_name"
-              defaultValue={setting?.uazapi_instance_name ?? "instituto-empuria"}
-            />
-          </Field>
-          <ReadonlyWebhookField webhookUrl={webhookUrl} />
-
-          <div className="grid gap-3 lg:col-span-2 md:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2">
             <StatusTile
               label="Conexao"
               value={connectionStatus(setting?.uazapi_connection_status)}
             />
             <StatusTile label="Webhook" value={webhookStatus} />
-            <StatusTile label="Perfil" value={setting?.uazapi_profile_name ?? "aguardando"} />
-            <StatusTile label="Telefone" value={setting?.uazapi_phone ?? "aguardando"} />
+            <StatusTile label="Perfil" value={setting?.uazapi_profile_name ?? "Aguardando"} />
+            <StatusTile label="Telefone" value={setting?.uazapi_phone ?? "Aguardando"} />
           </div>
 
-          <div className="rounded-xl border border-admin-border bg-admin-surface-2 p-4 lg:col-span-2">
+          {error && (
+            <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+              {error}
+            </p>
+          )}
+
+          <div className="rounded-xl border border-admin-border bg-admin-surface-2 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <Label className="font-display text-sm uppercase tracking-wide">
                   Conexao por QR Code
                 </Label>
                 <p className="mt-1 text-xs text-admin-ink-muted">
-                  Gere o QR Code, leia no WhatsApp e atualize o status ate aparecer conectado.
+                  {connected
+                    ? "Numero conectado. Use Atualizar para conferir o estado real."
+                    : "Gere o QR Code e leia no WhatsApp. A conexao so sera confirmada pela Uazapi."}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button
+                {!connected && <Button
                   type="button"
                   variant="outline"
                   className="gap-2"
                   onClick={() => generateQrMutation.mutate()}
-                  disabled={generateQrMutation.isPending || saveMutation.isPending}
+                  disabled={busy}
                 >
                   {generateQrMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -862,13 +778,13 @@ function UazapiConfigDialog({
                     <QrCode className="h-4 w-4" />
                   )}
                   Gerar QR Code
-                </Button>
+                </Button>}
                 <Button
                   type="button"
                   variant="outline"
                   className="gap-2"
                   onClick={() => refreshMutation.mutate()}
-                  disabled={refreshMutation.isPending}
+                  disabled={busy}
                 >
                   {refreshMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -877,12 +793,12 @@ function UazapiConfigDialog({
                   )}
                   Atualizar
                 </Button>
-                <Button
+                {setting?.has_instance && setting.uazapi_connection_status !== "disconnected" && <Button
                   type="button"
                   variant="outline"
                   className="gap-2"
-                  onClick={() => disconnectMutation.mutate()}
-                  disabled={disconnectMutation.isPending || !setting?.uazapi_instance_token}
+                  onClick={() => setConfirmDisconnectOpen(true)}
+                  disabled={busy}
                 >
                   {disconnectMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -890,11 +806,11 @@ function UazapiConfigDialog({
                     <Unplug className="h-4 w-4" />
                   )}
                   Desconectar
-                </Button>
+                </Button>}
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-4">
+            {(connecting || (pairCode && !connected)) && <div className="mt-4 flex flex-wrap items-center gap-4">
               <div className="flex h-48 w-48 items-center justify-center rounded-xl border border-admin-border bg-white p-3">
                 {qrSrc ? (
                   <img
@@ -903,7 +819,9 @@ function UazapiConfigDialog({
                     className="h-full w-full object-contain"
                   />
                 ) : (
-                  <QrCode className="h-12 w-12 text-admin-ink-muted" />
+                  <span className="text-center text-xs text-admin-ink-muted">
+                    {qrExpired ? "QR Code expirado. Gere outro." : "Aguardando QR Code"}
+                  </span>
                 )}
               </div>
               <div className="min-w-0 flex-1 space-y-2 text-sm text-admin-ink-muted">
@@ -925,19 +843,43 @@ function UazapiConfigDialog({
                     <span className="font-mono text-admin-ink">{pairCode}</span>
                   </p>
                 )}
-                {connected && (
-                  <p className="text-emerald-700">
-                    Instancia conectada e pronta para envio manual de follow-ups.
-                  </p>
-                )}
               </div>
-            </div>
+            </div>}
           </div>
-
-          <DialogActions saveMutation={saveMutation} testMutation={testMutation} />
-        </form>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={confirmDisconnectOpen} onOpenChange={(next) => {
+        if (!disconnectMutation.isPending) setConfirmDisconnectOpen(next);
+      }}>
+        <AlertDialogContent className="border-admin-border bg-admin-surface text-admin-ink">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desconectar WhatsApp?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A instancia sera desconectada, mas a configuracao sera preservada para reconectar depois.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={disconnectMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={disconnectMutation.isPending}
+              onClick={async (event) => {
+                event.preventDefault();
+                if (disconnectMutation.isPending) return;
+                try {
+                  await disconnectMutation.mutateAsync();
+                  setConfirmDisconnectOpen(false);
+                } catch {
+                  // Keep confirmation open; the parent displays the server error.
+                }
+              }}
+            >
+              Desconectar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -1148,6 +1090,7 @@ function webhookStatus({
 function connectionStatus(value: UazapiSetting["uazapi_connection_status"] | undefined) {
   if (value === "connected") return "conectado";
   if (value === "connecting") return "conectando";
+  if (value === "hibernated") return "sessao em pausa";
   if (value === "error") return "erro";
   return "desconectado";
 }
