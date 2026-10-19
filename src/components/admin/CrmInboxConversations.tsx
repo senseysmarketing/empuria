@@ -26,6 +26,7 @@ import {
 import { createCrmLead, searchCrmLeads } from "@/lib/admin/crm.functions";
 import {
   getCrmInboxConnection,
+  getCrmConversation,
   linkCrmConversationLead,
   listCrmConversationMessages,
   listCrmConversations,
@@ -56,9 +57,16 @@ type Message = {
 };
 type LeadResult = { id: string; full_name: string; phone: string };
 
-export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: string) => void }) {
+export function CrmInboxConversations({
+  onOpenLead,
+  selectedConversationId,
+}: {
+  onOpenLead: (leadId: string) => void;
+  selectedConversationId?: string | null;
+}) {
   const qc = useQueryClient();
   const fetchConversations = useServerFn(listCrmConversations);
+  const fetchConversation = useServerFn(getCrmConversation);
   const fetchMessages = useServerFn(listCrmConversationMessages);
   const connectionFn = useServerFn(getCrmInboxConnection);
   const markReadFn = useServerFn(markCrmConversationRead);
@@ -73,18 +81,27 @@ export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: str
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [uncertain, setUncertain] = useState<Record<string, boolean>>({});
   const [linkOpen, setLinkOpen] = useState(false);
   const [leadSearch, setLeadSearch] = useState("");
   const [newLeadName, setNewLeadName] = useState("");
   const [syncOffset, setSyncOffset] = useState(0);
   const [historyOffset, setHistoryOffset] = useState(0);
   const sendingRef = useRef(false);
+  const directReadRef = useRef(new Set<string>());
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    if (selectedConversationId) {
+      setSelectedId(selectedConversationId);
+      setHistoryOffset(0);
+    }
+  }, [selectedConversationId]);
 
   const conversationsQ = useInfiniteQuery({
     queryKey: ["crm-inbox", "conversations", debouncedSearch, unreadOnly],
@@ -98,7 +115,14 @@ export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: str
     () => (conversationsQ.data?.pages.flatMap((page) => page.items) ?? []) as Conversation[],
     [conversationsQ.data],
   );
-  const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
+  const selectedInList = conversations.find((conversation) => conversation.id === selectedId);
+  const selectedQ = useQuery({
+    queryKey: ["crm-inbox", "conversation", selectedId],
+    queryFn: () => fetchConversation({ data: { conversationId: selectedId! } }),
+    enabled: Boolean(selectedId) && !selectedInList,
+  });
+  const selected = selectedInList ?? (selectedQ.data as Conversation | null) ?? null;
+  const draft = selectedId ? (drafts[selectedId] ?? "") : "";
   const messagesQ = useInfiniteQuery({
     queryKey: ["crm-inbox", "messages", selectedId],
     initialPageParam: 0,
@@ -143,14 +167,40 @@ export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: str
     onSuccess: refresh,
     onError: () => toast.error("Nao foi possivel marcar a conversa como lida."),
   });
+  useEffect(() => {
+    if (
+      selectedConversationId &&
+      selected?.id === selectedConversationId &&
+      selected.unread_count > 0 &&
+      !directReadRef.current.has(selectedConversationId)
+    ) {
+      directReadRef.current.add(selectedConversationId);
+      readMutation.mutate(selectedConversationId);
+    }
+  }, [selectedConversationId, selected?.id, selected?.unread_count, readMutation]);
   const sendMutation = useMutation({
-    mutationFn: ({ text, requestId }: { text: string; requestId: string }) =>
-      sendFn({ data: { conversationId: selectedId!, text, requestId } }),
-    onSuccess: (result) => {
+    mutationFn: ({
+      conversationId,
+      text,
+      requestId,
+    }: {
+      conversationId: string;
+      text: string;
+      requestId: string;
+    }) => sendFn({ data: { conversationId, text, requestId } }),
+    onSuccess: (result, variables) => {
       refresh();
-      setDraft("");
-      if (!result.ok)
+      if (result.ok) {
+        setDrafts((old) => ({
+          ...old,
+          [variables.conversationId]:
+            old[variables.conversationId] === variables.text ? "" : old[variables.conversationId],
+        }));
+        setUncertain((old) => ({ ...old, [variables.conversationId]: false }));
+      } else {
+        setUncertain((old) => ({ ...old, [variables.conversationId]: true }));
         toast.error("Resultado do envio incerto. Confira a conversa antes de tentar novamente.");
+      }
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Nao foi possivel enviar."),
@@ -159,9 +209,20 @@ export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: str
     },
   });
   const submitMessage = () => {
-    if (sendingRef.current || !selectedId || !connectionQ.data?.connected || !draft.trim()) return;
+    if (
+      sendingRef.current ||
+      !selectedId ||
+      uncertain[selectedId] ||
+      !connectionQ.data?.connected ||
+      !draft.trim()
+    )
+      return;
     sendingRef.current = true;
-    sendMutation.mutate({ text: draft.trim(), requestId: crypto.randomUUID() });
+    sendMutation.mutate({
+      conversationId: selectedId,
+      text: draft.trim(),
+      requestId: crypto.randomUUID(),
+    });
   };
   const syncMutation = useMutation({
     mutationFn: () => syncChatsFn({ data: { offset: syncOffset } }),
@@ -402,6 +463,22 @@ export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: str
               ))}
             </div>
             <div className="space-y-2 border-t border-admin-border p-3">
+              {selectedId && uncertain[selectedId] && (
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-700">
+                  <span>
+                    Envio incerto. Rascunho preservado; confira a conversa antes de tentar
+                    novamente.
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setUncertain((old) => ({ ...old, [selectedId]: false }))}
+                  >
+                    Ja conferi a conversa
+                  </Button>
+                </div>
+              )}
               {!connectionQ.data?.connected && (
                 <p className="text-xs text-amber-700">
                   WhatsApp desconectado. Conecte a Uazapi em Configuracoes para responder.
@@ -410,7 +487,9 @@ export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: str
               <div className="flex items-end gap-2">
                 <Textarea
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) =>
+                    setDrafts((old) => ({ ...old, [selectedId!]: event.target.value }))
+                  }
                   rows={2}
                   placeholder="Escreva uma resposta manual..."
                   disabled={!connectionQ.data?.connected || sendMutation.isPending}
@@ -418,7 +497,12 @@ export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: str
                 <Button
                   size="icon"
                   onClick={submitMessage}
-                  disabled={!connectionQ.data?.connected || !draft.trim() || sendMutation.isPending}
+                  disabled={
+                    !connectionQ.data?.connected ||
+                    !draft.trim() ||
+                    sendMutation.isPending ||
+                    Boolean(selectedId && uncertain[selectedId])
+                  }
                   aria-label="Enviar mensagem"
                 >
                   {sendMutation.isPending ? (

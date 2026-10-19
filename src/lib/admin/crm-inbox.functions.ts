@@ -47,6 +47,22 @@ export const listCrmConversations = createServerFn({ method: "GET" })
     };
   });
 
+export const getCrmConversation = createServerFn({ method: "GET" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) => z.object({ conversationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: row, error } = await db
+      .from("crm_conversations")
+      .select(
+        "id,lead_id,provider_chat_id,phone,contact_name,last_preview,last_message_at,unread_count",
+      )
+      .eq("id", data.conversationId)
+      .eq("provider", "whatsapp")
+      .maybeSingle();
+    if (error) throw new Error("Nao foi possivel abrir a conversa.");
+    return row ?? null;
+  });
+
 export const listCrmConversationMessages = createServerFn({ method: "GET" })
   .middleware([requireModule("crm")])
   .inputValidator((d) =>

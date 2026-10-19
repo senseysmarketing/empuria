@@ -1,25 +1,38 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
+  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   addCrmLeadNote,
   createCrmFollowup,
   createCrmLead,
-  deactivateCrmColumn,
+  getCrmLeadConversation,
   getCrmLeadDetail,
+  listCrmColumnCounts,
   listCrmColumnLeads,
   listCrmWorkspace,
   logCrmWhatsappOpened,
+  reorderCrmColumns,
   saveCrmColumn,
   saveCrmDistribution,
   sendCrmFollowupMessage,
@@ -41,6 +54,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -57,6 +80,10 @@ import {
   Columns3,
   Pencil,
   MessageCircle,
+  GripVertical,
+  Archive,
+  RotateCcw,
+  Trash2,
   Plus,
   Send,
   Search,
@@ -92,6 +119,7 @@ type CrmColumn = {
   type: "system" | "custom";
   position: number;
   is_locked: boolean;
+  is_active: boolean;
 };
 
 type Lead = {
@@ -174,6 +202,7 @@ type DistributionMember = {
 
 type Workspace = {
   columns: CrmColumn[];
+  archivedColumns: CrmColumn[];
   distribution: Distribution;
   distributionMembers: DistributionMember[];
   users: CrmUser[];
@@ -230,12 +259,17 @@ function CrmPage() {
   const fetchWorkspace = useServerFn(listCrmWorkspace);
   const moveLead = useServerFn(updateCrmLeadColumn);
   const qc = useQueryClient();
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+  );
 
   const [search, setSearch] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("funil");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [inboxConversationId, setInboxConversationId] = useState<string | null>(null);
+  const [draggedLead, setDraggedLead] = useState<LeadCardData | null>(null);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [distributionOpen, setDistributionOpen] = useState(false);
@@ -248,7 +282,11 @@ function CrmPage() {
     staleTime: 20_000,
   });
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setDraggedLead((event.active.data.current?.lead as LeadCardData | undefined) ?? null);
+  };
   const handleDrop = async (event: DragEndEvent) => {
+    setDraggedLead(null);
     const leadId = String(event.active.id);
     const columnId = event.over?.id ? String(event.over.id) : "";
     const sourceColumnId = String(event.active.data.current?.columnId ?? "");
@@ -366,8 +404,13 @@ function CrmPage() {
         </TabsList>
 
         <TabsContent value="funil" className="mt-0">
-          <DndContext sensors={sensors} onDragEnd={handleDrop}>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragCancel={() => setDraggedLead(null)}
+            onDragEnd={handleDrop}
+          >
+            <div className="flex gap-4 overflow-x-auto pb-4">
               {data.columns.map((column) => (
                 <CrmColumnView
                   key={column.id}
@@ -379,12 +422,26 @@ function CrmPage() {
                 />
               ))}
             </div>
+            {typeof document !== "undefined" &&
+              createPortal(
+                <DragOverlay zIndex={200} dropAnimation={null}>
+                  {draggedLead && (
+                    <div className="w-[280px] rotate-1 cursor-grabbing rounded-lg border-2 border-admin-accent bg-admin-surface-2 p-3 shadow-2xl">
+                      <LeadCardBody lead={draggedLead} />
+                    </div>
+                  )}
+                </DragOverlay>,
+                document.body,
+              )}
           </DndContext>
         </TabsContent>
 
         {activeTab === "inbox" && (
           <TabsContent value="inbox" className="mt-0">
-            <CrmInboxConversations onOpenLead={setSelectedLeadId} />
+            <CrmInboxConversations
+              onOpenLead={setSelectedLeadId}
+              selectedConversationId={inboxConversationId}
+            />
           </TabsContent>
         )}
 
@@ -400,10 +457,22 @@ function CrmPage() {
         users={data.users}
         columns={data.columns}
         onClose={() => setSelectedLeadId(null)}
+        onViewConversation={(conversationId) => {
+          setSelectedLeadId(null);
+          setInboxConversationId(conversationId);
+          setActiveTab("inbox");
+        }}
         onCreateFollowup={(lead) => setFollowupLead(lead)}
       />
       <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} users={data.users} />
-      <ColumnsDialog open={columnsOpen} onOpenChange={setColumnsOpen} columns={data.columns} />
+      <ColumnsDialog
+        open={columnsOpen}
+        onOpenChange={setColumnsOpen}
+        columns={data.columns}
+        archivedColumns={data.archivedColumns}
+        onOpenLead={setSelectedLeadId}
+        users={data.users}
+      />
       <DistributionDialog open={distributionOpen} onOpenChange={setDistributionOpen} data={data} />
       <FollowupDialog
         lead={followupLead}
@@ -458,7 +527,7 @@ function CrmColumnView({
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-[58vh] flex-col rounded-xl border border-admin-border bg-admin-surface ${isOver ? "ring-2 ring-admin-accent" : ""}`}
+      className={`flex min-h-[58vh] w-[280px] min-w-[280px] max-w-[280px] flex-col rounded-xl border border-admin-border bg-admin-surface sm:w-[300px] sm:min-w-[300px] sm:max-w-[300px] ${isOver ? "ring-2 ring-admin-accent bg-admin-accent/5" : ""}`}
     >
       <header className="flex items-center justify-between border-b border-admin-border px-4 py-3">
         <div>
@@ -518,23 +587,33 @@ function LeadCard({
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: lead.id,
-    data: { columnId },
+    data: { columnId, lead },
   });
-  const temp = leadTemperature(lead);
   return (
     <button
       ref={setNodeRef}
       type="button"
-      style={{
-        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-      }}
+      style={
+        transform && !isDragging
+          ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+          : undefined
+      }
       className={`w-full cursor-grab rounded-lg border border-admin-border bg-admin-surface-2 p-3 text-left active:cursor-grabbing ${
-        isDragging ? "opacity-50 shadow-lg" : "hover:border-admin-accent/70"
+        isDragging ? "opacity-25 ring-2 ring-admin-accent" : "hover:border-admin-accent/70"
       }`}
       onClick={onClick}
       {...attributes}
       {...listeners}
     >
+      <LeadCardBody lead={lead} />
+    </button>
+  );
+}
+
+function LeadCardBody({ lead }: { lead: LeadCardData }) {
+  const temp = leadTemperature(lead);
+  return (
+    <>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-admin-ink">{lead.full_name}</div>
@@ -568,7 +647,7 @@ function LeadCard({
           </span>
         </div>
       </div>
-    </button>
+    </>
   );
 }
 
@@ -924,12 +1003,14 @@ function LeadDialog({
   users,
   columns,
   onClose,
+  onViewConversation,
   onCreateFollowup,
 }: {
   leadId: string | null;
   users: Workspace["users"];
   columns: CrmColumn[];
   onClose: () => void;
+  onViewConversation: (conversationId: string) => void;
   onCreateFollowup: (lead: Lead) => void;
 }) {
   const fetchDetail = useServerFn(getCrmLeadDetail);
@@ -939,6 +1020,7 @@ function LeadDialog({
   const updateColumn = useServerFn(updateCrmLeadColumn);
   const updateNotes = useServerFn(updateCrmLeadNotes);
   const logWa = useServerFn(logCrmWhatsappOpened);
+  const findConversation = useServerFn(getCrmLeadConversation);
   const [note, setNote] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
   const { data: detail, isError } = useQuery<{ lead: Lead; activity: Activity[] }>({
@@ -971,6 +1053,18 @@ function LeadDialog({
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Erro ao salvar dossie"),
+  });
+  const openConversation = useMutation({
+    mutationFn: (id: string) => findConversation({ data: { leadId: id } }),
+    onSuccess: (result) => {
+      if (!result.conversationId) {
+        toast.info("Este lead ainda nao possui conversa vinculada no Inbox.");
+        return;
+      }
+      onViewConversation(result.conversationId);
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel abrir o Inbox."),
   });
 
   if (!leadId) return null;
@@ -1096,6 +1190,14 @@ function LeadDialog({
           </div>
 
           <aside className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              disabled={openConversation.isPending}
+              onClick={() => openConversation.mutate(lead.id)}
+            >
+              <MessageCircle className="h-4 w-4" /> Ver conversa no Inbox
+            </Button>
             <Button
               className="w-full justify-start gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
               onClick={async () => {
@@ -1290,87 +1392,399 @@ function ColumnsDialog({
   open,
   onOpenChange,
   columns,
+  archivedColumns,
+  onOpenLead,
+  users,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   columns: CrmColumn[];
+  archivedColumns: CrmColumn[];
+  onOpenLead: (id: string) => void;
+  users: CrmUser[];
 }) {
   const saveColumnFn = useServerFn(saveCrmColumn);
-  const deleteColumnFn = useServerFn(deactivateCrmColumn);
+  const reorderFn = useServerFn(reorderCrmColumns);
+  const countFn = useServerFn(listCrmColumnCounts);
   const qc = useQueryClient();
   const [label, setLabel] = useState("");
-  const [position, setPosition] = useState(40);
+  const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState("");
+  const [confirm, setConfirm] = useState<{
+    action: "archive" | "delete";
+    column: CrmColumn;
+  } | null>(null);
+  const [viewArchived, setViewArchived] = useState<CrmColumn | null>(null);
+  const wasOpen = useRef(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+  );
+  useEffect(() => {
+    if (open && !wasOpen.current) setOrderedIds(columns.map((column) => column.id));
+    wasOpen.current = open;
+  }, [open, columns]);
+  const countsQ = useQuery({
+    queryKey: ["crm-workspace", "column-counts"],
+    queryFn: () => countFn(),
+    enabled: open,
+  });
+  const orderedColumns = orderedIds
+    .map((id) => columns.find((column) => column.id === id))
+    .filter((column): column is CrmColumn => Boolean(column));
+  for (const column of columns) if (!orderedIds.includes(column.id)) orderedColumns.push(column);
+  const orderChanged =
+    orderedColumns.map((column) => column.id).join() !== columns.map((column) => column.id).join();
   const save = useMutation({
-    mutationFn: () => saveColumnFn({ data: { label, position } }),
-    onSuccess: () => {
-      setLabel("");
-      toast.success("Coluna salva");
+    mutationFn: (data: {
+      action: "create" | "rename" | "archive" | "restore" | "delete";
+      id?: string;
+      label?: string;
+    }) => saveColumnFn({ data }),
+    onSuccess: (result, variables) => {
+      if (variables.action === "create") {
+        setLabel("");
+        setOrderedIds((old) => [...old, result.id]);
+      }
+      if (variables.action === "rename") setEditingId(null);
+      setConfirm(null);
+      toast.success(
+        variables.action === "archive"
+          ? "Coluna arquivada sem mover leads."
+          : variables.action === "restore"
+            ? "Coluna restaurada."
+            : variables.action === "delete"
+              ? "Coluna vazia excluida."
+              : "Coluna salva.",
+      );
       qc.invalidateQueries({ queryKey: ["crm-workspace"] });
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Erro ao salvar coluna"),
   });
-  const deactivate = useMutation({
-    mutationFn: (id: string) => deleteColumnFn({ data: { id } }),
+  const reorder = useMutation({
+    mutationFn: () => reorderFn({ data: { ids: orderedColumns.map((column) => column.id) } }),
     onSuccess: () => {
-      toast.success("Coluna desativada");
+      toast.success("Ordem das colunas salva.");
       qc.invalidateQueries({ queryKey: ["crm-workspace"] });
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao desativar coluna"),
+      toast.error(error instanceof Error ? error.message : "Erro ao ordenar colunas"),
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-admin-surface sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Configurar colunas</DialogTitle>
-          <DialogDescription>
-            Colunas padrao ficam bloqueadas. Colunas personalizadas entram antes de Fechado e
-            Desqualificado.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
-          {columns.map((column) => (
-            <div
-              key={column.id}
-              className="flex items-center justify-between rounded-lg border border-admin-border bg-admin-surface-2 p-3"
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto bg-admin-surface sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Configurar colunas</DialogTitle>
+            <DialogDescription>
+              Arraste pela alca para ordenar. Colunas padrao podem mudar de lugar, mas nao de nome
+              ou significado.
+            </DialogDescription>
+          </DialogHeader>
+          <DndContext
+            sensors={sensors}
+            onDragEnd={({ active, over }) => {
+              if (!over || active.id === over.id) return;
+              setOrderedIds((old) =>
+                arrayMove(old, old.indexOf(String(active.id)), old.indexOf(String(over.id))),
+              );
+            }}
+          >
+            <SortableContext
+              items={orderedColumns.map((column) => column.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <div>
-                <div className="font-medium">{column.label}</div>
-                <div className="text-xs text-admin-ink-muted">
-                  posicao {column.position} · {column.type}
-                </div>
+              <div className="space-y-2">
+                {orderedColumns.map((column) => (
+                  <SortableColumnRow
+                    key={column.id}
+                    column={column}
+                    count={countsQ.data?.[column.id] ?? 0}
+                    busy={save.isPending}
+                    editing={editingId === column.id}
+                    editingLabel={editingLabel}
+                    onEditingLabel={setEditingLabel}
+                    onEdit={() => {
+                      setEditingId(column.id);
+                      setEditingLabel(column.label);
+                    }}
+                    onSaveEdit={() =>
+                      save.mutate({ action: "rename", id: column.id, label: editingLabel })
+                    }
+                    onCancelEdit={() => setEditingId(null)}
+                    onAction={(action) => setConfirm({ action, column })}
+                  />
+                ))}
               </div>
-              {!column.is_locked && (
-                <Button size="sm" variant="ghost" onClick={() => deactivate.mutate(column.id)}>
-                  Desativar
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="grid gap-2 border-t border-admin-border pt-4 md:grid-cols-[1fr_120px_auto]">
-          <Input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Nova coluna"
-            className="bg-admin-bg"
-          />
-          <Input
-            value={position}
-            type="number"
-            min={31}
-            max={899}
-            onChange={(e) => setPosition(Number(e.target.value))}
-            className="bg-admin-bg"
-          />
-          <Button onClick={() => save.mutate()} disabled={!label.trim() || save.isPending}>
-            Adicionar
+            </SortableContext>
+          </DndContext>
+          <Button
+            variant="outline"
+            onClick={() => reorder.mutate()}
+            disabled={!orderChanged || reorder.isPending || save.isPending}
+          >
+            Salvar ordem
           </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <div className="grid gap-2 border-t border-admin-border pt-4 sm:grid-cols-[1fr_auto]">
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Nome da nova coluna"
+              maxLength={60}
+              className="bg-admin-bg"
+            />
+            <Button
+              onClick={() => save.mutate({ action: "create", label })}
+              disabled={label.trim().length < 2 || save.isPending}
+            >
+              Adicionar
+            </Button>
+          </div>
+          {archivedColumns.length > 0 && (
+            <section className="space-y-2 border-t border-admin-border pt-4">
+              <h3 className="text-sm font-semibold">Colunas arquivadas</h3>
+              {archivedColumns.map((column) => (
+                <div
+                  key={column.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border p-3"
+                >
+                  <span>
+                    {column.label}{" "}
+                    <span className="text-xs text-admin-ink-muted">
+                      · {countsQ.data?.[column.id] ?? 0} lead(s)
+                    </span>
+                  </span>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setViewArchived(column)}>
+                      Ver leads
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={save.isPending}
+                      onClick={() => save.mutate({ action: "restore", id: column.id })}
+                    >
+                      <RotateCcw className="mr-1 h-4 w-4" /> Restaurar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={Boolean(confirm)} onOpenChange={(value) => !value && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirm?.action === "delete" ? "Excluir coluna vazia?" : "Arquivar coluna?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm?.action === "delete"
+                ? `A coluna ${confirm.column.label} sera excluida somente se ainda estiver vazia no banco.`
+                : `A coluna ${confirm?.column.label} saira do Kanban; seus ${countsQ.data?.[confirm?.column.id ?? ""] ?? 0} lead(s), estagios e historico permanecem intactos.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={save.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={save.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (confirm) save.mutate({ action: confirm.action, id: confirm.column.id });
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Dialog
+        open={Boolean(viewArchived)}
+        onOpenChange={(value) => !value && setViewArchived(null)}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto bg-admin-surface sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Leads em {viewArchived?.label}</DialogTitle>
+            <DialogDescription>
+              Coluna arquivada; restaure-a para voltar a movimentar os leads.
+            </DialogDescription>
+          </DialogHeader>
+          {viewArchived && (
+            <ArchivedColumnLeads
+              columnId={viewArchived.id}
+              users={users}
+              onOpen={(id) => {
+                setViewArchived(null);
+                onOpenChange(false);
+                onOpenLead(id);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function SortableColumnRow({
+  column,
+  count,
+  busy,
+  editing,
+  editingLabel,
+  onEditingLabel,
+  onEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onAction,
+}: {
+  column: CrmColumn;
+  count: number;
+  busy: boolean;
+  editing: boolean;
+  editingLabel: string;
+  onEditingLabel: (value: string) => void;
+  onEdit: () => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onAction: (action: "archive" | "delete") => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: column.id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`flex flex-wrap items-center gap-2 rounded-lg border border-admin-border bg-admin-surface-2 p-2 ${isDragging ? "opacity-50" : ""}`}
+    >
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        className="cursor-grab touch-none rounded p-1"
+        aria-label={`Arrastar ${column.label}`}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="min-w-[120px] flex-1">
+        {editing ? (
+          <Input
+            value={editingLabel}
+            maxLength={60}
+            onChange={(event) => onEditingLabel(event.target.value)}
+          />
+        ) : (
+          <>
+            <div className="font-medium">{column.label}</div>
+            <div className="text-xs text-admin-ink-muted">
+              {column.type === "system" ? "Padrao" : "Personalizada"} · {count} lead(s)
+            </div>
+          </>
+        )}
+      </div>
+      {editing ? (
+        <>
+          <Button size="sm" disabled={busy || editingLabel.trim().length < 2} onClick={onSaveEdit}>
+            Salvar
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onCancelEdit}>
+            Cancelar
+          </Button>
+        </>
+      ) : (
+        column.type === "custom" && (
+          <>
+            <Button size="icon" variant="ghost" aria-label="Renomear coluna" onClick={onEdit}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            {count === 0 ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Excluir coluna vazia"
+                onClick={() => onAction("delete")}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Arquivar coluna"
+                onClick={() => onAction("archive")}
+              >
+                <Archive className="h-4 w-4" />
+              </Button>
+            )}
+          </>
+        )
+      )}
+    </div>
+  );
+}
+
+function ArchivedColumnLeads({
+  columnId,
+  users,
+  onOpen,
+}: {
+  columnId: string;
+  users: CrmUser[];
+  onOpen: (id: string) => void;
+}) {
+  const fetchLeads = useServerFn(listCrmColumnLeads);
+  const query = useInfiniteQuery<LeadPage>({
+    queryKey: ["crm-workspace", "archived-column", columnId],
+    initialPageParam: null as LeadPage["nextCursor"],
+    queryFn: ({ pageParam }) =>
+      fetchLeads({
+        data: { columnId, cursor: pageParam as LeadPage["nextCursor"], owner: "all" },
+      }) as Promise<LeadPage>,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  return (
+    <div className="space-y-2">
+      {query.isLoading && <p>Carregando leads...</p>}
+      {query.isError && <p className="text-red-700">Erro ao carregar leads.</p>}
+      {query.data?.pages
+        .flatMap((page) => page.items)
+        .map((lead) => (
+          <button
+            key={lead.id}
+            type="button"
+            onClick={() => onOpen(lead.id)}
+            className="block w-full rounded-lg border border-admin-border p-3 text-left hover:border-admin-accent"
+          >
+            <span className="font-medium">{lead.full_name}</span>
+            <span className="block text-xs text-admin-ink-muted">
+              {usersById.get(lead.assigned_to)?.full_name ?? "Sem responsavel"}
+            </span>
+          </button>
+        ))}
+      {query.hasNextPage && (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => query.fetchNextPage()}
+          disabled={query.isFetchingNextPage}
+        >
+          Carregar mais 20
+        </Button>
+      )}
+    </div>
   );
 }
 
