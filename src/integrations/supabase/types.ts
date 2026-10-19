@@ -1522,6 +1522,48 @@ export type Database = {
           },
         ]
       }
+      finance_payout_skips: {
+        Row: {
+          created_at: string
+          currency: string
+          period_month: string
+          reason: string | null
+          rule_id: string
+          skipped_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          period_month: string
+          reason?: string | null
+          rule_id: string
+          skipped_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          period_month?: string
+          reason?: string | null
+          rule_id?: string
+          skipped_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_payout_skips_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "finance_payout_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payout_skips_skipped_by_fkey"
+            columns: ["skipped_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_payouts: {
         Row: {
           amount_cents: number
@@ -1935,9 +1977,23 @@ export type Database = {
           test_access_token: string | null
           test_public_key: string | null
           test_webhook_secret: string | null
+          uazapi_admin_token: string | null
+          uazapi_base_url: string
+          uazapi_connection_status: string
+          uazapi_instance_id: string | null
+          uazapi_instance_name: string
+          uazapi_instance_token: string | null
+          uazapi_last_connection_at: string | null
+          uazapi_last_qr_at: string | null
+          uazapi_phone: string | null
+          uazapi_profile_name: string | null
+          uazapi_profile_pic_url: string | null
+          uazapi_webhook_configured_at: string | null
+          uazapi_webhook_id: string | null
           updated_at: string
           webhook_secret: string | null
           whatsapp_group_url: string | null
+          whatsapp_mode: string
           wise_api_token: string | null
           wise_balance_currency: string | null
           wise_balance_id_eur: string | null
@@ -1982,9 +2038,23 @@ export type Database = {
           test_access_token?: string | null
           test_public_key?: string | null
           test_webhook_secret?: string | null
+          uazapi_admin_token?: string | null
+          uazapi_base_url?: string
+          uazapi_connection_status?: string
+          uazapi_instance_id?: string | null
+          uazapi_instance_name?: string
+          uazapi_instance_token?: string | null
+          uazapi_last_connection_at?: string | null
+          uazapi_last_qr_at?: string | null
+          uazapi_phone?: string | null
+          uazapi_profile_name?: string | null
+          uazapi_profile_pic_url?: string | null
+          uazapi_webhook_configured_at?: string | null
+          uazapi_webhook_id?: string | null
           updated_at?: string
           webhook_secret?: string | null
           whatsapp_group_url?: string | null
+          whatsapp_mode?: string
           wise_api_token?: string | null
           wise_balance_currency?: string | null
           wise_balance_id_eur?: string | null
@@ -2029,9 +2099,23 @@ export type Database = {
           test_access_token?: string | null
           test_public_key?: string | null
           test_webhook_secret?: string | null
+          uazapi_admin_token?: string | null
+          uazapi_base_url?: string
+          uazapi_connection_status?: string
+          uazapi_instance_id?: string | null
+          uazapi_instance_name?: string
+          uazapi_instance_token?: string | null
+          uazapi_last_connection_at?: string | null
+          uazapi_last_qr_at?: string | null
+          uazapi_phone?: string | null
+          uazapi_profile_name?: string | null
+          uazapi_profile_pic_url?: string | null
+          uazapi_webhook_configured_at?: string | null
+          uazapi_webhook_id?: string | null
           updated_at?: string
           webhook_secret?: string | null
           whatsapp_group_url?: string | null
+          whatsapp_mode?: string
           wise_api_token?: string | null
           wise_balance_currency?: string | null
           wise_balance_id_eur?: string | null
@@ -2944,21 +3028,21 @@ export type Database = {
           discount_eur_cents: number
           discount_type: string
           discount_value: number
+          fx_locked_at: string | null
+          fx_rate: number | null
+          fx_reference_date: string | null
+          fx_reference_rate: number | null
+          fx_source: string | null
           id: string
           notes: string | null
-          payment_method: string | null
-          payment_amount_cents: number | null
-          payment_currency: string | null
-          settled_amount_cents: number | null
-          settled_currency: string | null
           paid_at: string | null
           payment_account_id: string | null
-          fx_reference_rate: number | null
-          fx_reference_date: string | null
-          fx_rate: number | null
-          fx_source: string | null
-          fx_locked_at: string | null
+          payment_amount_cents: number | null
+          payment_currency: string | null
+          payment_method: string | null
           sale_code: string
+          settled_amount_cents: number | null
+          settled_currency: string | null
           status: string
           subtotal_brl_cents: number
           subtotal_eur_cents: number
@@ -2981,21 +3065,21 @@ export type Database = {
           discount_eur_cents?: number
           discount_type?: string
           discount_value?: number
+          fx_locked_at?: string | null
+          fx_rate?: number | null
+          fx_reference_date?: string | null
+          fx_reference_rate?: number | null
+          fx_source?: string | null
           id?: string
           notes?: string | null
-          payment_method?: string | null
-          payment_amount_cents?: number | null
-          payment_currency?: string | null
-          settled_amount_cents?: number | null
-          settled_currency?: string | null
           paid_at?: string | null
           payment_account_id?: string | null
-          fx_reference_rate?: number | null
-          fx_reference_date?: string | null
-          fx_rate?: number | null
-          fx_source?: string | null
-          fx_locked_at?: string | null
+          payment_amount_cents?: number | null
+          payment_currency?: string | null
+          payment_method?: string | null
           sale_code: string
+          settled_amount_cents?: number | null
+          settled_currency?: string | null
           status?: string
           subtotal_brl_cents?: number
           subtotal_eur_cents?: number
@@ -3018,21 +3102,21 @@ export type Database = {
           discount_eur_cents?: number
           discount_type?: string
           discount_value?: number
+          fx_locked_at?: string | null
+          fx_rate?: number | null
+          fx_reference_date?: string | null
+          fx_reference_rate?: number | null
+          fx_source?: string | null
           id?: string
           notes?: string | null
-          payment_method?: string | null
-          payment_amount_cents?: number | null
-          payment_currency?: string | null
-          settled_amount_cents?: number | null
-          settled_currency?: string | null
           paid_at?: string | null
           payment_account_id?: string | null
-          fx_reference_rate?: number | null
-          fx_reference_date?: string | null
-          fx_rate?: number | null
-          fx_source?: string | null
-          fx_locked_at?: string | null
+          payment_amount_cents?: number | null
+          payment_currency?: string | null
+          payment_method?: string | null
           sale_code?: string
+          settled_amount_cents?: number | null
+          settled_currency?: string | null
           status?: string
           subtotal_brl_cents?: number
           subtotal_eur_cents?: number
@@ -3044,6 +3128,13 @@ export type Database = {
           voided_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pdv_sales_payment_account_id_fkey"
+            columns: ["payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pdv_sales_voided_by_fkey"
             columns: ["voided_by"]
@@ -3850,6 +3941,27 @@ export type Database = {
           },
         ]
       }
+      uazapi_connection_secrets: {
+        Row: {
+          admin_token: string | null
+          instance_token: string | null
+          provider: string
+          webhook_secret: string | null
+        }
+        Insert: {
+          admin_token?: string | null
+          instance_token?: string | null
+          provider: string
+          webhook_secret?: string | null
+        }
+        Update: {
+          admin_token?: string | null
+          instance_token?: string | null
+          provider?: string
+          webhook_secret?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -4012,32 +4124,66 @@ export type Database = {
         Args: { p_lead_id: string; p_reason: string; p_step_id?: string }
         Returns: undefined
       }
+      crm_column_manage: {
+        Args: {
+          p_action: string
+          p_actor?: string
+          p_column_id?: string
+          p_label?: string
+        }
+        Returns: string
+      }
+      crm_column_reorder: { Args: { p_ids: string[] }; Returns: undefined }
+      crm_inbox_bind_lead: {
+        Args: { p_conversation_id: string; p_lead_id: string }
+        Returns: undefined
+      }
+      crm_inbox_ingest: {
+        Args: {
+          p_body: string
+          p_chat_id: string
+          p_client_request_id?: string
+          p_direction: Database["public"]["Enums"]["crm_message_direction"]
+          p_name: string
+          p_phone: string
+          p_provider_message_id: string
+          p_sent_at: string
+          p_status?: string
+          p_type: string
+        }
+        Returns: {
+          conversation_id: string
+          inserted: boolean
+          message_id: string
+        }[]
+      }
+      crm_inbox_unread_total: { Args: never; Returns: number }
       email_exists: { Args: { p_email: string }; Returns: boolean }
       esteira_create_order: {
         Args: {
-          p_payload: Json
           p_actor: string
           p_initiated_from?: string
-          p_reason?: string | null
+          p_payload: Json
+          p_reason?: string
         }
         Returns: string
       }
       esteira_delete_order: {
-        Args: { p_order_id: string; p_actor: string; p_reason?: string | null }
+        Args: { p_actor: string; p_order_id: string; p_reason?: string }
         Returns: undefined
       }
       esteira_settle_order: {
         Args: {
-          p_order_id: string
           p_actor: string
-          p_paid_at: string
           p_amount_cents: number
           p_currency: string
-          p_fx_reference_rate?: number | null
-          p_fx_reference_date?: string | null
-          p_fx_rate?: number | null
-          p_fx_source?: string | null
-          p_note?: string | null
+          p_fx_rate?: number
+          p_fx_reference_date?: string
+          p_fx_reference_rate?: number
+          p_fx_source?: string
+          p_note?: string
+          p_order_id: string
+          p_paid_at: string
         }
         Returns: undefined
       }
@@ -4088,8 +4234,12 @@ export type Database = {
         }[]
       }
       finance_reverse_settlement: {
-        Args: { p_actor: string; p_id: string; p_reason: string }
+        Args: { p_actor: string; p_id: string; p_reason?: string }
         Returns: undefined
+      }
+      finance_save_team_compensation: {
+        Args: { p_actor: string; p_data: Json }
+        Returns: string
       }
       finance_save_team_member: {
         Args: { p_actor: string; p_data: Json }
@@ -4107,6 +4257,20 @@ export type Database = {
           p_payee_id: string
           p_remove_pending: boolean
         }
+        Returns: undefined
+      }
+      finance_set_team_rule_state: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_month: string
+          p_remove_pending: boolean
+          p_rule_id: string
+        }
+        Returns: undefined
+      }
+      finance_skip_goal_commission: {
+        Args: { p_actor: string; p_month: string; p_rule_id: string }
         Returns: undefined
       }
       finance_sync_order: { Args: { p_order_id: string }; Returns: undefined }
@@ -4159,7 +4323,7 @@ export type Database = {
           p_discount_type: string
           p_discount_value: number
           p_notes?: string
-          p_payment_method: string | null
+          p_payment_method: string
           p_tab_id: string
         }
         Returns: string
@@ -4170,9 +4334,24 @@ export type Database = {
         Args: { p_customer_id: string; p_notes?: string; p_opened_by: string }
         Returns: Json
       }
-      service_archive_restore_or_delete: {
-        Args: { p_action: string; p_actor: string; p_service_id: string }
-        Returns: string
+      pdv_reverse_sale_payment: {
+        Args: { p_actor_id: string; p_reason: string; p_sale_id: string }
+        Returns: undefined
+      }
+      pdv_settle_sale: {
+        Args: {
+          p_account_id?: string
+          p_actor_id: string
+          p_fx_rate?: number
+          p_fx_reference_date?: string
+          p_fx_reference_rate?: number
+          p_fx_source?: string
+          p_paid_at: string
+          p_sale_id: string
+          p_settled_amount_cents: number
+          p_settled_currency: string
+        }
+        Returns: undefined
       }
       pdv_update_tab_item_qty: {
         Args: { p_actor_id: string; p_item_id: string; p_qty: number }
@@ -4182,24 +4361,9 @@ export type Database = {
         Args: { p_admin_id: string; p_reason: string; p_sale_id: string }
         Returns: undefined
       }
-      pdv_settle_sale: {
-        Args: {
-          p_sale_id: string
-          p_actor_id: string
-          p_paid_at: string
-          p_settled_amount_cents: number
-          p_settled_currency: string
-          p_account_id?: string | null
-          p_fx_reference_rate?: number | null
-          p_fx_reference_date?: string | null
-          p_fx_rate?: number | null
-          p_fx_source?: string | null
-        }
-        Returns: undefined
-      }
-      pdv_reverse_sale_payment: {
-        Args: { p_sale_id: string; p_actor_id: string; p_reason: string }
-        Returns: undefined
+      service_archive_restore_or_delete: {
+        Args: { p_action: string; p_actor: string; p_service_id: string }
+        Returns: string
       }
     }
     Enums: {

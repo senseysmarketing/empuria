@@ -100,6 +100,16 @@ import { CrmAutomationsTab } from "@/components/admin/CrmAutomationsTab";
 import { CrmInboxConversations } from "@/components/admin/CrmInboxConversations";
 
 export const Route = createFileRoute("/_authenticated/admin/crm")({
+  head: () => ({
+    meta: [
+      { title: "CRM | Instituto Empuria" },
+      { name: "description", content: "Gestão de leads e atendimentos do Instituto Empuria." },
+      { property: "og:title", content: "CRM | Instituto Empuria" },
+      { property: "og:description", content: "Gestão de leads e atendimentos do Instituto Empuria." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: CrmPage,
 });
 
@@ -1097,16 +1107,18 @@ function LeadDialog({
 
   return (
     <Dialog open={Boolean(lead)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto bg-admin-surface sm:max-w-4xl">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] overflow-y-auto bg-admin-surface sm:max-w-4xl [&>button]:top-5">
+        <Badge className={`absolute right-12 top-4 h-6 whitespace-nowrap ${temp.cls}`}>
+          {temp.label}
+        </Badge>
+        <DialogHeader className="pr-32">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <DialogTitle className="font-display text-2xl">{lead.full_name}</DialogTitle>
+            <div className="min-w-0">
+              <DialogTitle className="break-words font-display text-2xl">{lead.full_name}</DialogTitle>
               <DialogDescription>
                 Criado em {formatDateTime(lead.created_at)} · origem {lead.source || "site"}
               </DialogDescription>
             </div>
-            <Badge className={temp.cls}>{temp.label}</Badge>
           </div>
         </DialogHeader>
 
