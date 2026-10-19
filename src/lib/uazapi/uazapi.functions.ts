@@ -2,7 +2,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireModule } from "@/lib/admin/auth";
-import type { Json } from "@/integrations/supabase/types";
 import {
   normalizePhone as normalizeE164Phone,
   phoneToWhatsAppJid,
@@ -12,7 +11,9 @@ import {
   confirmedInstanceWebhook,
   equalSecret,
   redactUazapiValue,
+  receiptRank,
   uazapiEventType,
+  uazapiMessageTime,
 } from "@/lib/uazapi/uazapi.webhook";
 
 
@@ -61,13 +62,14 @@ type ProcessResult = {
 
 const db = supabaseAdmin as unknown as {
   from: (table: string) => any;
+  rpc: (name: string, args: Record<string, unknown>) => any;
 };
 
 const DEFAULT_UAZAPI_BASE_URL = "https://senseys.uazapi.com";
 const DEFAULT_INSTANCE_NAME = "instituto-empuria";
 const PUBLIC_WEBHOOK_URL = "https://institutoempuria.net/api/webhooks/uazapi";
-const UAZAPI_EVENTS = ["messages", "messages_update", "connection"] as const;
-const UAZAPI_EXCLUDED_MESSAGES = ["wasSentByApi", "isGroupYes"] as const;
+const UAZAPI_EVENTS = ["messages", "messages_update", "connection", "chats"] as const;
+const UAZAPI_EXCLUDED_MESSAGES = ["isGroupYes"] as const;
 
 function nowIso() {
   return new Date().toISOString();
@@ -149,10 +151,6 @@ function firstObjectWithMessageShape(value: unknown): Record<string, unknown> | 
     }
   }
   return null;
-}
-
-function safeJson(value: unknown): Json {
-  return JSON.parse(JSON.stringify(value ?? {})) as Json;
 }
 
 function publicSetting(setting: UazapiSetting) {
@@ -572,14 +570,17 @@ function parseWebhookPayload(payload: Record<string, unknown>, fallbackEventId: 
   const message = firstObjectWithMessageShape(payload);
   const eventType = uazapiEventType(payload, Boolean(message));
   const providerEventId =
-    (eventType === "connection" ? asString(payload.event_id) : null) ??
+    (eventType !== "messages" ? asString(payload.event_id) ?? fallbackEventId : null) ??
     asString(message?.messageid) ??
     asString(payload.id) ??
     asString(payload.event_id) ??
     fallbackEventId;
   const chatId = asString(message?.chatid) ?? asString(deepFind(payload, ["chatid", "wa_chatid"]));
   const sender = asString(message?.sender) ?? asString(deepFind(payload, ["sender", "from"]));
-  const rawDigits = phoneFromChat(sender) ?? phoneFromChat(chatId);
+  const individualChat = chatId && /@(s\.whatsapp\.net|c\.us)$/.test(chatId);
+  const rawDigits = (individualChat ? phoneFromChat(chatId) : null) ??
+    phoneFromChat(asString(message?.sender_pn)) ??
+    (!chatId ? phoneFromChat(sender) : null);
   const phoneE164 = toE164FromRaw(rawDigits);
   return {
     eventType,
@@ -605,171 +606,36 @@ function parseWebhookPayload(payload: Record<string, unknown>, fallbackEventId: 
       asString(message?.text) ??
       asString(deepFind(payload, ["text", "conversation", "caption", "body"])) ??
       null,
+    sentAt: uazapiMessageTime(message?.messageTimestamp, nowIso()),
+    clientRequestId: (() => {
+      const value = asString(message?.track_id) ?? asString(payload.track_id);
+      return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) ? value : null;
+    })(),
   };
 }
 
-async function findLeadByPhone(phone: string | null) {
-  if (!phone) return null;
-  const { data, error } = await db
-    .from("leads")
-    .select("id, full_name, phone")
-    .order("created_at", { ascending: false })
-    .limit(800);
+export async function ingestUazapiMessage(parsed: ReturnType<typeof parseWebhookPayload>) {
+  if (!asString(parsed.message?.messageid))
+    return { status: "ignored", reason: "Mensagem sem ID de provedor." };
+  if (!parsed.phone || parsed.isGroup || parsed.chatId?.includes("@g.us") || parsed.chatId?.includes("@broadcast"))
+    return { status: "ignored", reason: "Conversa individual nao identificada." };
+  const storedPhone = parsed.phoneE164 ?? parsed.phone;
+  const digits = storedPhone.replace(/\D/g, "");
+  if (digits.length < 8) return { status: "ignored", reason: "Telefone nao identificado." };
+  const { data, error } = await db.rpc("crm_inbox_ingest", {
+    p_chat_id: `wa:${digits}`,
+    p_phone: storedPhone,
+    p_name: parsed.senderName,
+    p_provider_message_id: parsed.providerEventId,
+    p_direction: parsed.fromMe ? "outbound" : "inbound",
+    p_type: parsed.messageType,
+    p_body: parsed.body,
+    p_sent_at: parsed.sentAt,
+    p_status: parsed.fromMe ? (parsed.wasSentByApi ? "sent" : "manual_sent") : "received",
+    p_client_request_id: parsed.clientRequestId,
+  });
   if (error) throw new Error(error.message);
-  const target =
-    normalizeE164Phone(phone) ?? normalizeE164Phone(phone, "BR") ?? phone;
-  return ((data ?? []) as Array<{ id: string; full_name: string; phone: string | null }>).find(
-    (lead) => {
-      const leadE164 =
-        normalizeE164Phone(lead.phone) ?? normalizeE164Phone(lead.phone, "BR");
-      return leadE164 === target;
-    },
-  );
-}
-
-async function recordInboundMessage(
-  parsed: ReturnType<typeof parseWebhookPayload>,
-  payload: Record<string, unknown>,
-) {
-  if (!parsed.phone) return { status: "ignored", reason: "Telefone nao identificado." };
-  if (parsed.fromMe || parsed.wasSentByApi || parsed.isGroup) {
-    return { status: "ignored", reason: "Mensagem enviada pela propria instancia, API ou grupo." };
-  }
-
-  const lead = await findLeadByPhone(parsed.phone);
-  const storedPhone = parsed.phoneE164 ?? parsed.phone;
-  const chatIdFallback = parsed.chatId ?? `wa:${parsed.rawDigits ?? storedPhone.replace(/\D/g, "")}`;
-  const inboxInsert = {
-    provider: "whatsapp",
-    provider_message_id: parsed.providerEventId,
-    provider_chat_id: chatIdFallback,
-    from_phone: storedPhone,
-    from_name: parsed.senderName,
-    message_type: parsed.messageType,
-    body: parsed.body,
-    raw_payload: payload,
-    matched_lead_id: lead?.id ?? null,
-    status: lead?.id ? "linked" : "received",
-  };
-  const { data: inbox, error: inboxError } = await db
-    .from("crm_inbox_messages")
-    .insert(inboxInsert)
-    .select("id")
-    .single();
-  if (inboxError) {
-    if (inboxError.code === "23505") return { status: "duplicate", reason: "Mensagem duplicada." };
-    throw new Error(inboxError.message);
-  }
-
-  if (!lead?.id) return { status: "received", inboxId: inbox.id as string };
-
-  const receivedAt = nowIso();
-  const { data: conversation, error: conversationError } = await db
-    .from("crm_conversations")
-    .upsert(
-      {
-        lead_id: lead.id,
-        provider: "whatsapp",
-        provider_chat_id: chatIdFallback,
-        phone: storedPhone,
-        last_message_at: receivedAt,
-        last_inbound_at: receivedAt,
-      },
-      { onConflict: "provider,provider_chat_id" },
-    )
-    .select("id")
-    .single();
-  if (conversationError) throw new Error(conversationError.message);
-
-  const { error: messageError } = await db.from("crm_messages").insert({
-    lead_id: lead.id,
-    conversation_id: conversation.id,
-    direction: "inbound",
-    provider: "whatsapp",
-    provider_message_id: parsed.providerEventId,
-    body: parsed.body,
-    message_type: parsed.messageType,
-    status: "received",
-    created_at: receivedAt,
-  });
-  if (messageError) {
-    if (messageError.code !== "23505") throw new Error(messageError.message);
-  }
-
-  await db
-    .from("leads")
-    .update({ last_inbound_at: receivedAt, last_interaction_at: receivedAt })
-    .eq("id", lead.id);
-
-  return { status: "processed", inboxId: inbox.id as string, leadId: lead.id };
-}
-
-async function recordManualOutboundMessage(
-  parsed: ReturnType<typeof parseWebhookPayload>,
-  payload: Record<string, unknown>,
-) {
-  if (!parsed.phone) return { status: "ignored", reason: "Telefone nao identificado." };
-  if (!parsed.fromMe || parsed.wasSentByApi || parsed.isGroup) {
-    return { status: "ignored", reason: "Nao e uma mensagem manual de saida." };
-  }
-
-  const lead = await findLeadByPhone(parsed.phone);
-  if (!lead?.id) return { status: "ignored", reason: "Mensagem manual sem lead associado." };
-
-  const sentAt = nowIso();
-  const storedPhone = parsed.phoneE164 ?? parsed.phone;
-  const chatIdFallback = parsed.chatId ?? `wa:${parsed.rawDigits ?? storedPhone.replace(/\D/g, "")}`;
-  const { data: conversation, error: conversationError } = await db
-    .from("crm_conversations")
-    .upsert(
-      {
-        lead_id: lead.id,
-        provider: "whatsapp",
-        provider_chat_id: chatIdFallback,
-        phone: storedPhone,
-        last_message_at: sentAt,
-        last_outbound_at: sentAt,
-      },
-      { onConflict: "provider,provider_chat_id" },
-    )
-    .select("id")
-    .single();
-  if (conversationError) throw new Error(conversationError.message);
-
-  const { error: messageError } = await db.from("crm_messages").insert({
-    lead_id: lead.id,
-    conversation_id: conversation.id,
-    direction: "outbound",
-    provider: "whatsapp",
-    provider_message_id: parsed.providerEventId,
-    body: parsed.body,
-    message_type: parsed.messageType,
-    status: "manual_sent",
-    created_at: sentAt,
-  });
-  if (messageError) {
-    if (messageError.code === "23505") return { status: "duplicate", reason: "Mensagem duplicada." };
-    throw new Error(messageError.message);
-  }
-
-  await Promise.all([
-    db
-      .from("leads")
-      .update({ last_outbound_at: sentAt, last_interaction_at: sentAt })
-      .eq("id", lead.id),
-    db.from("lead_activity_log").insert({
-      lead_id: lead.id,
-      kind: "message_outbound",
-      payload: {
-        provider: "whatsapp",
-        source: "manual_whatsapp",
-        raw_payload: safeJson(payload),
-      },
-      actor_id: null,
-    }),
-  ]);
-
-  return { status: "processed", leadId: lead.id };
+  return { status: data?.[0]?.inserted ? "processed" : "duplicate" };
 }
 
 export async function processUazapiWebhook(
@@ -825,10 +691,45 @@ export async function processUazapiWebhook(
       return { ok: true, status: "processed", eventId };
     }
 
-    const result =
-      parsed.fromMe && !parsed.wasSentByApi && !parsed.isGroup
-        ? await recordManualOutboundMessage(parsed, safePayload)
-        : await recordInboundMessage(parsed, safePayload);
+    let result: { status: string; reason?: string };
+    if (parsed.eventType === "messages_update") {
+      const event = payload.event as Record<string, unknown> | undefined;
+      const ids = Array.isArray(event?.MessageIDs) ? event.MessageIDs.filter((id): id is string => typeof id === "string") : [];
+      const status = asString(payload.state) ?? asString(event?.Type);
+      if (event?.IsGroup === true || !status || !ids.length) {
+        result = { status: "ignored", reason: "Recibo sem mensagem individual." };
+      } else {
+        const { data: rows, error } = await db.from("crm_messages")
+          .select("id, status, provider_message_id")
+          .eq("provider", "whatsapp").in("provider_message_id", ids);
+        if (error) throw new Error(error.message);
+        for (const row of rows ?? []) {
+          if (receiptRank(status) > receiptRank(row.status)) {
+            const { error: updateError } = await db.from("crm_messages")
+              .update({ status }).eq("id", row.id).eq("status", row.status);
+            if (updateError) throw new Error(updateError.message);
+          }
+        }
+        result = { status: "processed" };
+      }
+    } else if (parsed.eventType === "chats") {
+      const chat = payload.chat as Record<string, unknown> | undefined;
+      const jid = asString(chat?.wa_chatid);
+      const digits = phoneFromChat(jid);
+      if (chat?.wa_isGroup || !digits || !jid?.endsWith("@s.whatsapp.net")) {
+        result = { status: "ignored", reason: "Chat nao individual." };
+      } else {
+        const { error } = await db.from("crm_conversations")
+          .update({ contact_name: asString(chat?.name) ?? asString(chat?.wa_name) })
+          .eq("provider", "whatsapp").eq("provider_chat_id", `wa:${digits}`);
+        if (error) throw new Error(error.message);
+        result = { status: "processed" };
+      }
+    } else if (parsed.eventType === "messages") {
+      result = await ingestUazapiMessage(parsed);
+    } else {
+      result = { status: "ignored", reason: "Evento nao suportado." };
+    }
     await db
       .from("integration_events")
       .update({
@@ -882,8 +783,8 @@ export async function sendUazapiTextInternal({
     body: {
       number: phone,
       text,
-      readchat: true,
-      readmessages: true,
+      readchat: false,
+      readmessages: false,
       track_source: "empuria_crm",
       track_id: trackId ?? undefined,
       async: false,
@@ -891,8 +792,76 @@ export async function sendUazapiTextInternal({
   });
   return {
     providerMessageId:
-      asString(deepFind(response, ["messageid", "messageId", "id"])) ?? trackId ?? null,
+      asString(deepFind(response, ["messageid", "messageId", "id"])),
     status: asString(deepFind(response, ["status", "response"])) ?? "sent",
     raw: redactUazapiValue(response),
   };
+}
+
+export async function getUazapiInboxConnectionInternal() {
+  const setting = await getUazapiSetting(true);
+  return {
+    connected: setting.is_enabled && setting.uazapi_connection_status === "connected",
+    status: setting.uazapi_connection_status,
+  };
+}
+
+export async function syncUazapiInboxPageInternal(offset: number) {
+  const setting = await getUazapiSetting(true);
+  if (!setting.is_enabled || setting.uazapi_connection_status !== "connected")
+    throw new Error("Conecte o WhatsApp antes de sincronizar.");
+  const response = await uazapiFetch<unknown>(setting, "/chat/find", {
+    auth: "instance", method: "POST", body: { limit: 10, offset },
+  });
+  const wrapper = response && typeof response === "object" ? response as Record<string, unknown> : {};
+  const chats = Array.isArray(response) ? response : wrapper.chats;
+  if (!Array.isArray(chats)) throw new Error("Formato da lista de chats Uazapi nao reconhecido.");
+  let imported = 0;
+  for (const item of chats) {
+    if (!item || typeof item !== "object") continue;
+    const chat = item as Record<string, unknown>;
+    const jid = asString(chat.wa_chatid);
+    const phone = phoneFromChat(jid);
+    if (!jid?.endsWith("@s.whatsapp.net") || !phone || chat.wa_isGroup === true) continue;
+    const messages = await uazapiFetch<unknown>(setting, "/message/find", {
+      auth: "instance", method: "POST", body: { chatid: jid, limit: 20, offset: 0 },
+    });
+    const messageWrapper = messages && typeof messages === "object" ? messages as Record<string, unknown> : {};
+    const page = Array.isArray(messages) ? messages : messageWrapper.messages;
+    if (!Array.isArray(page)) throw new Error("Formato das mensagens Uazapi nao reconhecido.");
+    for (const row of page) {
+      if (!row || typeof row !== "object") continue;
+      const parsed = parseWebhookPayload({ EventType: "messages", message: row }, crypto.randomUUID());
+      if (!parsed.message || !asString(parsed.message.messageid)) continue;
+      const result = await ingestUazapiMessage({ ...parsed, chatId: jid, phone: toE164FromRaw(phone) ?? phone });
+      if (result.status === "processed") imported += 1;
+    }
+  }
+  const pagination = wrapper.pagination as Record<string, unknown> | undefined;
+  return { imported, nextOffset: pagination?.hasMore === true || (!pagination && chats.length === 10) ? Number(pagination?.nextOffset ?? offset + 10) : null };
+}
+
+export async function syncUazapiConversationPageInternal(chatId: string, offset: number) {
+  const setting = await getUazapiSetting(true);
+  if (!setting.is_enabled || setting.uazapi_connection_status !== "connected")
+    throw new Error("Conecte o WhatsApp antes de sincronizar.");
+  const phone = chatId.match(/^wa:([0-9]{8,20})$/)?.[1];
+  if (!phone) throw new Error("Conversa invalida.");
+  const jid = `${phone}@s.whatsapp.net`;
+  const response = await uazapiFetch<unknown>(setting, "/message/find", {
+    auth: "instance", method: "POST", body: { chatid: jid, limit: 20, offset },
+  });
+  const wrapper = response && typeof response === "object" ? response as Record<string, unknown> : {};
+  const page = Array.isArray(response) ? response : wrapper.messages;
+  if (!Array.isArray(page)) throw new Error("Formato das mensagens Uazapi nao reconhecido.");
+  let imported = 0;
+  for (const row of page) {
+    if (!row || typeof row !== "object") continue;
+    const parsed = parseWebhookPayload({ EventType: "messages", message: row }, crypto.randomUUID());
+    if (!parsed.message || !asString(parsed.message.messageid)) continue;
+    const result = await ingestUazapiMessage({ ...parsed, chatId: jid, phone: toE164FromRaw(phone) ?? phone });
+    if (result.status === "processed") imported += 1;
+  }
+  const pagination = wrapper.pagination as Record<string, unknown> | undefined;
+  return { imported, nextOffset: pagination?.hasMore === true || (!pagination && page.length === 20) ? Number(pagination?.nextOffset ?? offset + 20) : null };
 }

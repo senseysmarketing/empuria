@@ -5,7 +5,9 @@ import {
   confirmedInstanceWebhook,
   equalSecret,
   redactUazapiValue,
+  receiptRank,
   uazapiEventType,
+  uazapiMessageTime,
 } from "./uazapi.webhook.ts";
 
 const expected = {
@@ -21,6 +23,21 @@ test("connection EventType wins over Disconnected transition type", () => {
     "connection",
   );
   assert.equal(uazapiEventType({ event: "messages" }, true), "messages");
+  assert.equal(
+    uazapiEventType({ EventType: "messages_update", type: "ReadReceipt" }, true),
+    "messages_update",
+  );
+  assert.equal(uazapiEventType({ EventType: "chats", chat: {} }, false), "chats");
+});
+
+test("provider timestamp and receipt progression tolerate out-of-order events", () => {
+  assert.equal(
+    uazapiMessageTime(1_760_000_000_000, "fallback"),
+    new Date(1_760_000_000_000).toISOString(),
+  );
+  assert.equal(uazapiMessageTime("invalid", "fallback"), "fallback");
+  assert.ok(receiptRank("Read") > receiptRank("Delivered"));
+  assert.ok(receiptRank("Delivered") > receiptRank("Sent"));
 });
 
 test("webhook payload must match the configured instance when identity is present", () => {

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireModule } from "./auth";
 import { startMatchingCrmAutomationsForLead } from "./crm-automations.functions";
 import { sendUazapiTextInternal } from "@/lib/uazapi/uazapi.functions";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   normalizePhone as normalizeE164Phone,
   phoneToWhatsAppJid,
@@ -329,10 +330,7 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
         .select("id", { count: "exact", head: true })
         .eq("status", "pending")
         .lte("due_at", todayEnd.toISOString()),
-      db
-        .from("crm_inbox_messages")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["received", "suggested"]),
+      (supabaseAdmin as any).rpc("crm_inbox_unread_total"),
       db
         .from("leads")
         .select("id", { count: "exact", head: true })
@@ -354,7 +352,7 @@ export const listCrmWorkspace = createServerFn({ method: "GET" })
       metrics: {
         mine: mineRes.count ?? 0,
         followups: followupsRes.count ?? 0,
-        inbox: inboxRes.count ?? 0,
+        inbox: Number(inboxRes.data ?? 0),
         late: lateRes.count ?? 0,
       },
     };
