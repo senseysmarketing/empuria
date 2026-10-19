@@ -456,6 +456,7 @@ function CrmPage() {
         leadId={selectedLeadId}
         users={data.users}
         columns={data.columns}
+        archivedColumns={data.archivedColumns}
         onClose={() => setSelectedLeadId(null)}
         onViewConversation={(conversationId) => {
           setSelectedLeadId(null);
@@ -1002,6 +1003,7 @@ function LeadDialog({
   leadId,
   users,
   columns,
+  archivedColumns,
   onClose,
   onViewConversation,
   onCreateFollowup,
@@ -1009,6 +1011,7 @@ function LeadDialog({
   leadId: string | null;
   users: Workspace["users"];
   columns: CrmColumn[];
+  archivedColumns: CrmColumn[];
   onClose: () => void;
   onViewConversation: (conversationId: string) => void;
   onCreateFollowup: (lead: Lead) => void;
@@ -1090,6 +1093,7 @@ function LeadDialog({
     `Ola ${lead.full_name.split(" ")[0]}, aqui e da equipe do Instituto Empuria. Podemos falar sobre seu atendimento?`,
   );
   const waUrl = `https://wa.me/${phoneDigits}?text=${waText}`;
+  const archivedColumn = archivedColumns.find((column) => column.id === lead.crm_column_id);
 
   return (
     <Dialog open={Boolean(lead)} onOpenChange={(open) => !open && onClose()}>
@@ -1240,24 +1244,30 @@ function LeadDialog({
               <label className="text-xs uppercase tracking-wider text-admin-ink-muted">
                 Coluna
               </label>
-              <Select
-                value={lead.crm_column_id ?? ""}
-                onValueChange={async (value) => {
-                  await updateColumn({ data: { leadId: lead.id, columnId: value } });
-                  qc.invalidateQueries({ queryKey: ["crm-workspace"] });
-                }}
-              >
-                <SelectTrigger className="mt-2 bg-admin-surface">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {columns.map((column) => (
-                    <SelectItem key={column.id} value={column.id}>
-                      {column.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {archivedColumn ? (
+                <p className="mt-2 text-sm text-admin-ink-muted">
+                  {archivedColumn.label} (arquivada). Restaure a coluna para mover este lead.
+                </p>
+              ) : (
+                <Select
+                  value={lead.crm_column_id ?? ""}
+                  onValueChange={async (value) => {
+                    await updateColumn({ data: { leadId: lead.id, columnId: value } });
+                    qc.invalidateQueries({ queryKey: ["crm-workspace"] });
+                  }}
+                >
+                  <SelectTrigger className="mt-2 bg-admin-surface">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {columns.map((column) => (
+                      <SelectItem key={column.id} value={column.id}>
+                        {column.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </section>
 
             <section className="rounded-xl border border-admin-border bg-admin-surface-2 p-3 text-sm text-admin-ink-muted">

@@ -530,6 +530,15 @@ export const updateCrmLeadColumn = createServerFn({ method: "POST" })
       ]);
     if (leadError) throw new Error(leadError.message);
     if (columnError) throw new Error("Coluna de destino indisponivel ou arquivada.");
+    if (lead.crm_column_id && lead.crm_column_id !== data.columnId) {
+      const { data: source, error: sourceError } = await db
+        .from("crm_columns")
+        .select("is_active")
+        .eq("id", lead.crm_column_id)
+        .single();
+      if (sourceError || !source?.is_active)
+        throw new Error("Restaure a coluna arquivada antes de mover seus leads.");
+    }
 
     const patch: Record<string, unknown> = {
       crm_column_id: data.columnId,
