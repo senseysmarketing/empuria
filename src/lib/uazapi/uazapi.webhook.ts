@@ -55,9 +55,26 @@ export function uazapiEventType(payload: Record<string, unknown>, hasMessage: bo
   const direct = [payload.EventType, payload.event, payload.event_type, payload.type].find(
     (value) =>
       typeof value === "string" &&
-      ["connection", "messages", "messages_update"].includes(value.toLowerCase()),
+      ["connection", "messages", "messages_update", "chats"].includes(value.toLowerCase()),
   );
   return typeof direct === "string" ? direct.toLowerCase() : hasMessage ? "messages" : "unknown";
+}
+
+export function uazapiMessageTime(value: unknown, fallback: string) {
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  const milliseconds = number < 10_000_000_000 ? number * 1000 : number;
+  const date = new Date(milliseconds);
+  return Number.isNaN(date.getTime()) ? fallback : date.toISOString();
+}
+
+export function receiptRank(status: string | null | undefined) {
+  const key = (status ?? "").toLowerCase();
+  if (["played", "read"].includes(key)) return 4;
+  if (key === "delivered") return 3;
+  if (["sent", "manual_sent"].includes(key)) return 2;
+  if (["queued", "pending", "sending"].includes(key)) return 1;
+  return 0;
 }
 
 export function belongsToUazapiInstance(

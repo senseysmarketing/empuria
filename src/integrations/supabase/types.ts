@@ -754,39 +754,51 @@ export type Database = {
       }
       crm_conversations: {
         Row: {
+          contact_name: string | null
           created_at: string
           id: string
           last_inbound_at: string | null
           last_message_at: string | null
           last_outbound_at: string | null
-          lead_id: string
+          last_preview: string | null
+          last_read_at: string | null
+          lead_id: string | null
           phone: string
           provider: string
           provider_chat_id: string | null
+          unread_count: number
           updated_at: string
         }
         Insert: {
+          contact_name?: string | null
           created_at?: string
           id?: string
           last_inbound_at?: string | null
           last_message_at?: string | null
           last_outbound_at?: string | null
-          lead_id: string
+          last_preview?: string | null
+          last_read_at?: string | null
+          lead_id?: string | null
           phone: string
           provider?: string
           provider_chat_id?: string | null
+          unread_count?: number
           updated_at?: string
         }
         Update: {
+          contact_name?: string | null
           created_at?: string
           id?: string
           last_inbound_at?: string | null
           last_message_at?: string | null
           last_outbound_at?: string | null
-          lead_id?: string
+          last_preview?: string | null
+          last_read_at?: string | null
+          lead_id?: string | null
           phone?: string
           provider?: string
           provider_chat_id?: string | null
+          unread_count?: number
           updated_at?: string
         }
         Relationships: [
@@ -1027,11 +1039,12 @@ export type Database = {
       crm_messages: {
         Row: {
           body: string | null
+          client_request_id: string | null
           conversation_id: string | null
           created_at: string
           direction: Database["public"]["Enums"]["crm_message_direction"]
           id: string
-          lead_id: string
+          lead_id: string | null
           message_type: string
           provider: string
           provider_message_id: string | null
@@ -1040,11 +1053,12 @@ export type Database = {
         }
         Insert: {
           body?: string | null
+          client_request_id?: string | null
           conversation_id?: string | null
           created_at?: string
           direction: Database["public"]["Enums"]["crm_message_direction"]
           id?: string
-          lead_id: string
+          lead_id?: string | null
           message_type?: string
           provider?: string
           provider_message_id?: string | null
@@ -1053,11 +1067,12 @@ export type Database = {
         }
         Update: {
           body?: string | null
+          client_request_id?: string | null
           conversation_id?: string | null
           created_at?: string
           direction?: Database["public"]["Enums"]["crm_message_direction"]
           id?: string
-          lead_id?: string
+          lead_id?: string | null
           message_type?: string
           provider?: string
           provider_message_id?: string | null

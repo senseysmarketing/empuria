@@ -1,0 +1,481 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  ArrowLeft,
+  Link2,
+  Loader2,
+  MessageCircle,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { createCrmLead, searchCrmLeads } from "@/lib/admin/crm.functions";
+import {
+  getCrmInboxConnection,
+  linkCrmConversationLead,
+  listCrmConversationMessages,
+  listCrmConversations,
+  markCrmConversationRead,
+  reconcileLegacyCrmInbox,
+  sendCrmInboxText,
+  syncCrmInboxChats,
+  syncCrmInboxHistory,
+} from "@/lib/admin/crm-inbox.functions";
+
+type Conversation = {
+  id: string;
+  lead_id: string | null;
+  provider_chat_id: string;
+  phone: string;
+  contact_name: string | null;
+  last_preview: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+};
+type Message = {
+  id: string;
+  direction: "inbound" | "outbound";
+  body: string | null;
+  message_type: string;
+  status: string | null;
+  created_at: string;
+};
+type LeadResult = { id: string; full_name: string; phone: string };
+
+export function CrmInboxConversations({ onOpenLead }: { onOpenLead: (leadId: string) => void }) {
+  const qc = useQueryClient();
+  const fetchConversations = useServerFn(listCrmConversations);
+  const fetchMessages = useServerFn(listCrmConversationMessages);
+  const connectionFn = useServerFn(getCrmInboxConnection);
+  const markReadFn = useServerFn(markCrmConversationRead);
+  const sendFn = useServerFn(sendCrmInboxText);
+  const syncChatsFn = useServerFn(syncCrmInboxChats);
+  const syncHistoryFn = useServerFn(syncCrmInboxHistory);
+  const createLeadFn = useServerFn(createCrmLead);
+  const searchLeadsFn = useServerFn(searchCrmLeads);
+  const linkLeadFn = useServerFn(linkCrmConversationLead);
+  const reconcileLegacyFn = useServerFn(reconcileLegacyCrmInbox);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [leadSearch, setLeadSearch] = useState("");
+  const [newLeadName, setNewLeadName] = useState("");
+  const [syncOffset, setSyncOffset] = useState(0);
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const sendingRef = useRef(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const conversationsQ = useInfiniteQuery({
+    queryKey: ["crm-inbox", "conversations", debouncedSearch, unreadOnly],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchConversations({ data: { offset: pageParam, search: debouncedSearch, unreadOnly } }),
+    getNextPageParam: (page) => page.nextOffset ?? undefined,
+    refetchInterval: 20000,
+  });
+  const conversations = useMemo(
+    () => (conversationsQ.data?.pages.flatMap((page) => page.items) ?? []) as Conversation[],
+    [conversationsQ.data],
+  );
+  const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
+  const messagesQ = useInfiniteQuery({
+    queryKey: ["crm-inbox", "messages", selectedId],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchMessages({ data: { conversationId: selectedId!, offset: pageParam } }),
+    getNextPageParam: (page) => page.nextOffset ?? undefined,
+    enabled: Boolean(selectedId),
+    refetchInterval: 12000,
+  });
+  const messages = useMemo(
+    () =>
+      ((messagesQ.data?.pages.flatMap((page) => page.items) ?? []) as Message[]).sort(
+        (a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+      ),
+    [messagesQ.data],
+  );
+  const connectionQ = useQuery({
+    queryKey: ["crm-inbox", "connection"],
+    queryFn: () => connectionFn(),
+    refetchInterval: 30000,
+  });
+  const legacyQ = useQuery({
+    queryKey: ["crm-inbox-legacy-reconcile"],
+    queryFn: () => reconcileLegacyFn(),
+    staleTime: 60_000,
+    retry: false,
+  });
+  useEffect(() => {
+    if (legacyQ.data?.imported) qc.invalidateQueries({ queryKey: ["crm-inbox", "conversations"] });
+  }, [legacyQ.data?.imported, qc]);
+  const leadResultsQ = useQuery({
+    queryKey: ["crm-inbox", "lead-search", leadSearch],
+    queryFn: () => searchLeadsFn({ data: { search: leadSearch } }) as Promise<LeadResult[]>,
+    enabled: linkOpen && leadSearch.trim().length >= 2,
+  });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["crm-inbox"] });
+    qc.invalidateQueries({ queryKey: ["crm-workspace"] });
+  };
+  const readMutation = useMutation({
+    mutationFn: (id: string) => markReadFn({ data: { conversationId: id } }),
+    onSuccess: refresh,
+    onError: () => toast.error("Nao foi possivel marcar a conversa como lida."),
+  });
+  const sendMutation = useMutation({
+    mutationFn: ({ text, requestId }: { text: string; requestId: string }) =>
+      sendFn({ data: { conversationId: selectedId!, text, requestId } }),
+    onSuccess: (result) => {
+      refresh();
+      setDraft("");
+      if (!result.ok)
+        toast.error("Resultado do envio incerto. Confira a conversa antes de tentar novamente.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel enviar."),
+    onSettled: () => {
+      sendingRef.current = false;
+    },
+  });
+  const submitMessage = () => {
+    if (sendingRef.current || !selectedId || !connectionQ.data?.connected || !draft.trim()) return;
+    sendingRef.current = true;
+    sendMutation.mutate({ text: draft.trim(), requestId: crypto.randomUUID() });
+  };
+  const syncMutation = useMutation({
+    mutationFn: () => syncChatsFn({ data: { offset: syncOffset } }),
+    onSuccess: (result) => {
+      setSyncOffset(result.nextOffset ?? 0);
+      refresh();
+      toast.success(`${result.imported} mensagem(ns) conciliada(s).`);
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Falha na sincronizacao."),
+  });
+  const historyMutation = useMutation({
+    mutationFn: () =>
+      syncHistoryFn({ data: { conversationId: selectedId!, offset: historyOffset } }),
+    onSuccess: (result) => {
+      setHistoryOffset(result.nextOffset ?? historyOffset);
+      refresh();
+      toast.success(`${result.imported} mensagem(ns) anterior(es) conciliada(s).`);
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Falha ao carregar historico anterior."),
+  });
+  const linkMutation = useMutation({
+    mutationFn: (leadId: string) => linkLeadFn({ data: { conversationId: selectedId!, leadId } }),
+    onSuccess: () => {
+      setLinkOpen(false);
+      refresh();
+      toast.success("Conversa vinculada ao lead.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Falha ao vincular lead."),
+  });
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const created = await createLeadFn({
+        data: { full_name: newLeadName, phone: selected!.phone, source: "whatsapp" },
+      });
+      await linkLeadFn({ data: { conversationId: selectedId!, leadId: created.id } });
+    },
+    onSuccess: () => {
+      setLinkOpen(false);
+      refresh();
+      toast.success("Lead criado e vinculado.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel criar o lead."),
+  });
+
+  return (
+    <div className="grid min-h-[620px] overflow-hidden rounded-xl border border-admin-border bg-admin-surface md:grid-cols-[minmax(280px,340px)_1fr]">
+      <div
+        className={`${selectedId ? "hidden md:flex" : "flex"} min-w-0 flex-col border-r border-admin-border`}
+      >
+        <div className="space-y-3 border-b border-admin-border p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-semibold">Conversas</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncMutation.mutate()}
+              disabled={!connectionQ.data?.connected || syncMutation.isPending}
+              title="Sincronizar proxima pagina de ate 10 chats"
+            >
+              {syncMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span className="ml-1">Sincronizar</span>
+            </Button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-admin-ink-muted" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar nome ou telefone"
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={unreadOnly ? "outline" : "default"}
+              onClick={() => setUnreadOnly(false)}
+            >
+              Todas
+            </Button>
+            <Button
+              size="sm"
+              variant={unreadOnly ? "default" : "outline"}
+              onClick={() => setUnreadOnly(true)}
+            >
+              Nao lidas
+            </Button>
+          </div>
+        </div>
+        <div className="max-h-[650px] flex-1 overflow-y-auto">
+          {conversationsQ.isLoading && (
+            <p className="p-4 text-sm text-admin-ink-muted">Carregando conversas...</p>
+          )}
+          {conversationsQ.isError && (
+            <p className="p-4 text-sm text-red-600">Erro ao carregar conversas.</p>
+          )}
+          {!conversationsQ.isLoading && !conversations.length && (
+            <p className="p-4 text-sm text-admin-ink-muted">Nenhuma conversa encontrada.</p>
+          )}
+          {conversations.map((conversation) => (
+            <button
+              key={conversation.id}
+              type="button"
+              onClick={() => {
+                setSelectedId(conversation.id);
+                setHistoryOffset(0);
+                if (conversation.unread_count) readMutation.mutate(conversation.id);
+              }}
+              className={`w-full border-b border-admin-border p-4 text-left hover:bg-admin-bg ${selectedId === conversation.id ? "bg-admin-bg" : ""}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-medium">
+                  {conversation.contact_name || conversation.phone}
+                </span>
+                <span className="shrink-0 text-xs text-admin-ink-muted">
+                  {conversation.last_message_at
+                    ? new Date(conversation.last_message_at).toLocaleDateString("pt-BR")
+                    : ""}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className="truncate text-sm text-admin-ink-muted">
+                  {conversation.last_preview || "Sem mensagens"}
+                </span>
+                {conversation.unread_count > 0 && <Badge>{conversation.unread_count}</Badge>}
+              </div>
+            </button>
+          ))}
+          {conversationsQ.hasNextPage && (
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => conversationsQ.fetchNextPage()}
+              disabled={conversationsQ.isFetchingNextPage}
+            >
+              Carregar mais conversas
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className={`${selectedId ? "flex" : "hidden md:flex"} min-w-0 flex-col`}>
+        {!selected ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-admin-ink-muted">
+            <MessageCircle className="h-10 w-10" />
+            <p>Selecione uma conversa para ver o historico.</p>
+          </div>
+        ) : (
+          <>
+            <header className="flex items-center justify-between gap-2 border-b border-admin-border p-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="md:hidden"
+                  onClick={() => setSelectedId(null)}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="min-w-0">
+                  <h3 className="truncate font-medium">
+                    {selected.contact_name || selected.phone}
+                  </h3>
+                  <p className="text-xs text-admin-ink-muted">{selected.phone}</p>
+                </div>
+              </div>
+              {selected.lead_id ? (
+                <Button size="sm" variant="outline" onClick={() => onOpenLead(selected.lead_id!)}>
+                  Ver lead
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setNewLeadName(selected.contact_name || "");
+                    setLinkOpen(true);
+                  }}
+                >
+                  <Link2 className="mr-1 h-4 w-4" /> Vincular lead
+                </Button>
+              )}
+            </header>
+            <div className="flex-1 space-y-3 overflow-y-auto bg-admin-bg p-4">
+              {messagesQ.hasNextPage && (
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => messagesQ.fetchNextPage()}
+                  disabled={messagesQ.isFetchingNextPage}
+                >
+                  Carregar mensagens anteriores
+                </Button>
+              )}
+              {connectionQ.data?.connected && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => historyMutation.mutate()}
+                  disabled={historyMutation.isPending}
+                >
+                  Conciliar historico anterior da Uazapi
+                </Button>
+              )}
+              {messagesQ.isLoading && (
+                <p className="text-sm text-admin-ink-muted">Carregando mensagens...</p>
+              )}
+              {messagesQ.isError && (
+                <p className="text-sm text-red-600">Erro ao carregar mensagens.</p>
+              )}
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-xl px-3 py-2 text-sm shadow-sm ${message.direction === "outbound" ? "bg-admin-accent text-white" : "bg-admin-surface text-admin-ink"}`}
+                  >
+                    <p className="whitespace-pre-wrap break-words">
+                      {message.body || `[${message.message_type}]`}
+                    </p>
+                    <div className="mt-1 flex justify-end gap-2 text-[11px] opacity-75">
+                      <span>{new Date(message.created_at).toLocaleString("pt-BR")}</span>
+                      {message.direction === "outbound" && (
+                        <span>{message.status || "pendente"}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2 border-t border-admin-border p-3">
+              {!connectionQ.data?.connected && (
+                <p className="text-xs text-amber-700">
+                  WhatsApp desconectado. Conecte a Uazapi em Configuracoes para responder.
+                </p>
+              )}
+              <div className="flex items-end gap-2">
+                <Textarea
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  rows={2}
+                  placeholder="Escreva uma resposta manual..."
+                  disabled={!connectionQ.data?.connected || sendMutation.isPending}
+                />
+                <Button
+                  size="icon"
+                  onClick={submitMessage}
+                  disabled={!connectionQ.data?.connected || !draft.trim() || sendMutation.isPending}
+                  aria-label="Enviar mensagem"
+                >
+                  {sendMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lead desta conversa</DialogTitle>
+            <DialogDescription>
+              Vincule um lead existente ou crie um novo. O historico permanece nesta conversa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                value={leadSearch}
+                onChange={(event) => setLeadSearch(event.target.value)}
+                placeholder="Buscar lead por nome, telefone ou e-mail"
+              />
+              {leadResultsQ.data?.map((lead) => (
+                <Button
+                  key={lead.id}
+                  variant="outline"
+                  className="w-full justify-start truncate"
+                  onClick={() => linkMutation.mutate(lead.id)}
+                  disabled={linkMutation.isPending}
+                >
+                  {lead.full_name} · {lead.phone}
+                </Button>
+              ))}
+            </div>
+            <div className="border-t border-admin-border pt-4">
+              <Input
+                value={newLeadName}
+                onChange={(event) => setNewLeadName(event.target.value)}
+                placeholder="Nome do novo lead"
+              />
+              <Button
+                className="mt-2 w-full"
+                onClick={() => createMutation.mutate()}
+                disabled={newLeadName.trim().length < 2 || createMutation.isPending}
+              >
+                <Plus className="mr-1 h-4 w-4" /> Criar e vincular
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

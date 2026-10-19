@@ -16,16 +16,12 @@ import {
   createCrmFollowup,
   createCrmLead,
   deactivateCrmColumn,
-  ignoreCrmInboxMessage,
-  linkInboxToLead,
   getCrmLeadDetail,
   listCrmColumnLeads,
-  listCrmInboxMessages,
   listCrmWorkspace,
   logCrmWhatsappOpened,
   saveCrmColumn,
   saveCrmDistribution,
-  searchCrmLeads,
   sendCrmFollowupMessage,
   updateCrmFollowupStatus,
   updateCrmLeadColumn,
@@ -74,6 +70,7 @@ import type { LucideIcon } from "lucide-react";
 import { AdminStatCard, type AdminStatCardTone } from "@/components/admin/AdminStatCard";
 import { scoreLead, temperatureChip, temperatureOf } from "@/lib/leads/scoring";
 import { CrmAutomationsTab } from "@/components/admin/CrmAutomationsTab";
+import { CrmInboxConversations } from "@/components/admin/CrmInboxConversations";
 
 export const Route = createFileRoute("/_authenticated/admin/crm")({
   component: CrmPage,
@@ -155,16 +152,6 @@ type Followup = {
   canceled_reason: string | null;
   lead: Lead | null;
   assigned_user: CrmUser | null;
-};
-
-type InboxMessage = {
-  id: string;
-  from_phone: string;
-  from_name: string | null;
-  body: string | null;
-  status: string;
-  created_at: string;
-  matched_lead_id: string | null;
 };
 
 type Activity = {
@@ -397,7 +384,7 @@ function CrmPage() {
 
         {activeTab === "inbox" && (
           <TabsContent value="inbox" className="mt-0">
-            <InboxTab onOpenLead={setSelectedLeadId} />
+            <CrmInboxConversations onOpenLead={setSelectedLeadId} />
           </TabsContent>
         )}
 
@@ -582,190 +569,6 @@ function LeadCard({
         </div>
       </div>
     </button>
-  );
-}
-
-function InboxTab({ onOpenLead }: { onOpenLead: (leadId: string) => void }) {
-  const fetchMessages = useServerFn(listCrmInboxMessages);
-  const searchLeadsFn = useServerFn(searchCrmLeads);
-  const createLeadFn = useServerFn(createCrmLead);
-  const ignoreFn = useServerFn(ignoreCrmInboxMessage);
-  const linkFn = useServerFn(linkInboxToLead);
-  const qc = useQueryClient();
-  const [linkTarget, setLinkTarget] = useState<Record<string, string>>({});
-  const [leadSearch, setLeadSearch] = useState("");
-  const debouncedLeadSearch = useDebouncedValue(leadSearch, 300);
-  const {
-    data: messages = [],
-    isLoading,
-    isError,
-  } = useQuery<InboxMessage[]>({
-    queryKey: ["crm-workspace", "inbox"],
-    queryFn: () => fetchMessages() as Promise<InboxMessage[]>,
-    staleTime: 20_000,
-  });
-  const { data: leadResults = [], isFetching: isSearchingLeads } = useQuery<LeadSearchResult[]>({
-    queryKey: ["crm-workspace", "lead-search", debouncedLeadSearch],
-    queryFn: () =>
-      searchLeadsFn({ data: { search: debouncedLeadSearch } }) as Promise<LeadSearchResult[]>,
-    enabled: debouncedLeadSearch.trim().length >= 2,
-    staleTime: 20_000,
-  });
-
-  const createFromInbox = useMutation({
-    mutationFn: (message: InboxMessage) =>
-      createLeadFn({
-        data: {
-          full_name: message.from_name || message.from_phone,
-          phone: message.from_phone,
-          message: message.body || "",
-          source: "whatsapp",
-          inbox_message_id: message.id,
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Lead criado a partir da mensagem");
-      qc.invalidateQueries({ queryKey: ["crm-workspace"] });
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao criar lead"),
-  });
-
-  const ignore = useMutation({
-    mutationFn: (id: string) => ignoreFn({ data: { inboxId: id } }),
-    onSuccess: () => {
-      toast.success("Mensagem ignorada");
-      qc.invalidateQueries({ queryKey: ["crm-workspace"] });
-    },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao ignorar mensagem"),
-  });
-
-  const link = useMutation({
-    mutationFn: ({ inboxId, leadId }: { inboxId: string; leadId: string }) =>
-      linkFn({ data: { inboxId, leadId } }),
-    onSuccess: () => {
-      toast.success("Mensagem vinculada ao lead");
-      qc.invalidateQueries({ queryKey: ["crm-workspace"] });
-    },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Erro ao vincular mensagem"),
-  });
-
-  if (isLoading)
-    return (
-      <div className="rounded-xl border border-admin-border bg-admin-surface p-8 text-center text-sm text-admin-ink-muted">
-        Carregando inbox...
-      </div>
-    );
-  if (isError) return <CrmError message="Erro ao carregar o Inbox WhatsApp." />;
-  if (messages.length === 0)
-    return (
-      <EmptyState
-        title="Inbox vazio"
-        body="Novas conversas do WhatsApp aparecerao aqui quando a integracao estiver ativa."
-      />
-    );
-
-  return (
-    <div className="space-y-3">
-      <div className="rounded-xl border border-admin-border bg-admin-surface p-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-ink-muted" />
-          <Input
-            value={leadSearch}
-            onChange={(event) => setLeadSearch(event.target.value)}
-            placeholder="Buscar lead por nome, telefone ou e-mail para vincular..."
-            className="bg-admin-bg pl-9"
-          />
-        </div>
-        <p className="mt-1 text-xs text-admin-ink-muted">
-          {isSearchingLeads
-            ? "Buscando no servidor..."
-            : debouncedLeadSearch.length >= 2
-              ? `${leadResults.length} resultado(s)`
-              : "Digite ao menos 2 caracteres."}
-        </p>
-      </div>
-      {messages.map((message) => (
-        <article
-          key={message.id}
-          className="rounded-xl border border-admin-border bg-admin-surface p-4"
-        >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-medium text-admin-ink">
-                  {message.from_name || message.from_phone}
-                </h3>
-                <Badge variant="secondary">{message.status}</Badge>
-                <span className="text-xs text-admin-ink-muted">
-                  {formatDateTime(message.created_at)}
-                </span>
-              </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-admin-ink-soft">
-                {message.body || "Mensagem sem texto."}
-              </p>
-              {message.matched_lead_id && (
-                <Button
-                  variant="link"
-                  className="mt-2 h-auto p-0 text-admin-accent"
-                  onClick={() => onOpenLead(message.matched_lead_id!)}
-                >
-                  Abrir lead sugerido
-                </Button>
-              )}
-            </div>
-            <div className="flex min-w-72 flex-col gap-2">
-              <Button
-                size="sm"
-                onClick={() => createFromInbox.mutate(message)}
-                disabled={createFromInbox.isPending}
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" /> Criar lead
-              </Button>
-              <div className="flex gap-2">
-                <Select
-                  value={linkTarget[message.id] ?? ""}
-                  onValueChange={(value) =>
-                    setLinkTarget((old) => ({ ...old, [message.id]: value }))
-                  }
-                >
-                  <SelectTrigger className="h-9 bg-admin-bg">
-                    <SelectValue placeholder="Vincular a lead" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {leadResults.map((lead) => (
-                      <SelectItem key={lead.id} value={lead.id}>
-                        {lead.full_name} · {lead.phone}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!linkTarget[message.id] || link.isPending}
-                  onClick={() =>
-                    link.mutate({ inboxId: message.id, leadId: linkTarget[message.id] })
-                  }
-                >
-                  OK
-                </Button>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => ignore.mutate(message.id)}
-                disabled={ignore.isPending}
-              >
-                Ignorar
-              </Button>
-            </div>
-          </div>
-        </article>
-      ))}
-    </div>
   );
 }
 
