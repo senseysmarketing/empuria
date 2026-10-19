@@ -115,8 +115,45 @@ CREATE TRIGGER trg_zz_crm_guard_active_column
 BEFORE INSERT OR UPDATE OF crm_column_id ON public.leads
 FOR EACH ROW EXECUTE FUNCTION public.crm_guard_active_column();
 
+-- Existing staff table policies remain intact, but direct Data API writes must
+-- obey the same non-destructive invariants as the server RPCs.
+CREATE OR REPLACE FUNCTION public.crm_guard_column_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.type = 'system' OR OLD.is_locked THEN
+      RAISE EXCEPTION 'Coluna padrao nao pode ser excluida';
+    END IF;
+    IF EXISTS (SELECT 1 FROM public.leads WHERE crm_column_id = OLD.id) THEN
+      RAISE EXCEPTION 'Coluna com leads deve ser arquivada';
+    END IF;
+    RETURN OLD;
+  END IF;
+  IF OLD.type = 'system' OR OLD.is_locked THEN
+    IF (NEW.id, NEW.key, NEW.label, NEW.type, NEW.is_active, NEW.is_locked)
+       IS DISTINCT FROM
+       (OLD.id, OLD.key, OLD.label, OLD.type, OLD.is_active, OLD.is_locked) THEN
+      RAISE EXCEPTION 'Coluna padrao so pode mudar de ordem';
+    END IF;
+  ELSIF (NEW.id, NEW.key, NEW.type, NEW.is_locked)
+        IS DISTINCT FROM (OLD.id, OLD.key, OLD.type, OLD.is_locked) THEN
+    RAISE EXCEPTION 'Identidade da coluna nao pode ser alterada';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+CREATE TRIGGER trg_crm_guard_column_mutation
+BEFORE UPDATE OR DELETE ON public.crm_columns
+FOR EACH ROW EXECUTE FUNCTION public.crm_guard_column_mutation();
+
 REVOKE ALL ON FUNCTION public.crm_column_manage(text, uuid, text, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.crm_column_reorder(uuid[]) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.crm_guard_active_column() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.crm_guard_column_mutation() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.crm_column_manage(text, uuid, text, uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.crm_column_reorder(uuid[]) TO service_role;
