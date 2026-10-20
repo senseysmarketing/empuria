@@ -138,6 +138,7 @@ export function IntegracoesTab() {
   const [waQrCode, setWaQrCode] = useState<string | null>(null);
   const [waPairCode, setWaPairCode] = useState<string | null>(null);
   const [waActionError, setWaActionError] = useState<string | null>(null);
+  const [profileRetry, setProfileRetry] = useState(0);
 
   const mpQ = useQuery({
     queryKey: ["mercadopago-admin-overview"],
@@ -222,8 +223,12 @@ export function IntegracoesTab() {
     mutationFn: () => refreshWaStatus(),
     onSuccess: (result) => {
       setWaActionError(null);
-      setWaQrCode((current) => result.status === "connecting" ? result.qrcode ?? current : null);
-      setWaPairCode((current) => result.status === "connecting" ? result.paircode ?? current : null);
+      setWaQrCode((current) =>
+        result.status === "connecting" ? (result.qrcode ?? current) : null,
+      );
+      setWaPairCode((current) =>
+        result.status === "connecting" ? (result.paircode ?? current) : null,
+      );
       toast.success(
         result.status === "connected" ? "WhatsApp conectado" : "Status do WhatsApp atualizado",
       );
@@ -241,7 +246,8 @@ export function IntegracoesTab() {
       toast.success("WhatsApp desconectado");
       waQ.refetch();
     },
-    onError: (e) => setWaActionError(e instanceof Error ? e.message : "Erro ao desconectar WhatsApp"),
+    onError: (e) =>
+      setWaActionError(e instanceof Error ? e.message : "Erro ao desconectar WhatsApp"),
   });
 
   const mpSetting = mpQ.data?.setting as MercadoPagoSetting | undefined;
@@ -271,14 +277,48 @@ export function IntegracoesTab() {
   useEffect(() => {
     if (!waConfigOpen || waSetting?.uazapi_connection_status !== "connecting") return;
     const timer = window.setInterval(() => {
-      refreshWaStatus().then((result) => {
-        setWaQrCode((current) => result.status === "connecting" ? result.qrcode ?? current : null);
-        setWaPairCode((current) => result.status === "connecting" ? result.paircode ?? current : null);
-        void refetchWa();
-      }).catch(() => undefined);
+      refreshWaStatus()
+        .then((result) => {
+          setWaQrCode((current) =>
+            result.status === "connecting" ? (result.qrcode ?? current) : null,
+          );
+          setWaPairCode((current) =>
+            result.status === "connecting" ? (result.paircode ?? current) : null,
+          );
+          void refetchWa();
+        })
+        .catch(() => undefined);
     }, 12000);
     return () => window.clearInterval(timer);
   }, [waConfigOpen, waSetting?.uazapi_connection_status, refreshWaStatus, refetchWa]);
+
+  useEffect(() => {
+    if (!waConfigOpen) {
+      setProfileRetry(0);
+      return;
+    }
+    if (
+      waSetting?.uazapi_connection_status !== "connected" ||
+      (waSetting.uazapi_profile_name && waSetting.uazapi_phone) ||
+      profileRetry >= 4
+    )
+      return;
+    const timer = window.setTimeout(() => {
+      void refreshWaStatus()
+        .then(() => refetchWa())
+        .catch(() => undefined)
+        .finally(() => setProfileRetry((count) => count + 1));
+    }, [3000, 6000, 12000, 24000][profileRetry]);
+    return () => window.clearTimeout(timer);
+  }, [
+    waConfigOpen,
+    waSetting?.uazapi_connection_status,
+    waSetting?.uazapi_profile_name,
+    waSetting?.uazapi_phone,
+    profileRetry,
+    refreshWaStatus,
+    refetchWa,
+  ]);
 
   return (
     <div className="space-y-5">
@@ -717,22 +757,30 @@ function UazapiConfigDialog({
   webhookStatus: string;
 }) {
   const [confirmDisconnectOpen, setConfirmDisconnectOpen] = useState(false);
-  const qrExpired = Boolean(setting?.uazapi_last_qr_at &&
-    Date.now() - new Date(setting.uazapi_last_qr_at).getTime() > 120000);
+  const qrExpired = Boolean(
+    setting?.uazapi_last_qr_at &&
+    Date.now() - new Date(setting.uazapi_last_qr_at).getTime() > 120000,
+  );
   const qrSrc = qrCode && !qrExpired ? qrImageSrc(qrCode) : null;
   const connected = setting?.uazapi_connection_status === "connected";
   const connecting = setting?.uazapi_connection_status === "connecting";
-  const busy = generateQrMutation.isPending || refreshMutation.isPending ||
-    disconnectMutation.isPending;
+  const busy =
+    generateQrMutation.isPending || refreshMutation.isPending || disconnectMutation.isPending;
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next); }}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!busy) onOpenChange(next);
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto border-admin-border bg-admin-surface text-admin-ink sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Conexao WhatsApp</DialogTitle>
             <DialogDescription className="text-admin-ink-muted">
-              Escaneie o QR Code para conectar o numero. O modo de operacao permanece em sugestao/manual.
+              Escaneie o QR Code para conectar o numero. O modo de operacao permanece em
+              sugestao/manual.
             </DialogDescription>
           </DialogHeader>
 
@@ -747,13 +795,16 @@ function UazapiConfigDialog({
           </div>
 
           {error && (
-            <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+            <p
+              role="alert"
+              className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800"
+            >
               {error}
             </p>
           )}
 
-          <div className="rounded-xl border border-admin-border bg-admin-surface-2 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-xl border border-admin-border bg-admin-surface-2 p-4 text-center">
+            <div className="space-y-3">
               <div>
                 <Label className="font-display text-sm uppercase tracking-wide">
                   Conexao por QR Code
@@ -764,21 +815,23 @@ function UazapiConfigDialog({
                     : "Gere o QR Code e leia no WhatsApp. A conexao so sera confirmada pela Uazapi."}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {!connected && <Button
-                  type="button"
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => generateQrMutation.mutate()}
-                  disabled={busy}
-                >
-                  {generateQrMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <QrCode className="h-4 w-4" />
-                  )}
-                  Gerar QR Code
-                </Button>}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {!connected && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => generateQrMutation.mutate()}
+                    disabled={busy}
+                  >
+                    {generateQrMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <QrCode className="h-4 w-4" />
+                    )}
+                    Gerar QR Code
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -793,72 +846,84 @@ function UazapiConfigDialog({
                   )}
                   Atualizar
                 </Button>
-                {setting?.has_instance && setting.uazapi_connection_status !== "disconnected" && <Button
-                  type="button"
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => setConfirmDisconnectOpen(true)}
-                  disabled={busy}
-                >
-                  {disconnectMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Unplug className="h-4 w-4" />
-                  )}
-                  Desconectar
-                </Button>}
+                {setting?.has_instance && setting.uazapi_connection_status !== "disconnected" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => setConfirmDisconnectOpen(true)}
+                    disabled={busy}
+                  >
+                    {disconnectMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Unplug className="h-4 w-4" />
+                    )}
+                    Desconectar
+                  </Button>
+                )}
               </div>
             </div>
 
-            {(connecting || (pairCode && !connected)) && <div className="mt-4 flex flex-wrap items-center gap-4">
-              <div className="flex h-48 w-48 items-center justify-center rounded-xl border border-admin-border bg-white p-3">
-                {qrSrc ? (
-                  <img
-                    src={qrSrc}
-                    alt="QR Code de conexao Uazapi"
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <span className="text-center text-xs text-admin-ink-muted">
-                    {qrExpired ? "QR Code expirado. Gere outro." : "Aguardando QR Code"}
-                  </span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-2 text-sm text-admin-ink-muted">
-                <p>
-                  Status atual:{" "}
-                  <span className="font-medium text-admin-ink">
-                    {connectionStatus(setting?.uazapi_connection_status)}
-                  </span>
-                </p>
-                <p>
-                  Ultimo QR:{" "}
-                  <span className="font-medium text-admin-ink">
-                    {formatRelativeDate(setting?.uazapi_last_qr_at)}
-                  </span>
-                </p>
-                {pairCode && (
+            {(connecting || (pairCode && !connected)) && (
+              <div className="mt-5 flex flex-col items-center gap-3">
+                <div className="flex h-[min(72vw,280px)] w-[min(72vw,280px)] items-center justify-center rounded-xl border border-admin-border bg-white p-3">
+                  {qrSrc ? (
+                    <img
+                      src={qrSrc}
+                      alt="QR Code de conexao Uazapi"
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-center text-xs text-admin-ink-muted">
+                      {qrExpired ? "QR Code expirado. Gere outro." : "Aguardando QR Code"}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 space-y-2 text-sm text-admin-ink-muted">
                   <p>
-                    Codigo de pareamento:{" "}
-                    <span className="font-mono text-admin-ink">{pairCode}</span>
+                    Status atual:{" "}
+                    <span className="font-medium text-admin-ink">
+                      {connectionStatus(setting?.uazapi_connection_status)}
+                    </span>
                   </p>
-                )}
+                  <p>
+                    Ultimo QR:{" "}
+                    <span className="font-medium text-admin-ink">
+                      {formatRelativeDate(setting?.uazapi_last_qr_at)}
+                    </span>
+                  </p>
+                  {pairCode && (
+                    <p>
+                      Codigo de pareamento:{" "}
+                      <span className="font-mono text-admin-ink">{pairCode}</span>
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>}
+            )}
           </div>
         </DialogContent>
       </Dialog>
-      <AlertDialog open={confirmDisconnectOpen} onOpenChange={(next) => {
-        if (!disconnectMutation.isPending) setConfirmDisconnectOpen(next);
-      }}>
+      <AlertDialog
+        open={confirmDisconnectOpen}
+        onOpenChange={(next) => {
+          if (!disconnectMutation.isPending) setConfirmDisconnectOpen(next);
+        }}
+      >
         <AlertDialogContent className="border-admin-border bg-admin-surface text-admin-ink">
           <AlertDialogHeader>
             <AlertDialogTitle>Desconectar WhatsApp?</AlertDialogTitle>
             <AlertDialogDescription>
-              A instancia sera desconectada, mas a configuracao sera preservada para reconectar depois.
+              A instancia sera desconectada, mas a configuracao sera preservada para reconectar
+              depois.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-red-700">
+              {error}
+            </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={disconnectMutation.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
