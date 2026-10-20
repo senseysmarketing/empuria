@@ -1045,6 +1045,11 @@ export type Database = {
           direction: Database["public"]["Enums"]["crm_message_direction"]
           id: string
           lead_id: string | null
+          media_kind: string | null
+          media_mime: string | null
+          media_name: string | null
+          media_path: string | null
+          media_size: number | null
           message_type: string
           provider: string
           provider_message_id: string | null
@@ -1059,6 +1064,11 @@ export type Database = {
           direction: Database["public"]["Enums"]["crm_message_direction"]
           id?: string
           lead_id?: string | null
+          media_kind?: string | null
+          media_mime?: string | null
+          media_name?: string | null
+          media_path?: string | null
+          media_size?: number | null
           message_type?: string
           provider?: string
           provider_message_id?: string | null
@@ -1073,6 +1083,11 @@ export type Database = {
           direction?: Database["public"]["Enums"]["crm_message_direction"]
           id?: string
           lead_id?: string | null
+          media_kind?: string | null
+          media_mime?: string | null
+          media_name?: string | null
+          media_path?: string | null
+          media_size?: number | null
           message_type?: string
           provider?: string
           provider_message_id?: string | null
