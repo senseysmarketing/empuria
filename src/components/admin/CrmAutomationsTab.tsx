@@ -4,6 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  ArrowDown,
+  ArrowUp,
   Archive,
   BellOff,
   Bot,
@@ -24,9 +26,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  cancelCrmAutomationPendingAction,
   duplicateCrmAutomationFlow,
   listCrmAutomationWorkspace,
+  prepareCrmAutomationMedia,
   saveCrmAutomationFlow,
   updateCrmAutomationFlowStatus,
 } from "@/lib/admin/crm-automations.functions";
@@ -48,8 +50,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  allowedMediaMime,
+  INBOX_MEDIA_BUCKET,
+  MAX_INBOX_MEDIA_BYTES,
+  validMediaName,
+  type InboxMediaKind,
+} from "@/lib/uazapi/uazapi.media";
 
 type Step = {
   id?: string;
@@ -64,7 +73,7 @@ type Flow = {
   name: string;
   description: string | null;
   status: "active" | "paused" | "archived";
-  trigger_type: "lead_created" | "pipeline_stage_entered" | "inbound_message" | "manual";
+  trigger_type: "lead_created" | "pipeline_stage_entered" | "manual";
   trigger_config: Record<string, unknown>;
   stop_rules: Record<string, unknown>;
   schedule_window: Record<string, unknown>;
@@ -72,14 +81,6 @@ type Flow = {
   steps: Step[];
   activeExecutions: number;
   updated_at: string;
-};
-
-type PendingActionView = {
-  id: string;
-  run_at: string;
-  leads?: { full_name?: string | null; phone?: string | null } | null;
-  crm_automation_flows?: { name?: string | null } | null;
-  crm_automation_steps?: { title?: string | null; step_type?: string | null } | null;
 };
 
 type AutomationLogView = {
@@ -94,7 +95,7 @@ type AutomationLogView = {
 
 type Workspace = {
   flows: Flow[];
-  pendingActions: PendingActionView[];
+  columns: Array<{ id: string; label: string; key: string; type: string }>;
   logs: AutomationLogView[];
   metrics: {
     activeFlows: number;
@@ -124,12 +125,6 @@ const defaultSteps: Step[] = [
   { position: 2, step_type: "delay", title: "Aguardar 1 dia", config: { amount: 1, unit: "days" } },
   {
     position: 3,
-    step_type: "condition",
-    title: "Se nao respondeu",
-    config: { condition: "no_reply" },
-  },
-  {
-    position: 4,
     step_type: "send_whatsapp",
     title: "Retomada",
     config: {
@@ -137,7 +132,7 @@ const defaultSteps: Step[] = [
         "Oi, {{primeiro_nome}}. Passando para saber se voce conseguiu ver minha mensagem anterior. Posso te ajudar com os proximos passos?",
     },
   },
-  { position: 5, step_type: "end", title: "Encerrar", config: {} },
+  { position: 4, step_type: "end", title: "Encerrar", config: {} },
 ];
 
 export function CrmAutomationsTab() {
@@ -145,7 +140,6 @@ export function CrmAutomationsTab() {
   const saveFlow = useServerFn(saveCrmAutomationFlow);
   const updateStatus = useServerFn(updateCrmAutomationFlowStatus);
   const duplicateFlow = useServerFn(duplicateCrmAutomationFlow);
-  const cancelPending = useServerFn(cancelCrmAutomationPendingAction);
   const qc = useQueryClient();
   const [editingFlow, setEditingFlow] = useState<Flow | null>(null);
   const [creating, setCreating] = useState(false);
@@ -175,16 +169,6 @@ export function CrmAutomationsTab() {
       refresh();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao duplicar fluxo"),
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: (id: string) =>
-      cancelPending({ data: { id, reason: "Cancelado manualmente na central de automacoes." } }),
-    onSuccess: () => {
-      toast.success("Envio pendente cancelado.");
-      refresh();
-    },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao cancelar envio"),
   });
 
   const saveMutation = useMutation({
@@ -249,14 +233,8 @@ export function CrmAutomationsTab() {
             <Kpi icon={XCircle} label="Erros hoje" value={data.metrics.errorsToday} tone="danger" />
           </section>
 
-          <Tabs defaultValue="fluxos" className="space-y-4">
-            <TabsList className="bg-admin-surface border border-admin-border">
-              <TabsTrigger value="fluxos">Fluxos</TabsTrigger>
-              <TabsTrigger value="envios">Próximos envios</TabsTrigger>
-              <TabsTrigger value="logs">Logs</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="fluxos" className="mt-0">
+          <div className="space-y-6">
+            <section>
               {empty ? (
                 <EmptyState
                   onCreate={() => setCreating(true)}
@@ -276,26 +254,19 @@ export function CrmAutomationsTab() {
                   ))}
                 </div>
               )}
-            </TabsContent>
-
-            <TabsContent value="envios" className="mt-0">
-              <PendingList
-                items={data.pendingActions}
-                canCancel={data.permissions.canCancelPending}
-                onCancel={(id) => cancelMutation.mutate(id)}
-              />
-            </TabsContent>
-
-            <TabsContent value="logs" className="mt-0">
+            </section>
+            <section className="space-y-3">
+              <h2 className="font-display text-lg font-semibold">Eventos recentes</h2>
               <LogsList items={data.logs} />
-            </TabsContent>
-          </Tabs>
+            </section>
+          </div>
         </>
       ) : null}
 
       <FlowEditorDialog
         open={creating || Boolean(editingFlow)}
         flow={editingFlow}
+        columns={data?.columns ?? []}
         canManage={Boolean(data?.permissions.canManage)}
         saving={saveMutation.isPending}
         onClose={() => {
@@ -484,6 +455,7 @@ type FlowFormState = {
 function FlowEditorDialog({
   open,
   flow,
+  columns,
   canManage,
   saving,
   onClose,
@@ -491,6 +463,7 @@ function FlowEditorDialog({
 }: {
   open: boolean;
   flow: Flow | null;
+  columns: Workspace["columns"];
   canManage: boolean;
   saving: boolean;
   onClose: () => void;
@@ -551,6 +524,32 @@ function FlowEditorDialog({
     }));
   };
 
+  const insertStep = (index: number) =>
+    setDraft((current) => {
+      const steps = [...current.steps];
+      steps.splice(index + 1, 0, {
+        position: 0,
+        step_type: "send_whatsapp",
+        title: "Nova mensagem",
+        config: { message: "Oi, {primeiro_nome}." },
+      });
+      return {
+        ...current,
+        steps: steps.map((step, position) => ({ ...step, position: position + 1 })),
+      };
+    });
+  const moveStep = (index: number, direction: -1 | 1) =>
+    setDraft((current) => {
+      const destination = index + direction;
+      if (destination < 0 || destination >= current.steps.length) return current;
+      const steps = [...current.steps];
+      [steps[index], steps[destination]] = [steps[destination], steps[index]];
+      return {
+        ...current,
+        steps: steps.map((step, position) => ({ ...step, position: position + 1 })),
+      };
+    });
+
   const removeStep = (index: number) => {
     setDraft((current) => ({
       ...current,
@@ -562,7 +561,7 @@ function FlowEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>{flow ? "Editar fluxo" : "Novo fluxo"}</DialogTitle>
           <DialogDescription>
@@ -570,8 +569,8 @@ function FlowEditorDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="contents">
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Nome">
                 <Input
@@ -600,6 +599,50 @@ function FlowEditorDialog({
               </Field>
             </div>
 
+            {draft.trigger_type === "lead_created" && (
+              <Field label="Origem do lead">
+                <Select
+                  value={String(draft.trigger_config.source ?? "all")}
+                  onValueChange={(source) =>
+                    setDraft({ ...draft, trigger_config: { ...draft.trigger_config, source } })
+                  }
+                  disabled={!canManage}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="site">Site</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            {draft.trigger_type === "pipeline_stage_entered" && (
+              <Field label="Coluna de entrada">
+                <Select
+                  value={String(draft.trigger_config.column_id ?? "")}
+                  onValueChange={(column_id) =>
+                    setDraft({ ...draft, trigger_config: { ...draft.trigger_config, column_id } })
+                  }
+                  disabled={!canManage}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolha a coluna" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {columns.map((column) => (
+                      <SelectItem key={column.id} value={column.id}>
+                        {column.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+
             <Field label="Descrição">
               <Textarea
                 value={draft.description ?? ""}
@@ -609,7 +652,7 @@ function FlowEditorDialog({
               />
             </Field>
 
-            <div className="space-y-3 rounded-xl border border-admin-border bg-admin-bg p-4">
+            <div className="space-y-3 rounded-xl border border-admin-border bg-admin-bg p-4 lg:col-start-2 lg:row-start-1 lg:row-span-4 lg:max-h-[66vh] lg:overflow-y-auto">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="font-display text-lg font-semibold">Builder do fluxo</h3>
@@ -628,12 +671,15 @@ function FlowEditorDialog({
                 </Button>
               </div>
 
+              <div className="rounded-lg border border-dashed border-admin-accent/40 p-3 text-sm text-admin-ink-muted">
+                Gatilho: {triggerLabel(draft.trigger_type)}
+              </div>
               {draft.steps.map((step, index) => (
                 <div
                   key={`${step.id ?? "new"}-${index}`}
                   className="rounded-lg border border-admin-border bg-admin-surface p-3"
                 >
-                  <div className="grid gap-3 md:grid-cols-[150px_1fr_120px]">
+                  <div className="grid gap-3 md:grid-cols-[150px_1fr_auto]">
                     <Select
                       value={step.step_type}
                       onValueChange={(value) =>
@@ -657,42 +703,75 @@ function FlowEditorDialog({
                       onChange={(event) => updateStep(index, { title: event.target.value })}
                       disabled={!canManage}
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => removeStep(index)}
-                      disabled={!canManage || draft.steps.length <= 1}
-                    >
-                      Remover
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label="Subir bloco"
+                        onClick={() => moveStep(index, -1)}
+                        disabled={!canManage || index === 0}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label="Descer bloco"
+                        onClick={() => moveStep(index, 1)}
+                        disabled={!canManage || index === draft.steps.length - 1}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeStep(index)}
+                        disabled={!canManage || draft.steps.length <= 1}
+                      >
+                        Remover
+                      </Button>
+                    </div>
                   </div>
                   <StepConfigEditor
                     step={step}
+                    columns={columns}
                     disabled={!canManage}
                     onChange={(config) => updateStep(index, { config })}
                   />
+                  {index < draft.steps.length - 1 && (
+                    <div className="mt-3 border-l-2 border-admin-accent/40 pl-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => insertStep(index)}
+                        disabled={!canManage}
+                      >
+                        <Plus className="mr-1 h-3 w-3" /> Inserir bloco aqui
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
-          <aside className="space-y-4">
+          <aside className="space-y-4 lg:col-start-1 lg:row-start-4 lg:max-h-[48vh] lg:overflow-y-auto">
             <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
               <h3 className="font-display text-lg font-semibold">Status</h3>
-              <Select
-                value={draft.status}
-                onValueChange={(value) => setDraft({ ...draft, status: value as Flow["status"] })}
-                disabled={!canManage}
-              >
-                <SelectTrigger className="mt-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="paused">Pausado</SelectItem>
-                  <SelectItem value="active">Ativo</SelectItem>
-                  <SelectItem value="archived">Arquivado</SelectItem>
-                </SelectContent>
-              </Select>
+              <p className="mt-2 text-sm text-admin-ink-muted">
+                {flow
+                  ? `Atual: ${flow.status}. Ative ou pause pelo card após salvar.`
+                  : "Novos fluxos começam pausados e exigem ativação explícita."}
+              </p>
+              {flow && flow.activeExecutions > 0 && (
+                <p className="mt-2 text-xs text-red-brand">
+                  Há execução em andamento. Duplique este fluxo para editar seus blocos.
+                </p>
+              )}
             </div>
 
             <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
@@ -737,8 +816,50 @@ function FlowEditorDialog({
 
             <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
               <h3 className="font-display text-lg font-semibold">Janela de envio</h3>
+              <Field label="Fuso IANA">
+                <Input
+                  value={String(draft.schedule_window.timezone ?? "Europe/Madrid")}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      schedule_window: { ...draft.schedule_window, timezone: event.target.value },
+                    })
+                  }
+                  disabled={!canManage}
+                />
+              </Field>
+              <div className="mt-3 flex flex-wrap gap-1">
+                {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                  <Button
+                    key={day}
+                    type="button"
+                    size="sm"
+                    variant={
+                      ((draft.schedule_window.weekdays as number[]) ?? []).includes(day)
+                        ? "default"
+                        : "outline"
+                    }
+                    disabled={!canManage}
+                    onClick={() => {
+                      const weekdays = new Set((draft.schedule_window.weekdays as number[]) ?? []);
+                      if (weekdays.has(day)) weekdays.delete(day);
+                      else weekdays.add(day);
+                      setDraft({
+                        ...draft,
+                        schedule_window: {
+                          ...draft.schedule_window,
+                          weekdays: [...weekdays].sort(),
+                        },
+                      });
+                    }}
+                  >
+                    {["D", "S", "T", "Q", "Q", "S", "S"][day]}
+                  </Button>
+                ))}
+              </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <Input
+                  type="time"
                   value={String(draft.schedule_window.start ?? "09:00")}
                   onChange={(event) =>
                     setDraft({
@@ -749,6 +870,7 @@ function FlowEditorDialog({
                   disabled={!canManage}
                 />
                 <Input
+                  type="time"
                   value={String(draft.schedule_window.end ?? "18:00")}
                   onChange={(event) =>
                     setDraft({
@@ -767,7 +889,10 @@ function FlowEditorDialog({
           <Button variant="outline" onClick={onClose}>
             Fechar
           </Button>
-          <Button disabled={!canManage || saving} onClick={() => onSave(draft)}>
+          <Button
+            disabled={!canManage || saving || Boolean(flow?.activeExecutions)}
+            onClick={() => onSave(draft)}
+          >
             {saving ? "Salvando..." : "Salvar fluxo"}
           </Button>
         </div>
@@ -778,16 +903,60 @@ function FlowEditorDialog({
 
 function StepConfigEditor({
   step,
+  columns,
   disabled,
   onChange,
 }: {
   step: Step;
+  columns: Workspace["columns"];
   disabled: boolean;
   onChange: (config: Record<string, unknown>) => void;
 }) {
+  const prepareMedia = useServerFn(prepareCrmAutomationMedia);
+  const [uploading, setUploading] = useState(false);
+  const uploadMedia = async (file: File) => {
+    const kind: InboxMediaKind = file.type.startsWith("image/")
+      ? "image"
+      : file.type.startsWith("video/")
+        ? "video"
+        : file.type.startsWith("audio/")
+          ? "audio"
+          : "document";
+    if (
+      file.size > MAX_INBOX_MEDIA_BYTES ||
+      !allowedMediaMime(kind, file.type) ||
+      !validMediaName(file.name, file.type)
+    ) {
+      toast.error("Arquivo invalido ou maior que 16 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const signed = await prepareMedia({
+        data: { kind, mime: file.type, name: file.name, size: file.size },
+      });
+      const { error } = await supabase.storage
+        .from(INBOX_MEDIA_BUCKET)
+        .uploadToSignedUrl(signed.path, signed.token, file, { contentType: file.type });
+      if (error) throw new Error("Falha no upload privado.");
+      onChange({
+        ...step.config,
+        media_kind: kind,
+        media_path: signed.path,
+        media_mime: file.type,
+        media_name: file.name,
+        media_size: file.size,
+      });
+      toast.success("Midia anexada ao bloco.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao anexar midia.");
+    } finally {
+      setUploading(false);
+    }
+  };
   if (step.step_type === "send_whatsapp") {
     return (
-      <div className="mt-3">
+      <div className="mt-3 space-y-3">
         <Label className="text-xs uppercase tracking-wide text-admin-ink-muted">Mensagem</Label>
         <Textarea
           className="mt-1"
@@ -796,6 +965,44 @@ function StepConfigEditor({
           disabled={disabled}
           rows={4}
         />
+        <div className="rounded-lg border border-admin-border bg-admin-bg p-3 text-xs">
+          <Label>Anexo privado (imagem, MP4, áudio ou documento; até 16 MB)</Label>
+          <Input
+            className="mt-2"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,video/mp4,audio/ogg,audio/mpeg,audio/mp4,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain"
+            disabled={disabled || uploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void uploadMedia(file);
+              event.target.value = "";
+            }}
+          />
+          {uploading && <p className="mt-2 text-admin-ink-muted">Enviando anexo...</p>}
+          {Boolean(step.config.media_path) && (
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="truncate">{String(step.config.media_name ?? "Midia anexada")}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={disabled || uploading}
+                onClick={() => {
+                  const { media_kind, media_path, media_mime, media_name, media_size, ...rest } =
+                    step.config;
+                  void media_kind;
+                  void media_path;
+                  void media_mime;
+                  void media_name;
+                  void media_size;
+                  onChange(rest);
+                }}
+              >
+                Remover
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -843,18 +1050,120 @@ function StepConfigEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Registrar log</SelectItem>
-              <SelectItem value="move_stage">Mover etapa</SelectItem>
+              <SelectItem value="followup">Criar follow-up</SelectItem>
+              <SelectItem value="move_stage">Mover coluna</SelectItem>
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Etapa">
-          <Input
-            value={String(step.config.stage ?? "")}
-            onChange={(event) => onChange({ ...step.config, stage: event.target.value })}
-            disabled={disabled || step.config.action !== "move_stage"}
-            placeholder="em_contato"
-          />
+        {step.config.action === "move_stage" ? (
+          <Field label="Coluna ativa">
+            <Select
+              value={String(step.config.column_id ?? "")}
+              onValueChange={(column_id) => onChange({ ...step.config, column_id })}
+              disabled={disabled}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Escolha a coluna" />
+              </SelectTrigger>
+              <SelectContent>
+                {columns.map((column) => (
+                  <SelectItem key={column.id} value={column.id}>
+                    {column.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : (
+          <Field label="Prazo do follow-up (horas)">
+            <Input
+              type="number"
+              min={1}
+              max={720}
+              value={Number(step.config.hours ?? 24)}
+              onChange={(event) => onChange({ ...step.config, hours: Number(event.target.value) })}
+              disabled={disabled}
+            />
+          </Field>
+        )}
+      </div>
+    );
+  }
+  if (step.step_type === "condition") {
+    return (
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <Field label="Campo">
+          <Select
+            value={String(step.config.field ?? "source")}
+            onValueChange={(field) => onChange({ ...step.config, field })}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="source">Origem</SelectItem>
+              <SelectItem value="target_visa">Objetivo</SelectItem>
+              <SelectItem value="current_country">Localização</SelectItem>
+              <SelectItem value="crm_column_id">Coluna</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Operador">
+          <Select
+            value={String(step.config.operator ?? "equals")}
+            onValueChange={(operator) => onChange({ ...step.config, operator })}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="equals">É igual a</SelectItem>
+              <SelectItem value="not_equals">É diferente de</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Valor">
+          {step.config.field === "crm_column_id" ? (
+            <Select
+              value={String(step.config.value ?? "")}
+              onValueChange={(value) => onChange({ ...step.config, value })}
+              disabled={disabled}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Coluna" />
+              </SelectTrigger>
+              <SelectContent>
+                {columns.map((column) => (
+                  <SelectItem key={column.id} value={column.id}>
+                    {column.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={String(step.config.value ?? "")}
+              onChange={(event) => onChange({ ...step.config, value: event.target.value })}
+              disabled={disabled}
+            />
+          )}
+        </Field>
+        <Field label="Se não atender">
+          <Select
+            value={String(step.config.on_false ?? "stop")}
+            onValueChange={(on_false) => onChange({ ...step.config, on_false })}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="stop">Encerrar fluxo</SelectItem>
+              <SelectItem value="skip_next">Pular próximo bloco</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
       </div>
     );
@@ -872,47 +1181,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="text-xs uppercase tracking-wide text-admin-ink-muted">{label}</span>
       {children}
     </label>
-  );
-}
-
-function PendingList({
-  items,
-  canCancel,
-  onCancel,
-}: {
-  items: PendingActionView[];
-  canCancel: boolean;
-  onCancel: (id: string) => void;
-}) {
-  if (!items.length) {
-    return <PanelEmpty icon={CalendarClock} message="Nenhum envio pendente agora." />;
-  }
-  return (
-    <div className="rounded-xl border border-admin-border bg-admin-surface">
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="flex flex-col gap-3 border-b border-admin-border p-4 last:border-0 lg:flex-row lg:items-center lg:justify-between"
-        >
-          <div>
-            <div className="font-medium text-admin-ink">
-              {item.leads?.full_name ?? "Lead"} - {item.crm_automation_flows?.name ?? "Fluxo"}
-            </div>
-            <div className="text-xs text-admin-ink-muted">
-              {item.crm_automation_steps?.title ?? "Etapa"} - {formatDate(item.run_at)}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canCancel}
-            onClick={() => onCancel(String(item.id))}
-          >
-            Cancelar envio
-          </Button>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -996,7 +1264,6 @@ function StatusBadge({ status }: { status: Flow["status"] }) {
 function triggerLabel(trigger: Flow["trigger_type"]) {
   if (trigger === "lead_created") return "Lead criado";
   if (trigger === "pipeline_stage_entered") return "Etapa do funil";
-  if (trigger === "inbound_message") return "Mensagem recebida";
   return "Manual";
 }
 

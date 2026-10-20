@@ -3,15 +3,14 @@ import { z } from "zod";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Settings, User, Plug, Users, Zap, FileText, Tags } from "lucide-react";
+import { Settings, User, Plug, Users, FileText, Tags } from "lucide-react";
 import { PerfilContaTab } from "@/components/admin/configuracoes/PerfilContaTab";
 import { IntegracoesTab } from "@/components/admin/configuracoes/IntegracoesTab";
 import { EquipePermissoesTab } from "@/components/admin/configuracoes/EquipePermissoesTab";
 import { ServicosPrecosTab } from "@/components/admin/configuracoes/ServicosPrecosTab";
-import { AutomacoesPanel } from "@/components/admin/AutomacoesPanel";
 import { LogsAuditoriaTab } from "@/components/admin/configuracoes/LogsAuditoriaTab";
 
-const TABS = ["perfil", "integracoes", "equipe", "servicos-precos", "automacoes", "logs"] as const;
+const TABS = ["perfil", "integracoes", "equipe", "servicos-precos", "logs"] as const;
 
 type Tab = (typeof TABS)[number];
 
@@ -66,7 +65,7 @@ function ConfiguracoesPage() {
         <div>
           <h1 className="font-display text-4xl font-bold tracking-tight">Configurações</h1>
           <p className="text-admin-ink-muted text-sm mt-1">
-            Perfil, integrações, permissões, PDV, automações e auditoria.
+            Perfil, integrações, permissões, serviços e auditoria.
           </p>
         </div>
       </header>
@@ -98,12 +97,6 @@ function ConfiguracoesPage() {
             <Tags className="h-4 w-4" /> Serviços &amp; Preços
           </TabsTrigger>
           <TabsTrigger
-            value="automacoes"
-            className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
-          >
-            <Zap className="h-4 w-4" /> Automações
-          </TabsTrigger>
-          <TabsTrigger
             value="logs"
             className="gap-2 data-[state=active]:bg-admin-accent data-[state=active]:text-white"
           >
@@ -122,9 +115,6 @@ function ConfiguracoesPage() {
         </TabsContent>
         <TabsContent value="servicos-precos" className="mt-6">
           <ServicosPrecosTab />
-        </TabsContent>
-        <TabsContent value="automacoes" className="mt-6">
-          <AutomacoesPanel />
         </TabsContent>
         <TabsContent value="logs" className="mt-6">
           <LogsAuditoriaTab />

@@ -6,6 +6,15 @@ import type { Json } from "@/integrations/supabase/types";
 import { requireModule } from "./auth";
 
 import { sendCrmWhatsappMessageInternal } from "./crm-whatsapp.functions";
+import {
+  allowedMediaMime,
+  INBOX_MEDIA_BUCKET,
+  MAX_INBOX_MEDIA_BYTES,
+  validMediaName,
+  type InboxMediaKind,
+} from "@/lib/uazapi/uazapi.media";
+import { renderCrmAutomationTemplate } from "./crm-automation.template";
+import { isWithinWindow, nextAllowedRunAt } from "./crm-automation.schedule";
 
 const db = supabaseAdmin as any;
 
@@ -14,7 +23,7 @@ type AutomationFlow = {
   name: string;
   description: string | null;
   status: "active" | "paused" | "archived";
-  trigger_type: "lead_created" | "pipeline_stage_entered" | "inbound_message" | "manual";
+  trigger_type: "lead_created" | "pipeline_stage_entered" | "manual";
   trigger_config: Record<string, any>;
   stop_rules: Record<string, any>;
   schedule_window: Record<string, any>;
@@ -40,7 +49,7 @@ type AutomationExecution = {
   id: string;
   flow_id: string;
   lead_id: string;
-  status: "running" | "waiting" | "completed" | "stopped" | "failed";
+  status: "running" | "waiting" | "paused" | "completed" | "stopped" | "failed";
   current_step_id: string | null;
   started_at: string;
   last_activity_at: string;
@@ -70,6 +79,10 @@ type LeadRow = {
   last_inbound_at: string | null;
   last_outbound_at: string | null;
   created_at: string;
+  source: string | null;
+  target_visa: string | null;
+  current_country: string | null;
+  qualification_answers: Record<string, unknown> | null;
 };
 
 const stepInputSchema = z.object({
@@ -85,7 +98,7 @@ const flowInputSchema = z.object({
   name: z.string().trim().min(3).max(120),
   description: z.string().trim().max(500).optional().or(z.literal("")),
   status: z.enum(["active", "paused", "archived"]).default("paused"),
-  trigger_type: z.enum(["lead_created", "pipeline_stage_entered", "inbound_message", "manual"]),
+  trigger_type: z.enum(["lead_created", "pipeline_stage_entered", "manual"]),
   trigger_config: z.record(z.any()).default({}),
   stop_rules: z.record(z.any()).default({}),
   schedule_window: z.record(z.any()).default({}),
@@ -94,13 +107,13 @@ const flowInputSchema = z.object({
 
 function defaultStopRules(value?: Record<string, any>) {
   return {
-    stop_on_reply: true,
     stop_on_final_stage: true,
-    avoid_conflicts: true,
     max_messages_per_lead: 4,
     min_minutes_between_messages: 15,
     block_if_whatsapp_disconnected: true,
     ...(value ?? {}),
+    stop_on_reply: true,
+    avoid_conflicts: true,
   };
 }
 
@@ -131,72 +144,34 @@ function delayMinutes(config: Record<string, any>) {
   return safeAmount * 60;
 }
 
-function timeToMinutes(value: unknown, fallback: string) {
-  const text = typeof value === "string" && /^\d{2}:\d{2}$/.test(value) ? value : fallback;
-  const [hour, minute] = text.split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-function localDateParts(date: Date, timezone: string) {
-  const weekdayText = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    weekday: "short",
-  }).format(date);
-  const timeText = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-  const weekdayMap: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-  const [hour, minute] = timeText.split(":").map(Number);
-  return { weekday: weekdayMap[weekdayText] ?? 1, minutes: hour * 60 + minute };
-}
-
-function isWithinWindow(date: Date, window: Record<string, any>) {
-  const timezone = String(window.timezone ?? "Europe/Madrid");
-  const weekdays = Array.isArray(window.weekdays) ? window.weekdays.map(Number) : [1, 2, 3, 4, 5];
-  const start = timeToMinutes(window.start, "09:00");
-  const end = timeToMinutes(window.end, "18:00");
-  const local = localDateParts(date, timezone);
-  return weekdays.includes(local.weekday) && local.minutes >= start && local.minutes <= end;
-}
-
-function nextAllowedRunAt(now: Date, window: Record<string, any>) {
-  let cursor = addMinutes(now, 15);
-  for (let i = 0; i < 14 * 24 * 4; i++) {
-    if (isWithinWindow(cursor, window)) return cursor;
-    cursor = addMinutes(cursor, 15);
-  }
-  return addMinutes(now, 24 * 60);
-}
-
-function firstName(name: string | null | undefined) {
-  return (name ?? "").trim().split(/\s+/)[0] || "tudo bem";
-}
-
-function renderTemplate(template: string, lead: LeadRow) {
-  return template
-    .replaceAll("{{nome}}", lead.full_name ?? "")
-    .replaceAll("{{primeiro_nome}}", firstName(lead.full_name))
-    .replaceAll("{{email}}", lead.email ?? "")
-    .replaceAll("{{telefone}}", lead.phone ?? "");
-}
-
-function messageForStep(step: AutomationStep, lead: LeadRow) {
+async function messageForStep(step: AutomationStep, lead: LeadRow) {
   const template =
     typeof step.config.message === "string" && step.config.message.trim()
       ? step.config.message.trim()
-      : "Oi, {{primeiro_nome}}, tudo bem? Passando para dar continuidade ao seu atendimento no Instituto Empuria.";
-  return renderTemplate(template, lead);
+      : "";
+  const [owner, column] = await Promise.all([
+    lead.assigned_to
+      ? db.from("profiles").select("full_name").eq("id", lead.assigned_to).maybeSingle()
+      : Promise.resolve({ data: null }),
+    lead.crm_column_id
+      ? db.from("crm_columns").select("label").eq("id", lead.crm_column_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const answers = lead.qualification_answers ?? {};
+  return renderCrmAutomationTemplate(template, {
+    nome: lead.full_name,
+    telefone: lead.phone,
+    email: lead.email,
+    objetivo: lead.target_visa,
+    servico:
+      typeof answers.servico === "string"
+        ? answers.servico
+        : typeof answers.service === "string"
+          ? answers.service
+          : null,
+    responsavel: owner.data?.full_name ?? null,
+    etapa: column.data?.label ?? lead.pipeline_stage,
+  });
 }
 
 async function canManageAutomations(_userId: string, _isAdmin?: boolean) {
@@ -279,23 +254,19 @@ async function scheduleStep({
   runAt: Date;
   reason?: string;
 }) {
-  const idempotencyKey = `${executionId}:${step.id}:${runAt.getTime()}`;
-  const { error } = await db.from("crm_automation_pending_actions").upsert(
-    {
-      execution_id: executionId,
-      flow_id: flowId,
-      lead_id: leadId,
-      step_id: step.id,
-      action_type: "process_step",
-      payload: { reason: reason ?? "scheduled" },
-      status: "pending",
-      run_at: runAt.toISOString(),
-      locked_at: null,
-      idempotency_key: idempotencyKey,
-    },
-    { onConflict: "idempotency_key" },
-  );
-  if (error) throw new Error(error.message);
+  const idempotencyKey = `${executionId}:${step.id}`;
+  const { error } = await db.from("crm_automation_pending_actions").insert({
+    execution_id: executionId,
+    flow_id: flowId,
+    lead_id: leadId,
+    step_id: step.id,
+    action_type: "process_step",
+    payload: { reason: reason ?? "scheduled" },
+    status: "pending",
+    run_at: runAt.toISOString(),
+    idempotency_key: idempotencyKey,
+  });
+  if (error && error.code !== "23505") throw new Error(error.message);
 }
 
 async function stopExecution(
@@ -304,17 +275,22 @@ async function stopExecution(
   stepId?: string | null,
 ) {
   const stoppedAt = new Date().toISOString();
+  const { data: stopped, error } = await db
+    .from("crm_automation_executions")
+    .update({
+      status: "stopped",
+      stop_reason: reason,
+      completed_at: stoppedAt,
+      last_activity_at: stoppedAt,
+      current_step_id: stepId ?? execution.current_step_id,
+    })
+    .eq("id", execution.id)
+    .in("status", ["running", "waiting", "paused"])
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!stopped) return;
   await Promise.all([
-    db
-      .from("crm_automation_executions")
-      .update({
-        status: "stopped",
-        stop_reason: reason,
-        completed_at: stoppedAt,
-        last_activity_at: stoppedAt,
-        current_step_id: stepId ?? execution.current_step_id,
-      })
-      .eq("id", execution.id),
     db
       .from("crm_automation_pending_actions")
       .update({ status: "canceled", last_error: reason, locked_at: null })
@@ -355,7 +331,7 @@ async function shouldStopBeforeStep(
 ) {
   const stopRules = defaultStopRules(flow.stop_rules);
   if (stopRules.stop_on_final_stage && isFinalStage(lead.pipeline_stage)) return "final_stage";
-  if (stopRules.stop_on_reply && (await hasInboundAfter(lead.id, execution.started_at))) {
+  if (await hasInboundAfter(lead.id, execution.started_at)) {
     return "lead_replied";
   }
   return null;
@@ -373,25 +349,28 @@ async function messagesSentInExecution(executionId: string) {
 
 async function completeExecution(execution: AutomationExecution, stepId?: string | null) {
   const now = new Date().toISOString();
-  await Promise.all([
-    db
-      .from("crm_automation_executions")
-      .update({
-        status: "completed",
-        completed_at: now,
-        last_activity_at: now,
-        current_step_id: stepId ?? execution.current_step_id,
-      })
-      .eq("id", execution.id),
-    logAutomation({
+  const { data: completed, error } = await db
+    .from("crm_automation_executions")
+    .update({
+      status: "completed",
+      completed_at: now,
+      last_activity_at: now,
+      current_step_id: stepId ?? execution.current_step_id,
+    })
+    .eq("id", execution.id)
+    .in("status", ["running", "waiting"])
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (completed)
+    await logAutomation({
       executionId: execution.id,
       flowId: execution.flow_id,
       leadId: execution.lead_id,
       stepId,
       eventType: "automation_completed",
       message: "Automacao concluida.",
-    }),
-  ]);
+    });
 }
 
 async function processStep(action: PendingAction) {
@@ -415,8 +394,32 @@ async function processStep(action: PendingAction) {
   const step = steps.find((item) => item.id === action.step_id);
   if (!step) throw new Error("Etapa da automacao nao encontrada.");
 
+  if (flowRow.status === "paused") {
+    await db
+      .from("crm_automation_pending_actions")
+      .update({
+        status: "pending",
+        run_at: addMinutes(new Date(), 5).toISOString(),
+        locked_at: null,
+      })
+      .eq("id", action.id)
+      .eq("status", "locked");
+    return;
+  }
   if (flowRow.status !== "active" || flowRow.is_deleted) {
     await stopExecution(executionRow, "flow_not_active", step.id);
+    return;
+  }
+  if (executionRow.status === "paused") {
+    await db
+      .from("crm_automation_pending_actions")
+      .update({
+        status: "pending",
+        run_at: addMinutes(new Date(), 5).toISOString(),
+        locked_at: null,
+      })
+      .eq("id", action.id)
+      .eq("status", "locked");
     return;
   }
   if (!["running", "waiting"].includes(executionRow.status)) return;
@@ -450,6 +453,7 @@ async function processStep(action: PendingAction) {
   }
 
   const rules = defaultStopRules(flowRow.stop_rules);
+  let skipNext = false;
   if (step.step_type === "send_whatsapp") {
     if (
       leadRow.last_outbound_at &&
@@ -460,7 +464,8 @@ async function processStep(action: PendingAction) {
       await db
         .from("crm_automation_pending_actions")
         .update({ status: "pending", run_at: retryAt.toISOString(), locked_at: null })
-        .eq("id", action.id);
+        .eq("id", action.id)
+        .eq("status", "locked");
       await logAutomation({
         executionId: executionRow.id,
         flowId: flowRow.id,
@@ -480,7 +485,7 @@ async function processStep(action: PendingAction) {
       return;
     }
 
-    const body = messageForStep(step, leadRow);
+    const body = await messageForStep(step, leadRow);
     const sent = await sendCrmWhatsappMessageInternal({
       leadId: leadRow.id,
       message: body,
@@ -489,6 +494,15 @@ async function processStep(action: PendingAction) {
       flowId: flowRow.id,
       stepId: step.id,
       trackId: `automation:${executionRow.id}:${step.id}`,
+      media: step.config.media_path
+        ? {
+            kind: step.config.media_kind as InboxMediaKind,
+            path: String(step.config.media_path),
+            mime: String(step.config.media_mime),
+            name: String(step.config.media_name),
+            size: Number(step.config.media_size),
+          }
+        : null,
     });
     await Promise.all([
       db
@@ -499,7 +513,8 @@ async function processStep(action: PendingAction) {
           status: "waiting",
           last_activity_at: sent.sentAt,
         })
-        .eq("id", executionRow.id),
+        .eq("id", executionRow.id)
+        .in("status", ["running", "waiting"]),
       logAutomation({
         executionId: executionRow.id,
         flowId: flowRow.id,
@@ -526,31 +541,62 @@ async function processStep(action: PendingAction) {
   }
 
   if (step.step_type === "condition") {
-    const inbound = await hasInboundAfter(leadRow.id, executionRow.started_at);
-    if (inbound) {
-      await stopExecution(executionRow, "lead_replied", step.id);
+    const field = String(step.config.field ?? "source");
+    if (!["source", "target_visa", "current_country", "crm_column_id"].includes(field))
+      throw new Error("Campo de condicao invalido.");
+    const matches =
+      String(leadRow[field as keyof LeadRow] ?? "").toLowerCase() ===
+      String(step.config.value ?? "").toLowerCase();
+    const passed = step.config.operator === "not_equals" ? !matches : matches;
+    if (!passed && step.config.on_false !== "skip_next") {
+      await stopExecution(executionRow, "condition_not_met", step.id);
       return;
     }
+    skipNext = !passed;
     await logAutomation({
       executionId: executionRow.id,
       flowId: flowRow.id,
       leadId: leadRow.id,
       stepId: step.id,
       eventType: "condition_checked",
-      message: "Condicao avaliada; lead ainda sem resposta.",
-      metadata: { condition: step.config.condition ?? "no_reply" },
+      message: passed ? "Condicao atendida." : "Condicao nao atendida; proximo bloco pulado.",
+      metadata: { field, passed },
     });
   }
 
   if (step.step_type === "action") {
-    if (step.config.action === "move_stage" && typeof step.config.stage === "string") {
-      await db
-        .from("leads")
-        .update({
-          pipeline_stage: step.config.stage,
-          last_interaction_at: new Date().toISOString(),
-        })
-        .eq("id", leadRow.id);
+    if (step.config.action === "move_stage") {
+      const { data: column } = await db
+        .from("crm_columns")
+        .select("id,key,is_active")
+        .eq("id", String(step.config.column_id ?? ""))
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!column) throw new Error("Coluna de destino arquivada ou invalida.");
+      const patch: Record<string, unknown> = {
+        crm_column_id: column.id,
+        last_interaction_at: new Date().toISOString(),
+      };
+      if (["novo", "em_contato", "reuniao", "fechado", "descartado"].includes(column.key))
+        patch.pipeline_stage = column.key;
+      const { error: moveError } = await db.from("leads").update(patch).eq("id", leadRow.id);
+      if (moveError) throw new Error(moveError.message);
+    } else if (step.config.action === "followup") {
+      if (!leadRow.assigned_to) throw new Error("Lead sem responsavel para follow-up.");
+      const hours = Number(step.config.hours ?? 24);
+      if (!Number.isInteger(hours) || hours < 1 || hours > 720)
+        throw new Error("Prazo de follow-up invalido.");
+      const key = `automation:${executionRow.id}:${step.id}`;
+      const { error: followupError } = await db.from("crm_followups").insert({
+        lead_id: leadRow.id,
+        assigned_to: leadRow.assigned_to,
+        type: "automation",
+        mode: "automatic",
+        template_key: key,
+        due_at: new Date(Date.now() + hours * 3_600_000).toISOString(),
+        message_preview: String(step.config.message ?? "").slice(0, 1000),
+      });
+      if (followupError && followupError.code !== "23505") throw new Error(followupError.message);
     }
     await logAutomation({
       executionId: executionRow.id,
@@ -563,7 +609,25 @@ async function processStep(action: PendingAction) {
     });
   }
 
-  const next = nextStep(steps, step);
+  const { data: currentExecution } = await db
+    .from("crm_automation_executions")
+    .select("status")
+    .eq("id", executionRow.id)
+    .maybeSingle();
+  if (!currentExecution || !["running", "waiting"].includes(currentExecution.status)) {
+    await db
+      .from("crm_automation_pending_actions")
+      .update({ status: "canceled", locked_at: null })
+      .eq("id", action.id)
+      .eq("status", "locked");
+    return;
+  }
+  if (await hasInboundAfter(leadRow.id, executionRow.started_at)) {
+    await stopExecution(executionRow, "lead_replied", step.id);
+    return;
+  }
+  const immediateNext = nextStep(steps, step);
+  const next = skipNext && immediateNext ? nextStep(steps, immediateNext) : immediateNext;
   await db
     .from("crm_automation_pending_actions")
     .update({ status: "done", locked_at: null })
@@ -606,7 +670,22 @@ async function processPendingAction(action: PendingAction) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao processar automacao.";
     const attempts = Number(locked.attempts ?? 1);
-    const backoff = attempts === 1 ? 1 : attempts === 2 ? 5 : attempts === 3 ? 15 : null;
+    const { data: failedStep } = await db
+      .from("crm_automation_steps")
+      .select("step_type")
+      .eq("id", action.step_id)
+      .maybeSingle();
+    // A network failure after Uazapi receives a request is ambiguous. Never resend it blindly.
+    const backoff =
+      failedStep?.step_type === "send_whatsapp"
+        ? null
+        : attempts === 1
+          ? 1
+          : attempts === 2
+            ? 5
+            : attempts === 3
+              ? 15
+              : null;
     if (backoff) {
       await db
         .from("crm_automation_pending_actions")
@@ -616,13 +695,15 @@ async function processPendingAction(action: PendingAction) {
           run_at: addMinutes(new Date(), backoff).toISOString(),
           last_error: message,
         })
-        .eq("id", action.id);
+        .eq("id", action.id)
+        .eq("status", "locked");
     } else {
       await Promise.all([
         db
           .from("crm_automation_pending_actions")
           .update({ status: "failed", locked_at: null, last_error: message })
-          .eq("id", action.id),
+          .eq("id", action.id)
+          .eq("status", "locked"),
         db
           .from("crm_automation_executions")
           .update({
@@ -630,7 +711,8 @@ async function processPendingAction(action: PendingAction) {
             last_error: message,
             last_activity_at: new Date().toISOString(),
           })
-          .eq("id", action.execution_id),
+          .eq("id", action.execution_id)
+          .in("status", ["running", "waiting"]),
         logAutomation({
           executionId: action.execution_id,
           flowId: action.flow_id,
@@ -648,6 +730,46 @@ async function processPendingAction(action: PendingAction) {
 }
 
 export async function processCrmAutomationPendingActionsInternal(limit = 30) {
+  const staleBefore = new Date(Date.now() - 5 * 60_000).toISOString();
+  const { data: staleLocks, error: staleError } = await db
+    .from("crm_automation_pending_actions")
+    .select("id,execution_id,flow_id,lead_id,step_id,crm_automation_steps(step_type)")
+    .eq("status", "locked")
+    .lt("locked_at", staleBefore)
+    .limit(50);
+  if (staleError) throw new Error(staleError.message);
+  for (const stale of staleLocks ?? []) {
+    const send = stale.crm_automation_steps?.step_type === "send_whatsapp";
+    const { data: changed } = await db
+      .from("crm_automation_pending_actions")
+      .update({
+        status: send ? "failed" : "pending",
+        locked_at: null,
+        last_error: send
+          ? "Retorno de envio incerto; conferir na Uazapi antes de repetir."
+          : "Lock vencido; reprocessamento seguro.",
+      })
+      .eq("id", stale.id)
+      .eq("status", "locked")
+      .lt("locked_at", staleBefore)
+      .select("id")
+      .maybeSingle();
+    if (send && changed) {
+      await db
+        .from("crm_automation_executions")
+        .update({ status: "failed", last_error: "Envio incerto; revisao necessaria." })
+        .eq("id", stale.execution_id)
+        .in("status", ["running", "waiting"]);
+      await logAutomation({
+        executionId: stale.execution_id,
+        flowId: stale.flow_id,
+        leadId: stale.lead_id,
+        stepId: stale.step_id,
+        eventType: "send_uncertain",
+        message: "Envio pode ter ocorrido; revisao manual necessaria antes de repetir.",
+      });
+    }
+  }
   const { data, error } = await db
     .from("crm_automation_pending_actions")
     .select("*")
@@ -677,18 +799,24 @@ function flowMatchesLead(
 ) {
   if (flow.status !== "active" || flow.is_deleted || flow.trigger_type !== triggerType)
     return false;
+  if (triggerType === "lead_created") {
+    const source = String(flow.trigger_config?.source ?? "all");
+    if (source !== "all" && source !== lead.source) return false;
+  }
   if (triggerType === "pipeline_stage_entered") {
-    const stage = flow.trigger_config?.stage;
-    if (stage && stage !== lead.pipeline_stage && stage !== payload?.stage) return false;
+    const columnId = flow.trigger_config?.column_id;
+    if (!columnId || columnId !== payload?.column_id || columnId !== lead.crm_column_id)
+      return false;
   }
   return true;
 }
 
 export async function startMatchingCrmAutomationsForLead(input: {
   leadId: string;
-  triggerType: "lead_created" | "pipeline_stage_entered" | "inbound_message" | "manual";
+  triggerType: "lead_created" | "pipeline_stage_entered" | "manual";
   triggerPayload?: Record<string, any>;
   actorId?: string | null;
+  flowId?: string;
 }) {
   const [{ data: lead, error: leadError }, { data: flows, error: flowsError }] = await Promise.all([
     db.from("leads").select("*").eq("id", input.leadId).single(),
@@ -706,15 +834,17 @@ export async function startMatchingCrmAutomationsForLead(input: {
   if (isFinalStage(leadRow.pipeline_stage)) return { started: 0 };
 
   let started = 0;
-  for (const flow of ((flows ?? []) as AutomationFlow[]).filter((item) =>
-    flowMatchesLead(item, input.triggerType, leadRow, input.triggerPayload),
+  for (const flow of ((flows ?? []) as AutomationFlow[]).filter(
+    (item) =>
+      (!input.flowId || item.id === input.flowId) &&
+      flowMatchesLead(item, input.triggerType, leadRow, input.triggerPayload),
   )) {
     const rules = defaultStopRules(flow.stop_rules);
     const activeQuery = db
       .from("crm_automation_executions")
       .select("id, flow_id")
       .eq("lead_id", leadRow.id)
-      .in("status", ["running", "waiting"]);
+      .in("status", ["running", "waiting", "paused"]);
     if (!rules.avoid_conflicts) activeQuery.eq("flow_id", flow.id);
     const { data: active, error: activeError } = await activeQuery.limit(1);
     if (activeError) throw new Error(activeError.message);
@@ -733,6 +863,12 @@ export async function startMatchingCrmAutomationsForLead(input: {
         current_step_id: first.id,
         trigger_type: input.triggerType,
         trigger_payload: (input.triggerPayload ?? {}) as Json,
+        trigger_key:
+          input.triggerType === "lead_created"
+            ? `lead_created:${leadRow.id}`
+            : input.triggerType === "pipeline_stage_entered"
+              ? `column:${String(input.triggerPayload?.event_id ?? `${leadRow.id}:${input.triggerPayload?.column_id}`)}`
+              : `manual:${crypto.randomUUID()}`,
       })
       .select("*")
       .single();
@@ -772,7 +908,7 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const [flowsRes, stepsRes] = await Promise.all([
+    const [flowsRes, stepsRes, columnsRes] = await Promise.all([
       db
         .from("crm_automation_flows")
         .select("*")
@@ -783,9 +919,15 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
         .select("*")
         .eq("is_deleted", false)
         .order("position", { ascending: true }),
+      db
+        .from("crm_columns")
+        .select("id,label,key,type")
+        .eq("is_active", true)
+        .order("position", { ascending: true }),
     ]);
     if (flowsRes.error) throw new Error(flowsRes.error.message);
     if (stepsRes.error) throw new Error(stepsRes.error.message);
+    if (columnsRes.error) throw new Error(columnsRes.error.message);
     const flows = (flowsRes.data ?? []) as AutomationFlow[];
 
     const [
@@ -835,7 +977,7 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
             .from("crm_automation_executions")
             .select("id", { count: "exact", head: true })
             .eq("flow_id", flow.id)
-            .in("status", ["running", "waiting"]),
+            .in("status", ["running", "waiting", "paused"]),
         ),
       ),
     ]);
@@ -865,6 +1007,7 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
         steps: stepsByFlow.get(flow.id) ?? [],
         activeExecutions: activeByFlow.get(flow.id) ?? 0,
       })),
+      columns: columnsRes.data ?? [],
       pendingActions: pendingRes.data ?? [],
       logs: logsRes.data ?? [],
       metrics: {
@@ -886,52 +1029,206 @@ export const listCrmAutomationWorkspace = createServerFn({ method: "GET" })
     };
   });
 
+export const getCrmLeadAutomationState = createServerFn({ method: "GET" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) => z.object({ leadId: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const [executions, flows] = await Promise.all([
+      db
+        .from("crm_automation_executions")
+        .select(
+          "id,flow_id,status,current_step_id,started_at,last_activity_at,crm_automation_flows(name,schedule_window),crm_automation_steps(title)",
+        )
+        .eq("lead_id", data.leadId)
+        .in("status", ["running", "waiting", "paused"])
+        .order("last_activity_at", { ascending: false })
+        .limit(5),
+      db
+        .from("crm_automation_flows")
+        .select("id,name")
+        .eq("trigger_type", "manual")
+        .eq("status", "active")
+        .eq("is_deleted", false)
+        .order("name", { ascending: true }),
+    ]);
+    if (executions.error) throw new Error(executions.error.message);
+    if (flows.error) throw new Error(flows.error.message);
+    const ids = (executions.data ?? []).map((row: { id: string }) => row.id);
+    const { data: actions, error } = ids.length
+      ? await db
+          .from("crm_automation_pending_actions")
+          .select("execution_id,run_at,crm_automation_steps(title,step_type)")
+          .in("execution_id", ids)
+          .eq("status", "pending")
+          .order("run_at", { ascending: true })
+      : { data: [], error: null };
+    if (error) throw new Error(error.message);
+    return { executions: executions.data ?? [], flows: flows.data ?? [], actions: actions ?? [] };
+  });
+
+export const controlCrmLeadAutomation = createServerFn({ method: "POST" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) =>
+    z
+      .discriminatedUnion("action", [
+        z.object({
+          action: z.literal("start"),
+          leadId: z.string().uuid(),
+          flowId: z.string().uuid(),
+        }),
+        z.object({
+          action: z.enum(["pause", "resume", "cancel"]),
+          leadId: z.string().uuid(),
+          executionId: z.string().uuid(),
+        }),
+      ])
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManage(context.userId, context.isAdmin);
+    if (data.action === "start") {
+      const result = await startMatchingCrmAutomationsForLead({
+        leadId: data.leadId,
+        flowId: data.flowId,
+        triggerType: "manual",
+        actorId: context.userId,
+      });
+      if (!result.started)
+        throw new Error("Fluxo indisponivel ou outro fluxo ja esta em andamento.");
+      return { ok: true };
+    }
+    const { data: execution } = await db
+      .from("crm_automation_executions")
+      .select("id")
+      .eq("id", data.executionId)
+      .eq("lead_id", data.leadId)
+      .maybeSingle();
+    if (!execution) throw new Error("Execucao nao encontrada para este lead.");
+    const { error } = await db.rpc("crm_automation_control_execution", {
+      p_execution_id: data.executionId,
+      p_action: data.action,
+      p_actor: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const saveCrmAutomationFlow = createServerFn({ method: "POST" })
   .middleware([requireModule("crm")])
   .inputValidator((d) => flowInputSchema.parse(d))
   .handler(async ({ data, context }) => {
     await assertManage(context.userId, context.isAdmin);
+    const timezone = String(data.schedule_window.timezone ?? "Europe/Madrid");
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    } catch {
+      throw new Error("Fuso horario invalido.");
+    }
+    const weekdays = data.schedule_window.weekdays;
+    if (
+      !Array.isArray(weekdays) ||
+      weekdays.length === 0 ||
+      weekdays.some((day) => !Number.isInteger(day) || day < 0 || day > 6) ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(data.schedule_window.start ?? "")) ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(data.schedule_window.end ?? "")) ||
+      String(data.schedule_window.start) >= String(data.schedule_window.end)
+    )
+      throw new Error("Janela de envio invalida.");
+    if (data.steps.some((step, index) => step.position !== index + 1))
+      throw new Error("Os blocos devem ter posicoes consecutivas.");
+    const allowedVariables = new Set([
+      "nome",
+      "primeiro_nome",
+      "telefone",
+      "email",
+      "objetivo",
+      "servico",
+      "serviço",
+      "responsavel",
+      "etapa",
+    ]);
+    for (const step of data.steps) {
+      if (step.step_type === "send_whatsapp") {
+        const message = String(step.config.message ?? "");
+        const mediaPath = step.config.media_path;
+        if ((!message.trim() && !mediaPath) || message.length > 4000)
+          throw new Error("Mensagem ou midia invalida.");
+        if (
+          mediaPath &&
+          (typeof mediaPath !== "string" ||
+            !/^automations\/[0-9a-f-]{36}\/file\.[a-z0-9]{2,5}$/i.test(mediaPath) ||
+            !["image", "video", "audio", "document"].includes(String(step.config.media_kind)) ||
+            !allowedMediaMime(
+              step.config.media_kind as InboxMediaKind,
+              String(step.config.media_mime),
+            ) ||
+            !validMediaName(String(step.config.media_name), String(step.config.media_mime)))
+        )
+          throw new Error("Anexo do fluxo invalido.");
+        for (const match of message.matchAll(/\{\{?([^{}]+)\}\}?/g)) {
+          if (!allowedVariables.has(match[1].trim().toLowerCase()))
+            throw new Error(`Variavel desconhecida: ${match[1]}`);
+        }
+      }
+      if (
+        step.step_type === "delay" &&
+        (!Number.isInteger(Number(step.config.amount)) ||
+          Number(step.config.amount) < 1 ||
+          !["minutes", "hours", "days"].includes(String(step.config.unit)))
+      )
+        throw new Error("Delay invalido.");
+      if (step.step_type === "action" && step.config.action === "move_stage") {
+        const { data: column } = await db
+          .from("crm_columns")
+          .select("id")
+          .eq("id", String(step.config.column_id ?? ""))
+          .eq("is_active", true)
+          .maybeSingle();
+        if (!column) throw new Error("Coluna de destino invalida ou arquivada.");
+      }
+    }
     const payload = {
+      id: data.id,
       name: data.name,
       description: data.description || null,
-      status: data.status,
       trigger_type: data.trigger_type,
-      trigger_config: data.trigger_config as Json,
-      stop_rules: defaultStopRules(data.stop_rules) as Json,
-      schedule_window: defaultScheduleWindow(data.schedule_window) as Json,
-      created_by: context.userId,
-      is_deleted: false,
+      trigger_config: data.trigger_config,
+      stop_rules: defaultStopRules(data.stop_rules),
+      schedule_window: defaultScheduleWindow(data.schedule_window),
     };
-
-    const { data: flow, error } = data.id
-      ? await db.from("crm_automation_flows").update(payload).eq("id", data.id).select("*").single()
-      : await db.from("crm_automation_flows").insert(payload).select("*").single();
-    if (error) throw new Error(error.message);
-
-    await db.from("crm_automation_steps").update({ is_deleted: true }).eq("flow_id", flow.id);
-
-    for (const step of data.steps.sort((a, b) => a.position - b.position)) {
-      const row = {
-        flow_id: flow.id,
-        position: step.position,
-        step_type: step.step_type,
-        title: step.title,
-        config: step.config as Json,
-        is_deleted: false,
-      };
-      const { error: stepError } = step.id
-        ? await db.from("crm_automation_steps").upsert({ id: step.id, ...row })
-        : await db.from("crm_automation_steps").insert(row);
-      if (stepError) throw new Error(stepError.message);
-    }
-
-    await logAutomation({
-      flowId: flow.id,
-      eventType: "flow_saved",
-      message: "Fluxo salvo pela equipe.",
-      metadata: { actor_id: context.userId, status: data.status },
+    const { data: flowId, error } = await db.rpc("crm_automation_save_flow_atomic", {
+      p_flow: payload as Json,
+      p_steps: data.steps as Json,
+      p_actor: context.userId,
     });
-    return { ok: true, id: flow.id as string };
+    if (error) throw new Error(error.message);
+    return { ok: true, id: flowId as string };
+  });
+
+export const prepareCrmAutomationMedia = createServerFn({ method: "POST" })
+  .middleware([requireModule("crm")])
+  .inputValidator((d) =>
+    z
+      .object({
+        kind: z.enum(["image", "video", "audio", "document"]),
+        mime: z.string().max(150),
+        name: z.string().trim().min(1).max(180),
+        size: z.number().int().min(1).max(MAX_INBOX_MEDIA_BYTES),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertManage(context.userId, context.isAdmin);
+    if (!allowedMediaMime(data.kind, data.mime) || !validMediaName(data.name, data.mime))
+      throw new Error("Tipo de anexo nao suportado.");
+    const extension = data.name.toLowerCase().match(/\.([a-z0-9]{2,5})$/)?.[1];
+    if (!extension) throw new Error("Extensao de arquivo invalida.");
+    const path = `automations/${crypto.randomUUID()}/file.${extension}`;
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from(INBOX_MEDIA_BUCKET)
+      .createSignedUploadUrl(path);
+    if (error || !signed) throw new Error("Nao foi possivel preparar o anexo privado.");
+    return { path: signed.path, token: signed.token };
   });
 
 export const updateCrmAutomationFlowStatus = createServerFn({ method: "POST" })
@@ -954,7 +1251,7 @@ export const updateCrmAutomationFlowStatus = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
 
-    if (data.status !== "active") {
+    if (data.status === "archived") {
       await db
         .from("crm_automation_pending_actions")
         .update({ status: "canceled", last_error: `flow_${data.status}` })
@@ -981,33 +1278,24 @@ export const duplicateCrmAutomationFlow = createServerFn({ method: "POST" })
       getFlowSteps(data.id),
     ]);
     if (flowError) throw new Error(flowError.message);
-    const { data: copy, error: copyError } = await db
-      .from("crm_automation_flows")
-      .insert({
+    const { data: copyId, error: copyError } = await db.rpc("crm_automation_save_flow_atomic", {
+      p_flow: {
         name: `${flow.name} (copia)`,
         description: flow.description,
-        status: "paused",
         trigger_type: flow.trigger_type,
         trigger_config: flow.trigger_config,
         stop_rules: flow.stop_rules,
         schedule_window: flow.schedule_window,
-        created_by: context.userId,
-      })
-      .select("id")
-      .single();
-    if (copyError) throw new Error(copyError.message);
-
-    for (const step of steps) {
-      const { error } = await db.from("crm_automation_steps").insert({
-        flow_id: copy.id,
-        position: step.position,
+      } as Json,
+      p_steps: steps.map((step) => ({
         step_type: step.step_type,
         title: step.title,
         config: step.config,
-      });
-      if (error) throw new Error(error.message);
-    }
-    return { ok: true, id: copy.id as string };
+      })) as Json,
+      p_actor: context.userId,
+    });
+    if (copyError) throw new Error(copyError.message);
+    return { ok: true, id: copyId as string };
   });
 
 export const cancelCrmAutomationPendingAction = createServerFn({ method: "POST" })

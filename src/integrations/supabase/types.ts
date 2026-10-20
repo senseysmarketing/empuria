@@ -443,6 +443,7 @@ export type Database = {
           started_at: string
           status: string
           stop_reason: string | null
+          trigger_key: string | null
           trigger_payload: Json
           trigger_type: string
           updated_at: string
@@ -460,6 +461,7 @@ export type Database = {
           started_at?: string
           status?: string
           stop_reason?: string | null
+          trigger_key?: string | null
           trigger_payload?: Json
           trigger_type?: string
           updated_at?: string
@@ -477,6 +479,7 @@ export type Database = {
           started_at?: string
           status?: string
           stop_reason?: string | null
+          trigger_key?: string | null
           trigger_payload?: Json
           trigger_type?: string
           updated_at?: string
@@ -4131,9 +4134,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      crm_automation_control_execution: {
+        Args: { p_action: string; p_actor: string; p_execution_id: string }
+        Returns: undefined
+      }
       crm_automation_increment_metric: {
         Args: { p_amount?: number; p_flow_id: string; p_key: string }
         Returns: undefined
+      }
+      crm_automation_save_flow_atomic: {
+        Args: { p_actor: string; p_flow: Json; p_steps: Json }
+        Returns: string
       }
       crm_automation_stop_for_lead: {
         Args: { p_lead_id: string; p_reason: string; p_step_id?: string }
