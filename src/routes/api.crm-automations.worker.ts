@@ -1,18 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { processCrmAutomationPendingActionsInternal } from "@/lib/admin/crm-automations.functions";
+import { workerSecretIsValid } from "@/lib/admin/crm-automation.worker-auth";
 
 function validateWorkerSecret(request: Request) {
   const expected = process.env.WHATSAPP_AUTOMATION_WORKER_SECRET;
   if (!expected) return { ok: false, status: 503, error: "Worker secret not configured" };
 
-  const auth = request.headers.get("authorization") ?? "";
-  const candidates = [
-    request.headers.get("x-cron-secret"),
-    auth.toLowerCase().startsWith("bearer ") ? auth.slice(7) : null,
-    new URL(request.url).searchParams.get("secret"),
-  ].filter(Boolean);
-
-  if (!candidates.some((candidate) => candidate === expected)) {
+  if (!workerSecretIsValid(request.headers, expected)) {
     return { ok: false, status: 401, error: "Invalid worker secret" };
   }
   return { ok: true, status: 200, error: null };

@@ -404,7 +404,7 @@ export const getCrmLeadDetail = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ leadId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const db = context.supabase as any;
-    const [leadRes, activityRes, users] = await Promise.all([
+    const [leadRes, activityRes, automationRes, users] = await Promise.all([
       db.from("leads").select("*").eq("id", data.leadId).single(),
       db
         .from("lead_activity_log")
@@ -412,12 +412,42 @@ export const getCrmLeadDetail = createServerFn({ method: "GET" })
         .eq("lead_id", data.leadId)
         .order("created_at", { ascending: false })
         .limit(100),
+      db
+        .from("crm_automation_execution_logs")
+        .select(
+          "id,lead_id,event_type,message,created_at,flow_id,step_id,crm_automation_flows(name),crm_automation_steps(title)",
+        )
+        .eq("lead_id", data.leadId)
+        .order("created_at", { ascending: false })
+        .limit(100),
       listAssignableUsers(db),
     ]);
     if (leadRes.error) throw new Error(leadRes.error.message);
     if (activityRes.error) throw new Error(activityRes.error.message);
+    if (automationRes.error) throw new Error(automationRes.error.message);
     const owner = users.find((user) => user.id === leadRes.data.assigned_to) ?? null;
-    return { lead: { ...leadRes.data, assigned_user: owner }, activity: activityRes.data ?? [] };
+    const activity = (activityRes.data ?? []).filter(
+      (item: { kind: string; payload: Record<string, unknown> }) =>
+        !(item.kind === "message_outbound" && item.payload?.source === "crm_automation"),
+    );
+    for (const event of automationRes.data ?? []) {
+      activity.push({
+        id: `automation:${event.id}`,
+        lead_id: event.lead_id,
+        kind: "crm_automation",
+        created_at: event.created_at,
+        payload: {
+          event_type: event.event_type,
+          message: event.message,
+          flow: event.crm_automation_flows?.name ?? "Fluxo",
+          step: event.crm_automation_steps?.title ?? null,
+        },
+      });
+    }
+    activity.sort((a: { created_at: string }, b: { created_at: string }) =>
+      b.created_at.localeCompare(a.created_at),
+    );
+    return { lead: { ...leadRes.data, assigned_user: owner }, activity: activity.slice(0, 100) };
   });
 
 export const listCrmInboxMessages = createServerFn({ method: "GET" })
@@ -549,24 +579,31 @@ export const updateCrmLeadColumn = createServerFn({ method: "POST" })
     const { error } = await db.from("leads").update(patch).eq("id", data.leadId);
     if (error) throw new Error(error.message);
 
-    if (!systemStageKeys.has(column.key) || lead.pipeline_stage === column.key) {
-      await db.from("lead_activity_log").insert({
-        lead_id: data.leadId,
-        kind: "stage_changed",
-        payload: {
-          from: lead.crm_column_id ?? lead.pipeline_stage,
-          to: column.key,
-          to_label: column.label,
-        },
-        actor_id: context.userId,
-      });
-    }
-
-    if (systemStageKeys.has(column.key) && lead.pipeline_stage !== column.key) {
+    if (lead.crm_column_id !== data.columnId) {
+      const { data: moveEvent, error: moveError } = await db
+        .from("lead_activity_log")
+        .insert({
+          lead_id: data.leadId,
+          kind: "stage_changed",
+          payload: {
+            from: lead.crm_column_id ?? lead.pipeline_stage,
+            to: column.key,
+            to_label: column.label,
+          },
+          actor_id: context.userId,
+        })
+        .select("id")
+        .single();
+      if (moveError) throw new Error(moveError.message);
       await startMatchingCrmAutomationsForLead({
         leadId: data.leadId,
         triggerType: "pipeline_stage_entered",
-        triggerPayload: { from: lead.pipeline_stage, stage: column.key, column_id: data.columnId },
+        triggerPayload: {
+          from: lead.crm_column_id ?? lead.pipeline_stage,
+          stage: column.key,
+          column_id: data.columnId,
+          event_id: moveEvent.id,
+        },
         actorId: context.userId,
       });
     }

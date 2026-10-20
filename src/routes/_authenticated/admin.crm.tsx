@@ -97,6 +97,10 @@ import type { LucideIcon } from "lucide-react";
 import { AdminStatCard, type AdminStatCardTone } from "@/components/admin/AdminStatCard";
 import { scoreLead, temperatureChip, temperatureOf } from "@/lib/leads/scoring";
 import { CrmAutomationsTab } from "@/components/admin/CrmAutomationsTab";
+import {
+  controlCrmLeadAutomation,
+  getCrmLeadAutomationState,
+} from "@/lib/admin/crm-automations.functions";
 import { CrmInboxConversations } from "@/components/admin/CrmInboxConversations";
 
 export const Route = createFileRoute("/_authenticated/admin/crm")({
@@ -105,7 +109,10 @@ export const Route = createFileRoute("/_authenticated/admin/crm")({
       { title: "CRM | Instituto Empuria" },
       { name: "description", content: "Gestão de leads e atendimentos do Instituto Empuria." },
       { property: "og:title", content: "CRM | Instituto Empuria" },
-      { property: "og:description", content: "Gestão de leads e atendimentos do Instituto Empuria." },
+      {
+        property: "og:description",
+        content: "Gestão de leads e atendimentos do Instituto Empuria.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -1034,8 +1041,31 @@ function LeadDialog({
   const updateNotes = useServerFn(updateCrmLeadNotes);
   const logWa = useServerFn(logCrmWhatsappOpened);
   const findConversation = useServerFn(getCrmLeadConversation);
+  const fetchAutomation = useServerFn(getCrmLeadAutomationState);
+  const controlAutomation = useServerFn(controlCrmLeadAutomation);
   const [note, setNote] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
+  const [selectedFlow, setSelectedFlow] = useState("");
+  const [cancelExecution, setCancelExecution] = useState<string | null>(null);
+  const automation = useQuery<{
+    executions: Array<{
+      id: string;
+      status: string;
+      crm_automation_flows?: { name: string; schedule_window?: { timezone?: string } };
+      crm_automation_steps?: { title: string };
+    }>;
+    flows: Array<{ id: string; name: string }>;
+    actions: Array<{
+      execution_id: string;
+      run_at: string;
+      crm_automation_steps?: { title: string };
+    }>;
+  }>({
+    queryKey: ["crm-automation-lead", leadId],
+    queryFn: () => fetchAutomation({ data: { leadId: leadId! } }),
+    enabled: Boolean(leadId),
+    staleTime: 5_000,
+  });
   const { data: detail, isError } = useQuery<{ lead: Lead; activity: Activity[] }>({
     queryKey: ["crm-workspace", "lead-detail", leadId],
     queryFn: () =>
@@ -1079,6 +1109,22 @@ function LeadDialog({
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Nao foi possivel abrir o Inbox."),
   });
+  const flowAction = useMutation({
+    mutationFn: (
+      payload:
+        | { action: "start"; flowId: string }
+        | { action: "pause" | "resume" | "cancel"; executionId: string },
+    ) => controlAutomation({ data: { ...payload, leadId: leadId! } }),
+    onSuccess: () => {
+      toast.success("Fluxo atualizado.");
+      setCancelExecution(null);
+      qc.invalidateQueries({ queryKey: ["crm-automation-lead", leadId] });
+      qc.invalidateQueries({ queryKey: ["crm-workspace", "lead-detail", leadId] });
+      qc.invalidateQueries({ queryKey: ["crm-automations-workspace"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel atualizar o fluxo."),
+  });
 
   if (!leadId) return null;
   if (isError)
@@ -1114,7 +1160,9 @@ function LeadDialog({
         <DialogHeader className="pr-32">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <DialogTitle className="break-words font-display text-2xl">{lead.full_name}</DialogTitle>
+              <DialogTitle className="break-words font-display text-2xl">
+                {lead.full_name}
+              </DialogTitle>
               <DialogDescription>
                 Criado em {formatDateTime(lead.created_at)} · origem {lead.source || "site"}
               </DialogDescription>
@@ -1206,6 +1254,94 @@ function LeadDialog({
           </div>
 
           <aside className="space-y-3">
+            <section className="rounded-xl border border-admin-border bg-admin-surface-2 p-3">
+              <h3 className="font-display text-sm font-semibold text-admin-ink">
+                Fluxo de automação
+              </h3>
+              {automation.isLoading ? (
+                <p className="mt-2 text-xs text-admin-ink-muted">Carregando...</p>
+              ) : automation.isError ? (
+                <p className="mt-2 text-xs text-red-brand">Erro ao consultar o fluxo.</p>
+              ) : automation.data?.executions.length ? (
+                automation.data.executions.map((execution) => {
+                  const next = automation.data?.actions.find(
+                    (action) => action.execution_id === execution.id,
+                  );
+                  return (
+                    <div
+                      key={execution.id}
+                      className="mt-3 space-y-2 border-t border-admin-border pt-3 text-xs"
+                    >
+                      <div className="font-medium text-admin-ink">
+                        {execution.crm_automation_flows?.name ?? "Fluxo"}
+                      </div>
+                      <div className="text-admin-ink-muted">
+                        {execution.status === "paused" ? "Pausado" : "Em andamento"} ·{" "}
+                        {execution.crm_automation_steps?.title ?? "Início"}
+                      </div>
+                      <div className="text-admin-ink-muted">
+                        Próximo:{" "}
+                        {next
+                          ? `${next.crm_automation_steps?.title ?? "Ação"} · ${formatDateTime(next.run_at)} (${execution.crm_automation_flows?.schedule_window?.timezone ?? "Europe/Madrid"})`
+                          : "sem envio agendado"}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={flowAction.isPending}
+                          onClick={() =>
+                            flowAction.mutate({
+                              action: execution.status === "paused" ? "resume" : "pause",
+                              executionId: execution.id,
+                            })
+                          }
+                        >
+                          {execution.status === "paused" ? "Retomar" : "Pausar"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={flowAction.isPending}
+                          onClick={() => setCancelExecution(execution.id)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-admin-ink-muted">Nenhum fluxo em andamento.</p>
+                  {automation.data?.flows.length ? (
+                    <>
+                      <Select value={selectedFlow} onValueChange={setSelectedFlow}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Escolher fluxo manual" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {automation.data.flows.map((flow) => (
+                            <SelectItem key={flow.id} value={flow.id}>
+                              {flow.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        disabled={!selectedFlow || flowAction.isPending}
+                        onClick={() => flowAction.mutate({ action: "start", flowId: selectedFlow })}
+                      >
+                        Iniciar fluxo
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-admin-ink-muted">Nenhum fluxo manual ativo.</p>
+                  )}
+                </div>
+              )}
+            </section>
             <Button
               variant="outline"
               className="w-full justify-start gap-2"
@@ -1294,6 +1430,32 @@ function LeadDialog({
           </aside>
         </div>
       </DialogContent>
+      <AlertDialog
+        open={Boolean(cancelExecution)}
+        onOpenChange={(open) => !open && setCancelExecution(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar este fluxo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os próximos envios serão cancelados. O histórico permanece na timeline.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={flowAction.isPending}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={flowAction.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (cancelExecution)
+                  flowAction.mutate({ action: "cancel", executionId: cancelExecution });
+              }}
+            >
+              Cancelar fluxo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
@@ -2165,6 +2327,8 @@ function formatDateTime(value: string) {
 function formatActivity(event: Activity) {
   const payload = (event.payload ?? {}) as Record<string, string>;
   switch (event.kind) {
+    case "crm_automation":
+      return `${payload.flow ?? "Fluxo"}${payload.step ? ` · ${payload.step}` : ""}: ${payload.message || payload.event_type || "evento registrado"}`;
     case "created":
       return "Lead criado.";
     case "stage_changed":

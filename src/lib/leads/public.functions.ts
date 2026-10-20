@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { scoreLead, TIMELINE_LABEL, BUDGET_LABEL, COUNTRY_LABEL, VISA_LABEL } from "./scoring";
 import { normalizePhone, getCountryFromPhone } from "@/lib/phone/phone.utils";
+import { startMatchingCrmAutomationsForLead } from "@/lib/admin/crm-automations.functions";
 
 const schema = z.object({
   full_name: z.string().trim().min(2).max(120),
@@ -54,5 +55,10 @@ export const submitConsultoriaLead = createServerFn({ method: "POST" })
       .single();
 
     if (error) throw new Error(error.message);
+    await startMatchingCrmAutomationsForLead({
+      leadId: row.id,
+      triggerType: "lead_created",
+      triggerPayload: { source: "site" },
+    });
     return { ok: true, leadId: row.id, firstName };
   });
