@@ -1,9 +1,22 @@
 export type AutomationWindow = {
+  enabled?: boolean;
   timezone?: string;
   weekdays?: number[];
   start?: string;
   end?: string;
 };
+
+export function defaultScheduleWindow(
+  value?: AutomationWindow,
+): AutomationWindow & { enabled: boolean } {
+  return {
+    enabled: value?.enabled !== false,
+    timezone: value?.timezone ?? "Europe/Madrid",
+    weekdays: value?.weekdays ?? [1, 2, 3, 4, 5],
+    start: value?.start ?? "09:00",
+    end: value?.end ?? "18:00",
+  };
+}
 
 function timeToMinutes(value: string | undefined, fallback: string) {
   const text = value && /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : fallback;
@@ -12,6 +25,7 @@ function timeToMinutes(value: string | undefined, fallback: string) {
 }
 
 export function isWithinWindow(date: Date, window: AutomationWindow) {
+  if (window.enabled === false) return true;
   const timezone = window.timezone ?? "Europe/Madrid";
   const weekdayText = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
@@ -35,6 +49,7 @@ export function isWithinWindow(date: Date, window: AutomationWindow) {
 }
 
 export function nextAllowedRunAt(now: Date, window: AutomationWindow) {
+  if (window.enabled === false) return now;
   let cursor = new Date(now.getTime() + 60_000);
   cursor.setUTCSeconds(0, 0);
   // Scan in quarter-hour jumps, then refine to the first permitted minute.

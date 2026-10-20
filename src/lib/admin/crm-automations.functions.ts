@@ -14,7 +14,8 @@ import {
   type InboxMediaKind,
 } from "@/lib/uazapi/uazapi.media";
 import { renderCrmAutomationTemplate } from "./crm-automation.template";
-import { isWithinWindow, nextAllowedRunAt } from "./crm-automation.schedule";
+import { defaultScheduleWindow, isWithinWindow, nextAllowedRunAt } from "./crm-automation.schedule";
+import { defaultStopRules, shouldStopForLead } from "./crm-automation.rules";
 
 const db = supabaseAdmin as any;
 
@@ -104,28 +105,6 @@ const flowInputSchema = z.object({
   schedule_window: z.record(z.any()).default({}),
   steps: z.array(stepInputSchema).min(1).max(30),
 });
-
-function defaultStopRules(value?: Record<string, any>) {
-  return {
-    stop_on_final_stage: true,
-    max_messages_per_lead: 4,
-    min_minutes_between_messages: 15,
-    block_if_whatsapp_disconnected: true,
-    ...(value ?? {}),
-    stop_on_reply: true,
-    avoid_conflicts: true,
-  };
-}
-
-function defaultScheduleWindow(value?: Record<string, any>) {
-  return {
-    timezone: "Europe/Madrid",
-    weekdays: [1, 2, 3, 4, 5],
-    start: "09:00",
-    end: "18:00",
-    ...(value ?? {}),
-  };
-}
 
 function isFinalStage(stage: string | null | undefined) {
   return stage === "fechado" || stage === "descartado";
@@ -274,6 +253,15 @@ async function stopExecution(
   reason: string,
   stepId?: string | null,
 ) {
+  if (reason === "lead_replied") {
+    const { error } = await db.rpc("crm_automation_stop_for_lead", {
+      p_lead_id: execution.lead_id,
+      p_reason: reason,
+      p_step_id: null,
+    });
+    if (error) throw new Error(error.message);
+    return;
+  }
   const stoppedAt = new Date().toISOString();
   const { data: stopped, error } = await db
     .from("crm_automation_executions")
@@ -330,21 +318,11 @@ async function shouldStopBeforeStep(
   lead: LeadRow,
 ) {
   const stopRules = defaultStopRules(flow.stop_rules);
-  if (stopRules.stop_on_final_stage && isFinalStage(lead.pipeline_stage)) return "final_stage";
-  if (await hasInboundAfter(lead.id, execution.started_at)) {
-    return "lead_replied";
-  }
-  return null;
-}
-
-async function messagesSentInExecution(executionId: string) {
-  const { count, error } = await db
-    .from("crm_automation_execution_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("execution_id", executionId)
-    .eq("event_type", "message_sent");
-  if (error) throw new Error(error.message);
-  return count ?? 0;
+  return shouldStopForLead(
+    stopRules,
+    lead.pipeline_stage,
+    stopRules.stop_on_reply && (await hasInboundAfter(lead.id, execution.started_at)),
+  );
 }
 
 async function completeExecution(execution: AutomationExecution, stepId?: string | null) {
@@ -452,39 +430,8 @@ async function processStep(action: PendingAction) {
     return;
   }
 
-  const rules = defaultStopRules(flowRow.stop_rules);
   let skipNext = false;
   if (step.step_type === "send_whatsapp") {
-    if (
-      leadRow.last_outbound_at &&
-      Date.now() - new Date(leadRow.last_outbound_at).getTime() <
-        Number(rules.min_minutes_between_messages ?? 15) * 60 * 1000
-    ) {
-      const retryAt = addMinutes(now, Number(rules.min_minutes_between_messages ?? 15));
-      await db
-        .from("crm_automation_pending_actions")
-        .update({ status: "pending", run_at: retryAt.toISOString(), locked_at: null })
-        .eq("id", action.id)
-        .eq("status", "locked");
-      await logAutomation({
-        executionId: executionRow.id,
-        flowId: flowRow.id,
-        leadId: leadRow.id,
-        stepId: step.id,
-        eventType: "anti_spam_rescheduled",
-        message: "Envio reagendado por intervalo minimo entre mensagens.",
-        metadata: { next_run_at: retryAt.toISOString() },
-      });
-      return;
-    }
-
-    if (
-      (await messagesSentInExecution(executionRow.id)) >= Number(rules.max_messages_per_lead ?? 4)
-    ) {
-      await stopExecution(executionRow, "max_messages_reached", step.id);
-      return;
-    }
-
     const body = await messageForStep(step, leadRow);
     const sent = await sendCrmWhatsappMessageInternal({
       leadId: leadRow.id,
@@ -669,6 +616,14 @@ async function processPendingAction(action: PendingAction) {
     return { status: "processed" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao processar automacao.";
+    const { data: current } = await db
+      .from("crm_automation_executions")
+      .select("status")
+      .eq("id", action.execution_id)
+      .maybeSingle();
+    if (current?.status === "stopped" || current?.status === "completed") {
+      return { status: "skipped" };
+    }
     const attempts = Number(locked.attempts ?? 1);
     const { data: failedStep } = await db
       .from("crm_automation_steps")
@@ -831,8 +786,6 @@ export async function startMatchingCrmAutomationsForLead(input: {
   if (flowsError) throw new Error(flowsError.message);
 
   const leadRow = lead as LeadRow;
-  if (isFinalStage(leadRow.pipeline_stage)) return { started: 0 };
-
   let started = 0;
   for (const flow of ((flows ?? []) as AutomationFlow[]).filter(
     (item) =>
@@ -840,6 +793,7 @@ export async function startMatchingCrmAutomationsForLead(input: {
       flowMatchesLead(item, input.triggerType, leadRow, input.triggerPayload),
   )) {
     const rules = defaultStopRules(flow.stop_rules);
+    if (rules.stop_on_final_stage && isFinalStage(leadRow.pipeline_stage)) continue;
     const activeQuery = db
       .from("crm_automation_executions")
       .select("id, flow_id")
@@ -1118,22 +1072,35 @@ export const saveCrmAutomationFlow = createServerFn({ method: "POST" })
   .inputValidator((d) => flowInputSchema.parse(d))
   .handler(async ({ data, context }) => {
     await assertManage(context.userId, context.isAdmin);
-    const timezone = String(data.schedule_window.timezone ?? "Europe/Madrid");
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-    } catch {
-      throw new Error("Fuso horario invalido.");
+    const window = defaultScheduleWindow(data.schedule_window);
+    if (window.enabled) {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: window.timezone });
+      } catch {
+        throw new Error("Fuso horario invalido.");
+      }
+      if (
+        !Array.isArray(window.weekdays) ||
+        window.weekdays.length === 0 ||
+        window.weekdays.some((day) => !Number.isInteger(day) || day < 0 || day > 6) ||
+        !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(window.start)) ||
+        !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(window.end)) ||
+        String(window.start) >= String(window.end)
+      )
+        throw new Error("Janela de envio invalida.");
     }
-    const weekdays = data.schedule_window.weekdays;
-    if (
-      !Array.isArray(weekdays) ||
-      weekdays.length === 0 ||
-      weekdays.some((day) => !Number.isInteger(day) || day < 0 || day > 6) ||
-      !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(data.schedule_window.start ?? "")) ||
-      !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(data.schedule_window.end ?? "")) ||
-      String(data.schedule_window.start) >= String(data.schedule_window.end)
-    )
-      throw new Error("Janela de envio invalida.");
+    const rules = defaultStopRules(data.stop_rules);
+    if (rules.on_reply_move_stage_enabled) {
+      if (!rules.stop_on_reply || !rules.on_reply_move_stage)
+        throw new Error("Selecione uma coluna ativa e habilite a parada por resposta.");
+      const { data: destination } = await db
+        .from("crm_columns")
+        .select("id")
+        .eq("id", rules.on_reply_move_stage)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!destination) throw new Error("A coluna escolhida foi arquivada ou removida.");
+    }
     if (data.steps.some((step, index) => step.position !== index + 1))
       throw new Error("Os blocos devem ter posicoes consecutivas.");
     const allowedVariables = new Set([
@@ -1193,8 +1160,8 @@ export const saveCrmAutomationFlow = createServerFn({ method: "POST" })
       description: data.description || null,
       trigger_type: data.trigger_type,
       trigger_config: data.trigger_config,
-      stop_rules: defaultStopRules(data.stop_rules),
-      schedule_window: defaultScheduleWindow(data.schedule_window),
+      stop_rules: { ...data.stop_rules, ...rules },
+      schedule_window: window,
     };
     const { data: flowId, error } = await db.rpc("crm_automation_save_flow_atomic", {
       p_flow: payload as Json,
