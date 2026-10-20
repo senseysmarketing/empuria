@@ -1,3 +1,4 @@
+import { WHATSAPP_URL, WHATSAPP_DISPLAY } from "@/lib/contact";
 import logoCompleta from "@/assets/logo-empuria-completa.png";
 
 export function SiteFooter() {
@@ -44,12 +45,12 @@ export function SiteFooter() {
               </li>
               <li>
                 <a
-                  href="https://wa.me/34627906817"
+                  href={WHATSAPP_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-yellow-brand transition"
                 >
-                  +34 627 90 68 17
+                  {WHATSAPP_DISPLAY}
                 </a>
               </li>
               <li>Seg–Sex · 12h às 20h</li>
