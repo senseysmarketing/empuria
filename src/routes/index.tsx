@@ -1,3 +1,4 @@
+import { WHATSAPP_URL, WHATSAPP_DISPLAY } from "@/lib/contact";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -167,12 +168,12 @@ function HomePage() {
                 <MessageCircle className="w-4 h-4 text-yellow-brand" />
                 <span>Fale no WhatsApp:</span>
                 <a
-                  href="https://wa.me/34627906817"
+                  href={WHATSAPP_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-yellow-brand hover:text-offwhite underline underline-offset-4 transition"
                 >
-                  +34 627 90 68 17
+                  {WHATSAPP_DISPLAY}
                 </a>
               </div>
             </Reveal>

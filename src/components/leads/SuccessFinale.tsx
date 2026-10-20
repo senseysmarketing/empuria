@@ -1,11 +1,20 @@
+import { useEffect } from "react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { whatsappLeadUrl } from "@/lib/contact";
 
 // Simplified topographic Spain outline — single stroke for line-draw effect
 const SPAIN_PATH =
   "M 30 80 Q 50 60 90 65 Q 130 55 170 60 Q 210 50 250 65 Q 280 75 290 100 Q 295 130 270 150 Q 240 165 200 160 Q 160 170 120 165 Q 80 170 50 155 Q 25 135 30 105 Z";
 
 export function SuccessFinale({ firstName, onClose }: { firstName: string; onClose: () => void }) {
+  const waUrl = whatsappLeadUrl(firstName);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      window.location.assign(waUrl);
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [waUrl]);
   return (
     <div className="flex flex-col items-center text-center py-4 space-y-5">
       <motion.svg
@@ -62,14 +71,23 @@ export function SuccessFinale({ firstName, onClose }: { firstName: string; onClo
         transition={{ delay: 1.7, duration: 0.5 }}
         className="font-body italic text-base text-brown/70 max-w-md"
       >
-        Nossa equipe fará a triagem inicial e entrará em contato pelo WhatsApp em até 24 horas.
+        Vamos continuar a conversa pelo WhatsApp. Você será direcionado em instantes...
       </motion.p>
 
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 2.1, duration: 0.4 }}
+        className="flex flex-col items-center gap-2"
       >
+        <Button
+          asChild
+          className="bg-orange-brand hover:bg-yellow-brand hover:text-brown text-offwhite font-display uppercase tracking-widest text-xs"
+        >
+          <a href={waUrl} target="_blank" rel="noopener noreferrer">
+            Falar no WhatsApp agora
+          </a>
+        </Button>
         <Button
           onClick={onClose}
           variant="ghost"
