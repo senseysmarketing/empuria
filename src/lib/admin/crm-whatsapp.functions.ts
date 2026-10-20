@@ -14,6 +14,7 @@ import {
   MAX_INBOX_MEDIA_BYTES,
   type InboxMediaKind,
 } from "@/lib/uazapi/uazapi.media";
+import { defaultStopRules } from "./crm-automation.rules";
 
 type CrmWhatsappSendInput = {
   leadId: string;
@@ -60,7 +61,14 @@ export async function sendCrmWhatsappMessageInternal(input: CrmWhatsappSendInput
   if (leadError) throw new Error(leadError.message);
 
   const leadRow = lead as LeadForWhatsapp;
-  if (isFinalStage(leadRow.pipeline_stage)) {
+  const { data: flow, error: flowError } = await db
+    .from("crm_automation_flows")
+    .select("stop_rules")
+    .eq("id", input.flowId)
+    .single();
+  if (flowError) throw new Error("Fluxo de automacao indisponivel.");
+  const rules = defaultStopRules(flow.stop_rules);
+  if (rules.stop_on_final_stage && isFinalStage(leadRow.pipeline_stage)) {
     throw new Error("Lead em etapa final nao pode receber automacao.");
   }
 
@@ -144,15 +152,33 @@ export async function sendCrmWhatsappMessageInternal(input: CrmWhatsappSendInput
       .select("status,started_at")
       .eq("id", input.executionId)
       .maybeSingle();
-    const { data: reply } = await db
-      .from("crm_messages")
-      .select("id")
-      .eq("lead_id", leadRow.id)
-      .eq("direction", "inbound")
-      .gt("created_at", execution?.started_at ?? sentAt)
-      .limit(1)
-      .maybeSingle();
-    if (!execution || !["running", "waiting"].includes(execution.status) || reply) {
+    const [{ data: reply }, { data: latestLead }] = await Promise.all([
+      rules.stop_on_reply && execution
+        ? db
+            .from("crm_messages")
+            .select("id")
+            .eq("lead_id", leadRow.id)
+            .eq("direction", "inbound")
+            .gt("created_at", execution.started_at)
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      db.from("leads").select("pipeline_stage").eq("id", leadRow.id).single(),
+    ]);
+    if (reply && rules.stop_on_reply) {
+      const { error: stopError } = await db.rpc("crm_automation_stop_for_lead", {
+        p_lead_id: leadRow.id,
+        p_reason: "lead_replied",
+        p_step_id: null,
+      });
+      if (stopError) throw new Error(stopError.message);
+    }
+    if (
+      !execution ||
+      !["running", "waiting"].includes(execution.status) ||
+      reply ||
+      (rules.stop_on_final_stage && isFinalStage(latestLead?.pipeline_stage))
+    ) {
       await db.from("crm_messages").update({ status: "canceled" }).eq("id", messageId);
       throw new Error("Execucao interrompida antes do envio.");
     }

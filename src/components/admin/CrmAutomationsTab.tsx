@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import {
   allowedMediaMime,
@@ -134,6 +135,31 @@ const defaultSteps: Step[] = [
   },
   { position: 4, step_type: "end", title: "Encerrar", config: {} },
 ];
+
+const timezoneOptions = [
+  "Europe/Madrid",
+  "Europe/Lisbon",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "America/Sao_Paulo",
+  "America/Manaus",
+  "America/Recife",
+  "America/Fortaleza",
+  "America/Cuiaba",
+  "America/Porto_Velho",
+  "America/Rio_Branco",
+  "UTC",
+];
+
+function validTimezone(value: string) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function CrmAutomationsTab() {
   const fetchWorkspace = useServerFn(listCrmAutomationWorkspace);
@@ -481,11 +507,12 @@ function FlowEditorDialog({
         stop_on_reply: true,
         stop_on_final_stage: true,
         avoid_conflicts: true,
-        max_messages_per_lead: 4,
-        min_minutes_between_messages: 15,
+        on_reply_move_stage_enabled: false,
+        on_reply_move_stage: null,
         ...(flow?.stop_rules ?? {}),
       },
       schedule_window: {
+        enabled: flow ? flow.schedule_window.enabled !== false : false,
         timezone: "Europe/Madrid",
         weekdays: [1, 2, 3, 4, 5],
         start: "09:00",
@@ -775,112 +802,172 @@ function FlowEditorDialog({
             </div>
 
             <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
-              <h3 className="font-display text-lg font-semibold">Proteções</h3>
+              <h3 className="font-display text-lg font-semibold">Regras de parada</h3>
               <div className="mt-3 space-y-3">
-                <Field label="Máx. mensagens por lead">
-                  <Input
-                    type="number"
-                    min={1}
-                    value={Number(draft.stop_rules.max_messages_per_lead ?? 4)}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        stop_rules: {
-                          ...draft.stop_rules,
-                          max_messages_per_lead: Number(event.target.value),
-                        },
-                      })
-                    }
-                    disabled={!canManage}
-                  />
-                </Field>
-                <Field label="Intervalo mínimo (min)">
-                  <Input
-                    type="number"
-                    min={1}
-                    value={Number(draft.stop_rules.min_minutes_between_messages ?? 15)}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        stop_rules: {
-                          ...draft.stop_rules,
-                          min_minutes_between_messages: Number(event.target.value),
-                        },
-                      })
-                    }
-                    disabled={!canManage}
-                  />
-                </Field>
+                {(
+                  [
+                    ["stop_on_reply", "Parar quando o lead responder"],
+                    ["stop_on_final_stage", "Parar em etapa final"],
+                    ["avoid_conflicts", "Evitar fluxos conflitantes para o mesmo lead"],
+                    ["on_reply_move_stage_enabled", "Ao responder, mover lead para etapa"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="flex items-center justify-between gap-3 text-sm">
+                    <span>{label}</span>
+                    <Switch
+                      checked={draft.stop_rules[key] === true}
+                      disabled={
+                        !canManage ||
+                        (key === "on_reply_move_stage_enabled" &&
+                          draft.stop_rules.stop_on_reply !== true)
+                      }
+                      onCheckedChange={(checked) =>
+                        setDraft((current) => ({
+                          ...current,
+                          stop_rules: {
+                            ...current.stop_rules,
+                            [key]: checked,
+                            ...(key === "stop_on_reply" && !checked
+                              ? { on_reply_move_stage_enabled: false }
+                              : {}),
+                          },
+                        }))
+                      }
+                    />
+                  </label>
+                ))}
+                {draft.stop_rules.on_reply_move_stage_enabled === true && (
+                  <Field label="Etapa ao responder">
+                    <Select
+                      value={String(draft.stop_rules.on_reply_move_stage ?? "")}
+                      onValueChange={(value) =>
+                        setDraft((current) => ({
+                          ...current,
+                          stop_rules: { ...current.stop_rules, on_reply_move_stage: value },
+                        }))
+                      }
+                      disabled={!canManage}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma coluna ativa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {columns.map((column) => (
+                          <SelectItem key={column.id} value={column.id}>
+                            {column.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
               </div>
             </div>
 
             <div className="rounded-xl border border-admin-border bg-admin-surface p-4">
               <h3 className="font-display text-lg font-semibold">Janela de envio</h3>
-              <Field label="Fuso IANA">
-                <Input
-                  value={String(draft.schedule_window.timezone ?? "Europe/Madrid")}
-                  onChange={(event) =>
-                    setDraft({
-                      ...draft,
-                      schedule_window: { ...draft.schedule_window, timezone: event.target.value },
-                    })
-                  }
+              <label className="mt-3 flex items-center justify-between gap-3 text-sm">
+                <span>Respeitar janela de envio</span>
+                <Switch
+                  checked={draft.schedule_window.enabled !== false}
                   disabled={!canManage}
-                />
-              </Field>
-              <div className="mt-3 flex flex-wrap gap-1">
-                {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-                  <Button
-                    key={day}
-                    type="button"
-                    size="sm"
-                    variant={
-                      ((draft.schedule_window.weekdays as number[]) ?? []).includes(day)
-                        ? "default"
-                        : "outline"
-                    }
-                    disabled={!canManage}
-                    onClick={() => {
-                      const weekdays = new Set((draft.schedule_window.weekdays as number[]) ?? []);
-                      if (weekdays.has(day)) weekdays.delete(day);
-                      else weekdays.add(day);
-                      setDraft({
-                        ...draft,
-                        schedule_window: {
-                          ...draft.schedule_window,
-                          weekdays: [...weekdays].sort(),
-                        },
-                      });
-                    }}
-                  >
-                    {["D", "S", "T", "Q", "Q", "S", "S"][day]}
-                  </Button>
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Input
-                  type="time"
-                  value={String(draft.schedule_window.start ?? "09:00")}
-                  onChange={(event) =>
-                    setDraft({
-                      ...draft,
-                      schedule_window: { ...draft.schedule_window, start: event.target.value },
-                    })
+                  onCheckedChange={(enabled) =>
+                    setDraft((current) => ({
+                      ...current,
+                      schedule_window: { ...current.schedule_window, enabled },
+                    }))
                   }
-                  disabled={!canManage}
                 />
-                <Input
-                  type="time"
-                  value={String(draft.schedule_window.end ?? "18:00")}
-                  onChange={(event) =>
-                    setDraft({
-                      ...draft,
-                      schedule_window: { ...draft.schedule_window, end: event.target.value },
-                    })
-                  }
-                  disabled={!canManage}
-                />
-              </div>
+              </label>
+              {draft.schedule_window.enabled !== false && (
+                <>
+                  <Field label="Fuso IANA">
+                    <Select
+                      value={String(draft.schedule_window.timezone ?? "Europe/Madrid")}
+                      onValueChange={(timezone) =>
+                        setDraft((current) => ({
+                          ...current,
+                          schedule_window: { ...current.schedule_window, timezone },
+                        }))
+                      }
+                      disabled={!canManage}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um fuso" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[
+                          ...new Set([
+                            ...timezoneOptions,
+                            String(draft.schedule_window.timezone ?? "Europe/Madrid"),
+                          ]),
+                        ]
+                          .filter(validTimezone)
+                          .map((timezone) => (
+                            <SelectItem key={timezone} value={timezone}>
+                              {timezone}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                      <Button
+                        key={day}
+                        type="button"
+                        size="sm"
+                        variant={
+                          ((draft.schedule_window.weekdays as number[]) ?? []).includes(day)
+                            ? "default"
+                            : "outline"
+                        }
+                        disabled={!canManage}
+                        onClick={() => {
+                          const weekdays = new Set(
+                            (draft.schedule_window.weekdays as number[]) ?? [],
+                          );
+                          if (weekdays.has(day)) weekdays.delete(day);
+                          else weekdays.add(day);
+                          setDraft({
+                            ...draft,
+                            schedule_window: {
+                              ...draft.schedule_window,
+                              weekdays: [...weekdays].sort(),
+                            },
+                          });
+                        }}
+                      >
+                        {["D", "S", "T", "Q", "Q", "S", "S"][day]}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Input
+                      type="time"
+                      value={String(draft.schedule_window.start ?? "09:00")}
+                      onChange={(event) =>
+                        setDraft({
+                          ...draft,
+                          schedule_window: { ...draft.schedule_window, start: event.target.value },
+                        })
+                      }
+                      disabled={!canManage}
+                    />
+                    <Input
+                      type="time"
+                      value={String(draft.schedule_window.end ?? "18:00")}
+                      onChange={(event) =>
+                        setDraft({
+                          ...draft,
+                          schedule_window: { ...draft.schedule_window, end: event.target.value },
+                        })
+                      }
+                      disabled={!canManage}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </aside>
         </div>
