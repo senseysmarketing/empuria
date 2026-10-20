@@ -290,14 +290,24 @@ export function CrmInboxConversations({
       ),
     [messagesQ.data],
   );
+  const positionedConversationRef = useRef<string | null>(null);
+  const nearBottomRef = useRef(true);
   useLayoutEffect(() => {
     const element = messageScrollRef.current;
+    if (!element) return;
     const anchor = scrollAnchorRef.current;
-    if (element && anchor) {
+    if (anchor) {
       element.scrollTop = anchor.top + element.scrollHeight - anchor.height;
       scrollAnchorRef.current = null;
+      return;
     }
-  }, [messages.length]);
+    if (!messages.length) return;
+    if (positionedConversationRef.current !== selectedId || nearBottomRef.current) {
+      element.scrollTop = element.scrollHeight;
+      positionedConversationRef.current = selectedId ?? null;
+      nearBottomRef.current = true;
+    }
+  }, [messages.length, selectedId]);
   const connectionQ = useQuery({
     queryKey: ["crm-inbox", "connection"],
     queryFn: () => connectionFn(),
@@ -720,6 +730,10 @@ export function CrmInboxConversations({
             </header>
             <div
               ref={messageScrollRef}
+              onScroll={(event) => {
+                const el = event.currentTarget;
+                nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+              }}
               className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-admin-bg p-4"
             >
               {messagesQ.hasNextPage && (
