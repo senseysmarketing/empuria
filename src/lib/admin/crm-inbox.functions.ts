@@ -220,9 +220,11 @@ export const sendCrmInboxMedia = createServerFn({ method: "POST" })
     if (!conversation) throw new Error("Conversa nao encontrada.");
     const { data: existing } = await db
       .from("crm_messages")
-      .select("id,status")
+      .select("id,status,conversation_id")
       .eq("client_request_id", data.requestId)
       .maybeSingle();
+    if (existing && existing.conversation_id !== data.conversationId)
+      throw new Error("Identificador de envio ja utilizado em outra conversa.");
     if (existing)
       return {
         ok: !["sending", "uncertain", "failed"].includes(existing.status),
@@ -252,7 +254,7 @@ export const sendCrmInboxMedia = createServerFn({ method: "POST" })
     if (ingestError || !ingested?.[0]?.message_id)
       throw new Error("Nao foi possivel reservar o envio.");
     const messageId = ingested[0].message_id as string;
-    await db
+    const { error: metadataError } = await db
       .from("crm_messages")
       .update({
         sent_by: context.userId,
@@ -263,6 +265,10 @@ export const sendCrmInboxMedia = createServerFn({ method: "POST" })
         media_path: data.path,
       })
       .eq("id", messageId);
+    if (metadataError) {
+      await db.from("crm_messages").update({ status: "failed" }).eq("id", messageId);
+      return { ok: false, status: "failed", messageId };
+    }
     if (!ingested[0].inserted) return { ok: false, status: "uncertain", messageId };
     try {
       const { data: signed, error: signedError } = await supabaseAdmin.storage

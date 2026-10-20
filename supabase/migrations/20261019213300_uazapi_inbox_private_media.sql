@@ -35,10 +35,14 @@ BEGIN
   IF old_rank >= 3 AND new_rank < old_rank THEN NEW.status := OLD.status; END IF;
   RETURN NEW;
 END $$;
-DROP TRIGGER IF EXISTS crm_message_receipt_no_regression ON public.crm_messages;
-CREATE TRIGGER crm_message_receipt_no_regression
-  BEFORE UPDATE OF status ON public.crm_messages FOR EACH ROW
-  EXECUTE FUNCTION public.crm_message_receipt_no_regression();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'crm_message_receipt_no_regression'
+    AND tgrelid = 'public.crm_messages'::regclass) THEN
+    CREATE TRIGGER crm_message_receipt_no_regression
+      BEFORE UPDATE OF status ON public.crm_messages FOR EACH ROW
+      EXECUTE FUNCTION public.crm_message_receipt_no_regression();
+  END IF;
+END $$;
 REVOKE ALL ON FUNCTION public.crm_message_receipt_no_regression() FROM PUBLIC, anon, authenticated;
 
 UPDATE public.crm_messages SET media_kind = CASE
