@@ -1109,6 +1109,10 @@ function NewTransactionDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="mt-1 text-xs text-admin-ink-muted">
+                  Pedidos da Esteira já geram seu lançamento financeiro. Não registre a mesma venda
+                  novamente como receita manual.
+                </p>
               </Field>
             )}
             {orderMode ? (

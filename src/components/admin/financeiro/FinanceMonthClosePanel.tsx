@@ -112,6 +112,10 @@ export function FinanceMonthClosePanel({
           );
         })}
         <BentoCard title="Serviços mais vendidos">
+          <p className="mb-3 text-xs text-admin-ink-muted">
+            Vendido e a receber seguem a competência do Pedido ou o vencimento do lançamento manual.
+            Recebido segue a data da baixa. Cada moeda é exibida separadamente.
+          </p>
           <div className="space-y-3 text-sm">
             {analytics.services.map((row) => (
               <div
