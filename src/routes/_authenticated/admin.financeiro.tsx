@@ -81,8 +81,13 @@ const FINANCE_GROUPS = [
   ["mentoria", "Mentoria"],
 ] as const;
 const ORIGIN_OPTIONS = [
-  "manual", "orders", "pdv", "team_payout", "recurring",
-  "partner_distribution", "month_adjustment",
+  "manual",
+  "orders",
+  "pdv",
+  "team_payout",
+  "recurring",
+  "partner_distribution",
+  "month_adjustment",
 ];
 
 function financeGroupLabel(group?: string | null) {
