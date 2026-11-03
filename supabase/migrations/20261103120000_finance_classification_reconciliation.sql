@@ -16,17 +16,17 @@ CREATE INDEX finance_transactions_manual_service_idx
 
 DO $seed$
 BEGIN
-  IF (SELECT count(*) FROM public.services WHERE title = 'Mentoria de Regularização') <> 1
-    OR (SELECT count(*) FROM public.services WHERE title = 'Recepção no Aeroporto') <> 1 THEN
-    RAISE EXCEPTION 'Existing Mentoria/Recepção services do not match the expected baseline';
+  IF (SELECT count(*) FROM public.services WHERE slug = 'vale-transporte') <> 1
+    OR (SELECT count(*) FROM public.services WHERE slug = 'recepcao-aeroporto') <> 1 THEN
+    RAISE EXCEPTION 'Existing Mentoria/Recepção service slugs do not match the expected baseline';
   END IF;
   UPDATE public.services SET finance_group = 'mentoria'
-    WHERE title = 'Mentoria de Regularização' AND finance_group IS NULL;
+    WHERE slug = 'vale-transporte' AND finance_group IS NULL;
   UPDATE public.services SET finance_group = 'recepcao'
-    WHERE title = 'Recepção no Aeroporto' AND finance_group IS NULL;
+    WHERE slug = 'recepcao-aeroporto' AND finance_group IS NULL;
   IF EXISTS (SELECT 1 FROM public.services
-    WHERE (title = 'Mentoria de Regularização' AND finance_group <> 'mentoria')
-       OR (title = 'Recepção no Aeroporto' AND finance_group <> 'recepcao')) THEN
+    WHERE (slug = 'vale-transporte' AND finance_group <> 'mentoria')
+       OR (slug = 'recepcao-aeroporto' AND finance_group <> 'recepcao')) THEN
     RAISE EXCEPTION 'Existing service classification conflicts with expected group';
   END IF;
   IF EXISTS (SELECT 1 FROM public.services

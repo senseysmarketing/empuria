@@ -12,6 +12,14 @@ import { BentoCard } from "@/components/admin/BentoCard";
 import type { FinanceDashboardData } from "@/lib/admin/finance-close.functions";
 
 type Currency = "BRL" | "EUR";
+const GROUP_LABELS: Record<string, string> = {
+  matricula: "Matrícula",
+  estudo: "Estudo",
+  nomade: "Nômade",
+  quarto: "Quarto",
+  recepcao: "Recepção",
+  mentoria: "Mentoria",
+};
 
 function money(cents: number, currency: Currency) {
   return new Intl.NumberFormat(currency === "EUR" ? "pt-PT" : "pt-BR", {
@@ -111,8 +119,8 @@ export function FinanceMonthClosePanel({
                 className="border-b border-admin-border pb-2"
               >
                 <strong>
-                  {row.commercial_group
-                    ? `${({ matricula: "Matrícula", estudo: "Estudo", nomade: "Nômade", quarto: "Quarto", recepcao: "Recepção", mentoria: "Mentoria" } as Record<string, string>)[row.commercial_group] ?? row.service_title} · `
+                  {row.commercial_group && GROUP_LABELS[row.commercial_group] !== row.service_title
+                    ? `${GROUP_LABELS[row.commercial_group] ?? row.service_title} · `
                     : ""}
                   {row.service_title} · {row.sales_count} venda(s)
                 </strong>
