@@ -549,7 +549,7 @@ function FinanceiroContent() {
               </span>
               <div className="flex items-center gap-2">
                 <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
-                  <SelectTrigger className="w-28">
+                  <SelectTrigger className="w-36 shrink-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
