@@ -885,11 +885,16 @@ function ClassifyManualDialog({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">Sem classificação</SelectItem>
-              {services.map((service) => (
-                <SelectItem key={service.id} value={service.id}>
-                  {financeGroupLabel(service.finance_group)} · {service.title}
-                </SelectItem>
-              ))}
+              {services.map((service) => {
+                const groupLabel = financeGroupLabel(service.finance_group);
+                return (
+                  <SelectItem key={service.id} value={service.id}>
+                    {groupLabel && groupLabel.localeCompare(service.title, "pt") !== 0
+                      ? `${groupLabel} · ${service.title}`
+                      : service.title}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </Field>
@@ -1102,11 +1107,16 @@ function NewTransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sem classificação</SelectItem>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={service.id}>
-                        {financeGroupLabel(service.finance_group)} · {service.title}
-                      </SelectItem>
-                    ))}
+                    {services.map((service) => {
+                      const groupLabel = financeGroupLabel(service.finance_group);
+                      return (
+                        <SelectItem key={service.id} value={service.id}>
+                          {groupLabel && groupLabel.localeCompare(service.title, "pt") !== 0
+                            ? `${groupLabel} · ${service.title}`
+                            : service.title}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <p className="mt-1 text-xs text-admin-ink-muted">
