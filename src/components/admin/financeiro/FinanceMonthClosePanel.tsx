@@ -29,17 +29,18 @@ export function FinanceMonthClosePanel({
 }) {
   return (
     <div className="space-y-4">
-      <BentoCard title={`Resultado ao vivo · ${month}`}>
+      <BentoCard title={`Resultado gerencial ao vivo · ${month}`}>
         <p className="mb-4 text-sm text-admin-ink-muted">
-          Receitas recebidas e despesas do mês. Rossini e Luana são apenas uma referência
-          informativa; nenhum repasse é gerado automaticamente.
+          O saldo realizado usa somente entradas e saídas baixadas. O resultado gerencial também
+          considera despesas válidas ainda pendentes, incluindo repasses. Rossini e Luana são apenas
+          referência informativa; nenhum repasse é gerado automaticamente.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
           {(["BRL", "EUR"] as const).map((currency) => {
             const row = analytics.snapshot[currency];
             return (
               <section key={currency} className="rounded-lg border border-admin-border p-4">
-                <h3 className="mb-3 font-display font-semibold">Resultado {currency}</h3>
+                <h3 className="mb-3 font-display font-semibold">Resultado gerencial {currency}</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between gap-2">
                     <span>Recebido</span>
@@ -58,7 +59,7 @@ export function FinanceMonthClosePanel({
                     <strong>{money(row.recurring_expenses_cents, currency)}</strong>
                   </div>
                   <div className="flex justify-between border-t border-admin-border pt-2 font-semibold">
-                    <span>Resultado atual</span>
+                    <span>Resultado gerencial</span>
                     <span>{money(row.result_cents, currency)}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 border-t border-admin-border pt-3">
@@ -110,7 +111,10 @@ export function FinanceMonthClosePanel({
                 className="border-b border-admin-border pb-2"
               >
                 <strong>
-                  {row.service_title} · {row.sales_count} pedido(s)
+                  {row.commercial_group
+                    ? `${({ matricula: "Matrícula", estudo: "Estudo", nomade: "Nômade", quarto: "Quarto", recepcao: "Recepção", mentoria: "Mentoria" } as Record<string, string>)[row.commercial_group] ?? row.service_title} · `
+                    : ""}
+                  {row.service_title} · {row.sales_count} venda(s)
                 </strong>
                 {(["BRL", "EUR"] as const).map((currency) => {
                   const amounts = row.currencies[currency];

@@ -16,6 +16,12 @@ export type FinanceCategory = {
   is_active: boolean;
 };
 
+export type FinanceService = {
+  id: string;
+  title: string;
+  finance_group: string;
+};
+
 export type FinanceTransaction = {
   id: string;
   type: FinanceType;
@@ -42,6 +48,10 @@ export type FinanceTransaction = {
   notes: string | null;
   created_at: string;
   category_name?: string | null;
+  service_id?: string | null;
+  commercial_service_id?: string | null;
+  commercial_service_title?: string | null;
+  commercial_group?: string | null;
   is_courtesy?: boolean;
   is_courtesy_deletable?: boolean;
 };
@@ -117,7 +127,18 @@ async function financeMeta() {
     .order("type")
     .order("name");
   if (categoryErr) throw new Error(categoryErr.message);
-  return { categories: (categories ?? []) as FinanceCategory[] };
+  const { data: services, error: serviceErr } = await db
+    .from("services")
+    .select("id,title,finance_group")
+    .eq("is_active", true)
+    .is("archived_at", null)
+    .not("finance_group", "is", null)
+    .order("title");
+  if (serviceErr) throw new Error(serviceErr.message);
+  return {
+    categories: (categories ?? []) as FinanceCategory[],
+    services: (services ?? []) as FinanceService[],
+  };
 }
 
 async function validateOperationalCategory(
@@ -171,6 +192,9 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
         type: z.enum(["all", "income", "expense"]).default("all"),
         status: z.enum(["all", "pending", "received", "paid", "canceled"]).default("all"),
         sourceModule: z.string().trim().max(60).optional(),
+        commercialGroup: z
+          .enum(["matricula", "estudo", "nomade", "quarto", "recepcao", "mentoria"])
+          .optional(),
         categoryId: z.string().uuid().optional(),
         page: z.number().int().min(0).default(0),
         pageSize: z.number().int().min(10).max(100).default(25),
@@ -179,94 +203,41 @@ export const listFinanceTransactions = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await ensureFinanceMonth(data.month);
-    const { start, end } = monthRange(data.month);
+    const { start } = monthRange(data.month);
     const { categories } = await financeMeta();
     let query = db
-      .from("finance_transactions")
+      .from("finance_operational_transactions")
       .select(
-        "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
+        "id, type, status, operational_status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at, service_id, commercial_service_id, commercial_service_title, commercial_group, is_courtesy, is_courtesy_deletable",
         { count: "exact" },
       )
-      .gte("due_date", start)
-      .lte("due_date", end)
+      .eq("period_month", start)
       .order("due_date", { ascending: false })
+      .order("id", { ascending: false })
       .range(data.page * data.pageSize, data.page * data.pageSize + data.pageSize - 1);
 
     if (data.type !== "all") query = query.eq("type", data.type);
-    if (data.status !== "all") query = query.eq("status", data.status);
-    else query = query.neq("status", "canceled");
+    if (data.status !== "all") query = query.eq("operational_status", data.status);
+    else query = query.neq("operational_status", "canceled");
     if (data.categoryId) query = query.eq("category_id", data.categoryId);
-    if (data.sourceModule) query = query.eq("source_module", data.sourceModule);
+    if (data.sourceModule)
+      query =
+        data.sourceModule === "recurring"
+          ? query.like("source_module", "recurring:%")
+          : query.eq("source_module", data.sourceModule);
+    if (data.commercialGroup) query = query.eq("commercial_group", data.commercialGroup);
     if (data.search) query = query.ilike("description", `%${data.search.replace(/[%_]/g, "")}%`);
 
     const { data: rows, error, count } = await query;
     if (error) throw new Error(error.message);
-    let courtesies: FinanceTransaction[] = [];
-    if (
-      ["all", "received"].includes(data.status) &&
-      ["all", "income"].includes(data.type) &&
-      (!data.sourceModule || data.sourceModule === "orders")
-    ) {
-      const { data: courtesyOrders, error: ordersError } = await db
-        .from("orders")
-        .select("id,executed_at,delivery_status,payment_provider_payment_id")
-        .eq("payment_status", "aprovado")
-        .eq("payment_method", "gratuito")
-        .eq("amount_cents", 0)
-        .is("deleted_at", null)
-        .gte("created_at", start)
-        .lt("created_at", new Date(Date.parse(`${end}T00:00:00Z`) + 86_400_000).toISOString());
-      if (ordersError) throw new Error(ordersError.message);
-      const ids = (courtesyOrders ?? []).map((order: { id: string }) => order.id);
-      const deletableIds = new Set(
-        (courtesyOrders ?? [])
-          .filter(
-            (order: {
-              id: string;
-              executed_at: string | null;
-              delivery_status: string;
-              payment_provider_payment_id: string | null;
-            }) =>
-              !order.executed_at &&
-              order.delivery_status !== "concluido" &&
-              !order.payment_provider_payment_id,
-          )
-          .map((order: { id: string }) => order.id),
-      );
-      if (ids.length) {
-        let courtesyQuery = db
-          .from("finance_transactions")
-          .select(
-            "id, type, status, description, amount_cents, currency, settled_amount_cents, settled_currency, reference_amount_cents, reference_currency, fx_reference_rate, fx_rate, fx_source, fx_date, due_date, paid_at, category_id, account_id, payment_method, source_module, source_id, is_automatic, notes, created_at",
-          )
-          .eq("source_module", "orders")
-          .eq("status", "canceled")
-          .eq("amount_cents", 0)
-          .in("source_id", ids);
-        if (data.search)
-          courtesyQuery = courtesyQuery.ilike(
-            "description",
-            `%${data.search.replace(/[%_]/g, "")}%`,
-          );
-        if (data.categoryId) courtesyQuery = courtesyQuery.eq("category_id", data.categoryId);
-        const { data: courtesyRows, error: courtesyError } = await courtesyQuery;
-        if (courtesyError) throw new Error(courtesyError.message);
-        courtesies = (courtesyRows ?? []).map((row: FinanceTransaction) => ({
-          ...row,
-          status: "received",
-          is_courtesy: true,
-          is_courtesy_deletable: !!row.source_id && deletableIds.has(row.source_id),
-        }));
-      }
-    }
     return {
       rows: withNames(
-        [...((rows ?? []) as FinanceTransaction[]), ...courtesies].sort((a, b) =>
-          b.due_date.localeCompare(a.due_date),
+        ((rows ?? []) as (FinanceTransaction & { operational_status: FinanceStatus })[]).map(
+          (row) => ({ ...row, status: row.operational_status }),
         ),
         categories,
       ),
-      count: (count ?? 0) + courtesies.length,
+      count: count ?? 0,
     };
   });
 
@@ -278,6 +249,7 @@ const transactionInput = z.object({
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: z.literal("pending").default("pending"),
   categoryId: z.string().uuid().nullable().optional(),
+  serviceId: z.string().uuid().nullable().optional(),
   paymentMethod: z.string().trim().max(60).nullable().optional(),
   notes: z.string().trim().max(800).nullable().optional(),
 });
@@ -287,6 +259,18 @@ export const createFinanceTransaction = createServerFn({ method: "POST" })
   .inputValidator((d) => transactionInput.parse(d))
   .handler(async ({ data, context }) => {
     const category = await validateOperationalCategory(data.categoryId, data.type);
+    if (data.serviceId) {
+      if (data.type !== "income") throw new Error("Somente receitas podem ter serviço comercial.");
+      const { data: service, error: serviceError } = await db
+        .from("services")
+        .select("id")
+        .eq("id", data.serviceId)
+        .eq("is_active", true)
+        .is("archived_at", null)
+        .not("finance_group", "is", null)
+        .maybeSingle();
+      if (serviceError || !service) throw new Error("Serviço comercial inválido ou inativo.");
+    }
     if (category) {
       if (category.name === "Pedidos/Servicos") {
         throw new Error("Receitas de serviços devem ser criadas na origem Pedidos.");
@@ -305,6 +289,7 @@ export const createFinanceTransaction = createServerFn({ method: "POST" })
         settled_amount_cents: null,
         settled_currency: null,
         category_id: data.categoryId ?? null,
+        service_id: data.serviceId ?? null,
         account_id: null,
         payment_method: data.paymentMethod ?? null,
         source_module: "manual",
@@ -320,6 +305,26 @@ export const createFinanceTransaction = createServerFn({ method: "POST" })
       source_module: "manual",
     });
     return { ok: true, id: inserted.id as string };
+  });
+
+export const setFinanceManualService = createServerFn({ method: "POST" })
+  .middleware([requireModule("financeiro")])
+  .inputValidator((d) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        serviceId: z.string().uuid().nullable(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await db.rpc("finance_set_manual_service", {
+      p_id: data.id,
+      p_service_id: data.serviceId,
+      p_actor: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const deleteFinancePendingTransaction = createServerFn({ method: "POST" })

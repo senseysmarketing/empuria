@@ -55,7 +55,9 @@ import {
   updateFinanceRecurringRule,
   deleteFinancePendingTransaction,
   reverseFinanceSettlement,
+  setFinanceManualService,
   type FinanceCategory,
+  type FinanceService,
   type FinanceRecurringRule,
   type FinanceTransaction,
 } from "@/lib/admin/financeiro.functions";
@@ -70,6 +72,22 @@ const STATUS_LABEL: Record<string, string> = {
   paid: "Pago",
   canceled: "Cancelado",
 };
+const FINANCE_GROUPS = [
+  ["matricula", "Matrícula"],
+  ["estudo", "Estudo"],
+  ["nomade", "Nômade"],
+  ["quarto", "Quarto"],
+  ["recepcao", "Recepção"],
+  ["mentoria", "Mentoria"],
+] as const;
+const ORIGIN_OPTIONS = [
+  "manual", "orders", "pdv", "team_payout", "recurring",
+  "partner_distribution", "month_adjustment",
+];
+
+function financeGroupLabel(group?: string | null) {
+  return FINANCE_GROUPS.find(([key]) => key === group)?.[1] ?? null;
+}
 
 function defaultMonth() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -111,6 +129,8 @@ function FinanceiroContent() {
   const [month, setMonth] = useState(defaultMonth());
   const [tab, setTab] = useState("resumo");
   const [newOpen, setNewOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
   const [financialAction, setFinancialAction] = useState<{
     kind: "delete" | "reverse";
     id: string;
@@ -122,6 +142,7 @@ function FinanceiroContent() {
     type: "all",
     status: "all",
     sourceModule: "all",
+    commercialGroup: "all",
   });
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(filters.search), 300);
@@ -134,6 +155,7 @@ function FinanceiroContent() {
   const createTx = useServerFn(createFinanceTransaction);
   const deletePending = useServerFn(deleteFinancePendingTransaction);
   const reverseSettlement = useServerFn(reverseFinanceSettlement);
+  const classifyManual = useServerFn(setFinanceManualService);
   const settleTx = useServerFn(settleFinanceTransaction);
   const createRule = useServerFn(createFinanceRecurringRule);
   const updateRule = useServerFn(updateFinanceRecurringRule);
@@ -162,6 +184,9 @@ function FinanceiroContent() {
       filters.type,
       filters.status,
       filters.sourceModule,
+      filters.commercialGroup,
+      page,
+      pageSize,
     ],
     queryFn: () =>
       fetchTransactions({
@@ -171,8 +196,18 @@ function FinanceiroContent() {
           type: filters.type as "all" | "income" | "expense",
           status: filters.status as "all" | "pending" | "received" | "paid" | "canceled",
           sourceModule: filters.sourceModule === "all" ? undefined : filters.sourceModule,
-          page: 0,
-          pageSize: 60,
+          commercialGroup:
+            filters.commercialGroup === "all"
+              ? undefined
+              : (filters.commercialGroup as
+                  | "matricula"
+                  | "estudo"
+                  | "nomade"
+                  | "quarto"
+                  | "recepcao"
+                  | "mentoria"),
+          page,
+          pageSize,
         },
       }),
     enabled: tab === "lancamentos",
@@ -227,6 +262,7 @@ function FinanceiroContent() {
   });
 
   const categories = metaQ.data?.categories ?? [];
+  const services = metaQ.data?.services ?? [];
   const transactions = useMemo(
     () => (transactionsQ.data?.rows ?? []) as FinanceTransaction[],
     [transactionsQ.data?.rows],
@@ -238,10 +274,18 @@ function FinanceiroContent() {
         ? transactionsQ.isLoading
         : false;
 
-  const originOptions = useMemo(() => {
-    const set = new Set(transactions.map((tx) => tx.source_module));
-    return Array.from(set).sort();
-  }, [transactions]);
+  useEffect(
+    () => setPage(0),
+    [
+      month,
+      debouncedSearch,
+      filters.type,
+      filters.status,
+      filters.sourceModule,
+      filters.commercialGroup,
+      pageSize,
+    ],
+  );
   const loadError =
     dashboardQ.error ??
     (tab !== "resumo" ? metaQ.error : null) ??
@@ -285,6 +329,7 @@ function FinanceiroContent() {
           <NewTransactionDialog
             onOpenChange={setNewOpen}
             categories={categories}
+            services={services}
             createTx={createTx}
             onDone={refreshConfiguration}
           />
@@ -396,7 +441,7 @@ function FinanceiroContent() {
 
         <TabsContent value="lancamentos" className="mt-0 space-y-4">
           <BentoCard padded>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_150px_160px_170px]">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_140px_170px_160px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-ink-muted" />
                 <Input
@@ -444,9 +489,25 @@ function FinanceiroContent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas origens</SelectItem>
-                  {originOptions.map((origin) => (
+                  {ORIGIN_OPTIONS.map((origin) => (
                     <SelectItem key={origin} value={origin}>
-                      {financeOriginLabel(origin)}
+                      {origin === "recurring" ? "Recorrência" : financeOriginLabel(origin)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={filters.commercialGroup}
+                onValueChange={(v) => setFilters((p) => ({ ...p, commercialGroup: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos serviços</SelectItem>
+                  {FINANCE_GROUPS.map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -471,8 +532,47 @@ function FinanceiroContent() {
                   setFinancialAction({ kind: "reverse", id });
                   setFinancialActionError(null);
                 }}
+                services={services}
+                classify={(data) => classifyManual({ data })}
+                onClassified={refresh}
               />
             )}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-admin-border pt-4 text-sm">
+              <span>
+                {transactionsQ.data?.count ?? 0} resultado(s) · página {page + 1} de{" "}
+                {Math.max(1, Math.ceil((transactionsQ.data?.count ?? 0) / pageSize))}
+              </span>
+              <div className="flex items-center gap-2">
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25 por página</SelectItem>
+                    <SelectItem value="50">50 por página</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 0 || transactionsQ.isFetching}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    (page + 1) * pageSize >= (transactionsQ.data?.count ?? 0) ||
+                    transactionsQ.isFetching
+                  }
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Próxima
+                </Button>
+              </div>
+            </div>
           </BentoCard>
           <ConfirmFinancialAction
             open={!!financialAction}
@@ -588,6 +688,9 @@ function TransactionTable({
   onDone,
   onDelete,
   onReverse,
+  services,
+  classify,
+  onClassified,
   compact = false,
 }: {
   rows: FinanceTransaction[];
@@ -595,6 +698,9 @@ function TransactionTable({
   onDone: () => void;
   onDelete: (id: string) => void;
   onReverse: (id: string) => void;
+  services: FinanceService[];
+  classify: (data: { id: string; serviceId: string | null }) => Promise<unknown>;
+  onClassified: () => void;
   compact?: boolean;
 }) {
   if (!rows.length)
@@ -635,9 +741,18 @@ function TransactionTable({
                   <p className="truncate text-xs text-admin-ink-muted">
                     {tx.category_name ?? "Sem categoria"}
                   </p>
+                  {tx.type === "income" && (
+                    <p className="truncate text-xs text-admin-ink-muted">
+                      {financeGroupLabel(tx.commercial_group) ?? "Sem classificação comercial"}
+                      {tx.commercial_service_title ? ` · ${tx.commercial_service_title}` : ""}
+                    </p>
+                  )}
                 </td>
                 <td className="py-3 pr-3">
                   <Badge variant="outline">{financeOriginLabel(tx.source_module)}</Badge>
+                  {tx.source_module === "orders" && (
+                    <p className="mt-1 text-xs text-admin-ink-muted">Gerado pela Esteira</p>
+                  )}
                 </td>
                 <td
                   className={
@@ -679,6 +794,14 @@ function TransactionTable({
                           onDone={onDone}
                         />
                       )}
+                      {tx.source_module === "manual" && tx.type === "income" && (
+                        <ClassifyManualDialog
+                          transaction={tx}
+                          services={services}
+                          classify={classify}
+                          onDone={onClassified}
+                        />
+                      )}
                       {canDelete && (
                         <Button size="sm" variant="outline" onClick={() => onDelete(tx.id)}>
                           Excluir
@@ -698,6 +821,83 @@ function TransactionTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function ClassifyManualDialog({
+  transaction,
+  services,
+  classify,
+  onDone,
+}: {
+  transaction: FinanceTransaction;
+  services: FinanceService[];
+  classify: (data: { id: string; serviceId: string | null }) => Promise<unknown>;
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [serviceId, setServiceId] = useState(transaction.service_id ?? "none");
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useMutation({
+    mutationFn: () =>
+      classify({ id: transaction.id, serviceId: serviceId === "none" ? null : serviceId }),
+    onSuccess: () => {
+      setOpen(false);
+      toast.success("Classificação atualizada");
+      onDone();
+    },
+    onError: (e) => setError(e instanceof Error ? e.message : "Falha ao classificar"),
+  });
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (mutation.isPending) return;
+        setOpen(next);
+        if (next) {
+          setServiceId(transaction.service_id ?? "none");
+          setError(null);
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          Classificar
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Classificação comercial</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-admin-ink-muted">
+          Altera somente o serviço comercial deste lançamento manual. Valor, status, data e origem
+          são preservados.
+        </p>
+        <Field label="Serviço">
+          <Select value={serviceId} onValueChange={setServiceId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sem classificação</SelectItem>
+              {services.map((service) => (
+                <SelectItem key={service.id} value={service.id}>
+                  {financeGroupLabel(service.finance_group)} · {service.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        {error && (
+          <p role="alert" className="text-sm text-red-700">
+            {error}
+          </p>
+        )}
+        <Button disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+          {mutation.isPending ? "Salvando..." : "Salvar classificação"}
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -787,11 +987,13 @@ function RecurringTable({
 function NewTransactionDialog({
   onOpenChange,
   categories,
+  services,
   createTx,
   onDone,
 }: {
   onOpenChange: (open: boolean) => void;
   categories: FinanceCategory[];
+  services: FinanceService[];
   createTx: ReturnType<typeof useServerFn<typeof createFinanceTransaction>>;
   onDone: () => void;
 }) {
@@ -799,6 +1001,7 @@ function NewTransactionDialog({
   const [type, setType] = useState<"income" | "expense">("income");
   const [currency, setCurrency] = useState<"BRL" | "EUR" | "USD">("BRL");
   const [categoryId, setCategoryId] = useState("");
+  const [serviceId, setServiceId] = useState("none");
   const [orderWizardOpen, setOrderWizardOpen] = useState(false);
   const orderCategoryId = categories.find(
     (category) => category.is_system && category.name === "Pedidos/Servicos",
@@ -815,6 +1018,7 @@ function NewTransactionDialog({
           dueDate: String(form.get("dueDate") ?? ""),
           status: "pending",
           categoryId: categoryId || null,
+          serviceId: type === "income" && serviceId !== "none" ? serviceId : null,
           paymentMethod: emptyToNull(form.get("paymentMethod")),
           notes: emptyToNull(form.get("notes")),
         },
@@ -885,6 +1089,23 @@ function NewTransactionDialog({
                 </SelectContent>
               </Select>
             </Field>
+            {type === "income" && !orderMode && (
+              <Field label="Serviço comercial (opcional)">
+                <Select value={serviceId} onValueChange={setServiceId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sem classificação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem classificação</SelectItem>
+                    {services.map((service) => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {financeGroupLabel(service.finance_group)} · {service.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             {orderMode ? (
               <div className="space-y-3 rounded border border-blue-200 bg-blue-50 p-4 text-sm">
                 <strong>Receita de pedido/serviço</strong>
