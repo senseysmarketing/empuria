@@ -1646,6 +1646,13 @@ export type Database = {
             foreignKeyName: "finance_payouts_finance_transaction_id_fkey"
             columns: ["finance_transaction_id"]
             isOneToOne: true
+            referencedRelation: "finance_operational_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payouts_finance_transaction_id_fkey"
+            columns: ["finance_transaction_id"]
+            isOneToOne: true
             referencedRelation: "finance_transactions"
             referencedColumns: ["id"]
           },
@@ -1815,6 +1822,7 @@ export type Database = {
           payment_method: string | null
           reference_amount_cents: number | null
           reference_currency: string | null
+          service_id: string | null
           settled_amount_cents: number | null
           settled_currency: string | null
           source_id: string | null
@@ -1844,6 +1852,7 @@ export type Database = {
           payment_method?: string | null
           reference_amount_cents?: number | null
           reference_currency?: string | null
+          service_id?: string | null
           settled_amount_cents?: number | null
           settled_currency?: string | null
           source_id?: string | null
@@ -1873,6 +1882,7 @@ export type Database = {
           payment_method?: string | null
           reference_amount_cents?: number | null
           reference_currency?: string | null
+          service_id?: string | null
           settled_amount_cents?: number | null
           settled_currency?: string | null
           source_id?: string | null
@@ -1901,6 +1911,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_transactions_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
             referencedColumns: ["id"]
           },
         ]
@@ -3674,6 +3691,7 @@ export type Database = {
           display_price_note: string | null
           document_checklist: Json
           duration_minutes: number | null
+          finance_group: string | null
           id: string
           image_url: string | null
           is_active: boolean
@@ -3701,6 +3719,7 @@ export type Database = {
           display_price_note?: string | null
           document_checklist?: Json
           duration_minutes?: number | null
+          finance_group?: string | null
           id?: string
           image_url?: string | null
           is_active?: boolean
@@ -3728,6 +3747,7 @@ export type Database = {
           display_price_note?: string | null
           document_checklist?: Json
           duration_minutes?: number | null
+          finance_group?: string | null
           id?: string
           image_url?: string | null
           is_active?: boolean
@@ -4131,7 +4151,75 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      finance_operational_transactions: {
+        Row: {
+          account_id: string | null
+          amount_brl_cents: number | null
+          amount_cents: number | null
+          category_id: string | null
+          commercial_group: string | null
+          commercial_service_id: string | null
+          commercial_service_title: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          description: string | null
+          due_date: string | null
+          fx_date: string | null
+          fx_rate: number | null
+          fx_reference_rate: number | null
+          fx_source: string | null
+          id: string | null
+          is_automatic: boolean | null
+          is_courtesy: boolean | null
+          is_courtesy_deletable: boolean | null
+          notes: string | null
+          operational_status: string | null
+          paid_at: string | null
+          payment_method: string | null
+          period_month: string | null
+          reference_amount_cents: number | null
+          reference_currency: string | null
+          service_id: string | null
+          settled_amount_cents: number | null
+          settled_currency: string | null
+          source_id: string | null
+          source_module: string | null
+          status: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "finance_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_transactions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_transactions_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       crm_automation_control_execution: {
@@ -4270,6 +4358,11 @@ export type Database = {
       finance_save_team_member: {
         Args: { p_actor: string; p_data: Json }
         Returns: string
+      }
+      finance_service_sales_month: { Args: { p_month: string }; Returns: Json }
+      finance_set_manual_service: {
+        Args: { p_actor: string; p_id: string; p_service_id: string }
+        Returns: undefined
       }
       finance_set_payout_rule_services: {
         Args: { p_rule_id: string; p_service_ids: string[] }

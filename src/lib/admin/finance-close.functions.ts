@@ -44,6 +44,7 @@ export type FinanceDashboardData = {
   services: {
     service_id: string | null;
     service_title: string;
+    commercial_group?: string | null;
     sales_count: number;
     paid_count: number;
     pending_count: number;
